@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/book.dart';
 import '../widgets/book_cover_card.dart';
 import '../../../app/theme/colors.dart';
@@ -58,53 +61,79 @@ class _BookshelfViewState extends State<BookshelfView> {
     ),
   ];
 
+  Future<void> _onRefresh() async {
+    // 模拟刷新延迟
+    await Future.delayed(const Duration(seconds: 1));
+    if (mounted) {
+      HapticFeedback.lightImpact(); // iOS 风格刷新反馈
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('书架'),
-        actions: [
-          // 搜索按钮
-          IconButton(icon: const Icon(Icons.search), onPressed: _onSearch),
-          // 视图切换按钮
-          IconButton(
-            icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
-            onPressed: () {
-              setState(() {
-                _isGridView = !_isGridView;
-              });
-            },
-          ),
-          // 更多选项
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: _onMenuSelected,
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'import',
-                child: Row(
-                  children: [
-                    Icon(Icons.file_open, size: 20),
-                    SizedBox(width: 12),
-                    Text('导入本地书籍'),
-                  ],
-                ),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics()), // 强制 iOS 弹性回弹
+        slivers: [
+          SliverAppBar.large(
+            title: const Text('书架'),
+            centerTitle: Platform.isIOS ? false : true, // iOS 大标题默认居左
+            actions: [
+              IconButton(icon: const Icon(Icons.search), onPressed: _onSearch),
+              IconButton(
+                icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
+                onPressed: () {
+                  setState(() {
+                    _isGridView = !_isGridView;
+                  });
+                  if (Platform.isIOS) HapticFeedback.selectionClick();
+                },
               ),
-              const PopupMenuItem(
-                value: 'manage',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 20),
-                    SizedBox(width: 12),
-                    Text('批量管理'),
-                  ],
-                ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: _onMenuSelected,
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'import',
+                    child: Row(
+                      children: [
+                        Icon(Icons.file_open, size: 20),
+                        SizedBox(width: 12),
+                        Text('导入本地书籍'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'manage',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20),
+                        SizedBox(width: 12),
+                        Text('批量管理'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+
+          // iOS 原生下拉刷新
+          if (Platform.isIOS)
+            CupertinoSliverRefreshControl(
+              onRefresh: _onRefresh,
+            ),
+
+          // 内容区域
+          _books.isEmpty
+              ? SliverFillRemaining(child: _buildEmptyState())
+              : _buildSliverContent(),
+
+          // 底部留白，避免被 FAB 或 Navbar 遮挡
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
-      body: _books.isEmpty ? _buildEmptyState() : _buildBookList(),
       floatingActionButton: FloatingActionButton(
         onPressed: _onAddBook,
         backgroundColor: AppColors.accent,
@@ -134,34 +163,31 @@ class _BookshelfViewState extends State<BookshelfView> {
           Text(
             '点击右下角添加书籍',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textMuted.withOpacity(0.7),
-            ),
+                  color: AppColors.textMuted.withOpacity(0.7),
+                ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBookList() {
-    if (_isGridView) {
-      return _buildGridView();
-    } else {
-      return _buildListView();
-    }
+  Widget _buildSliverContent() {
+    return SliverPadding(
+      padding: const EdgeInsets.all(16),
+      sliver: _isGridView ? _buildSliverGrid() : _buildSliverList(),
+    );
   }
 
-  Widget _buildGridView() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 0.55,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-        ),
-        itemCount: _books.length,
-        itemBuilder: (context, index) {
+  Widget _buildSliverGrid() {
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.55,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
           final book = _books[index];
           return BookCoverCard(
             book: book,
@@ -169,19 +195,23 @@ class _BookshelfViewState extends State<BookshelfView> {
             onLongPress: () => _onBookLongPress(book),
           );
         },
+        childCount: _books.length,
       ),
     );
   }
 
-  Widget _buildListView() {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _books.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final book = _books[index];
-        return _buildListItem(book);
-      },
+  Widget _buildSliverList() {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final book = _books[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildListItem(book),
+          );
+        },
+        childCount: _books.length,
+      ),
     );
   }
 
@@ -194,11 +224,12 @@ class _BookshelfViewState extends State<BookshelfView> {
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
+          // 减少阴影浓度，更扁平化
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -267,8 +298,8 @@ class _BookshelfViewState extends State<BookshelfView> {
                       Text(
                         book.progressText,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMuted,
-                        ),
+                              color: AppColors.textMuted,
+                            ),
                       ),
                     ],
                   ),
@@ -282,7 +313,6 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _onSearch() {
-    // TODO: 实现搜索功能
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('搜索功能开发中...')));
@@ -300,27 +330,25 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _onAddBook() {
-    // TODO: 跳转到书源搜索页面
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('添加书籍功能开发中...')));
   }
 
   void _onImportLocal() {
-    // TODO: 导入本地文件
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('导入本地书籍功能开发中...')));
   }
 
   void _onBookTap(Book book) {
-    // TODO: 跳转到阅读页面
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('打开《${book.title}》')));
   }
 
   void _onBookLongPress(Book book) {
+    if (Platform.isIOS) HapticFeedback.mediumImpact();
     // 显示操作菜单
     showModalBottomSheet(
       context: context,
@@ -345,7 +373,6 @@ class _BookshelfViewState extends State<BookshelfView> {
             title: const Text('书籍详情'),
             onTap: () {
               Navigator.pop(context);
-              // TODO: 显示书籍详情
             },
           ),
           ListTile(
@@ -353,7 +380,6 @@ class _BookshelfViewState extends State<BookshelfView> {
             title: const Text('缓存全本'),
             onTap: () {
               Navigator.pop(context);
-              // TODO: 缓存功能
             },
           ),
           ListTile(
