@@ -10,11 +10,13 @@ class TxtParser {
 
   /// 常见章节标题正则 - 按优先级排序
   static final List<RegExp> _chapterPatterns = [
+    // 第1章xxx 格式（阿拉伯数字，章后直接跟标题）
+    RegExp(r'^\s*第\d+章\S.*$', multiLine: true),
     // 第X章、第X节、第X回、第X卷 (中文数字或阿拉伯数字)
     RegExp(r'^\s*第[零一二三四五六七八九十百千万\d]+[章节回卷].*$', multiLine: true),
     // 【第X章】格式
     RegExp(r'^\s*【第[零一二三四五六七八九十百千万\d]+[章节回卷]】.*$', multiLine: true),
-    // 第X章 (宽松匹配，允许前后空格)
+    // 第 X 章 (带空格)
     RegExp(r'^\s*第\s*\d+\s*章.*$', multiLine: true),
     // Chapter X / CHAPTER X
     RegExp(r'^\s*[Cc][Hh][Aa][Pp][Tt][Ee][Rr]\s+\d+.*$', multiLine: true),
