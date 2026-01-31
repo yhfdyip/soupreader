@@ -1,13 +1,18 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors, Slider;
+import 'package:flutter/material.dart'
+    show Colors, Slider, showModalBottomSheet;
 import 'package:flutter/services.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
+import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/typography.dart';
 import '../../bookshelf/models/book.dart';
 import '../models/reading_settings.dart';
+import '../widgets/auto_pager.dart';
+import '../widgets/bookmark_dialog.dart';
+import '../widgets/click_action_config_dialog.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -44,16 +49,36 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   final ScrollController _scrollController = ScrollController();
   bool _isInitialized = false;
 
+  // 书签系统
+  late final BookmarkRepository _bookmarkRepo;
+  bool _hasBookmarkAtCurrent = false;
+
+  // 自动阅读
+  final AutoPager _autoPager = AutoPager();
+  bool _showAutoReadPanel = false;
+
+  // 当前书籍信息
+  String _bookAuthor = '';
+
   @override
   void initState() {
     super.initState();
     _chapterRepo = ChapterRepository(DatabaseService());
     _bookRepo = BookRepository(DatabaseService());
+    _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
     _settings = _settingsService.readingSettings;
 
     _currentChapterIndex = widget.initialChapter;
     _initReader();
+
+    // 初始化自动翻页器
+    _autoPager.setScrollController(_scrollController);
+    _autoPager.setOnNextPage(() {
+      if (_currentChapterIndex < _chapters.length - 1) {
+        _loadChapter(_currentChapterIndex + 1);
+      }
+    });
 
     // 全屏沉浸模式
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -78,6 +103,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void dispose() {
     _saveProgress();
     _scrollController.dispose();
+    _autoPager.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -246,13 +272,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               ),
 
               // 底部状态栏
-              if (_settings.showStatusBar && !_showMenu) _buildStatusBar(),
+              if (_settings.showStatusBar && !_showMenu && !_showAutoReadPanel)
+                _buildStatusBar(),
 
               // 顶部菜单
               if (_showMenu) _buildTopMenu(),
 
               // 底部菜单
               if (_showMenu) _buildBottomMenu(),
+
+              // 自动阅读控制面板
+              if (_showAutoReadPanel)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: AutoReadPanel(
+                    autoPager: _autoPager,
+                    onClose: () {
+                      setState(() {
+                        _showAutoReadPanel = false;
+                      });
+                    },
+                  ),
+                ),
             ],
           ),
         ),
@@ -509,9 +552,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 _buildMenuBtn(
                     CupertinoIcons.list_bullet, '目录', _showChapterList),
                 _buildMenuBtn(
-                    CupertinoIcons.brightness, '亮度', _showBrightnessSheet),
+                    _hasBookmarkAtCurrent
+                        ? CupertinoIcons.bookmark_fill
+                        : CupertinoIcons.bookmark,
+                    '书签',
+                    _showBookmarkDialog),
                 _buildMenuBtn(
-                    CupertinoIcons.textformat_size, '字体', _showFontSheet),
+                    CupertinoIcons.brightness, '亮度', _showBrightnessSheet),
                 _buildMenuBtn(CupertinoIcons.moon, '主题', _showThemeSheet),
               ],
             ),
@@ -521,13 +568,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildMenuBtn(
+                    CupertinoIcons.textformat_size, '字体', _showFontSheet),
+                _buildMenuBtn(
                     CupertinoIcons.book, '翻页', _showPageTurnModeSheet),
                 _buildMenuBtn(
                     CupertinoIcons.slider_horizontal_3, '排版', _showLayoutSheet),
                 _buildMenuBtn(
                     CupertinoIcons.settings, '更多', _showMoreSettingsSheet),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 设置按钮组 - 第三排
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildMenuBtn(
+                    CupertinoIcons.play_circle, '自动', _toggleAutoReadPanel),
+                _buildMenuBtn(CupertinoIcons.square_grid_3x2, '点击',
+                    _showClickActionConfig),
                 _buildMenuBtn(
                     CupertinoIcons.arrow_clockwise, '刷新', _refreshChapter),
+                _buildMenuBtn(
+                    CupertinoIcons.bookmark_fill, '加签', _toggleBookmark),
               ],
             ),
           ],
@@ -1081,6 +1143,83 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
         ],
       ),
+    );
+  }
+
+  /// 显示书签列表
+  void _showBookmarkDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => BookmarkDialog(
+        bookId: widget.bookId,
+        bookName: widget.bookTitle,
+        bookAuthor: _bookAuthor,
+        currentChapter: _currentChapterIndex,
+        currentChapterTitle: _currentTitle,
+        repository: _bookmarkRepo,
+        onJumpTo: (chapterIndex, chapterPos) {
+          _loadChapter(chapterIndex);
+        },
+      ),
+    );
+  }
+
+  /// 切换当前位置的书签
+  Future<void> _toggleBookmark() async {
+    if (_hasBookmarkAtCurrent) {
+      // 删除书签
+      final bookmark =
+          _bookmarkRepo.getBookmarkAt(widget.bookId, _currentChapterIndex, 0);
+      if (bookmark != null) {
+        await _bookmarkRepo.removeBookmark(bookmark.id);
+      }
+    } else {
+      // 添加书签
+      await _bookmarkRepo.addBookmark(
+        bookId: widget.bookId,
+        bookName: widget.bookTitle,
+        bookAuthor: _bookAuthor,
+        chapterIndex: _currentChapterIndex,
+        chapterTitle: _currentTitle,
+        chapterPos: 0,
+        content:
+            _currentContent.substring(0, _currentContent.length.clamp(0, 50)),
+      );
+    }
+    _updateBookmarkStatus();
+  }
+
+  /// 更新书签状态
+  void _updateBookmarkStatus() {
+    setState(() {
+      _hasBookmarkAtCurrent =
+          _bookmarkRepo.hasBookmark(widget.bookId, _currentChapterIndex);
+    });
+  }
+
+  /// 显示自动阅读面板
+  void _toggleAutoReadPanel() {
+    setState(() {
+      _showAutoReadPanel = !_showAutoReadPanel;
+      _showMenu = false;
+      if (_showAutoReadPanel) {
+        _autoPager.start();
+      } else {
+        _autoPager.stop();
+      }
+    });
+  }
+
+  /// 显示点击区域配置
+  void _showClickActionConfig() {
+    showClickActionConfigDialog(
+      context,
+      currentConfig: _settings.clickActions,
+      onSave: (newConfig) {
+        _updateSettings(_settings.copyWith(clickActions: newConfig));
+      },
     );
   }
 
