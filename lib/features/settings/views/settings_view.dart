@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// 设置页面 - 纯 iOS 原生风格
 class SettingsView extends StatefulWidget {
@@ -294,8 +293,6 @@ class _SettingsViewState extends State<SettingsView> {
 
     try {
       final dio = Dio();
-      final prefs = await SharedPreferences.getInstance();
-
       final response = await dio.get(
         'https://github-action-cf.mcshr.workers.dev/latest',
       );
@@ -315,40 +312,20 @@ class _SettingsViewState extends State<SettingsView> {
           return;
         }
 
-        // 版本比较
-        final lastIgnoredTime = prefs.getString('last_ignored_update_time');
-        final lastUpdatedTime = prefs.getString('last_updated_time');
-
-        if (publishedAt != null) {
-          final remoteTime = DateTime.tryParse(publishedAt);
-          if (remoteTime != null) {
-            if (lastIgnoredTime != null) {
-              final ignored = DateTime.tryParse(lastIgnoredTime);
-              if (ignored != null && !remoteTime.isAfter(ignored)) {
-                _showMessage('已是最新版本');
-                return;
-              }
-            }
-            if (lastUpdatedTime != null) {
-              final updated = DateTime.tryParse(lastUpdatedTime);
-              if (updated != null && !remoteTime.isAfter(updated)) {
-                _showMessage('已是最新版本');
-                return;
-              }
-            }
-          }
-        }
-
+        // 格式化发布信息
         String info = name ?? 'Nightly Build';
+        String dateStr = '';
         if (publishedAt != null) {
           try {
-            final date = DateTime.parse(publishedAt);
-            info +=
-                '\n${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+            final date = DateTime.parse(publishedAt).toLocal();
+            dateStr =
+                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+            info += '\n$dateStr';
           } catch (_) {}
         }
 
-        _showUpdateDialog(tag ?? 'nightly', info, downloadUrl, publishedAt);
+        // 显示最新版本信息，让用户决定是否更新
+        _showUpdateInfo(tag ?? 'nightly', info, downloadUrl);
       }
     } catch (e) {
       if (mounted) {
@@ -377,57 +354,29 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _showUpdateDialog(
-      String tag, String body, String url, String? publishedAt) {
+  /// 显示更新信息对话框
+  void _showUpdateInfo(String tag, String info, String downloadUrl) {
     showCupertinoDialog(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text('有新版本 $tag'),
-        content: Text('\n$body'),
+        title: const Text('最新版本'),
+        content: Text('\n$tag\n$info'),
         actions: [
           CupertinoDialogAction(
-            child: const Text('忽略'),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _saveIgnoreTime(publishedAt);
-            },
+            child: const Text('关闭'),
+            onPressed: () => Navigator.pop(dialogContext),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: const Text('更新'),
+            child: const Text('下载'),
             onPressed: () {
               Navigator.pop(dialogContext);
-              _saveUpdateTimeAndLaunch(url, publishedAt);
+              launchUrl(Uri.parse(downloadUrl),
+                  mode: LaunchMode.externalApplication);
             },
           ),
         ],
       ),
     );
-  }
-
-  /// 保存忽略时间
-  Future<void> _saveIgnoreTime(String? publishedAt) async {
-    if (publishedAt == null) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('last_ignored_update_time', publishedAt);
-      debugPrint('已保存忽略时间: $publishedAt');
-    } catch (e) {
-      debugPrint('保存忽略时间失败: $e');
-    }
-  }
-
-  /// 保存更新时间并打开链接
-  Future<void> _saveUpdateTimeAndLaunch(String url, String? publishedAt) async {
-    if (publishedAt != null) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('last_updated_time', publishedAt);
-        debugPrint('已保存更新时间: $publishedAt');
-      } catch (e) {
-        debugPrint('保存更新时间失败: $e');
-      }
-    }
-    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 }
