@@ -44,6 +44,16 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
         continue-on-error: true
 
+      # 禁用 Xcode 代码签名（CI 环境必需）
+      - name: Disable Code Signing
+        run: |
+          # 修改 Xcode 项目配置以禁用签名
+          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' ios/Runner.xcodeproj/project.pbxproj
+          # 添加全局禁用配置
+          echo 'CODE_SIGNING_ALLOWED=NO' >> ios/Flutter/Release.xcconfig
+          echo 'CODE_SIGNING_REQUIRED=NO' >> ios/Flutter/Release.xcconfig
+
       # 构建 iOS（无签名）
       - name: Build iOS (No Codesign)
         run: flutter build ios --release --no-codesign

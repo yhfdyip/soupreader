@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart'
+    show LinearProgressIndicator, AlwaysStoppedAnimation;
 import '../models/book.dart';
 import '../widgets/book_cover_card.dart';
 import '../../../app/theme/colors.dart';
