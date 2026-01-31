@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
+import '../../import/import_service.dart';
+import '../../reader/views/simple_reader_view.dart';
 import '../models/book.dart';
 
 /// 书架页面 - 纯 iOS 原生风格
@@ -14,30 +16,69 @@ class BookshelfView extends StatefulWidget {
 class _BookshelfViewState extends State<BookshelfView> {
   bool _isGridView = true;
   late final BookRepository _bookRepo;
+  late final ImportService _importService;
   List<Book> _books = [];
+  bool _isImporting = false;
 
   @override
   void initState() {
     super.initState();
     _bookRepo = BookRepository(DatabaseService());
+    _importService = ImportService();
     _loadBooks();
   }
 
   void _loadBooks() {
     setState(() {
       _books = _bookRepo.getAllBooks();
+      // 按最后阅读时间排序
+      _books.sort((a, b) {
+        final aTime = a.lastReadTime ?? a.addedTime ?? DateTime(2000);
+        final bTime = b.lastReadTime ?? b.addedTime ?? DateTime(2000);
+        return bTime.compareTo(aTime);
+      });
     });
   }
 
-  Future<void> _addTestBook() async {
-    final book = Book(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: '测试书籍 ${_books.length + 1}',
-      author: '测试作者',
-      addedTime: DateTime.now(),
+  Future<void> _importTxtFile() async {
+    if (_isImporting) return;
+
+    setState(() => _isImporting = true);
+
+    try {
+      final result = await _importService.importTxtFile();
+
+      if (result.success && result.book != null) {
+        _loadBooks();
+        if (mounted) {
+          _showMessage(
+              '导入成功：${result.book!.title}\n共 ${result.chapterCount} 章');
+        }
+      } else if (!result.cancelled && result.errorMessage != null) {
+        if (mounted) {
+          _showMessage('导入失败：${result.errorMessage}');
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('好'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
     );
-    await _bookRepo.addBook(book);
-    _loadBooks();
   }
 
   @override
@@ -47,8 +88,10 @@ class _BookshelfViewState extends State<BookshelfView> {
         middle: const Text('书架'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.add),
-          onPressed: _addTestBook,
+          child: _isImporting
+              ? const CupertinoActivityIndicator()
+              : const Icon(CupertinoIcons.add),
+          onPressed: _isImporting ? null : _importTxtFile,
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -61,11 +104,6 @@ class _BookshelfViewState extends State<BookshelfView> {
                     : CupertinoIcons.square_grid_2x2,
               ),
               onPressed: () => setState(() => _isGridView = !_isGridView),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              child: const Icon(CupertinoIcons.ellipsis_vertical),
-              onPressed: _showMoreOptions,
             ),
           ],
         ),
@@ -94,13 +132,10 @@ class _BookshelfViewState extends State<BookshelfView> {
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '点击左上角 + 添加测试书籍',
-            style: TextStyle(
-              fontSize: 15,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-            ),
+          const SizedBox(height: 24),
+          CupertinoButton.filled(
+            child: const Text('导入本地书籍'),
+            onPressed: _importTxtFile,
           ),
         ],
       ),
@@ -136,7 +171,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Widget _buildBookCard(Book book) {
     return GestureDetector(
-      onTap: () => _onBookTap(book),
+      onTap: () => _openReader(book),
       onLongPress: () => _onBookLongPress(book),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,9 +213,11 @@ class _BookshelfViewState extends State<BookshelfView> {
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 2),
-          // 进度
+          // 作者
           Text(
-            book.progressText,
+            book.author,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
@@ -206,57 +243,38 @@ class _BookshelfViewState extends State<BookshelfView> {
               color: CupertinoColors.systemGrey5.resolveFrom(context),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: book.coverUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(book.coverUrl!, fit: BoxFit.cover),
-                  )
-                : Center(
-                    child: Text(
-                      book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
-                      style: TextStyle(
-                        color:
-                            CupertinoColors.secondaryLabel.resolveFrom(context),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
+            child: Center(
+              child: Text(
+                book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
+                style: TextStyle(
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
           ),
           title: Text(book.title),
-          subtitle: Text(book.author),
-          additionalInfo: Text(book.progressText),
+          subtitle: Text('${book.author} · ${book.totalChapters}章'),
           trailing: const CupertinoListTileChevron(),
-          onTap: () => _onBookTap(book),
+          onTap: () => _openReader(book),
         );
       },
     );
   }
 
-  void _showMoreOptions() {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('导入本地书籍'),
-            onPressed: () => Navigator.pop(context),
+  void _openReader(Book book) {
+    Navigator.of(context, rootNavigator: true)
+        .push(
+          CupertinoPageRoute(
+            builder: (context) => SimpleReaderView(
+              bookId: book.id,
+              bookTitle: book.title,
+              initialChapter: book.currentChapter,
+            ),
           ),
-          CupertinoActionSheetAction(
-            child: const Text('批量管理'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-    );
-  }
-
-  void _onBookTap(Book book) {
-    // TODO: 跳转到阅读页面
+        )
+        .then((_) => _loadBooks()); // 返回时刷新列表
   }
 
   void _onBookLongPress(Book book) {
@@ -267,11 +285,10 @@ class _BookshelfViewState extends State<BookshelfView> {
         actions: [
           CupertinoActionSheetAction(
             child: const Text('书籍详情'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('缓存全本'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _showBookInfo(book);
+            },
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
@@ -287,6 +304,23 @@ class _BookshelfViewState extends State<BookshelfView> {
           child: const Text('取消'),
           onPressed: () => Navigator.pop(context),
         ),
+      ),
+    );
+  }
+
+  void _showBookInfo(Book book) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text(book.title),
+        content: Text(
+            '\n作者：${book.author}\n章节：${book.totalChapters}章\n${book.isLocal ? '来源：本地导入' : ''}'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('好'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
     );
   }
