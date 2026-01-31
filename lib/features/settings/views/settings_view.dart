@@ -388,33 +388,46 @@ class _SettingsViewState extends State<SettingsView> {
           CupertinoDialogAction(
             child: const Text('忽略'),
             onPressed: () {
-              // 先关闭对话框
               Navigator.pop(dialogContext);
-              // 再保存忽略时间
-              if (publishedAt != null) {
-                SharedPreferences.getInstance().then((prefs) {
-                  prefs.setString('last_ignored_update_time', publishedAt);
-                });
-              }
+              _saveIgnoreTime(publishedAt);
             },
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             child: const Text('更新'),
             onPressed: () {
-              // 先关闭对话框
               Navigator.pop(dialogContext);
-              // 保存更新时间并打开链接
-              if (publishedAt != null) {
-                SharedPreferences.getInstance().then((prefs) {
-                  prefs.setString('last_updated_time', publishedAt);
-                });
-              }
-              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+              _saveUpdateTimeAndLaunch(url, publishedAt);
             },
           ),
         ],
       ),
     );
+  }
+
+  /// 保存忽略时间
+  Future<void> _saveIgnoreTime(String? publishedAt) async {
+    if (publishedAt == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_ignored_update_time', publishedAt);
+      debugPrint('已保存忽略时间: $publishedAt');
+    } catch (e) {
+      debugPrint('保存忽略时间失败: $e');
+    }
+  }
+
+  /// 保存更新时间并打开链接
+  Future<void> _saveUpdateTimeAndLaunch(String url, String? publishedAt) async {
+    if (publishedAt != null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_updated_time', publishedAt);
+        debugPrint('已保存更新时间: $publishedAt');
+      } catch (e) {
+        debugPrint('保存更新时间失败: $e');
+      }
+    }
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 }
