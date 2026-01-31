@@ -381,29 +381,35 @@ class _SettingsViewState extends State<SettingsView> {
       String tag, String body, String url, String? publishedAt) {
     showCupertinoDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Text('有新版本 $tag'),
         content: Text('\n$body'),
         actions: [
           CupertinoDialogAction(
             child: const Text('忽略'),
-            onPressed: () async {
+            onPressed: () {
+              // 先关闭对话框
+              Navigator.pop(dialogContext);
+              // 再保存忽略时间
               if (publishedAt != null) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('last_ignored_update_time', publishedAt);
+                SharedPreferences.getInstance().then((prefs) {
+                  prefs.setString('last_ignored_update_time', publishedAt);
+                });
               }
-              if (mounted) Navigator.pop(context);
             },
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             child: const Text('更新'),
-            onPressed: () async {
+            onPressed: () {
+              // 先关闭对话框
+              Navigator.pop(dialogContext);
+              // 保存更新时间并打开链接
               if (publishedAt != null) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('last_updated_time', publishedAt);
+                SharedPreferences.getInstance().then((prefs) {
+                  prefs.setString('last_updated_time', publishedAt);
+                });
               }
-              if (mounted) Navigator.pop(context);
               launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
             },
           ),
