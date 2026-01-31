@@ -205,27 +205,12 @@ class _BookshelfViewState extends State<BookshelfView> {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w500),
-                ),
-              ),
-              if (book.readProgress > 0)
-                Text(
-                  ' ${(book.readProgress * 100).toInt()}%',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: CupertinoColors.activeBlue.withOpacity(0.8),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-            ],
+          // 标题
+          Text(
+            book.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 2),
           // 作者
@@ -270,8 +255,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             ),
           ),
           title: Text(book.title),
-          subtitle: Text(
-              '${book.author} · ${book.totalChapters}章${book.readProgress > 0 ? ' · 已读 ${(book.readProgress * 100).toInt()}%' : ''}'),
+          subtitle: Text('${book.author} · ${book.totalChapters}章'),
           trailing: const CupertinoListTileChevron(),
           onTap: () => _openReader(book),
         );

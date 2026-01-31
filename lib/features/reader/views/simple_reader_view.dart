@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors, Curves;
+import 'package:flutter/material.dart' show Colors, Slider;
 import 'package:flutter/services.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
+import '../../../app/theme/colors.dart';
+import '../../../app/theme/typography.dart';
 import '../../bookshelf/models/book.dart';
 import '../models/reading_settings.dart';
 
@@ -126,12 +128,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await _saveProgress();
   }
 
-  /// 切换主题
+  /// 更新设置
   void _updateSettings(ReadingSettings newSettings) {
     setState(() {
       _settings = newSettings;
     });
     _settingsService.saveReadingSettings(newSettings);
+  }
+
+  /// 获取当前主题
+  ReadingThemeColors get _currentTheme {
+    final index = _settings.themeIndex;
+    if (index >= 0 && index < AppColors.readingThemes.length) {
+      return AppColors.readingThemes[index];
+    }
+    return AppColors.readingThemes[0];
+  }
+
+  /// 获取当前字体
+  String? get _currentFontFamily {
+    final family = ReadingFontFamily.getFontFamily(_settings.fontFamilyIndex);
+    return family.isEmpty ? null : family;
   }
 
   /// 左右点击翻页处理
@@ -188,66 +205,184 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  /// 获取当前时间字符串
+  String _getCurrentTime() {
+    final now = DateTime.now();
+    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 计算章节内进度
+  double _getChapterProgress() {
+    if (!_scrollController.hasClients) return 0;
+    final max = _scrollController.position.maxScrollExtent;
+    if (max <= 0) return 1.0;
+    return (_scrollController.offset / max).clamp(0.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const CupertinoPageScaffold(
-        child: Center(child: CupertinoActivityIndicator()),
+      return CupertinoPageScaffold(
+        backgroundColor: _currentTheme.background,
+        child: const Center(child: CupertinoActivityIndicator()),
       );
     }
 
-    final theme = ReaderTheme.values[_settings.themeIndex];
+    // 获取屏幕尺寸，确保固定全屏布局
+    final screenSize = MediaQuery.of(context).size;
 
     return CupertinoPageScaffold(
-      backgroundColor: theme.backgroundColor,
+      backgroundColor: _currentTheme.background,
       child: GestureDetector(
         onTapUp: _handleTap,
-        child: Stack(
-          children: [
-            // 阅读内容
-            SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: _settings.padding,
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
-                      Text(
-                        _currentTitle,
-                        style: TextStyle(
-                          fontSize: _settings.fontSize + 6,
-                          fontWeight: FontWeight.bold,
-                          color: theme.textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      Text(
-                        _currentContent,
-                        style: TextStyle(
-                          fontSize: _settings.fontSize,
-                          height: _settings.lineHeight,
-                          color: theme.textColor,
-                          letterSpacing: _settings.letterSpacing,
-                        ),
-                      ),
-                      const SizedBox(height: 100),
-                      _buildChapterNav(theme.textColor),
-                      const SizedBox(height: 60),
-                    ],
+        child: SizedBox(
+          width: screenSize.width,
+          height: screenSize.height,
+          child: Stack(
+            children: [
+              // 阅读内容 - 固定全屏
+              Positioned.fill(
+                child: _buildReadingContent(),
+              ),
+
+              // 底部状态栏
+              if (_settings.showStatusBar && !_showMenu) _buildStatusBar(),
+
+              // 顶部菜单
+              if (_showMenu) _buildTopMenu(),
+
+              // 底部菜单
+              if (_showMenu) _buildBottomMenu(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadingContent() {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: _settings.marginHorizontal,
+          right: _settings.marginHorizontal,
+          top: _settings.marginVertical,
+          bottom: _settings.showStatusBar ? 30 : _settings.marginVertical,
+        ),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollUpdateNotification) {
+              setState(() {}); // 更新进度显示
+            }
+            return false;
+          },
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                // 章节标题
+                Text(
+                  _currentTitle,
+                  style: TextStyle(
+                    fontSize: _settings.fontSize + 6,
+                    fontWeight: FontWeight.bold,
+                    color: _currentTheme.text,
+                    fontFamily: _currentFontFamily,
                   ),
+                ),
+                SizedBox(height: _settings.paragraphSpacing * 1.5),
+                // 正文内容
+                _buildFormattedContent(),
+                const SizedBox(height: 60),
+                _buildChapterNav(_currentTheme.text),
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建格式化的正文内容（支持段落间距）
+  Widget _buildFormattedContent() {
+    // 按段落分割
+    final paragraphs = _currentContent.split(RegExp(r'\n\s*\n|\n'));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: paragraphs.map((paragraph) {
+        final trimmed = paragraph.trim();
+        if (trimmed.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
+          child: Text(
+            '　　$trimmed', // 首行缩进两个中文字符
+            style: TextStyle(
+              fontSize: _settings.fontSize,
+              height: _settings.lineHeight,
+              color: _currentTheme.text,
+              letterSpacing: _settings.letterSpacing,
+              fontFamily: _currentFontFamily,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// 底部状态栏
+  Widget _buildStatusBar() {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 4,
+          top: 4,
+          left: _settings.marginHorizontal,
+          right: _settings.marginHorizontal,
+        ),
+        color: _currentTheme.background,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // 时间
+            if (_settings.showTime)
+              Text(
+                _getCurrentTime(),
+                style: TextStyle(
+                  color: _currentTheme.text.withValues(alpha: 0.4),
+                  fontSize: 11,
+                ),
+              ),
+            // 章节标题（缩略）
+            Expanded(
+              child: Text(
+                _currentTitle,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _currentTheme.text.withValues(alpha: 0.4),
+                  fontSize: 11,
                 ),
               ),
             ),
-
-            // 顶部菜单
-            if (_showMenu) _buildTopMenu(),
-
-            // 底部菜单
-            if (_showMenu) _buildBottomMenu(),
+            // 进度
+            if (_settings.showProgress)
+              Text(
+                '${(_getChapterProgress() * 100).toStringAsFixed(0)}%',
+                style: TextStyle(
+                  color: _currentTheme.text.withValues(alpha: 0.4),
+                  fontSize: 11,
+                ),
+              ),
           ],
         ),
       ),
@@ -261,18 +396,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         if (_currentChapterIndex > 0)
           CupertinoButton(
             padding: EdgeInsets.zero,
-            child: Text('← 上一章',
-                style: TextStyle(color: textColor.withOpacity(0.6))),
             onPressed: () => _loadChapter(_currentChapterIndex - 1),
+            child: Text('← 上一章',
+                style: TextStyle(color: textColor.withValues(alpha: 0.6))),
           )
         else
           const SizedBox(),
         if (_currentChapterIndex < _chapters.length - 1)
           CupertinoButton(
             padding: EdgeInsets.zero,
-            child: Text('下一章 →',
-                style: TextStyle(color: textColor.withOpacity(0.6))),
             onPressed: () => _loadChapter(_currentChapterIndex + 1),
+            child: Text('下一章 →',
+                style: TextStyle(color: textColor.withValues(alpha: 0.6))),
           )
         else
           const SizedBox(),
@@ -288,16 +423,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: Container(
         padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
         decoration: BoxDecoration(
-          color: CupertinoColors.black.withOpacity(0.85),
+          color: CupertinoColors.black.withValues(alpha: 0.85),
         ),
         child: CupertinoNavigationBar(
           backgroundColor: CupertinoColors.transparent,
           border: null,
           leading: CupertinoButton(
             padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(context),
             child:
                 const Icon(CupertinoIcons.back, color: CupertinoColors.white),
-            onPressed: () => Navigator.pop(context),
           ),
           middle: Text(
             widget.bookTitle,
@@ -306,9 +441,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
           trailing: CupertinoButton(
             padding: EdgeInsets.zero,
+            onPressed: _showChapterList,
             child: const Icon(CupertinoIcons.list_bullet,
                 color: CupertinoColors.white),
-            onPressed: _showChapterList,
           ),
         ),
       ),
@@ -323,26 +458,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).padding.bottom + 10,
-          top: 20,
+          top: 16,
         ),
         decoration: BoxDecoration(
-          color: CupertinoColors.black.withOpacity(0.85),
+          color: CupertinoColors.black.withValues(alpha: 0.85),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 进度滑条 (模拟进度)
+            // 进度滑条
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
                   CupertinoButton(
                     padding: EdgeInsets.zero,
-                    child: const Icon(CupertinoIcons.chevron_left,
-                        color: CupertinoColors.white, size: 20),
                     onPressed: _currentChapterIndex > 0
                         ? () => _loadChapter(_currentChapterIndex - 1)
                         : null,
+                    child: const Icon(CupertinoIcons.chevron_left,
+                        color: CupertinoColors.white, size: 20),
                   ),
                   Expanded(
                     child: Column(
@@ -357,25 +492,42 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   ),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
-                    child: const Icon(CupertinoIcons.chevron_right,
-                        color: CupertinoColors.white, size: 20),
                     onPressed: _currentChapterIndex < _chapters.length - 1
                         ? () => _loadChapter(_currentChapterIndex + 1)
                         : null,
+                    child: const Icon(CupertinoIcons.chevron_right,
+                        color: CupertinoColors.white, size: 20),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-            // 设置按钮组
+            const SizedBox(height: 12),
+            // 设置按钮组 - 第一排
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildMenuBtn(
-                    CupertinoIcons.textformat_size, '样式', _showStyleSheet),
+                    CupertinoIcons.list_bullet, '目录', _showChapterList),
                 _buildMenuBtn(
                     CupertinoIcons.brightness, '亮度', _showBrightnessSheet),
-                _buildMenuBtn(CupertinoIcons.square_grid_2x2, '更多', () {}),
+                _buildMenuBtn(
+                    CupertinoIcons.textformat_size, '字体', _showFontSheet),
+                _buildMenuBtn(CupertinoIcons.moon, '主题', _showThemeSheet),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 设置按钮组 - 第二排
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildMenuBtn(
+                    CupertinoIcons.book, '翻页', _showPageTurnModeSheet),
+                _buildMenuBtn(
+                    CupertinoIcons.slider_horizontal_3, '排版', _showLayoutSheet),
+                _buildMenuBtn(
+                    CupertinoIcons.settings, '更多', _showMoreSettingsSheet),
+                _buildMenuBtn(
+                    CupertinoIcons.arrow_clockwise, '刷新', _refreshChapter),
               ],
             ),
           ],
@@ -387,19 +539,29 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Widget _buildMenuBtn(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        children: [
-          Icon(icon, color: CupertinoColors.white, size: 24),
-          const SizedBox(height: 6),
-          Text(label,
-              style:
-                  const TextStyle(color: CupertinoColors.white, fontSize: 12)),
-        ],
+      child: SizedBox(
+        width: 60,
+        child: Column(
+          children: [
+            Icon(icon, color: CupertinoColors.white, size: 22),
+            const SizedBox(height: 4),
+            Text(label,
+                style: const TextStyle(
+                    color: CupertinoColors.white, fontSize: 11)),
+          ],
+        ),
       ),
     );
   }
 
-  void _showStyleSheet() {
+  /// 刷新当前章节
+  void _refreshChapter() {
+    _loadChapter(_currentChapterIndex);
+    setState(() => _showMenu = false);
+  }
+
+  /// 显示亮度调节
+  void _showBrightnessSheet() {
     showCupertinoModalPopup(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -415,54 +577,239 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('字体大小',
-                    style: TextStyle(color: Colors.white, fontSize: 14)),
-                _buildSizeAdjuster((val) {
-                  _updateSettings(
-                      _settings.copyWith(fontSize: _settings.fontSize + val));
-                  setPopupState(() {});
-                }, _settings.fontSize.toInt()),
+                const Text('亮度调节',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
-                const Text('行高间距',
-                    style: TextStyle(color: Colors.white, fontSize: 14)),
-                _buildLineHeightAdjuster((val) {
-                  _updateSettings(_settings.copyWith(
-                      lineHeight:
-                          (_settings.lineHeight + val).clamp(1.2, 3.0)));
-                  setPopupState(() {});
-                }, _settings.lineHeight),
-                const SizedBox(height: 20),
-                const Text('阅读背景',
-                    style: TextStyle(color: Colors.white, fontSize: 14)),
-                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(CupertinoIcons.sun_min,
+                        color: Colors.white54, size: 20),
+                    Expanded(
+                      child: Slider(
+                        value: _settings.brightness,
+                        min: 0.1,
+                        max: 1.0,
+                        activeColor: CupertinoColors.activeBlue,
+                        inactiveColor: Colors.white24,
+                        onChanged: (value) {
+                          _updateSettings(
+                              _settings.copyWith(brightness: value));
+                          setPopupState(() {});
+                        },
+                      ),
+                    ),
+                    const Icon(CupertinoIcons.sun_max_fill,
+                        color: Colors.white, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: ReaderTheme.values
-                      .map((t) => GestureDetector(
-                            onTap: () {
-                              _updateSettings(
-                                  _settings.copyWith(themeIndex: t.index));
-                              setPopupState(() {});
-                            },
-                            child: Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: t.backgroundColor,
-                                shape: BoxShape.circle,
-                                border: _settings.themeIndex == t.index
-                                    ? Border.all(
-                                        color: CupertinoColors.activeBlue,
-                                        width: 3)
-                                    : Border.all(color: Colors.white24),
-                              ),
-                              child: t.index == 3
-                                  ? const Icon(CupertinoIcons.moon_fill,
-                                      size: 16, color: Colors.white)
-                                  : null,
+                  children: [
+                    const Text('跟随系统',
+                        style: TextStyle(color: Colors.white, fontSize: 16)),
+                    CupertinoSwitch(
+                      value: _settings.useSystemBrightness,
+                      activeTrackColor: CupertinoColors.activeBlue,
+                      onChanged: (value) {
+                        _updateSettings(
+                            _settings.copyWith(useSystemBrightness: value));
+                        setPopupState(() {});
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '注：亮度调节功能需要原生插件支持',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 显示字体设置
+  void _showFontSheet() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPopupState) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('字体设置',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                // 字体大小
+                const Text('字体大小',
+                    style: TextStyle(color: Colors.white70, fontSize: 14)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      onPressed: () {
+                        if (_settings.fontSize > 12) {
+                          _updateSettings(_settings.copyWith(
+                              fontSize: _settings.fontSize - 2));
+                          setPopupState(() {});
+                        }
+                      },
+                      child: const Text('A-',
+                          style: TextStyle(color: Colors.white, fontSize: 18)),
+                    ),
+                    Expanded(
+                      child: Slider(
+                        value: _settings.fontSize,
+                        min: 12,
+                        max: 32,
+                        divisions: 10,
+                        activeColor: CupertinoColors.activeBlue,
+                        inactiveColor: Colors.white24,
+                        onChanged: (value) {
+                          _updateSettings(_settings.copyWith(fontSize: value));
+                          setPopupState(() {});
+                        },
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      onPressed: () {
+                        if (_settings.fontSize < 32) {
+                          _updateSettings(_settings.copyWith(
+                              fontSize: _settings.fontSize + 2));
+                          setPopupState(() {});
+                        }
+                      },
+                      child: const Text('A+',
+                          style: TextStyle(color: Colors.white, fontSize: 18)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // 字体选择
+                const Text('字体',
+                    style: TextStyle(color: Colors.white70, fontSize: 14)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children:
+                      List.generate(ReadingFontFamily.presets.length, (index) {
+                    final font = ReadingFontFamily.presets[index];
+                    final isSelected = _settings.fontFamilyIndex == index;
+                    return GestureDetector(
+                      onTap: () {
+                        _updateSettings(
+                            _settings.copyWith(fontFamilyIndex: index));
+                        setPopupState(() {});
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? CupertinoColors.activeBlue
+                              : Colors.white12,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          font.name,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 显示主题选择
+  void _showThemeSheet() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPopupState) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('阅读主题',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children:
+                      List.generate(AppColors.readingThemes.length, (index) {
+                    final theme = AppColors.readingThemes[index];
+                    final isSelected = _settings.themeIndex == index;
+                    return GestureDetector(
+                      onTap: () {
+                        _updateSettings(_settings.copyWith(themeIndex: index));
+                        setPopupState(() {});
+                      },
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: theme.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: isSelected
+                              ? Border.all(
+                                  color: CupertinoColors.activeBlue, width: 3)
+                              : Border.all(color: Colors.white24),
+                        ),
+                        child: Center(
+                          child: Text(
+                            theme.name,
+                            style: TextStyle(
+                              color: theme.text,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                             ),
-                          ))
-                      .toList(),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -473,47 +820,266 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Widget _buildSizeAdjuster(Function(double) onChange, int current) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        CupertinoButton(
-            child: const Text('A-', style: TextStyle(color: Colors.white)),
-            onPressed: () => onChange(-2)),
-        Text('$current',
-            style: const TextStyle(color: Colors.white, fontSize: 18)),
-        CupertinoButton(
-            child: const Text('A+', style: TextStyle(color: Colors.white)),
-            onPressed: () => onChange(2)),
-      ],
-    );
-  }
-
-  Widget _buildLineHeightAdjuster(Function(double) onChange, double current) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        CupertinoButton(
-            child: const Icon(CupertinoIcons.minus, color: Colors.white),
-            onPressed: () => onChange(-0.2)),
-        Text(current.toStringAsFixed(1),
-            style: const TextStyle(color: Colors.white, fontSize: 18)),
-        CupertinoButton(
-            child: const Icon(CupertinoIcons.plus, color: Colors.white),
-            onPressed: () => onChange(0.2)),
-      ],
-    );
-  }
-
-  void _showBrightnessSheet() {
-    // 暂未实现完整系统亮度调节，仅展示占位
+  /// 显示翻页方式选择
+  void _showPageTurnModeSheet() {
     showCupertinoModalPopup(
       context: context,
-      builder: (context) => Container(
-        height: 150,
-        color: const Color(0xFF1C1C1E),
-        child: const Center(
-            child: Text('亮度调节功能开发中...', style: TextStyle(color: Colors.white))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPopupState) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('翻页方式',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: PageTurnMode.values.map((mode) {
+                    final isSelected = _settings.pageTurnMode == mode;
+                    return GestureDetector(
+                      onTap: () {
+                        _updateSettings(_settings.copyWith(pageTurnMode: mode));
+                        setPopupState(() {});
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? CupertinoColors.activeBlue
+                              : Colors.white12,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(mode.icon,
+                                color:
+                                    isSelected ? Colors.white : Colors.white70,
+                                size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              mode.name,
+                              style: TextStyle(
+                                color:
+                                    isSelected ? Colors.white : Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '注：目前仅支持滚动模式，其他翻页模式开发中',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 显示排版设置
+  void _showLayoutSheet() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPopupState) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('排版设置',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                // 行距
+                _buildSliderRow(
+                  '行距',
+                  _settings.lineHeight,
+                  1.2,
+                  3.0,
+                  (value) {
+                    _updateSettings(_settings.copyWith(lineHeight: value));
+                    setPopupState(() {});
+                  },
+                  displayValue: _settings.lineHeight.toStringAsFixed(1),
+                ),
+                const SizedBox(height: 16),
+                // 段距
+                _buildSliderRow(
+                  '段落间距',
+                  _settings.paragraphSpacing,
+                  0,
+                  48,
+                  (value) {
+                    _updateSettings(
+                        _settings.copyWith(paragraphSpacing: value));
+                    setPopupState(() {});
+                  },
+                  displayValue: '${_settings.paragraphSpacing.toInt()}',
+                ),
+                const SizedBox(height: 16),
+                // 左右边距
+                _buildSliderRow(
+                  '左右边距',
+                  _settings.marginHorizontal,
+                  8,
+                  48,
+                  (value) {
+                    _updateSettings(
+                        _settings.copyWith(marginHorizontal: value));
+                    setPopupState(() {});
+                  },
+                  displayValue: '${_settings.marginHorizontal.toInt()}',
+                ),
+                const SizedBox(height: 16),
+                // 上下边距
+                _buildSliderRow(
+                  '上下边距',
+                  _settings.marginVertical,
+                  8,
+                  48,
+                  (value) {
+                    _updateSettings(_settings.copyWith(marginVertical: value));
+                    setPopupState(() {});
+                  },
+                  displayValue: '${_settings.marginVertical.toInt()}',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSliderRow(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged, {
+    String? displayValue,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            Text(displayValue ?? value.toString(),
+                style: const TextStyle(color: Colors.white, fontSize: 14)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          activeColor: CupertinoColors.activeBlue,
+          inactiveColor: Colors.white24,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  /// 显示更多设置
+  void _showMoreSettingsSheet() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPopupState) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Row(
+                  children: [
+                    Text('更多设置',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildSwitchRow('显示状态栏', _settings.showStatusBar, (value) {
+                  _updateSettings(_settings.copyWith(showStatusBar: value));
+                  setPopupState(() {});
+                }),
+                _buildSwitchRow('显示时间', _settings.showTime, (value) {
+                  _updateSettings(_settings.copyWith(showTime: value));
+                  setPopupState(() {});
+                }),
+                _buildSwitchRow('显示进度', _settings.showProgress, (value) {
+                  _updateSettings(_settings.copyWith(showProgress: value));
+                  setPopupState(() {});
+                }),
+                _buildSwitchRow('屏幕常亮', _settings.keepScreenOn, (value) {
+                  _updateSettings(_settings.copyWith(keepScreenOn: value));
+                  setPopupState(() {});
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow(
+      String label, bool value, ValueChanged<bool> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: const TextStyle(color: Colors.white, fontSize: 16)),
+          CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeTrackColor: CupertinoColors.activeBlue,
+          ),
+        ],
       ),
     );
   }
@@ -566,44 +1132,5 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         ),
       ),
     );
-  }
-}
-
-/// 阅读器主题定义
-enum ReaderTheme {
-  dark,
-  beige,
-  green,
-  black,
-  contrast;
-
-  Color get backgroundColor {
-    switch (this) {
-      case ReaderTheme.dark:
-        return const Color(0xFF1C1C1E);
-      case ReaderTheme.beige:
-        return const Color(0xFFF5F5DC);
-      case ReaderTheme.green:
-        return const Color(0xFFE3EDCD);
-      case ReaderTheme.black:
-        return const Color(0xFF000000);
-      case ReaderTheme.contrast:
-        return const Color(0xFFFFFFFF);
-    }
-  }
-
-  Color get textColor {
-    switch (this) {
-      case ReaderTheme.dark:
-        return const Color(0xFFE5E5E7);
-      case ReaderTheme.beige:
-        return const Color(0xFF2C2C2E);
-      case ReaderTheme.green:
-        return const Color(0xFF2C2C2E);
-      case ReaderTheme.black:
-        return const Color(0xFF999999);
-      case ReaderTheme.contrast:
-        return const Color(0xFF111111);
-    }
   }
 }

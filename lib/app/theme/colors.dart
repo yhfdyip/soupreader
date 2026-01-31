@@ -58,6 +58,34 @@ class AppColors {
     name: '深蓝',
   );
 
+  /// 奶酪模式（温暖护眼）
+  static const ReadingThemeColors creamTheme = ReadingThemeColors(
+    background: Color(0xFFFFF8E1),
+    text: Color(0xFF3E2723),
+    name: '奶酪',
+  );
+
+  /// 薄荷模式（清新护眼）
+  static const ReadingThemeColors mintTheme = ReadingThemeColors(
+    background: Color(0xFFE0F2F1),
+    text: Color(0xFF004D40),
+    name: '薄荷',
+  );
+
+  /// 玫瑰模式（柔和浪漫）
+  static const ReadingThemeColors roseTheme = ReadingThemeColors(
+    background: Color(0xFFFCE4EC),
+    text: Color(0xFF880E4F),
+    name: '玫瑰',
+  );
+
+  /// AMOLED 纯黑模式（省电）
+  static const ReadingThemeColors amoledTheme = ReadingThemeColors(
+    background: Color(0xFF000000),
+    text: Color(0xFFAAAAAA),
+    name: '纯黑',
+  );
+
   /// 所有阅读主题
   static const List<ReadingThemeColors> readingThemes = [
     dayTheme,
@@ -65,6 +93,10 @@ class AppColors {
     sepiaTheme,
     inkTheme,
     midnightTheme,
+    creamTheme,
+    mintTheme,
+    roseTheme,
+    amoledTheme,
   ];
 
   // ===== 功能色 =====

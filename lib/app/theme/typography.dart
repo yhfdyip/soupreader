@@ -164,3 +164,39 @@ class ReadingFontSize {
     }
   }
 }
+
+/// 阅读字体预设
+class ReadingFontFamily {
+  static const String system = ''; // 系统默认
+  static const String notoSerif = 'NotoSerifTC';
+  static const String notoSans = 'NotoSansTC';
+  static const String sourceHanMono = 'SourceHanMono';
+
+  static const List<ReadingFontConfig> presets = [
+    ReadingFontConfig(name: '系统默认', fontFamily: system),
+    ReadingFontConfig(name: '思源宋体', fontFamily: notoSerif),
+    ReadingFontConfig(name: '思源黑体', fontFamily: notoSans),
+    ReadingFontConfig(name: '等宽字体', fontFamily: sourceHanMono),
+  ];
+
+  static String getFontFamily(int index) {
+    if (index < 0 || index >= presets.length) return system;
+    return presets[index].fontFamily;
+  }
+
+  static String getFontName(int index) {
+    if (index < 0 || index >= presets.length) return '系统默认';
+    return presets[index].name;
+  }
+}
+
+/// 字体配置
+class ReadingFontConfig {
+  final String name;
+  final String fontFamily;
+
+  const ReadingFontConfig({
+    required this.name,
+    required this.fontFamily,
+  });
+}
