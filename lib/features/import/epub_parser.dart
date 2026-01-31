@@ -94,9 +94,9 @@ class EpubParser {
       if (idRef == null) continue;
 
       // 查找对应的 manifest item
-      final manifestItem = manifest.values.firstWhere(
+      final manifestItem = manifest.firstWhere(
         (item) => item.Id == idRef,
-        orElse: () => manifest.values.first,
+        orElse: () => manifest.first,
       );
 
       // 获取HTML内容
@@ -118,7 +118,8 @@ class EpubParser {
       if (tocItems != null) {
         for (final tocItem in tocItems) {
           if (tocItem.Content?.Source?.contains(href) == true) {
-            chapterTitle = tocItem.NavLabels?.first?.Text ?? chapterTitle;
+            chapterTitle =
+                tocItem.NavigationLabels?.first?.Text ?? chapterTitle;
             break;
           }
         }
