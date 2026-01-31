@@ -23,6 +23,7 @@ class SimpleReaderView extends StatefulWidget {
 
 class _SimpleReaderViewState extends State<SimpleReaderView> {
   late final ChapterRepository _chapterRepo;
+  late final BookRepository _bookRepo;
   List<Chapter> _chapters = [];
   int _currentChapterIndex = 0;
   String _currentContent = '';
@@ -40,6 +41,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void initState() {
     super.initState();
     _chapterRepo = ChapterRepository(DatabaseService());
+    _bookRepo = BookRepository(DatabaseService());
     _currentChapterIndex = widget.initialChapter;
     _loadChapters();
 
@@ -49,14 +51,35 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   @override
   void dispose() {
+    // 保存阅读进度
+    _saveProgress();
     _scrollController.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
+  /// 保存阅读进度
+  Future<void> _saveProgress() async {
+    if (_chapters.isEmpty) return;
+
+    final progress = _chapters.isNotEmpty
+        ? (_currentChapterIndex + 1) / _chapters.length
+        : 0.0;
+
+    await _bookRepo.updateReadProgress(
+      widget.bookId,
+      currentChapter: _currentChapterIndex,
+      readProgress: progress,
+    );
+  }
+
   void _loadChapters() {
     _chapters = _chapterRepo.getChaptersForBook(widget.bookId);
     if (_chapters.isNotEmpty) {
+      // 确保 initialChapter 在有效范围内
+      if (_currentChapterIndex >= _chapters.length) {
+        _currentChapterIndex = 0;
+      }
       _loadChapter(_currentChapterIndex);
     }
   }
@@ -71,12 +94,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     });
 
     _scrollController.jumpTo(0);
+
+    // 切换章节时保存进度
+    _saveProgress();
   }
 
   @override
   Widget build(BuildContext context) {
     final bgColor =
-        _isDarkMode ? const Color(0xFF1C1C1E) : const Color(0xFFF5F5DC); // 米色
+        _isDarkMode ? const Color(0xFF1C1C1E) : const Color(0xFFF5F5DC);
     final textColor =
         _isDarkMode ? const Color(0xFFE5E5E7) : const Color(0xFF2C2C2E);
 
@@ -203,6 +229,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Widget _buildBottomMenu() {
+    final progress = _chapters.isNotEmpty
+        ? ((_currentChapterIndex + 1) / _chapters.length * 100)
+            .toStringAsFixed(0)
+        : '0';
+
     return Positioned(
       bottom: 0,
       left: 0,
@@ -222,7 +253,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           children: [
             // 进度显示
             Text(
-              '${_currentChapterIndex + 1} / ${_chapters.length}',
+              '${_currentChapterIndex + 1} / ${_chapters.length}  ($progress%)',
               style: TextStyle(
                 color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 fontSize: 13,
