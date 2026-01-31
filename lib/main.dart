@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'core/database/database_service.dart';
+import 'core/services/settings_service.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
 import 'features/source/views/source_list_view.dart';
 import 'features/settings/views/settings_view.dart';
@@ -13,6 +14,9 @@ void main() async {
 
   // 初始化数据库
   await DatabaseService().init();
+
+  // 初始化全局设置
+  await SettingsService().init();
 
   runApp(const SoupReaderApp());
 }
