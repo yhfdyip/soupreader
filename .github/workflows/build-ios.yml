@@ -45,9 +45,8 @@ jobs:
         continue-on-error: true
 
       # 构建 iOS（无签名）
-      # 添加 --no-codesign 还是不够，需要传递参数给 xcodebuild 明确禁止签名
       - name: Build iOS (No Codesign)
-        run: flutter build ios --release --no-codesign -- CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" PROVISIONING_PROFILE=""
+        run: flutter build ios --release --no-codesign
           
       # 创建未签名的 IPA (Release需要IPA文件)
       - name: Create unsigned IPA
