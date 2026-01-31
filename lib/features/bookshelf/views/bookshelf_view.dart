@@ -1,11 +1,7 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart'
-    show LinearProgressIndicator, AlwaysStoppedAnimation;
 import '../models/book.dart';
-import '../widgets/book_cover_card.dart';
-import '../../../app/theme/colors.dart';
 
-/// 书架页面 - iOS 原生风格
+/// 书架页面 - 纯 iOS 原生风格
 class BookshelfView extends StatefulWidget {
   const BookshelfView({super.key});
 
@@ -61,11 +57,8 @@ class _BookshelfViewState extends State<BookshelfView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.black,
       navigationBar: CupertinoNavigationBar(
         middle: const Text('书架'),
-        backgroundColor: const Color(0xE6121212),
-        border: null,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -75,16 +68,12 @@ class _BookshelfViewState extends State<BookshelfView> {
                 _isGridView
                     ? CupertinoIcons.list_bullet
                     : CupertinoIcons.square_grid_2x2,
-                color: CupertinoColors.white,
               ),
-              onPressed: () {
-                setState(() => _isGridView = !_isGridView);
-              },
+              onPressed: () => setState(() => _isGridView = !_isGridView),
             ),
             CupertinoButton(
               padding: EdgeInsets.zero,
-              child: const Icon(CupertinoIcons.ellipsis_vertical,
-                  color: CupertinoColors.white),
+              child: const Icon(CupertinoIcons.ellipsis_vertical),
               onPressed: _showMoreOptions,
             ),
           ],
@@ -104,22 +93,22 @@ class _BookshelfViewState extends State<BookshelfView> {
           Icon(
             CupertinoIcons.book,
             size: 64,
-            color: CupertinoColors.systemGrey.withOpacity(0.5),
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
           ),
           const SizedBox(height: 16),
           Text(
             '书架空空如也',
             style: TextStyle(
               fontSize: 17,
-              color: CupertinoColors.systemGrey,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '前往发现页添加书籍',
             style: TextStyle(
-              fontSize: 14,
-              color: CupertinoColors.systemGrey.withOpacity(0.7),
+              fontSize: 15,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -141,124 +130,113 @@ class _BookshelfViewState extends State<BookshelfView> {
       child: GridView.builder(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          childAspectRatio: 0.55,
-          crossAxisSpacing: 16,
+          childAspectRatio: 0.58,
+          crossAxisSpacing: 12,
           mainAxisSpacing: 16,
         ),
         itemCount: _books.length,
         itemBuilder: (context, index) {
           final book = _books[index];
-          return BookCoverCard(
-            book: book,
-            onTap: () => _onBookTap(book),
-            onLongPress: () => _onBookLongPress(book),
-          );
+          return _buildBookCard(book);
         },
       ),
     );
   }
 
-  Widget _buildListView() {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _books.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final book = _books[index];
-        return _buildListItem(book);
-      },
-    );
-  }
-
-  Widget _buildListItem(Book book) {
+  Widget _buildBookCard(Book book) {
     return GestureDetector(
       onTap: () => _onBookTap(book),
       onLongPress: () => _onBookLongPress(book),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            // 封面
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                width: 60,
-                height: 84,
-                color: AppColors.accent.withOpacity(0.2),
-                child: book.coverUrl != null
-                    ? Image.network(book.coverUrl!, fit: BoxFit.cover)
-                    : Center(
-                        child: Text(
-                          book.title.substring(0, 1),
-                          style: const TextStyle(
-                            color: AppColors.accent,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 封面
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemGrey5.resolveFrom(context),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ),
-            const SizedBox(width: 12),
-            // 书籍信息
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: CupertinoColors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    book.author,
-                    style: TextStyle(
-                      color: CupertinoColors.systemGrey,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: LinearProgressIndicator(
-                            value: book.readProgress,
-                            backgroundColor:
-                                CupertinoColors.systemGrey.withOpacity(0.3),
-                            valueColor:
-                                const AlwaysStoppedAnimation(AppColors.accent),
-                            minHeight: 4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        book.progressText,
+              child: book.coverUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(book.coverUrl!, fit: BoxFit.cover),
+                    )
+                  : Center(
+                      child: Text(
+                        book.title.substring(0, 1),
                         style: TextStyle(
-                          color: CupertinoColors.systemGrey,
-                          fontSize: 12,
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          // 标题
+          Text(
+            book.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 2),
+          // 进度
+          Text(
+            book.progressText,
+            style: TextStyle(
+              fontSize: 12,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildListView() {
+    return ListView.builder(
+      itemCount: _books.length,
+      itemBuilder: (context, index) {
+        final book = _books[index];
+        return CupertinoListTile(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          leadingSize: 50,
+          leading: Container(
+            width: 50,
+            height: 70,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemGrey5.resolveFrom(context),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: book.coverUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.network(book.coverUrl!, fit: BoxFit.cover),
+                  )
+                : Center(
+                    child: Text(
+                      book.title.substring(0, 1),
+                      style: TextStyle(
+                        color:
+                            CupertinoColors.secondaryLabel.resolveFrom(context),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+          ),
+          title: Text(book.title),
+          subtitle: Text(book.author),
+          additionalInfo: Text(book.progressText),
+          trailing: const CupertinoListTileChevron(),
+          onTap: () => _onBookTap(book),
+        );
+      },
     );
   }
 
@@ -269,15 +247,11 @@ class _BookshelfViewState extends State<BookshelfView> {
         actions: [
           CupertinoActionSheetAction(
             child: const Text('导入本地书籍'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
           ),
           CupertinoActionSheetAction(
             child: const Text('批量管理'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -300,22 +274,20 @@ class _BookshelfViewState extends State<BookshelfView> {
         actions: [
           CupertinoActionSheetAction(
             child: const Text('书籍详情'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
           ),
           CupertinoActionSheetAction(
             child: const Text('缓存全本'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             child: const Text('移除书籍'),
             onPressed: () {
               Navigator.pop(context);
-              _removeBook(book);
+              setState(() {
+                _books.removeWhere((b) => b.id == book.id);
+              });
             },
           ),
         ],
@@ -325,11 +297,5 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
       ),
     );
-  }
-
-  void _removeBook(Book book) {
-    setState(() {
-      _books.removeWhere((b) => b.id == book.id);
-    });
   }
 }

@@ -1,11 +1,13 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
 import 'features/source/views/source_list_view.dart';
 import 'features/settings/views/settings_view.dart';
-import 'app/theme/colors.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // 设置状态栏样式
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
   runApp(const SoupReaderApp());
 }
 
@@ -15,56 +17,30 @@ class SoupReaderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 使用 CupertinoApp 获得完整的 iOS 体验
-    return CupertinoApp(
+    // 使用纯 CupertinoApp，不指定自定义字体让系统自动使用 SF Pro
+    return const CupertinoApp(
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
-      theme: const CupertinoThemeData(
+      // 使用系统默认深色主题，不过度自定义
+      theme: CupertinoThemeData(
         brightness: Brightness.dark,
-        primaryColor: AppColors.accent,
-        scaffoldBackgroundColor: CupertinoColors.black,
-        barBackgroundColor: Color(0xE6121212), // 半透明深色
-        textTheme: CupertinoTextThemeData(
-          primaryColor: AppColors.accent,
-          textStyle: TextStyle(
-            fontFamily: '.SF Pro Text',
-            color: CupertinoColors.white,
-          ),
-          navTitleTextStyle: TextStyle(
-            fontFamily: '.SF Pro Text',
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: CupertinoColors.white,
-          ),
-          navLargeTitleTextStyle: TextStyle(
-            fontFamily: '.SF Pro Display',
-            fontSize: 34,
-            fontWeight: FontWeight.w700,
-            color: CupertinoColors.white,
-          ),
-        ),
+        // 使用系统蓝色作为主色调（iOS 标准）
+        primaryColor: CupertinoColors.systemBlue,
       ),
-      home: const MainScreen(),
+      home: MainScreen(),
     );
   }
 }
 
 /// 主屏幕（带底部导航）
-class MainScreen extends StatefulWidget {
+class MainScreen extends StatelessWidget {
   const MainScreen({super.key});
 
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
-        backgroundColor: const Color(0xE6121212), // 半透明深色
-        activeColor: AppColors.accent,
-        inactiveColor: CupertinoColors.systemGrey,
+        // 使用系统默认样式，不自定义背景色
         items: const [
           BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.book),
@@ -73,7 +49,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.search),
-            activeIcon: Icon(CupertinoIcons.search),
             label: '发现',
           ),
           BottomNavigationBarItem(
@@ -82,31 +57,35 @@ class _MainScreenState extends State<MainScreen> {
             label: '书源',
           ),
           BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.settings),
-            activeIcon: Icon(CupertinoIcons.settings_solid),
+            icon: Icon(CupertinoIcons.gear),
+            activeIcon: Icon(CupertinoIcons.gear_solid),
             label: '设置',
           ),
         ],
       ),
       tabBuilder: (context, index) {
-        switch (index) {
-          case 0:
-            return const BookshelfView();
-          case 1:
-            return const ExploreView();
-          case 2:
-            return const SourceListView();
-          case 3:
-            return const SettingsView();
-          default:
-            return const BookshelfView();
-        }
+        return CupertinoTabView(
+          builder: (context) {
+            switch (index) {
+              case 0:
+                return const BookshelfView();
+              case 1:
+                return const ExploreView();
+              case 2:
+                return const SourceListView();
+              case 3:
+                return const SettingsView();
+              default:
+                return const BookshelfView();
+            }
+          },
+        );
       },
     );
   }
 }
 
-/// 发现/探索页面（搜索书籍）
+/// 发现页面
 class ExploreView extends StatefulWidget {
   const ExploreView({super.key});
 
@@ -133,111 +112,123 @@ class _ExploreViewState extends State<ExploreView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: CupertinoSearchTextField(
-          controller: _searchController,
-          placeholder: '搜索书籍、作者',
-          onSubmitted: _onSearch,
-          onChanged: (value) {
-            if (value.isEmpty && _isSearching) {
-              setState(() {
-                _isSearching = false;
-              });
-            }
-          },
-          onSuffixTap: () {
-            _searchController.clear();
-            setState(() {
-              _isSearching = false;
-            });
-          },
-        ),
-        backgroundColor: const Color(0xE6121212),
-        border: null,
+      // 使用大标题导航栏 - iOS 原生风格
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('发现'),
       ),
-      backgroundColor: CupertinoColors.black,
       child: SafeArea(
-        child: _isSearching ? _buildSearchResults() : _buildExploreContent(),
-      ),
-    );
-  }
-
-  Widget _buildExploreContent() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // 热门搜索
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
-            '热门搜索',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.white,
-            ),
-          ),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _hotKeywords.map((keyword) {
-            return CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: AppColors.accent.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(20),
-              minSize: 0,
-              onPressed: () {
-                _searchController.text = keyword;
-                _onSearch(keyword);
-              },
-              child: Text(
-                keyword,
-                style: const TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 14,
+        child: CustomScrollView(
+          slivers: [
+            // 搜索框
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: CupertinoSearchTextField(
+                  controller: _searchController,
+                  placeholder: '搜索书籍、作者',
+                  onSubmitted: _onSearch,
+                  onSuffixTap: () {
+                    _searchController.clear();
+                    setState(() => _isSearching = false);
+                  },
                 ),
               ),
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: 32),
-
-        // 分类推荐
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
-            '分类',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.white,
             ),
-          ),
-        ),
-        GridView.count(
-          crossAxisCount: 4,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          children: [
-            _buildCategoryItem(CupertinoIcons.flame, '玄幻'),
-            _buildCategoryItem(CupertinoIcons.heart, '言情'),
-            _buildCategoryItem(CupertinoIcons.book, '历史'),
-            _buildCategoryItem(CupertinoIcons.rocket, '科幻'),
-            _buildCategoryItem(CupertinoIcons.sportscourt, '武侠'),
-            _buildCategoryItem(CupertinoIcons.building_2_fill, '都市'),
-            _buildCategoryItem(CupertinoIcons.moon_stars, '灵异'),
-            _buildCategoryItem(CupertinoIcons.ellipsis, '更多'),
+
+            if (_isSearching)
+              ..._buildSearchResultsSliver()
+            else
+              ..._buildExploreContentSliver(),
           ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildCategoryItem(IconData icon, String label) {
+  List<Widget> _buildExploreContentSliver() {
+    return [
+      // 热门搜索标题
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Text(
+            '热门搜索',
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+          ),
+        ),
+      ),
+      // 热门搜索标签
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _hotKeywords.map((keyword) {
+              return CupertinoButton(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                color: CupertinoColors.systemGrey5.darkColor,
+                borderRadius: BorderRadius.circular(18),
+                minSize: 0,
+                onPressed: () {
+                  _searchController.text = keyword;
+                  _onSearch(keyword);
+                },
+                child: Text(
+                  keyword,
+                  style: const TextStyle(
+                    color: CupertinoColors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+
+      // 分类标题
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 32, 16, 12),
+          child: Text(
+            '分类',
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+          ),
+        ),
+      ),
+      // 分类网格
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverGrid.count(
+          crossAxisCount: 4,
+          mainAxisSpacing: 20,
+          crossAxisSpacing: 16,
+          children: [
+            _buildCategoryItem(
+                CupertinoIcons.flame_fill, '玄幻', CupertinoColors.systemOrange),
+            _buildCategoryItem(
+                CupertinoIcons.heart_fill, '言情', CupertinoColors.systemPink),
+            _buildCategoryItem(
+                CupertinoIcons.book_fill, '历史', CupertinoColors.systemBrown),
+            _buildCategoryItem(
+                CupertinoIcons.rocket_fill, '科幻', CupertinoColors.systemIndigo),
+            _buildCategoryItem(CupertinoIcons.sportscourt_fill, '武侠',
+                CupertinoColors.systemRed),
+            _buildCategoryItem(CupertinoIcons.building_2_fill, '都市',
+                CupertinoColors.systemTeal),
+            _buildCategoryItem(
+                CupertinoIcons.moon_fill, '灵异', CupertinoColors.systemPurple),
+            _buildCategoryItem(
+                CupertinoIcons.ellipsis, '更多', CupertinoColors.systemGrey),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildCategoryItem(IconData icon, String label, Color color) {
     return GestureDetector(
       onTap: () {
         _searchController.text = label;
@@ -247,20 +238,20 @@ class _ExploreViewState extends State<ExploreView> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(icon, color: AppColors.accent, size: 24),
+            child: Icon(icon, color: color, size: 26),
           ),
           const SizedBox(height: 8),
           Text(
             label,
             style: TextStyle(
-              color: CupertinoColors.systemGrey,
-              fontSize: 12,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              fontSize: 13,
             ),
           ),
         ],
@@ -268,90 +259,52 @@ class _ExploreViewState extends State<ExploreView> {
     );
   }
 
-  Widget _buildSearchResults() {
+  List<Widget> _buildSearchResultsSliver() {
     if (_searchResults.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CupertinoActivityIndicator(radius: 14),
-            const SizedBox(height: 16),
-            Text(
-              '正在搜索...',
-              style: TextStyle(color: CupertinoColors.systemGrey),
-            ),
-          ],
+      return [
+        const SliverFillRemaining(
+          child: Center(
+            child: CupertinoActivityIndicator(),
+          ),
         ),
-      );
+      ];
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final book = _searchResults[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C1C1E),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Container(
+    return [
+      SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final book = _searchResults[index];
+            return CupertinoListTile(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              leadingSize: 50,
+              leading: Container(
                 width: 50,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.2),
+                  color: CupertinoColors.systemGrey5.darkColor,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(CupertinoIcons.book_fill,
-                    color: AppColors.accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      book['title'] ?? '',
-                      style: const TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      book['author'] ?? '',
-                      style: TextStyle(
-                        color: CupertinoColors.systemGrey,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  CupertinoIcons.book_fill,
+                  color: CupertinoColors.systemGrey,
                 ),
               ),
-              CupertinoButton(
+              title: Text(book['title'] ?? ''),
+              subtitle: Text(book['author'] ?? ''),
+              trailing: CupertinoButton(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(20),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 minSize: 0,
-                onPressed: () {
-                  // TODO: 添加到书架
-                },
-                child: const Text(
-                  '加入',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
+                child: const Text('加入'),
+                onPressed: () {},
               ),
-            ],
-          ),
-        );
-      },
-    );
+            );
+          },
+          childCount: _searchResults.length,
+        ),
+      ),
+    ];
   }
 
   void _onSearch(String query) {
@@ -362,7 +315,6 @@ class _ExploreViewState extends State<ExploreView> {
       _searchResults = [];
     });
 
-    // 模拟搜索延迟
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         setState(() {

@@ -3,9 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../app/theme/colors.dart';
 
-/// 设置页面 - iOS 原生风格
+/// 设置页面 - 纯 iOS 原生风格
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
 
@@ -29,7 +28,7 @@ class _SettingsViewState extends State<SettingsView> {
     try {
       final info = await PackageInfo.fromPlatform();
       setState(() {
-        _version = '${info.version}+${info.buildNumber}';
+        _version = '${info.version} (${info.buildNumber})';
       });
     } catch (e) {
       setState(() {
@@ -41,38 +40,31 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.black,
       navigationBar: const CupertinoNavigationBar(
         middle: Text('设置'),
-        backgroundColor: Color(0xE6121212),
-        border: null,
       ),
       child: SafeArea(
         child: ListView(
           children: [
-            const SizedBox(height: 20),
-
             // 阅读设置
             CupertinoListSection.insetGrouped(
-              backgroundColor: CupertinoColors.black,
-              header: const Text('阅读设置'),
+              header: const Text('阅读'),
               children: [
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.textformat),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                      CupertinoIcons.textformat, CupertinoColors.systemBlue),
                   title: const Text('阅读偏好'),
-                  subtitle: const Text('字体、行距、背景等'),
+                  additionalInfo: const Text('默认'),
                   trailing: const CupertinoListTileChevron(),
                   onTap: _openReadingSettings,
                 ),
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.moon),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                      CupertinoIcons.moon_fill, CupertinoColors.systemIndigo),
                   title: const Text('深色模式'),
                   trailing: CupertinoSwitch(
                     value: _darkMode,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (value) {
-                      setState(() => _darkMode = value);
-                    },
+                    onChanged: (value) => setState(() => _darkMode = value),
                   ),
                 ),
               ],
@@ -80,50 +72,46 @@ class _SettingsViewState extends State<SettingsView> {
 
             // 书源设置
             CupertinoListSection.insetGrouped(
-              backgroundColor: CupertinoColors.black,
-              header: const Text('书源设置'),
+              header: const Text('书源'),
               children: [
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.cloud),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                      CupertinoIcons.cloud_fill, CupertinoColors.systemCyan),
                   title: const Text('书源管理'),
-                  subtitle: const Text('添加、编辑、删除书源'),
+                  additionalInfo: const Text('4 个'),
                   trailing: const CupertinoListTileChevron(),
                   onTap: () {},
                 ),
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.arrow_2_circlepath),
-                  title: const Text('自动更新书源'),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(CupertinoIcons.arrow_2_circlepath,
+                      CupertinoColors.systemGreen),
+                  title: const Text('自动更新'),
                   trailing: CupertinoSwitch(
                     value: _autoUpdate,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (value) {
-                      setState(() => _autoUpdate = value);
-                    },
+                    onChanged: (value) => setState(() => _autoUpdate = value),
                   ),
                 ),
               ],
             ),
 
-            // 缓存与存储
+            // 存储
             CupertinoListSection.insetGrouped(
-              backgroundColor: CupertinoColors.black,
-              header: const Text('缓存与存储'),
+              header: const Text('存储'),
               children: [
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.wifi),
-                  title: const Text('仅WiFi下缓存'),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                      CupertinoIcons.wifi, CupertinoColors.systemBlue),
+                  title: const Text('仅 Wi-Fi 下载'),
                   trailing: CupertinoSwitch(
                     value: _wifiOnly,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (value) {
-                      setState(() => _wifiOnly = value);
-                    },
+                    onChanged: (value) => setState(() => _wifiOnly = value),
                   ),
                 ),
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.folder),
-                  title: const Text('缓存管理'),
-                  subtitle: const Text('当前缓存：256 MB'),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                      CupertinoIcons.trash_fill, CupertinoColors.systemRed),
+                  title: const Text('清除缓存'),
+                  additionalInfo: const Text('256 MB'),
                   trailing: const CupertinoListTileChevron(),
                   onTap: _showCacheOptions,
                 ),
@@ -132,50 +120,50 @@ class _SettingsViewState extends State<SettingsView> {
 
             // 其他
             CupertinoListSection.insetGrouped(
-              backgroundColor: CupertinoColors.black,
               header: const Text('其他'),
               children: [
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.arrow_down_circle),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(CupertinoIcons.arrow_down_circle_fill,
+                      CupertinoColors.systemGreen),
                   title: const Text('检查更新'),
-                  subtitle: const Text('获取最新开发版'),
                   trailing: const CupertinoListTileChevron(),
                   onTap: _checkUpdate,
                 ),
-                CupertinoListTile(
-                  leading:
-                      _buildIcon(CupertinoIcons.arrow_up_arrow_down_circle),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(CupertinoIcons.arrow_up_arrow_down,
+                      CupertinoColors.systemOrange),
                   title: const Text('备份与恢复'),
-                  subtitle: const Text('导出/导入数据'),
                   trailing: const CupertinoListTileChevron(),
                   onTap: _showBackupOptions,
                 ),
-                CupertinoListTile(
-                  leading: _buildIcon(CupertinoIcons.info),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(CupertinoIcons.info_circle_fill,
+                      CupertinoColors.systemGrey),
                   title: const Text('关于'),
-                  subtitle: Text('SoupReader $_version'),
+                  additionalInfo: Text(_version),
                   trailing: const CupertinoListTileChevron(),
                   onTap: _showAbout,
                 ),
               ],
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildIcon(IconData icon) {
+  /// 构建设置项图标盒子 - iOS 风格
+  Widget _buildIconBox(IconData icon, Color color) {
     return Container(
-      width: 30,
-      height: 30,
+      width: 29,
+      height: 29,
       decoration: BoxDecoration(
-        color: AppColors.accent,
+        color: color,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Icon(icon, color: CupertinoColors.white, size: 18),
+      child: Icon(icon, color: CupertinoColors.white, size: 17),
     );
   }
 
@@ -183,124 +171,47 @@ class _SettingsViewState extends State<SettingsView> {
     showCupertinoModalPopup(
       context: context,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        decoration: const BoxDecoration(
-          color: Color(0xFF1C1C1E),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        height: MediaQuery.of(context).size.height * 0.5,
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground.resolveFrom(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
         ),
         child: Column(
           children: [
-            // 拖动条
+            // 拖动指示器
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
+              margin: const EdgeInsets.only(top: 8),
               width: 36,
               height: 5,
               decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey,
+                color: CupertinoColors.systemGrey3.resolveFrom(context),
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
-            // 标题
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
-                '阅读偏好设置',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: CupertinoColors.white,
-                ),
+                '阅读偏好',
+                style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
               ),
             ),
-            // 主题选择
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
+              child: CupertinoListSection.insetGrouped(
                 children: [
-                  const Text(
-                    '阅读主题',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: CupertinoColors.systemGrey,
-                    ),
+                  CupertinoListTile.notched(
+                    title: const Text('字体大小'),
+                    additionalInfo: const Text('18'),
+                    trailing: const CupertinoListTileChevron(),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 80,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: AppColors.readingThemes.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        final theme = AppColors.readingThemes[index];
-                        return GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            width: 80,
-                            decoration: BoxDecoration(
-                              color: theme.background,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color:
-                                    CupertinoColors.systemGrey.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Aa',
-                                  style: TextStyle(
-                                    color: theme.text,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  theme.name,
-                                  style: TextStyle(
-                                    color: theme.text,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                  CupertinoListTile.notched(
+                    title: const Text('行距'),
+                    additionalInfo: const Text('1.8'),
+                    trailing: const CupertinoListTileChevron(),
                   ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    '字体大小',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: CupertinoColors.systemGrey,
-                    ),
-                  ),
-                  CupertinoSlider(
-                    value: 18,
-                    min: 12,
-                    max: 28,
-                    divisions: 8,
-                    activeColor: AppColors.accent,
-                    onChanged: (value) {},
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '行距',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: CupertinoColors.systemGrey,
-                    ),
-                  ),
-                  CupertinoSlider(
-                    value: 1.8,
-                    min: 1.2,
-                    max: 2.5,
-                    activeColor: AppColors.accent,
-                    onChanged: (value) {},
+                  CupertinoListTile.notched(
+                    title: const Text('主题'),
+                    additionalInfo: const Text('夜间'),
+                    trailing: const CupertinoListTileChevron(),
                   ),
                 ],
               ),
@@ -315,11 +226,8 @@ class _SettingsViewState extends State<SettingsView> {
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('缓存管理'),
-        content: const Padding(
-          padding: EdgeInsets.only(top: 12),
-          child: Text('当前缓存：256 MB\n\n清除缓存将删除所有已下载的章节内容，书架和阅读进度不受影响。'),
-        ),
+        title: const Text('清除缓存'),
+        content: const Text('\n当前缓存 256 MB\n\n这将删除所有已下载的章节，书架和阅读进度不受影响。'),
         actions: [
           CupertinoDialogAction(
             child: const Text('取消'),
@@ -327,10 +235,8 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           CupertinoDialogAction(
             isDestructiveAction: true,
-            child: const Text('清除缓存'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            child: const Text('清除'),
+            onPressed: () => Navigator.pop(context),
           ),
         ],
       ),
@@ -341,25 +247,18 @@ class _SettingsViewState extends State<SettingsView> {
     showCupertinoModalPopup(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('备份与恢复'),
         actions: [
           CupertinoActionSheetAction(
-            child: const Text('导出数据'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            child: const Text('导出到文件'),
+            onPressed: () => Navigator.pop(context),
           ),
           CupertinoActionSheetAction(
-            child: const Text('导入数据'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            child: const Text('从文件导入'),
+            onPressed: () => Navigator.pop(context),
           ),
           CupertinoActionSheetAction(
             child: const Text('iCloud 同步'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -374,15 +273,11 @@ class _SettingsViewState extends State<SettingsView> {
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('关于 SoupReader'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Text(
-              '版本 $_version\n\n一款简洁优雅的阅读应用\n支持自定义书源，兼容源阅格式\n\n© 2026 SoupReader'),
-        ),
+        title: const Text('SoupReader'),
+        content: Text('\n版本 $_version\n\n一款简洁优雅的阅读应用\n支持自定义书源'),
         actions: [
           CupertinoDialogAction(
-            child: const Text('确定'),
+            child: const Text('好'),
             onPressed: () => Navigator.pop(context),
           ),
         ],
@@ -391,26 +286,22 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _checkUpdate() async {
-    // 显示加载指示器
     showCupertinoDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CupertinoActivityIndicator(radius: 14),
-      ),
+      builder: (context) => const Center(child: CupertinoActivityIndicator()),
     );
 
     try {
       final dio = Dio();
       final prefs = await SharedPreferences.getInstance();
 
-      // 使用自定义 Worker 代理 API
       final response = await dio.get(
         'https://github-action-cf.mcshr.workers.dev/latest',
       );
 
       if (!mounted) return;
-      Navigator.pop(context); // 关闭加载
+      Navigator.pop(context);
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -424,29 +315,23 @@ class _SettingsViewState extends State<SettingsView> {
           return;
         }
 
-        // 版本比较逻辑：基于发布时间
+        // 版本比较
         final lastIgnoredTime = prefs.getString('last_ignored_update_time');
         final lastUpdatedTime = prefs.getString('last_updated_time');
 
         if (publishedAt != null) {
-          final remoteReleaseTime = DateTime.tryParse(publishedAt);
-
-          if (remoteReleaseTime != null) {
-            // 检查是否已忽略此版本
+          final remoteTime = DateTime.tryParse(publishedAt);
+          if (remoteTime != null) {
             if (lastIgnoredTime != null) {
-              final ignoredTime = DateTime.tryParse(lastIgnoredTime);
-              if (ignoredTime != null &&
-                  !remoteReleaseTime.isAfter(ignoredTime)) {
+              final ignored = DateTime.tryParse(lastIgnoredTime);
+              if (ignored != null && !remoteTime.isAfter(ignored)) {
                 _showMessage('已是最新版本');
                 return;
               }
             }
-
-            // 检查是否已更新到此版本
             if (lastUpdatedTime != null) {
-              final updatedTime = DateTime.tryParse(lastUpdatedTime);
-              if (updatedTime != null &&
-                  !remoteReleaseTime.isAfter(updatedTime)) {
+              final updated = DateTime.tryParse(lastUpdatedTime);
+              if (updated != null && !remoteTime.isAfter(updated)) {
                 _showMessage('已是最新版本');
                 return;
               }
@@ -454,30 +339,24 @@ class _SettingsViewState extends State<SettingsView> {
           }
         }
 
-        // 格式化发布时间
-        String releaseInfo = name ?? 'Nightly Build';
+        String info = name ?? 'Nightly Build';
         if (publishedAt != null) {
           try {
             final date = DateTime.parse(publishedAt);
-            releaseInfo +=
-                '\n发布时间: ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+            info +=
+                '\n${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
           } catch (_) {}
         }
 
-        _showUpdateDialog(
-          tag ?? 'nightly',
-          releaseInfo,
-          downloadUrl,
-          publishedAt,
-        );
+        _showUpdateDialog(tag ?? 'nightly', info, downloadUrl, publishedAt);
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
         if (e is DioException && e.response?.statusCode == 404) {
-          _showMessage('暂无新版本');
+          _showMessage('暂无更新');
         } else {
-          _showMessage('检查更新失败: ${e.toString().split('\n').first}');
+          _showMessage('检查失败');
         }
       }
     }
@@ -490,7 +369,7 @@ class _SettingsViewState extends State<SettingsView> {
         content: Text(message),
         actions: [
           CupertinoDialogAction(
-            child: const Text('确定'),
+            child: const Text('好'),
             onPressed: () => Navigator.pop(context),
           ),
         ],
@@ -499,20 +378,16 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showUpdateDialog(
-      String tagName, String body, String downloadUrl, String? publishedAt) {
+      String tag, String body, String url, String? publishedAt) {
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: Text('发现新版本 $tagName'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Text(body),
-        ),
+        title: Text('有新版本 $tag'),
+        content: Text('\n$body'),
         actions: [
           CupertinoDialogAction(
-            child: const Text('忽略本次'),
+            child: const Text('忽略'),
             onPressed: () async {
-              // 保存忽略的版本时间
               if (publishedAt != null) {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('last_ignored_update_time', publishedAt);
@@ -522,16 +397,14 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
-            child: const Text('下载更新'),
+            child: const Text('更新'),
             onPressed: () async {
-              // 保存更新的版本时间
               if (publishedAt != null) {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('last_updated_time', publishedAt);
               }
               if (mounted) Navigator.pop(context);
-              launchUrl(Uri.parse(downloadUrl),
-                  mode: LaunchMode.externalApplication);
+              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
             },
           ),
         ],
