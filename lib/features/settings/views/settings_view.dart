@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import '../../../app/theme/colors.dart';
 import '../../../shared/widgets/adaptive_widgets.dart';
 
 /// 设置页面
@@ -235,7 +234,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showCacheOptions() {
-    showAdaptiveDialog(
+    showPlatformDialog(
       context: context,
       title: '清除缓存',
       content: '确定要清除 $_cacheSize 缓存数据吗？此操作不会删除书架记录。',
@@ -279,7 +278,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showAbout() {
-    showAdaptiveDialog(
+    showPlatformDialog(
       context: context,
       title: 'SoupReader',
       content: '版本: $_version\n\n一款专注阅读体验的开源应用。',
@@ -330,7 +329,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showUpdateDialog(String tagName, String body, String downloadUrl) {
-    showAdaptiveDialog(
+    showPlatformDialog(
       context: context,
       title: '发现新版本 $tagName',
       content: body,

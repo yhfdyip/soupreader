@@ -284,7 +284,7 @@ class AdaptiveSettingsTile extends StatelessWidget {
 }
 
 /// 平台自适应弹窗辅助函数
-Future<T?> showAdaptiveDialog<T>({
+Future<T?> showPlatformDialog<T>({
   required BuildContext context,
   required String title,
   String? content,
