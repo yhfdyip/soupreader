@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:uuid/uuid.dart';
-import '../../bookshelf/models/book.dart';
+import '../bookshelf/models/book.dart';
 
 /// TXT 文件解析器
 class TxtParser {

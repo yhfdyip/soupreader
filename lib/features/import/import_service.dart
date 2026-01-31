@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import '../../bookshelf/models/book.dart';
+import '../bookshelf/models/book.dart';
 import '../../core/database/database_service.dart';
 import '../../core/database/repositories/book_repository.dart';
 import 'txt_parser.dart';

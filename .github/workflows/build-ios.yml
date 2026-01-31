@@ -44,13 +44,25 @@ jobs:
           flutter pub get
           cd ios && pod install --repo-update || pod install
 
-      # 禁用代码签名
+      # 禁用代码签名 - 必须彻底禁用所有签名相关设置
       - name: Disable Codesign
         run: |
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' ios/Runner.xcodeproj/project.pbxproj
-          echo 'CODE_SIGNING_ALLOWED=NO' >> ios/Flutter/Release.xcconfig
-          echo 'CODE_SIGNING_REQUIRED=NO' >> ios/Flutter/Release.xcconfig
+          cd ios
+          # 修改 project.pbxproj
+          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/"CODE_SIGNING_REQUIRED=YES"/"CODE_SIGNING_REQUIRED=NO"/g' Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/"CODE_SIGNING_ALLOWED=YES"/"CODE_SIGNING_ALLOWED=NO"/g' Runner.xcodeproj/project.pbxproj
+          # 清除开发团队
+          sed -i '' 's/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = "";/g' Runner.xcodeproj/project.pbxproj
+          # 添加到 xcconfig
+          echo 'CODE_SIGNING_ALLOWED=NO' >> Flutter/Release.xcconfig
+          echo 'CODE_SIGNING_REQUIRED=NO' >> Flutter/Release.xcconfig
+          echo 'CODE_SIGN_IDENTITY=""' >> Flutter/Release.xcconfig
+          echo 'PROVISIONING_PROFILE_SPECIFIER=""' >> Flutter/Release.xcconfig
+          # 添加到 Debug.xcconfig 以防万一
+          echo 'CODE_SIGNING_ALLOWED=NO' >> Flutter/Debug.xcconfig
+          echo 'CODE_SIGNING_REQUIRED=NO' >> Flutter/Debug.xcconfig
 
       # 构建 iOS
       - name: Build iOS
