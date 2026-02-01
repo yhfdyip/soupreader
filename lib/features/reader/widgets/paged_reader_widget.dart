@@ -198,17 +198,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _lastSize = size;
     }
 
-    // NEXT: curPage翻起，露出nextPage
-    // PREV: prevPage从左边翻过来，覆盖curPage
+    // 对标 flutter_novel：当前页永远是翻起的页面
+    // drawTopPageCanvas: 画 getCurrentPage() - 当前页
+    // drawBottomPageCanvas: 画 isTurnToNext ? getNextPage() : getPrePage()
+    _curPagePicture ??= _recordPage(_factory.curPage, size);
+
     if (_direction == _PageDirection.next) {
-      _curPagePicture ??= _recordPage(_factory.curPage, size);
       _targetPagePicture ??= _recordPage(_factory.nextPage, size);
     } else if (_direction == _PageDirection.prev) {
-      _curPagePicture ??= _recordPage(_factory.prevPage, size);
-      _targetPagePicture ??= _recordPage(_factory.curPage, size);
-    } else {
-      _curPagePicture ??= _recordPage(_factory.curPage, size);
-      _targetPagePicture = null;
+      _targetPagePicture ??= _recordPage(_factory.prevPage, size);
     }
   }
 
@@ -247,8 +245,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _direction = _PageDirection.prev;
 
     final size = MediaQuery.of(context).size;
-    // PREV 方向：从左下角开始，prevPage从左边翻过来覆盖curPage
-    _startX = size.width * 0.1;
+    // PREV 方向：从右下角翻起，向右翻露出左边的 prevPage
+    // 起始点和 NEXT 相同，但目标点向右
+    _startX = size.width * 0.9;
     _startY = size.height * 0.9;
     _touchX = _startX;
     _touchY = _startY;
