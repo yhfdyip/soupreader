@@ -2,14 +2,14 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
-/// 仿真翻页绘制器（完全对标 flutter_novel SimulationTurnPageAnimation）
-/// 使用贝塞尔曲线模拟真实书页翻转效果
+/// 仿真翻页绘制器（对标 flutter_novel SimulationTurnPageAnimation）
+/// 核心优化：直接Canvas绘制，避免截图开销
 class SimulationPagePainter extends CustomPainter {
-  /// 当前页面图片（被翻起的页面）
-  final ui.Image? curPageImage;
+  /// 当前页面 Picture（被翻起的页面）
+  final ui.Picture? curPagePicture;
 
-  /// 目标页面图片（底下露出的页面）
-  final ui.Image? nextPageImage;
+  /// 目标页面 Picture（底下露出的页面）
+  final ui.Picture? nextPagePicture;
 
   /// 触摸点
   final Offset touch;
@@ -30,8 +30,8 @@ class SimulationPagePainter extends CustomPainter {
   final double cornerY;
 
   SimulationPagePainter({
-    required this.curPageImage,
-    required this.nextPageImage,
+    required this.curPagePicture,
+    required this.nextPagePicture,
     required this.touch,
     required this.viewSize,
     required this.isTurnToNext,
@@ -66,8 +66,12 @@ class SimulationPagePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (curPageImage == null) return;
-    if (touch.dx == 0 && touch.dy == 0) return;
+    if (curPagePicture == null) return;
+    if (touch.dx == 0 && touch.dy == 0) {
+      // 静止状态，直接画当前页
+      canvas.drawPicture(curPagePicture!);
+      return;
+    }
 
     // 初始化
     mTouch = touch;
@@ -87,7 +91,7 @@ class SimulationPagePainter extends CustomPainter {
     _drawTopPageBackArea(canvas);
   }
 
-  /// 计算贝塞尔曲线各点（对标 flutter_novel calBezierPoint）
+  /// 计算贝塞尔曲线各点
   void _calBezierPoint() {
     mMiddleX = (mTouch.dx + mCornerX) / 2;
     mMiddleY = (mTouch.dy + mCornerY) / 2;
@@ -205,7 +209,7 @@ class SimulationPagePainter extends CustomPainter {
     return Offset((b2 - b1) / (k1 - k2), k1 * ((b2 - b1) / (k1 - k2)) + b1);
   }
 
-  /// 画在最顶上的那页（对标 flutter_novel drawTopPageCanvas）
+  /// 画在最顶上的那页
   void _drawTopPageCanvas(Canvas canvas) {
     mTopPagePath.reset();
 
@@ -236,7 +240,7 @@ class SimulationPagePainter extends CustomPainter {
 
     canvas.save();
     canvas.clipPath(mTopPagePath);
-    canvas.drawImage(curPageImage!, Offset.zero, Paint()..isAntiAlias = true);
+    canvas.drawPicture(curPagePicture!);
     _drawTopPageShadow(canvas);
     canvas.restore();
   }
@@ -264,9 +268,9 @@ class SimulationPagePainter extends CustomPainter {
     canvas.drawShadow(shadowPath, Colors.black, 5, true);
   }
 
-  /// 画翻起来的底下那页（对标 flutter_novel drawBottomPageCanvas）
+  /// 画翻起来的底下那页
   void _drawBottomPageCanvas(Canvas canvas) {
-    if (nextPageImage == null) return;
+    if (nextPagePicture == null) return;
 
     mBottomPagePath.reset();
     mBottomPagePath.moveTo(mCornerX, mCornerY);
@@ -302,7 +306,7 @@ class SimulationPagePainter extends CustomPainter {
 
     canvas.save();
     canvas.clipPath(mBottomPagePath, doAntiAlias: false);
-    canvas.drawImage(nextPageImage!, Offset.zero, Paint()..isAntiAlias = true);
+    canvas.drawPicture(nextPagePicture!);
     _drawBottomPageShadow(canvas);
     canvas.restore();
   }
@@ -336,9 +340,9 @@ class SimulationPagePainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTRB(left, 0, right, mMaxLength), shadowPaint);
   }
 
-  /// 画在最顶上的那页的翻转过来的部分（对标 flutter_novel drawTopPageBackArea）
+  /// 画在最顶上的那页的翻转过来的部分
   void _drawTopPageBackArea(Canvas canvas) {
-    if (curPageImage == null) return;
+    if (curPagePicture == null) return;
 
     mBottomPagePath.reset();
     mBottomPagePath.moveTo(mCornerX, mCornerY);
@@ -414,8 +418,8 @@ class SimulationPagePainter extends CustomPainter {
     );
     canvas.transform(matrix4.storage);
 
-    // 绘制翻转的图片
-    canvas.drawImage(curPageImage!, Offset.zero, Paint()..isAntiAlias = true);
+    // 绘制翻转的页面
+    canvas.drawPicture(curPagePicture!);
 
     // 添加半透明遮罩模拟纸张背面
     canvas.drawPaint(Paint()..color = backgroundColor.withValues(alpha: 0.67));
@@ -465,8 +469,8 @@ class SimulationPagePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant SimulationPagePainter oldDelegate) {
     return touch != oldDelegate.touch ||
-        curPageImage != oldDelegate.curPageImage ||
-        nextPageImage != oldDelegate.nextPageImage ||
+        curPagePicture != oldDelegate.curPagePicture ||
+        nextPagePicture != oldDelegate.nextPagePicture ||
         cornerX != oldDelegate.cornerX ||
         cornerY != oldDelegate.cornerY;
   }
