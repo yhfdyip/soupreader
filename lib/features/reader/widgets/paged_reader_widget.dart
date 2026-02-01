@@ -426,16 +426,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       return CustomPaint(
         size: size,
         painter: SimulationPagePainter(
-          curBitmap: _curPageImage,
-          nextBitmap: _targetPageImage,
-          touchX: _touchX,
-          touchY: _touchY,
-          viewWidth: size.width.toInt(),
-          viewHeight: size.height.toInt(),
-          isNext: isNext,
+          curPageImage: _curPageImage,
+          nextPageImage: _targetPageImage,
+          touch: Offset(_touchX, _touchY),
+          viewSize: size,
+          isTurnToNext: isNext,
           backgroundColor: widget.backgroundColor,
-          cornerX: cornerX,
-          cornerY: cornerY,
+          cornerX: cornerX.toDouble(),
+          cornerY: cornerY.toDouble(),
         ),
       );
     }
