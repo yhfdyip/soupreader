@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 
-/// 翻页阅读器组件（基于 flutter_reader 架构重写）
+/// 翻页阅读器组件（完全对标 flutter_reader 架构）
 /// 使用 PageView.builder 实现平滑翻页
 class PagedReaderWidget extends StatefulWidget {
   final List<String> pages;
@@ -18,6 +19,10 @@ class PagedReaderWidget extends StatefulWidget {
   // 状态栏参数
   final bool showStatusBar;
   final String chapterTitle;
+
+  // 边距常量（对标 flutter_reader ReaderUtils）
+  static const double topOffset = 37;
+  static const double bottomOffset = 37;
 
   const PagedReaderWidget({
     super.key,
@@ -51,6 +56,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
       initialPage: _currentPage,
       keepPage: false,
     );
+    _pageController.addListener(_onScroll);
   }
 
   @override
@@ -58,7 +64,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pages != widget.pages) {
       _currentPage = widget.initialPage.clamp(0, widget.pages.length - 1);
-      // 重置 PageController
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_pageController.hasClients) {
           _pageController.jumpToPage(_currentPage);
@@ -69,14 +74,21 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
 
   @override
   void dispose() {
+    _pageController.removeListener(_onScroll);
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// 滚动监听（对标 flutter_reader onScroll）
+  void _onScroll() {
+    // 可在此处添加章节切换逻辑
   }
 
   void _onTap(Offset position) {
     final screenWidth = MediaQuery.of(context).size.width;
     final xRate = position.dx / screenWidth;
 
+    // 对标 flutter_reader 的点击区域划分
     if (xRate > 0.33 && xRate < 0.66) {
       // 中间区域：显示菜单
       widget.onTap?.call();
@@ -91,7 +103,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
 
   void _previousPage() {
     if (_currentPage == 0) {
-      // 已是第一页，尝试上一章
       widget.onPrevChapter?.call();
       return;
     }
@@ -103,7 +114,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
 
   void _nextPage() {
     if (_currentPage >= widget.pages.length - 1) {
-      // 已是最后一页，尝试下一章
       widget.onNextChapter?.call();
       return;
     }
@@ -131,8 +141,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
       );
     }
 
-    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final topSafeHeight = MediaQuery.of(context).padding.top;
+    final bottomSafeHeight = MediaQuery.of(context).padding.bottom;
 
+    // 对标 flutter_reader ReaderView 结构
     return Container(
       color: widget.backgroundColor,
       child: Stack(
@@ -141,55 +153,65 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
           Positioned.fill(
             child: _buildPageView(),
           ),
-          // 底部状态栏
-          if (widget.showStatusBar)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: EdgeInsets.only(
-                  bottom: safeBottom + 4,
-                  top: 4,
-                  left: widget.padding.left,
-                  right: widget.padding.right,
-                ),
-                color: widget.backgroundColor,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // 时间
-                    Text(
-                      _getCurrentTime(),
-                      style: widget.textStyle.copyWith(
-                        fontSize: 11,
-                        color: widget.textStyle.color?.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    // 章节标题
-                    Expanded(
-                      child: Text(
-                        widget.chapterTitle,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: widget.textStyle.copyWith(
-                          fontSize: 11,
-                          color: widget.textStyle.color?.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ),
-                    // 页码进度
-                    Text(
-                      '${_currentPage + 1}/${widget.pages.length}',
-                      style: widget.textStyle.copyWith(
-                        fontSize: 11,
-                        color: widget.textStyle.color?.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ],
+          // 覆盖层（对标 ReaderOverlayer）
+          _buildOverlayer(topSafeHeight, bottomSafeHeight),
+        ],
+      ),
+    );
+  }
+
+  /// 构建覆盖层（对标 flutter_reader ReaderOverlayer）
+  Widget _buildOverlayer(double topSafeHeight, double bottomSafeHeight) {
+    if (!widget.showStatusBar) return const SizedBox.shrink();
+
+    final format = DateFormat('HH:mm');
+    final time = format.format(DateTime.now());
+    final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
+        const Color(0xff8B7961);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        widget.padding.left,
+        10 + topSafeHeight,
+        widget.padding.right,
+        10 + bottomSafeHeight,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 顶部：章节标题
+          Text(
+            widget.chapterTitle,
+            style: widget.textStyle.copyWith(
+              fontSize: 14,
+              color: statusColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Expanded(child: SizedBox.shrink()),
+          // 底部：时间 + 页码
+          Row(
+            children: [
+              // 时间
+              Text(
+                time,
+                style: widget.textStyle.copyWith(
+                  fontSize: 11,
+                  color: statusColor,
                 ),
               ),
-            ),
+              const Expanded(child: SizedBox.shrink()),
+              // 页码
+              Text(
+                '第${_currentPage + 1}页',
+                style: widget.textStyle.copyWith(
+                  fontSize: 11,
+                  color: statusColor,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -201,9 +223,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
     switch (widget.pageTurnMode) {
       case PageTurnMode.none:
         physics = const NeverScrollableScrollPhysics();
-        break;
-      case PageTurnMode.scroll:
-        physics = const BouncingScrollPhysics();
         break;
       default:
         physics = const BouncingScrollPhysics();
@@ -224,31 +243,36 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget> {
     );
   }
 
+  /// 构建单页内容（对标 flutter_reader ReaderView.buildContent）
   Widget _buildPage(int index) {
     if (index < 0 || index >= widget.pages.length) {
       return Container(color: widget.backgroundColor);
     }
 
-    final safeTop = MediaQuery.of(context).padding.top;
+    final topSafeHeight = MediaQuery.of(context).padding.top;
+    final bottomSafeHeight = MediaQuery.of(context).padding.bottom;
 
+    // 对标 flutter_reader 的 margin 布局
+    // margin: EdgeInsets.fromLTRB(15, topSafeHeight + topOffset, 10, bottomSafeHeight + bottomOffset)
     return Container(
-      color: widget.backgroundColor,
-      padding: EdgeInsets.only(
-        left: widget.padding.left,
-        right: widget.padding.right,
-        top: widget.padding.top + safeTop,
-        bottom: widget.showStatusBar ? 30 : widget.padding.bottom,
+      color: Colors.transparent,
+      margin: EdgeInsets.fromLTRB(
+        widget.padding.left,
+        topSafeHeight + PagedReaderWidget.topOffset,
+        widget.padding.right,
+        bottomSafeHeight + PagedReaderWidget.bottomOffset,
       ),
-      child: Text(
-        widget.pages[index],
-        style: widget.textStyle,
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: widget.pages[index],
+              style: widget.textStyle,
+            ),
+          ],
+        ),
         textAlign: TextAlign.justify,
       ),
     );
-  }
-
-  String _getCurrentTime() {
-    final now = DateTime.now();
-    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 }

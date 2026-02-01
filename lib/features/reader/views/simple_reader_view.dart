@@ -165,28 +165,35 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await _saveProgress();
   }
 
-  /// 将内容分页（使用 TextPainter 精确计算）
+  /// 将内容分页（使用 TextPainter 精确计算，对标 flutter_reader）
   void _paginateContent() {
     if (!mounted) return;
 
-    // 获取屏幕可用尺寸
+    // 获取屏幕可用尺寸（对标 flutter_reader fetchArticle）
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     final safeArea = MediaQuery.of(context).padding;
 
-    // 计算可用区域
-    final availableWidth = screenWidth - _settings.marginHorizontal * 2;
-    final statusBarHeight = _settings.showStatusBar ? 30.0 : 0.0;
-    final availableHeight = screenHeight -
+    // 对标 flutter_reader 的布局计算
+    // contentHeight = Screen.height - topSafeHeight - topOffset - bottomSafeHeight - bottomOffset - 20
+    // contentWidth = Screen.width - 15 - 10
+    const topOffset = 37.0;
+    const bottomOffset = 37.0;
+
+    final contentHeight = screenHeight -
         safeArea.top -
-        _settings.marginVertical * 2 -
-        statusBarHeight;
+        topOffset -
+        safeArea.bottom -
+        bottomOffset -
+        20;
+    final contentWidth =
+        screenWidth - _settings.marginHorizontal - _settings.marginHorizontal;
 
     // 使用 ReaderPageAgent 精确分页
     final pages = ReaderPageAgent.paginateContent(
       _currentContent,
-      availableHeight,
-      availableWidth,
+      contentHeight,
+      contentWidth,
       _settings.fontSize,
       lineHeight: _settings.lineHeight,
       letterSpacing: _settings.letterSpacing,
@@ -363,7 +370,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return _buildScrollContent();
   }
 
-  /// 翻页模式内容
+  /// 翻页模式内容（对标 flutter_reader）
   Widget _buildPagedContent() {
     return PagedReaderWidget(
       pages: _contentPages.isEmpty ? [_currentTitle] : _contentPages,
@@ -377,12 +384,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         fontFamily: _currentFontFamily,
       ),
       backgroundColor: _currentTheme.background,
-      padding: EdgeInsets.only(
-        left: _settings.marginHorizontal,
-        right: _settings.marginHorizontal,
-        top: _settings.marginVertical + MediaQuery.of(context).padding.top,
-        bottom: _settings.showStatusBar ? 30 : _settings.marginVertical,
-      ),
+      // 对标 flutter_reader: margin: EdgeInsets.fromLTRB(15, topSafeHeight + topOffset, 10, bottomSafeHeight + bottomOffset)
+      padding: EdgeInsets.symmetric(horizontal: _settings.marginHorizontal),
       onPageChanged: (pageIndex) {
         setState(() {
           _currentPageIndex = pageIndex;
