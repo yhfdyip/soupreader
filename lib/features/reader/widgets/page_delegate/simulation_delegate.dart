@@ -9,6 +9,9 @@ class SimulationDelegate extends PageDelegate {
   VoidCallback? _onUpdate;
   bool _isDragging = false;
 
+  /// 翻页完成回调
+  PageTurnCallback? onPageTurn;
+
   // 触摸点
   late Offset mTouch = Offset.zero;
   // 视图尺寸
@@ -318,7 +321,10 @@ class SimulationDelegate extends PageDelegate {
       isStartAnimation = false;
       _animation?.removeListener(_onAnimationUpdate);
       _animation?.removeStatusListener(_onConfirmAnimationStatus);
-      // 翻页完成回调由外部处理
+      // 调用翻页回调
+      onPageTurn?.call(direction);
+      direction = PageDirection.none;
+      _onUpdate?.call();
     }
   }
 
