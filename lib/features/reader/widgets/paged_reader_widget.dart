@@ -1,48 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
+import 'page_factory.dart';
 
-/// 翻页阅读器组件（参考 Legado 实现）
-/// 支持滑动跨章节翻页
+/// 翻页阅读器组件（对标 Legado ReadView）
+/// 三页面预加载架构：prevPage / curPage / nextPage
 class PagedReaderWidget extends StatefulWidget {
-  final List<String> pages;
-  final int initialPage;
+  final PageFactory pageFactory;
   final PageTurnMode pageTurnMode;
   final TextStyle textStyle;
   final Color backgroundColor;
   final EdgeInsets padding;
-  final Function(int pageIndex)? onPageChanged;
-  final VoidCallback? onPrevChapter;
-  final VoidCallback? onNextChapter;
   final VoidCallback? onTap;
-
-  // 状态栏
   final bool showStatusBar;
-  final String chapterTitle;
-
-  // 章节信息（用于判断是否可以跨章节）
-  final bool hasPrevChapter;
-  final bool hasNextChapter;
 
   static const double topOffset = 37;
   static const double bottomOffset = 37;
 
   const PagedReaderWidget({
     super.key,
-    required this.pages,
-    this.initialPage = 0,
+    required this.pageFactory,
     required this.pageTurnMode,
     required this.textStyle,
     required this.backgroundColor,
     this.padding = const EdgeInsets.all(16),
-    this.onPageChanged,
-    this.onPrevChapter,
-    this.onNextChapter,
     this.onTap,
     this.showStatusBar = true,
-    this.chapterTitle = '',
-    this.hasPrevChapter = true,
-    this.hasNextChapter = true,
   });
 
   @override
@@ -51,7 +34,6 @@ class PagedReaderWidget extends StatefulWidget {
 
 class _PagedReaderWidgetState extends State<PagedReaderWidget>
     with SingleTickerProviderStateMixin {
-  late int _currentPage;
   late AnimationController _animController;
 
   // 翻页状态
@@ -63,28 +45,24 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   @override
   void initState() {
     super.initState();
-    _currentPage = widget.initialPage.clamp(0, _maxPageIndex);
-
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+
+    // 监听内容变化
+    widget.pageFactory.onContentChanged = () {
+      if (mounted) setState(() {});
+    };
   }
-
-  int get _maxPageIndex => widget.pages.isEmpty ? 0 : widget.pages.length - 1;
-
-  /// 对标 Legado hasNext: 有下一页或有下一章
-  bool get _hasNext => _currentPage < _maxPageIndex || widget.hasNextChapter;
-
-  /// 对标 Legado hasPrev: 有上一页或有上一章
-  bool get _hasPrev => _currentPage > 0 || widget.hasPrevChapter;
 
   @override
   void didUpdateWidget(PagedReaderWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.pages != widget.pages) {
-      _currentPage = widget.initialPage.clamp(0, _maxPageIndex);
-      _dragOffset = 0;
+    if (oldWidget.pageFactory != widget.pageFactory) {
+      widget.pageFactory.onContentChanged = () {
+        if (mounted) setState(() {});
+      };
     }
   }
 
@@ -93,6 +71,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _animController.dispose();
     super.dispose();
   }
+
+  PageFactory get _factory => widget.pageFactory;
 
   void _onTap(Offset position) {
     if (_isAnimating) return;
@@ -109,44 +89,30 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
-  /// 对标 Legado moveToNext
   void _goNext() {
-    if (!_hasNext) return;
-
-    if (_currentPage >= _maxPageIndex) {
-      // 已是最后一页，切换到下一章
-      widget.onNextChapter?.call();
-    } else {
-      _direction = _PageDirection.next;
-      _animateToPage(_currentPage + 1);
-    }
+    if (!_factory.hasNext()) return;
+    _direction = _PageDirection.next;
+    _startAnimation();
   }
 
-  /// 对标 Legado moveToPrev
   void _goPrev() {
-    if (!_hasPrev) return;
-
-    if (_currentPage <= 0) {
-      // 已是第一页，切换到上一章
-      widget.onPrevChapter?.call();
-    } else {
-      _direction = _PageDirection.prev;
-      _animateToPage(_currentPage - 1);
-    }
+    if (!_factory.hasPrev()) return;
+    _direction = _PageDirection.prev;
+    _startAnimation();
   }
 
-  void _animateToPage(int targetPage) {
+  void _startAnimation() {
     if (_isAnimating) return;
     _isAnimating = true;
 
     final screenWidth = MediaQuery.of(context).size.width;
     final targetOffset =
         _direction == _PageDirection.next ? -screenWidth : screenWidth;
-
     final startOffset = _dragOffset;
 
     _animController.reset();
-    _animController.addListener(() {
+
+    void listener() {
       if (mounted) {
         setState(() {
           _dragOffset = startOffset +
@@ -154,35 +120,40 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                   Curves.easeOutCubic.transform(_animController.value);
         });
       }
-    });
+    }
 
-    _animController.addStatusListener((status) {
+    void statusListener(AnimationStatus status) {
       if (status == AnimationStatus.completed) {
-        setState(() {
-          _currentPage = targetPage;
-          _dragOffset = 0;
-          _direction = _PageDirection.none;
-          _isAnimating = false;
-        });
-        widget.onPageChanged?.call(_currentPage);
-        _animController.removeListener(() {});
+        _onAnimStop();
+        _animController.removeListener(listener);
+        _animController.removeStatusListener(statusListener);
       }
-    });
+    }
 
+    _animController.addListener(listener);
+    _animController.addStatusListener(statusListener);
     _animController.forward();
+  }
+
+  /// 对标 Legado onAnimStop + fillPage
+  void _onAnimStop() {
+    // 执行翻页
+    if (_direction == _PageDirection.next) {
+      _factory.moveToNext();
+    } else if (_direction == _PageDirection.prev) {
+      _factory.moveToPrev();
+    }
+
+    // 重置状态
+    setState(() {
+      _dragOffset = 0;
+      _direction = _PageDirection.none;
+      _isAnimating = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.pages.isEmpty) {
-      return Container(
-        color: widget.backgroundColor,
-        child: Center(
-          child: Text('暂无内容', style: widget.textStyle),
-        ),
-      );
-    }
-
     final topSafe = MediaQuery.of(context).padding.top;
     final bottomSafe = MediaQuery.of(context).padding.bottom;
 
@@ -218,7 +189,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.chapterTitle,
+              _factory.currentChapterTitle,
               style:
                   widget.textStyle.copyWith(fontSize: 14, color: statusColor),
               maxLines: 1,
@@ -232,7 +203,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                         .copyWith(fontSize: 11, color: statusColor)),
                 const Expanded(child: SizedBox.shrink()),
                 Text(
-                  '${_currentPage + 1}/${widget.pages.length}',
+                  '${_factory.currentPageIndex + 1}/${_factory.totalPages}',
                   style: widget.textStyle
                       .copyWith(fontSize: 11, color: statusColor),
                 ),
@@ -245,85 +216,76 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Widget _buildPageContent() {
-    // slide 模式使用 PageView
     if (widget.pageTurnMode == PageTurnMode.slide) {
-      return _buildSlidePageView();
+      return _buildSlideMode();
     }
-    // cover/simulation/none 使用自定义手势
-    return _buildCustomPageView();
+    return _buildCoverMode();
   }
 
-  Widget _buildSlidePageView() {
-    return PageView.builder(
-      controller: PageController(initialPage: _currentPage),
-      physics: const BouncingScrollPhysics(),
-      itemCount: widget.pages.length,
-      onPageChanged: (index) {
-        setState(() => _currentPage = index);
-        widget.onPageChanged?.call(index);
-
-        // 滑动到边界时自动切换章节
-        if (index == 0 && _currentPage == 0) {
-          // 可能需要上一章（由 PageView 边界处理）
-        } else if (index == _maxPageIndex) {
-          // 在最后一页继续滑动会触发下一章
-        }
-      },
-      itemBuilder: (context, index) {
-        return GestureDetector(
-          onTapUp: (d) => _onTap(d.globalPosition),
-          child: _buildPage(index),
-        );
-      },
-    );
-  }
-
-  Widget _buildCustomPageView() {
-    final screenWidth = MediaQuery.of(context).size.width;
-
+  /// 滑动模式
+  Widget _buildSlideMode() {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapUp: (d) => _onTap(d.globalPosition),
       onHorizontalDragStart: _onDragStart,
       onHorizontalDragUpdate: _onDragUpdate,
       onHorizontalDragEnd: _onDragEnd,
-      child: Stack(
-        children: [
-          // 底层：目标页面
-          if (_direction == _PageDirection.prev && _currentPage > 0)
-            Positioned.fill(child: _buildPage(_currentPage - 1)),
-          if (_direction == _PageDirection.next && _currentPage < _maxPageIndex)
-            Positioned.fill(child: _buildPage(_currentPage + 1)),
-
-          // 顶层：当前页面（带动画）
-          _buildCurrentPageWithAnimation(screenWidth),
-        ],
-      ),
+      child: _buildThreePageStack(isSlide: true),
     );
   }
 
-  Widget _buildCurrentPageWithAnimation(double screenWidth) {
-    double offset = _dragOffset.clamp(-screenWidth, screenWidth);
-    double shadowOpacity = 0;
+  /// 覆盖模式（cover/simulation/none）
+  Widget _buildCoverMode() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (d) => _onTap(d.globalPosition),
+      onHorizontalDragStart: _onDragStart,
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: _buildThreePageStack(isSlide: false),
+    );
+  }
 
-    switch (widget.pageTurnMode) {
-      case PageTurnMode.cover:
-        // 覆盖效果：当前页滑出覆盖
-        shadowOpacity = (offset.abs() / screenWidth * 0.3).clamp(0, 0.3);
-        break;
-      case PageTurnMode.simulation:
-        // 仿真效果（简化版）
-        shadowOpacity = (offset.abs() / screenWidth * 0.4).clamp(0, 0.4);
-        break;
-      case PageTurnMode.none:
-        // 无动画：不显示中间状态
-        if (!_isAnimating && offset.abs() > 20) {
-          return const SizedBox.shrink();
-        }
-        offset = 0;
-        break;
-      default:
-        break;
+  /// 三页面堆叠（对标 Legado 的 prevPage/curPage/nextPage）
+  Widget _buildThreePageStack({required bool isSlide}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final offset = _dragOffset.clamp(-screenWidth, screenWidth);
+
+    return Stack(
+      children: [
+        // 底层：目标页面
+        if (_direction == _PageDirection.prev || offset > 0)
+          Positioned.fill(
+            child: _buildPageWidget(_factory.prevPage),
+          ),
+        if (_direction == _PageDirection.next || offset < 0)
+          Positioned.fill(
+            child: _buildPageWidget(_factory.nextPage),
+          ),
+
+        // 顶层：当前页面
+        if (isSlide)
+          // 滑动模式：两页同时移动
+          Positioned(
+            left: offset,
+            top: 0,
+            bottom: 0,
+            width: screenWidth,
+            child: _buildPageWidget(_factory.curPage),
+          )
+        else
+          // 覆盖模式：当前页覆盖在上面
+          _buildCoverCurrentPage(screenWidth, offset),
+      ],
+    );
+  }
+
+  Widget _buildCoverCurrentPage(double screenWidth, double offset) {
+    double shadowOpacity = (offset.abs() / screenWidth * 0.3).clamp(0, 0.3);
+
+    // none模式：不显示动画过渡
+    if (widget.pageTurnMode == PageTurnMode.none && !_isAnimating) {
+      return Positioned.fill(child: _buildPageWidget(_factory.curPage));
     }
 
     return Positioned(
@@ -343,7 +305,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 ]
               : null,
         ),
-        child: _buildPage(_currentPage),
+        child: _buildPageWidget(_factory.curPage),
       ),
     );
   }
@@ -366,14 +328,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             _dragOffset > 0 ? _PageDirection.prev : _PageDirection.next;
       }
 
-      // 边界检查和阻尼
-      if (_direction == _PageDirection.prev && !_hasPrev) {
-        _dragOffset = _dragOffset.clamp(-double.infinity, 50);
-        _dragOffset *= 0.3;
+      // 边界阻尼
+      if (_direction == _PageDirection.prev && !_factory.hasPrev()) {
+        _dragOffset = (_dragOffset * 0.3).clamp(-50, 50);
       }
-      if (_direction == _PageDirection.next && !_hasNext) {
-        _dragOffset = _dragOffset.clamp(-50, double.infinity);
-        _dragOffset *= 0.3;
+      if (_direction == _PageDirection.next && !_factory.hasNext()) {
+        _dragOffset = (_dragOffset * 0.3).clamp(-50, 50);
       }
     });
   }
@@ -389,33 +349,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final shouldTurn =
         _dragOffset.abs() > screenWidth * 0.25 || velocity.abs() > 800;
 
-    if (shouldTurn) {
-      if (_direction == _PageDirection.prev) {
-        if (_currentPage > 0) {
-          _animateToPage(_currentPage - 1);
-        } else if (widget.hasPrevChapter) {
-          // 跨章节：上一章最后一页
-          widget.onPrevChapter?.call();
-          _resetDrag();
-        } else {
-          _cancelDrag();
-        }
-      } else if (_direction == _PageDirection.next) {
-        if (_currentPage < _maxPageIndex) {
-          _animateToPage(_currentPage + 1);
-        } else if (widget.hasNextChapter) {
-          // 跨章节：下一章第一页
-          widget.onNextChapter?.call();
-          _resetDrag();
-        } else {
-          _cancelDrag();
-        }
-      } else {
-        _cancelDrag();
+    if (shouldTurn && _direction != _PageDirection.none) {
+      bool canTurn = _direction == _PageDirection.prev
+          ? _factory.hasPrev()
+          : _factory.hasNext();
+
+      if (canTurn) {
+        _startAnimation();
+        return;
       }
-    } else {
-      _cancelDrag();
     }
+
+    // 回弹动画
+    _cancelDrag();
   }
 
   void _cancelDrag() {
@@ -423,34 +369,35 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final startOffset = _dragOffset;
 
     _animController.reset();
-    _animController.addListener(() {
+
+    void listener() {
       if (mounted) {
         setState(() {
           _dragOffset = startOffset *
               (1 - Curves.easeOut.transform(_animController.value));
         });
       }
-    });
+    }
 
-    _animController.addStatusListener((status) {
+    void statusListener(AnimationStatus status) {
       if (status == AnimationStatus.completed) {
-        _resetDrag();
+        setState(() {
+          _dragOffset = 0;
+          _direction = _PageDirection.none;
+          _isAnimating = false;
+        });
+        _animController.removeListener(listener);
+        _animController.removeStatusListener(statusListener);
       }
-    });
+    }
 
+    _animController.addListener(listener);
+    _animController.addStatusListener(statusListener);
     _animController.forward();
   }
 
-  void _resetDrag() {
-    setState(() {
-      _dragOffset = 0;
-      _direction = _PageDirection.none;
-      _isAnimating = false;
-    });
-  }
-
-  Widget _buildPage(int index) {
-    if (index < 0 || index >= widget.pages.length) {
+  Widget _buildPageWidget(String content) {
+    if (content.isEmpty) {
       return Container(color: widget.backgroundColor);
     }
 
@@ -466,7 +413,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         bottomSafe + PagedReaderWidget.bottomOffset,
       ),
       child: Text.rich(
-        TextSpan(text: widget.pages[index], style: widget.textStyle),
+        TextSpan(text: content, style: widget.textStyle),
         textAlign: TextAlign.justify,
       ),
     );

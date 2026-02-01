@@ -14,7 +14,7 @@ import '../widgets/auto_pager.dart';
 import '../widgets/bookmark_dialog.dart';
 import '../widgets/click_action_config_dialog.dart';
 import '../widgets/paged_reader_widget.dart';
-import '../widgets/reader_page_agent.dart';
+import '../widgets/page_factory.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -60,11 +60,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _showAutoReadPanel = false;
 
   // 当前书籍信息
-  String _bookAuthor = '';
+  final String _bookAuthor = '';
 
-  // 翻页模式相关
-  List<String> _contentPages = [];
-  int _currentPageIndex = 0;
+  // 翻页模式相关（对标 Legado PageFactory）
+  final PageFactory _pageFactory = PageFactory();
+  List<String> _contentPages = []; // 保留兼容滚动模式
 
   @override
   void initState() {
@@ -96,6 +96,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       if (_currentChapterIndex >= _chapters.length) {
         _currentChapterIndex = 0;
       }
+
+      // 初始化 PageFactory：设置章节数据
+      final chapterDataList = _chapters
+          .map((c) => ChapterData(
+                title: c.title,
+                content: c.content ?? '',
+              ))
+          .toList();
+      _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
+
+      // 监听章节变化
+      _pageFactory.onContentChanged = () {
+        if (mounted) {
+          setState(() {
+            _currentChapterIndex = _pageFactory.currentChapterIndex;
+            _currentTitle = _pageFactory.currentChapterTitle;
+          });
+          _saveProgress();
+        }
+      };
+
       await _loadChapter(_currentChapterIndex, restoreOffset: true);
     }
     if (mounted) {
@@ -142,7 +163,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _currentChapterIndex = index;
       _currentTitle = _chapters[index].title;
       _currentContent = _chapters[index].content ?? '';
-      _currentPageIndex = 0;
     });
 
     // 如果是非滚动模式，需要在build后进行分页
@@ -150,12 +170,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       if (_settings.pageTurnMode != PageTurnMode.scroll) {
         _paginateContent();
 
-        // 跳转到最后一页（从上一章滑动过来时）
-        if (goToLastPage && _contentPages.isNotEmpty) {
-          setState(() {
-            _currentPageIndex = _contentPages.length - 1;
-          });
-        }
+        // 使用PageFactory跳转章节（自动处理goToLastPage）
+        _pageFactory.jumpToChapter(index, goToLastPage: goToLastPage);
       }
 
       if (_scrollController.hasClients) {
@@ -178,7 +194,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await _saveProgress();
   }
 
-  /// 将内容分页（使用 TextPainter 精确计算，对标 flutter_reader）
+  /// 将内容分页（使用 PageFactory 对标 Legado）
   void _paginateContent() {
     if (!mounted) return;
 
@@ -188,8 +204,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final safeArea = MediaQuery.of(context).padding;
 
     // 对标 flutter_reader 的布局计算
-    // contentHeight = Screen.height - topSafeHeight - topOffset - bottomSafeHeight - bottomOffset - 20
-    // contentWidth = Screen.width - 15 - 10
     const topOffset = 37.0;
     const bottomOffset = 37.0;
 
@@ -202,20 +216,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final contentWidth =
         screenWidth - _settings.marginHorizontal - _settings.marginHorizontal;
 
-    // 使用 ReaderPageAgent 精确分页
-    final pages = ReaderPageAgent.paginateContent(
-      _currentContent,
-      contentHeight,
-      contentWidth,
-      _settings.fontSize,
+    // 使用 PageFactory 进行三章节分页（对标 Legado）
+    _pageFactory.setLayoutParams(
+      contentHeight: contentHeight,
+      contentWidth: contentWidth,
+      fontSize: _settings.fontSize,
       lineHeight: _settings.lineHeight,
       letterSpacing: _settings.letterSpacing,
-      title: _currentTitle,
     );
+    _pageFactory.paginateAll();
 
+    // 保留兼容滚动模式
     setState(() {
-      _contentPages = pages;
-      _currentPageIndex = 0;
+      _contentPages = _pageFactory.currentPages;
     });
   }
 
@@ -383,11 +396,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return _buildScrollContent();
   }
 
-  /// 翻页模式内容（对标 flutter_reader）
+  /// 翻页模式内容（对标 Legado ReadView）
   Widget _buildPagedContent() {
     return PagedReaderWidget(
-      pages: _contentPages.isEmpty ? [_currentTitle] : _contentPages,
-      initialPage: _currentPageIndex,
+      pageFactory: _pageFactory,
       pageTurnMode: _settings.pageTurnMode,
       textStyle: TextStyle(
         fontSize: _settings.fontSize,
@@ -398,31 +410,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ),
       backgroundColor: _currentTheme.background,
       padding: EdgeInsets.symmetric(horizontal: _settings.marginHorizontal),
-      onPageChanged: (pageIndex) {
-        setState(() {
-          _currentPageIndex = pageIndex;
-        });
-      },
-      onPrevChapter: () {
-        if (_currentChapterIndex > 0) {
-          _loadChapter(_currentChapterIndex - 1, goToLastPage: true);
-        }
-      },
-      onNextChapter: () {
-        if (_currentChapterIndex < _chapters.length - 1) {
-          _loadChapter(_currentChapterIndex + 1);
-        }
-      },
       onTap: () {
         setState(() {
           _showMenu = !_showMenu;
         });
       },
       showStatusBar: _settings.showStatusBar,
-      chapterTitle: _currentTitle,
-      // 章节信息：用于判断是否可以滑动跨章节
-      hasPrevChapter: _currentChapterIndex > 0,
-      hasNextChapter: _currentChapterIndex < _chapters.length - 1,
     );
   }
 
