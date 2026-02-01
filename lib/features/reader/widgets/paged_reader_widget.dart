@@ -405,19 +405,37 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     // 如果正在动画且有图片，使用 CustomPaint
     if ((_isDragging || _isAnimating) && _curPageImage != null) {
+      // 计算角点（对标 Legado calcCornerXY + setDirection）
+      int cornerX;
+      int cornerY;
+
+      if (isNext) {
+        // NEXT方向：从右下角或右上角翻
+        cornerX = _startX <= size.width / 2 ? 0 : size.width.toInt();
+        cornerY = _startY <= size.height / 2 ? 0 : size.height.toInt();
+        // 如果从左边滑动，镜像到右边
+        if (size.width / 2 > _startX) {
+          cornerX = size.width.toInt();
+        }
+      } else {
+        // PREV方向：强制从底部翻（上一页滑动不出现对角）
+        cornerX = _startX > size.width / 2 ? size.width.toInt() : 0;
+        cornerY = size.height.toInt();
+      }
+
       return CustomPaint(
         size: size,
         painter: SimulationPagePainter(
-          curPageImage: _curPageImage,
-          targetPageImage: _targetPageImage,
+          curBitmap: _curPageImage,
+          nextBitmap: _targetPageImage,
           touchX: _touchX,
           touchY: _touchY,
-          startX: _startX,
-          startY: _startY,
           viewWidth: size.width.toInt(),
           viewHeight: size.height.toInt(),
           isNext: isNext,
           backgroundColor: widget.backgroundColor,
+          cornerX: cornerX,
+          cornerY: cornerY,
         ),
       );
     }
@@ -425,12 +443,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 准备截图用的隐藏组件
     return Stack(
       children: [
-        // 当前页（用于截图）
+        // 当前页（用于截图）- NEXT时是curPage，PREV时是prevPage
         RepaintBoundary(
           key: _curPageKey,
-          child: _buildPageWidget(_factory.curPage),
+          child: _buildPageWidget(
+            _direction == _PageDirection.prev
+                ? _factory.prevPage
+                : _factory.curPage,
+          ),
         ),
-        // 目标页（隐藏，用于截图）
+        // 目标页（隐藏，用于截图）- NEXT时是nextPage，PREV时是curPage
         Offstage(
           offstage: true,
           child: RepaintBoundary(
@@ -438,7 +460,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             child: _buildPageWidget(
               _direction == _PageDirection.next
                   ? _factory.nextPage
-                  : _factory.prevPage,
+                  : _factory.curPage,
             ),
           ),
         ),
