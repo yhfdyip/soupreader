@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'
-    show Colors, Slider, showModalBottomSheet;
+    show Colors, Slider, showModalBottomSheet, Material, InkWell;
 import 'package:flutter/services.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -500,54 +500,47 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       right: 0,
       child: Container(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 10,
-          top: 16,
+          bottom: MediaQuery.of(context).padding.bottom + 8,
+          top: 12,
+          left: 8,
+          right: 8,
         ),
         decoration: BoxDecoration(
-          color: CupertinoColors.black.withValues(alpha: 0.85),
+          color: CupertinoColors.black.withValues(alpha: 0.9),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 进度滑条
+            // 进度条
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _currentChapterIndex > 0
-                        ? () => _loadChapter(_currentChapterIndex - 1)
-                        : null,
-                    child: const Icon(CupertinoIcons.chevron_left,
-                        color: CupertinoColors.white, size: 20),
-                  ),
+                  _buildNavBtn(
+                      CupertinoIcons.chevron_left,
+                      _currentChapterIndex > 0
+                          ? () => _loadChapter(_currentChapterIndex - 1)
+                          : null),
                   Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '${_currentChapterIndex + 1} / ${_chapters.length}',
-                          style: const TextStyle(
-                              color: CupertinoColors.systemGrey, fontSize: 12),
-                        ),
-                      ],
+                    child: Text(
+                      '${_currentChapterIndex + 1} / ${_chapters.length}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: CupertinoColors.systemGrey, fontSize: 13),
                     ),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _currentChapterIndex < _chapters.length - 1
-                        ? () => _loadChapter(_currentChapterIndex + 1)
-                        : null,
-                    child: const Icon(CupertinoIcons.chevron_right,
-                        color: CupertinoColors.white, size: 20),
-                  ),
+                  _buildNavBtn(
+                      CupertinoIcons.chevron_right,
+                      _currentChapterIndex < _chapters.length - 1
+                          ? () => _loadChapter(_currentChapterIndex + 1)
+                          : null),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            // 设置按钮组 - 第一排
+            // 主要按钮 - 单排5个
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildMenuBtn(
                     CupertinoIcons.list_bullet, '目录', _showChapterList),
@@ -556,40 +549,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         ? CupertinoIcons.bookmark_fill
                         : CupertinoIcons.bookmark,
                     '书签',
-                    _showBookmarkDialog),
-                _buildMenuBtn(
-                    CupertinoIcons.brightness, '亮度', _showBrightnessSheet),
-                _buildMenuBtn(CupertinoIcons.moon, '主题', _showThemeSheet),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // 设置按钮组 - 第二排
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
+                    _toggleBookmark),
                 _buildMenuBtn(
                     CupertinoIcons.textformat_size, '字体', _showFontSheet),
+                _buildMenuBtn(CupertinoIcons.moon, '主题', _showThemeSheet),
                 _buildMenuBtn(
-                    CupertinoIcons.book, '翻页', _showPageTurnModeSheet),
-                _buildMenuBtn(
-                    CupertinoIcons.slider_horizontal_3, '排版', _showLayoutSheet),
-                _buildMenuBtn(
-                    CupertinoIcons.settings, '更多', _showMoreSettingsSheet),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // 设置按钮组 - 第三排
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildMenuBtn(
-                    CupertinoIcons.play_circle, '自动', _toggleAutoReadPanel),
-                _buildMenuBtn(CupertinoIcons.square_grid_3x2, '点击',
-                    _showClickActionConfig),
-                _buildMenuBtn(
-                    CupertinoIcons.arrow_clockwise, '刷新', _refreshChapter),
-                _buildMenuBtn(
-                    CupertinoIcons.bookmark_fill, '加签', _toggleBookmark),
+                    CupertinoIcons.ellipsis_circle, '更多', _showMoreMenu),
               ],
             ),
           ],
@@ -598,19 +563,159 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  /// 导航按钮（上一章/下一章）
+  Widget _buildNavBtn(IconData icon, VoidCallback? onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
+            icon,
+            color: onTap != null
+                ? CupertinoColors.white
+                : CupertinoColors.systemGrey,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMenuBtn(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: 60,
-        child: Column(
-          children: [
-            Icon(icon, color: CupertinoColors.white, size: 22),
-            const SizedBox(height: 4),
-            Text(label,
-                style: const TextStyle(
-                    color: CupertinoColors.white, fontSize: 11)),
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        splashColor: CupertinoColors.activeBlue.withValues(alpha: 0.3),
+        highlightColor: CupertinoColors.activeBlue.withValues(alpha: 0.1),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: CupertinoColors.white, size: 24),
+              const SizedBox(height: 6),
+              Text(label,
+                  style: const TextStyle(
+                      color: CupertinoColors.white, fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 更多菜单弹窗
+  void _showMoreMenu() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 标题
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text('更多选项',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold)),
+              ),
+              // 第一排
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildMoreMenuItem(CupertinoIcons.brightness, '亮度', () {
+                    Navigator.pop(context);
+                    _showBrightnessSheet();
+                  }),
+                  _buildMoreMenuItem(CupertinoIcons.book, '翻页', () {
+                    Navigator.pop(context);
+                    _showPageTurnModeSheet();
+                  }),
+                  _buildMoreMenuItem(CupertinoIcons.slider_horizontal_3, '排版',
+                      () {
+                    Navigator.pop(context);
+                    _showLayoutSheet();
+                  }),
+                  _buildMoreMenuItem(CupertinoIcons.settings, '设置', () {
+                    Navigator.pop(context);
+                    _showMoreSettingsSheet();
+                  }),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // 第二排
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildMoreMenuItem(CupertinoIcons.play_circle, '自动', () {
+                    Navigator.pop(context);
+                    _toggleAutoReadPanel();
+                  }),
+                  _buildMoreMenuItem(CupertinoIcons.square_grid_3x2, '点击', () {
+                    Navigator.pop(context);
+                    _showClickActionConfig();
+                  }),
+                  _buildMoreMenuItem(CupertinoIcons.arrow_clockwise, '刷新', () {
+                    Navigator.pop(context);
+                    _refreshChapter();
+                  }),
+                  _buildMoreMenuItem(CupertinoIcons.bookmark_solid, '书签列表', () {
+                    Navigator.pop(context);
+                    _showBookmarkDialog();
+                  }),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // 取消按钮
+              SizedBox(
+                width: double.infinity,
+                child: CupertinoButton(
+                  color: CupertinoColors.systemGrey5,
+                  onPressed: () => Navigator.pop(context),
+                  child:
+                      const Text('取消', style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMoreMenuItem(IconData icon, String label, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        splashColor: CupertinoColors.activeBlue.withValues(alpha: 0.3),
+        child: Container(
+          width: 70,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: CupertinoColors.white, size: 26),
+              const SizedBox(height: 8),
+              Text(label,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ],
+          ),
         ),
       ),
     );
