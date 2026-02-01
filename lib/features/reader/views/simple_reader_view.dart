@@ -336,50 +336,62 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final screenSize = MediaQuery.of(context).size;
     final isScrollMode = _settings.pageTurnMode == PageTurnMode.scroll;
 
-    return CupertinoPageScaffold(
-      backgroundColor: _currentTheme.background,
-      child: GestureDetector(
-        // 只有滚动模式才使用外层的点击处理
-        onTapUp: isScrollMode ? _handleTap : null,
-        child: SizedBox(
-          width: screenSize.width,
-          height: screenSize.height,
-          child: Stack(
-            children: [
-              // 阅读内容 - 固定全屏
-              Positioned.fill(
-                child: _buildReadingContent(),
-              ),
-
-              // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
-              if (_settings.showStatusBar &&
-                  !_showMenu &&
-                  !_showAutoReadPanel &&
-                  isScrollMode)
-                _buildStatusBar(),
-
-              // 顶部菜单
-              if (_showMenu) _buildTopMenu(),
-
-              // 底部菜单
-              if (_showMenu) _buildBottomMenu(),
-
-              // 自动阅读控制面板
-              if (_showAutoReadPanel)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: AutoReadPanel(
-                    autoPager: _autoPager,
-                    onClose: () {
-                      setState(() {
-                        _showAutoReadPanel = false;
-                      });
-                    },
-                  ),
+    // 阅读模式时阻止 iOS 边缘滑动返回（菜单显示时允许返回）
+    return PopScope(
+      canPop: _showMenu,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && !_showMenu) {
+          // 如果阻止了 pop 且菜单未显示，则显示菜单
+          setState(() {
+            _showMenu = true;
+          });
+        }
+      },
+      child: CupertinoPageScaffold(
+        backgroundColor: _currentTheme.background,
+        child: GestureDetector(
+          // 只有滚动模式才使用外层的点击处理
+          onTapUp: isScrollMode ? _handleTap : null,
+          child: SizedBox(
+            width: screenSize.width,
+            height: screenSize.height,
+            child: Stack(
+              children: [
+                // 阅读内容 - 固定全屏
+                Positioned.fill(
+                  child: _buildReadingContent(),
                 ),
-            ],
+
+                // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
+                if (_settings.showStatusBar &&
+                    !_showMenu &&
+                    !_showAutoReadPanel &&
+                    isScrollMode)
+                  _buildStatusBar(),
+
+                // 顶部菜单
+                if (_showMenu) _buildTopMenu(),
+
+                // 底部菜单
+                if (_showMenu) _buildBottomMenu(),
+
+                // 自动阅读控制面板
+                if (_showAutoReadPanel)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: AutoReadPanel(
+                      autoPager: _autoPager,
+                      onClose: () {
+                        setState(() {
+                          _showAutoReadPanel = false;
+                        });
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
