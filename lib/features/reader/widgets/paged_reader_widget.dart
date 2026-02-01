@@ -5,8 +5,8 @@ import 'page_delegate/cover_delegate.dart';
 import 'page_delegate/slide_delegate.dart';
 import 'page_delegate/no_anim_delegate.dart';
 
-/// 翻页阅读器组件
-/// 支持覆盖、滑动、无动画等翻页模式
+/// 翻页阅读器组件（对标 Legado ReadView）
+/// 采用 prevPage/curPage/nextPage 三视图架构
 class PagedReaderWidget extends StatefulWidget {
   final List<String> pages;
   final int initialPage;
@@ -39,15 +39,18 @@ class PagedReaderWidget extends StatefulWidget {
 
 class _PagedReaderWidgetState extends State<PagedReaderWidget>
     with TickerProviderStateMixin {
-  late PageController _pageController;
   late int _currentPage;
   PageDelegate? _pageDelegate;
+
+  // 触摸状态
+  double _startX = 0;
+  double _startY = 0;
+  bool _isMoving = false;
 
   @override
   void initState() {
     super.initState();
     _currentPage = widget.initialPage.clamp(0, widget.pages.length - 1);
-    _pageController = PageController(initialPage: _currentPage);
     _initPageDelegate();
   }
 
@@ -59,7 +62,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
     if (oldWidget.pages != widget.pages) {
       _currentPage = widget.initialPage.clamp(0, widget.pages.length - 1);
-      _pageController.jumpToPage(_currentPage);
     }
   }
 
@@ -141,7 +143,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   @override
   void dispose() {
-    _pageController.dispose();
     _pageDelegate?.dispose();
     super.dispose();
   }
@@ -151,99 +152,111 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (widget.pages.isEmpty) {
       return Container(
         color: widget.backgroundColor,
-        child: const Center(child: Text('暂无内容')),
+        child: Center(
+          child: Text('暂无内容', style: widget.textStyle),
+        ),
       );
     }
 
-    // 如果使用PageDelegate
-    if (_pageDelegate != null) {
-      return _buildDelegateBasedReader();
-    }
-
-    // 默认使用PageView（滚动模式应该由外层处理，这里作为后备）
-    return _buildPageViewReader();
-  }
-
-  Widget _buildDelegateBasedReader() {
     final size = MediaQuery.of(context).size;
 
     return GestureDetector(
-      onHorizontalDragStart: _pageDelegate?.onDragStart,
-      onHorizontalDragUpdate: _pageDelegate?.onDragUpdate,
-      onHorizontalDragEnd: _pageDelegate?.onDragEnd,
-      onTapUp: (details) {
-        final screenWidth = size.width;
-        final tapX = details.globalPosition.dx;
-
-        if (tapX < screenWidth / 3) {
-          // 左侧点击：上一页
-          _pageDelegate?.prevPage();
-        } else if (tapX > screenWidth * 2 / 3) {
-          // 右侧点击：下一页
-          _pageDelegate?.nextPage();
-        } else {
-          // 中间点击：显示菜单
-          widget.onTap?.call();
-        }
-      },
+      behavior: HitTestBehavior.opaque,
+      onPanStart: _onPanStart,
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: _onPanEnd,
+      onTapUp: _onTapUp,
       child: Container(
+        width: size.width,
+        height: size.height,
         color: widget.backgroundColor,
-        child: _pageDelegate!.buildPageTransition(
-          currentPage: _buildPage(_currentPage),
-          prevPage: _currentPage > 0
-              ? _buildPage(_currentPage - 1)
-              : Container(color: widget.backgroundColor),
-          nextPage: _currentPage < widget.pages.length - 1
-              ? _buildPage(_currentPage + 1)
-              : _buildEndOfChapterPage(),
-          size: size,
-        ),
+        child: _pageDelegate != null
+            ? _pageDelegate!.buildPageTransition(
+                currentPage: _buildPage(_currentPage),
+                prevPage: _currentPage > 0
+                    ? _buildPage(_currentPage - 1)
+                    : _buildEmptyPage('已是第一页'),
+                nextPage: _currentPage < widget.pages.length - 1
+                    ? _buildPage(_currentPage + 1)
+                    : _buildEmptyPage('本章结束\n点击右侧进入下一章'),
+                size: size,
+              )
+            : _buildPage(_currentPage),
       ),
     );
   }
 
-  Widget _buildPageViewReader() {
-    return PageView.builder(
-      controller: _pageController,
-      itemCount: widget.pages.length,
-      onPageChanged: (index) {
-        setState(() {
-          _currentPage = index;
-        });
-        widget.onPageChanged?.call(index);
-      },
-      itemBuilder: (context, index) {
-        return GestureDetector(
-          onTapUp: (details) {
-            final screenWidth = MediaQuery.of(context).size.width;
-            final tapX = details.globalPosition.dx;
+  void _onPanStart(DragStartDetails details) {
+    _startX = details.localPosition.dx;
+    _startY = details.localPosition.dy;
+    _isMoving = false;
+    _pageDelegate?.onDragStart(details);
+  }
 
-            if (tapX < screenWidth / 3) {
-              if (_currentPage > 0) {
-                _pageController.previousPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              } else {
-                widget.onPrevChapter?.call();
-              }
-            } else if (tapX > screenWidth * 2 / 3) {
-              if (_currentPage < widget.pages.length - 1) {
-                _pageController.nextPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              } else {
-                widget.onNextChapter?.call();
-              }
-            } else {
-              widget.onTap?.call();
-            }
-          },
-          child: _buildPage(index),
-        );
-      },
-    );
+  void _onPanUpdate(DragUpdateDetails details) {
+    final dx = (details.localPosition.dx - _startX).abs();
+    final dy = (details.localPosition.dy - _startY).abs();
+
+    // 水平滑动阈值
+    if (dx > 10 || dy > 10) {
+      _isMoving = true;
+    }
+
+    if (_isMoving && dx > dy) {
+      _pageDelegate?.onDragUpdate(details);
+    }
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    if (_isMoving) {
+      _pageDelegate?.onDragEnd(details);
+    }
+    _isMoving = false;
+  }
+
+  /// 点击处理 - 对标 Legado 9宫格
+  void _onTapUp(TapUpDetails details) {
+    if (_isMoving) return;
+
+    final size = MediaQuery.of(context).size;
+    final tapX = details.localPosition.dx;
+    final tapY = details.localPosition.dy;
+
+    // 9宫格区域划分
+    final leftBound = size.width / 3;
+    final rightBound = size.width * 2 / 3;
+    final topBound = size.height / 3;
+    final bottomBound = size.height * 2 / 3;
+
+    // 中间区域 - 显示菜单
+    if (tapX >= leftBound &&
+        tapX <= rightBound &&
+        tapY >= topBound &&
+        tapY <= bottomBound) {
+      widget.onTap?.call();
+      return;
+    }
+
+    // 左侧区域 - 上一页
+    if (tapX < leftBound) {
+      _pageDelegate?.prevPage();
+      return;
+    }
+
+    // 右侧区域 - 下一页
+    if (tapX > rightBound) {
+      _pageDelegate?.nextPage();
+      return;
+    }
+
+    // 上中/下中区域 - 也可以翻页
+    if (tapY < topBound) {
+      // 上方区域 - 上一页
+      _pageDelegate?.prevPage();
+    } else if (tapY > bottomBound) {
+      // 下方区域 - 下一页
+      _pageDelegate?.nextPage();
+    }
   }
 
   Widget _buildPage(int index) {
@@ -261,29 +274,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
-  Widget _buildEndOfChapterPage() {
+  Widget _buildEmptyPage(String message) {
     return Container(
       color: widget.backgroundColor,
+      padding: widget.padding,
       child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '本章结束',
-              style: widget.textStyle.copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '点击右侧进入下一章',
-              style: widget.textStyle.copyWith(
-                fontSize: 14,
-                color: widget.textStyle.color?.withOpacity(0.6),
-              ),
-            ),
-          ],
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: widget.textStyle.copyWith(
+            fontSize: 16,
+            color: widget.textStyle.color?.withValues(alpha: 0.6),
+          ),
         ),
       ),
     );

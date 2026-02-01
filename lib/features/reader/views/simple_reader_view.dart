@@ -171,8 +171,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 获取屏幕可用高度
     final screenHeight = MediaQuery.of(context).size.height;
     final safeArea = MediaQuery.of(context).padding;
+    // 可用高度 = 屏幕高度 - 安全区域 - 上下边距 - 状态栏(30)
+    final verticalPadding = _settings.marginVertical * 2;
+    final statusBarHeight = _settings.showStatusBar ? 30.0 : 0.0;
     final availableHeight =
-        screenHeight - safeArea.top - safeArea.bottom - 80; // 减去边距和状态栏
+        screenHeight - safeArea.top - verticalPadding - statusBarHeight;
 
     // 估算每页可容纳的行数
     final lineHeight = _settings.fontSize * _settings.lineHeight;
@@ -389,47 +392,44 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 翻页模式内容
   Widget _buildPagedContent() {
-    return SafeArea(
-      bottom: false,
-      child: PagedReaderWidget(
-        pages: _contentPages.isEmpty ? [_currentTitle] : _contentPages,
-        initialPage: _currentPageIndex,
-        pageTurnMode: _settings.pageTurnMode,
-        textStyle: TextStyle(
-          fontSize: _settings.fontSize,
-          height: _settings.lineHeight,
-          color: _currentTheme.text,
-          letterSpacing: _settings.letterSpacing,
-          fontFamily: _currentFontFamily,
-        ),
-        backgroundColor: _currentTheme.background,
-        padding: EdgeInsets.only(
-          left: _settings.marginHorizontal,
-          right: _settings.marginHorizontal,
-          top: _settings.marginVertical,
-          bottom: _settings.showStatusBar ? 30 : _settings.marginVertical,
-        ),
-        onPageChanged: (pageIndex) {
-          setState(() {
-            _currentPageIndex = pageIndex;
-          });
-        },
-        onPrevChapter: () {
-          if (_currentChapterIndex > 0) {
-            _loadChapter(_currentChapterIndex - 1);
-          }
-        },
-        onNextChapter: () {
-          if (_currentChapterIndex < _chapters.length - 1) {
-            _loadChapter(_currentChapterIndex + 1);
-          }
-        },
-        onTap: () {
-          setState(() {
-            _showMenu = !_showMenu;
-          });
-        },
+    return PagedReaderWidget(
+      pages: _contentPages.isEmpty ? [_currentTitle] : _contentPages,
+      initialPage: _currentPageIndex,
+      pageTurnMode: _settings.pageTurnMode,
+      textStyle: TextStyle(
+        fontSize: _settings.fontSize,
+        height: _settings.lineHeight,
+        color: _currentTheme.text,
+        letterSpacing: _settings.letterSpacing,
+        fontFamily: _currentFontFamily,
       ),
+      backgroundColor: _currentTheme.background,
+      padding: EdgeInsets.only(
+        left: _settings.marginHorizontal,
+        right: _settings.marginHorizontal,
+        top: _settings.marginVertical + MediaQuery.of(context).padding.top,
+        bottom: _settings.showStatusBar ? 30 : _settings.marginVertical,
+      ),
+      onPageChanged: (pageIndex) {
+        setState(() {
+          _currentPageIndex = pageIndex;
+        });
+      },
+      onPrevChapter: () {
+        if (_currentChapterIndex > 0) {
+          _loadChapter(_currentChapterIndex - 1);
+        }
+      },
+      onNextChapter: () {
+        if (_currentChapterIndex < _chapters.length - 1) {
+          _loadChapter(_currentChapterIndex + 1);
+        }
+      },
+      onTap: () {
+        setState(() {
+          _showMenu = !_showMenu;
+        });
+      },
     );
   }
 
