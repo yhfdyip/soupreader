@@ -385,6 +385,12 @@ class SimulationDelegate extends PageDelegate {
   }) {
     currentSize = size;
 
+    // 如果没有进行动画，显示普通页面
+    if (!isStartAnimation) {
+      return currentPage;
+    }
+
+    // 仿真动画进行中，使用 CustomPaint 绘制
     return CustomPaint(
       size: size,
       painter: SimulationPainter(
@@ -394,7 +400,6 @@ class SimulationDelegate extends PageDelegate {
         currentPageImage: curPageImage,
         backgroundColor: backgroundColor,
       ),
-      child: currentPage,
     );
   }
 

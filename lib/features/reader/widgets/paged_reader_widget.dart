@@ -232,8 +232,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return recorder.endRecording();
   }
 
-  /// 为仿真模式预渲染 Picture
-  Future<void> _ensureSimulationPictures(Size size) async {
+  /// 为仿真模式预渲染 Picture（同步）
+  void _ensureSimulationPictures(Size size) {
     if (_delegate is! SimulationDelegate) return;
 
     final simDelegate = _delegate as SimulationDelegate;
@@ -245,25 +245,33 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _lastSize = size;
     }
 
-    // 预渲染当前页 Picture
+    // 预渲染当前页 Picture（同步）
     _curPagePicture ??= _recordPage(_factory.curPage, size);
     simDelegate.curPagePicture = _curPagePicture;
 
-    // 预渲染下一页 Picture
+    // 预渲染下一页 Picture（同步）
     _nextPagePicture ??= _recordPage(_factory.nextPage, size);
     simDelegate.nextPagePicture = _nextPagePicture;
 
-    // 预渲染上一页 Picture
+    // 预渲染上一页 Picture（同步）
     _prevPagePicture ??= _recordPage(_factory.prevPage, size);
     simDelegate.prevPagePicture = _prevPagePicture;
 
-    // 生成当前页 Image（用于背面渲染）
+    // 异步生成当前页 Image（用于背面渲染），不阻塞
     if (_curPageImage == null && _curPagePicture != null) {
-      _curPageImage = await _curPagePicture!.toImage(
+      _curPagePicture!
+          .toImage(
         size.width.toInt(),
         size.height.toInt(),
-      );
-      simDelegate.curPageImage = _curPageImage;
+      )
+          .then((image) {
+        if (mounted) {
+          _curPageImage = image;
+          simDelegate.curPageImage = _curPageImage;
+          // 触发重绘
+          setState(() {});
+        }
+      });
     }
   }
 
