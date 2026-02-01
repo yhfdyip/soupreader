@@ -1,0 +1,16 @@
+{
+  "project": "soupag",
+  "platform": "ios",
+  "github": {
+    "owner": "Inighty",
+    "repo": "soupreader"
+  },
+  "ios": {
+    "path": "ios"
+  },
+  "flutter": {
+    "version": "3.38.9"
+  },
+  "reactNative": {},
+  "mobai": {}
+}
