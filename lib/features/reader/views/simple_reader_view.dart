@@ -14,6 +14,7 @@ import '../widgets/auto_pager.dart';
 import '../widgets/bookmark_dialog.dart';
 import '../widgets/click_action_config_dialog.dart';
 import '../widgets/paged_reader_widget.dart';
+import '../widgets/reader_page_agent.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -164,66 +165,33 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await _saveProgress();
   }
 
-  /// 将内容分页（简单按行数分页）
+  /// 将内容分页（使用 TextPainter 精确计算）
   void _paginateContent() {
     if (!mounted) return;
 
-    // 获取屏幕可用高度
+    // 获取屏幕可用尺寸
     final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
     final safeArea = MediaQuery.of(context).padding;
-    // 可用高度 = 屏幕高度 - 安全区域 - 上下边距 - 状态栏(30)
-    final verticalPadding = _settings.marginVertical * 2;
+
+    // 计算可用区域
+    final availableWidth = screenWidth - _settings.marginHorizontal * 2;
     final statusBarHeight = _settings.showStatusBar ? 30.0 : 0.0;
-    final availableHeight =
-        screenHeight - safeArea.top - verticalPadding - statusBarHeight;
+    final availableHeight = screenHeight -
+        safeArea.top -
+        _settings.marginVertical * 2 -
+        statusBarHeight;
 
-    // 估算每页可容纳的行数
-    final lineHeight = _settings.fontSize * _settings.lineHeight;
-    final linesPerPage = (availableHeight / lineHeight).floor() - 2;
-
-    // 按段落分割
-    final paragraphs = _currentContent.split(RegExp(r'\n\s*\n|\n'));
-    final List<String> pages = [];
-    StringBuffer currentPage = StringBuffer();
-    int currentLines = 0;
-
-    // 第一页包含标题
-    currentPage.writeln(_currentTitle);
-    currentPage.writeln();
-    currentLines += 3;
-
-    for (final paragraph in paragraphs) {
-      final trimmed = paragraph.trim();
-      if (trimmed.isEmpty) continue;
-
-      final text = '　　$trimmed';
-      // 估算这段需要多少行
-      final charsPerLine = (MediaQuery.of(context).size.width -
-              _settings.marginHorizontal * 2) ~/
-          _settings.fontSize;
-      final estLines = (text.length / charsPerLine).ceil() + 1;
-
-      if (currentLines + estLines > linesPerPage && currentPage.isNotEmpty) {
-        // 开启新页
-        pages.add(currentPage.toString());
-        currentPage = StringBuffer();
-        currentLines = 0;
-      }
-
-      currentPage.writeln(text);
-      currentPage.writeln();
-      currentLines += estLines;
-    }
-
-    // 添加最后一页
-    if (currentPage.isNotEmpty) {
-      pages.add(currentPage.toString());
-    }
-
-    // 确保至少有一页
-    if (pages.isEmpty) {
-      pages.add(_currentTitle.isNotEmpty ? _currentTitle : '暂无内容');
-    }
+    // 使用 ReaderPageAgent 精确分页
+    final pages = ReaderPageAgent.paginateContent(
+      _currentContent,
+      availableHeight,
+      availableWidth,
+      _settings.fontSize,
+      lineHeight: _settings.lineHeight,
+      letterSpacing: _settings.letterSpacing,
+      title: _currentTitle,
+    );
 
     setState(() {
       _contentPages = pages;
@@ -333,11 +301,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     // 获取屏幕尺寸，确保固定全屏布局
     final screenSize = MediaQuery.of(context).size;
+    final isScrollMode = _settings.pageTurnMode == PageTurnMode.scroll;
 
     return CupertinoPageScaffold(
       backgroundColor: _currentTheme.background,
       child: GestureDetector(
-        onTapUp: _handleTap,
+        // 只有滚动模式才使用外层的点击处理
+        onTapUp: isScrollMode ? _handleTap : null,
         child: SizedBox(
           width: screenSize.width,
           height: screenSize.height,
@@ -348,8 +318,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 child: _buildReadingContent(),
               ),
 
-              // 底部状态栏
-              if (_settings.showStatusBar && !_showMenu && !_showAutoReadPanel)
+              // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
+              if (_settings.showStatusBar &&
+                  !_showMenu &&
+                  !_showAutoReadPanel &&
+                  isScrollMode)
                 _buildStatusBar(),
 
               // 顶部菜单
@@ -430,6 +403,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           _showMenu = !_showMenu;
         });
       },
+      showStatusBar: _settings.showStatusBar,
+      chapterTitle: _currentTitle,
     );
   }
 
