@@ -319,27 +319,28 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onAnimStop() {
-    // 先保存方向
+    // 1. 先保存方向
     final direction = _direction;
 
-    // 重置状态
-    _dragOffset = 0;
-    _touchX = 0;
-    _touchY = 0;
-    _direction = _PageDirection.none;
-    _isAnimating = false;
-
-    // 更新 Factory（这会改变 curPage 的内容）
+    // 2. 先更新 Factory（这会改变 curPage 的内容）
+    //    必须在重置状态前执行，否则会闪烁
     if (direction == _PageDirection.next) {
       _factory.moveToNext();
     } else if (direction == _PageDirection.prev) {
       _factory.moveToPrev();
     }
 
-    // 清除缓存，下次渲染时会重新生成正确的 Picture
+    // 3. 清除缓存，下次渲染时会重新生成正确的 Picture
     _invalidatePictures();
 
-    // 使用 setState 触发重绘
+    // 4. 重置状态（放在最后，避免中间状态渲染导致闪烁）
+    _dragOffset = 0;
+    _touchX = 0;
+    _touchY = 0;
+    _direction = _PageDirection.none;
+    _isAnimating = false;
+
+    // 5. 使用 setState 触发重绘
     if (mounted) {
       setState(() {});
     }
