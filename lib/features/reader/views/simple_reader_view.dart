@@ -428,6 +428,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         });
       },
       showStatusBar: _settings.showStatusBar,
+      // 翻页动画增强参数
+      animDuration: _settings.pageAnimDuration,
+      pageDirection: _settings.pageDirection,
+      pageTouchSlop: _settings.pageTouchSlop,
     );
   }
 
@@ -1129,64 +1133,190 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
           child: SafeArea(
             top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('翻页方式',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: PageTurnMode.values.map((mode) {
-                    final isSelected = _settings.pageTurnMode == mode;
-                    return GestureDetector(
-                      onTap: () {
-                        _updateSettings(_settings.copyWith(pageTurnMode: mode));
-                        setPopupState(() {});
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? CupertinoColors.activeBlue
-                              : Colors.white12,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(mode.icon,
-                                color:
-                                    isSelected ? Colors.white : Colors.white70,
-                                size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              mode.name,
-                              style: TextStyle(
-                                color:
-                                    isSelected ? Colors.white : Colors.white70,
-                                fontSize: 14,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('翻页设置',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+
+                  // 翻页模式
+                  const Text('翻页模式',
+                      style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: PageTurnMode.values.map((mode) {
+                      final isSelected = _settings.pageTurnMode == mode;
+                      return GestureDetector(
+                        onTap: () {
+                          _updateSettings(_settings.copyWith(pageTurnMode: mode));
+                          setPopupState(() {});
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? CupertinoColors.activeBlue
+                                : Colors.white12,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(mode.icon,
+                                  color:
+                                      isSelected ? Colors.white : Colors.white70,
+                                  size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                mode.name,
+                                style: TextStyle(
+                                  color:
+                                      isSelected ? Colors.white : Colors.white70,
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 翻页方向
+                  const Text('翻页方向',
+                      style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: PageDirection.values.map((direction) {
+                      final isSelected = _settings.pageDirection == direction;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: GestureDetector(
+                          onTap: () {
+                            _updateSettings(_settings.copyWith(pageDirection: direction));
+                            setPopupState(() {});
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? CupertinoColors.activeBlue
+                                  : Colors.white12,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(direction.icon,
+                                    color: isSelected ? Colors.white : Colors.white70,
+                                    size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  direction.name,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 动画时长
+                  _buildSliderRow(
+                    '动画时长',
+                    _settings.pageAnimDuration.toDouble(),
+                    100,
+                    600,
+                    (value) {
+                      _updateSettings(_settings.copyWith(pageAnimDuration: value.toInt()));
+                      setPopupState(() {});
+                    },
+                    displayValue: '${_settings.pageAnimDuration}ms',
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 翻页灵敏度
+                  _buildSliderRow(
+                    '翻页灵敏度',
+                    _settings.pageTouchSlop.toDouble(),
+                    10,
+                    50,
+                    (value) {
+                      _updateSettings(_settings.copyWith(pageTouchSlop: value.toInt()));
+                      setPopupState(() {});
+                    },
+                    displayValue: '${_settings.pageTouchSlop}%',
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 滚动模式无动画
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('滚动模式无动画翻页',
+                          style: TextStyle(color: Colors.white, fontSize: 14)),
+                      CupertinoSwitch(
+                        value: _settings.noAnimScrollPage,
+                        onChanged: (value) {
+                          _updateSettings(_settings.copyWith(noAnimScrollPage: value));
+                          setPopupState(() {});
+                        },
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '注：目前仅支持滚动模式，其他翻页模式开发中',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 音量键翻页
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('音量键翻页',
+                          style: TextStyle(color: Colors.white, fontSize: 14)),
+                      CupertinoSwitch(
+                        value: _settings.volumeKeyPage,
+                        onChanged: (value) {
+                          _updateSettings(_settings.copyWith(volumeKeyPage: value));
+                          setPopupState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 鼠标滚轮翻页
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('鼠标滚轮翻页',
+                          style: TextStyle(color: Colors.white, fontSize: 14)),
+                      CupertinoSwitch(
+                        value: _settings.mouseWheelPage,
+                        onChanged: (value) {
+                          _updateSettings(_settings.copyWith(mouseWheelPage: value));
+                          setPopupState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

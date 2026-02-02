@@ -16,6 +16,11 @@ class PagedReaderWidget extends StatefulWidget {
   final VoidCallback? onTap;
   final bool showStatusBar;
 
+  // === 翻页动画增强 ===
+  final int animDuration; // 动画时长 (100-600ms)
+  final PageDirection pageDirection; // 翻页方向
+  final int pageTouchSlop; // 翻页触发灵敏度 (0-100)
+
   static const double topOffset = 37;
   static const double bottomOffset = 37;
 
@@ -28,6 +33,10 @@ class PagedReaderWidget extends StatefulWidget {
     this.padding = const EdgeInsets.all(16),
     this.onTap,
     this.showStatusBar = true,
+    // 翻页动画增强默认值
+    this.animDuration = 300,
+    this.pageDirection = PageDirection.horizontal,
+    this.pageTouchSlop = 25,
   });
 
   @override
@@ -60,7 +69,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: Duration(milliseconds: widget.animDuration),
     );
 
     widget.pageFactory.onContentChanged = () {
@@ -74,6 +83,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   @override
   void didUpdateWidget(PagedReaderWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // 动画时长变化时更新 AnimationController
+    if (oldWidget.animDuration != widget.animDuration) {
+      _animController.duration = Duration(milliseconds: widget.animDuration);
+    }
     if (oldWidget.pageFactory != widget.pageFactory ||
         oldWidget.textStyle != widget.textStyle ||
         oldWidget.backgroundColor != widget.backgroundColor) {
@@ -341,12 +354,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Widget _buildPageContent() {
+    final isVertical = widget.pageDirection == PageDirection.vertical;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapUp: (d) => _onTap(d.globalPosition),
-      onHorizontalDragStart: _onDragStart,
-      onHorizontalDragUpdate: _onDragUpdate,
-      onHorizontalDragEnd: _onDragEnd,
+      // 水平方向手势
+      onHorizontalDragStart: isVertical ? null : _onDragStart,
+      onHorizontalDragUpdate: isVertical ? null : _onDragUpdate,
+      onHorizontalDragEnd: isVertical ? null : _onDragEnd,
+      // 垂直方向手势
+      onVerticalDragStart: isVertical ? _onVerticalDragStart : null,
+      onVerticalDragUpdate: isVertical ? _onVerticalDragUpdate : null,
+      onVerticalDragEnd: isVertical ? _onVerticalDragEnd : null,
       child: _buildAnimatedPages(),
     );
   }
@@ -354,23 +373,101 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   Widget _buildAnimatedPages() {
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
-    final offset = _dragOffset.clamp(-screenWidth, screenWidth);
+    final screenHeight = size.height;
+    final isVertical = widget.pageDirection == PageDirection.vertical;
+
+    // 根据方向选择限制范围
+    final maxOffset = isVertical ? screenHeight : screenWidth;
+    final offset = _dragOffset.clamp(-maxOffset, maxOffset);
 
     switch (widget.pageTurnMode) {
       case PageTurnMode.slide:
-        return _buildSlideAnimation(screenWidth, offset);
+        return isVertical
+            ? _buildVerticalSlideAnimation(screenHeight, offset)
+            : _buildSlideAnimation(screenWidth, offset);
       case PageTurnMode.cover:
-        return _buildCoverAnimation(screenWidth, offset);
+        return isVertical
+            ? _buildVerticalCoverAnimation(screenHeight, offset)
+            : _buildCoverAnimation(screenWidth, offset);
       case PageTurnMode.simulation:
-        return _buildSimulationAnimation(size);
+        // 仿真模式暂不支持垂直，使用滑动模式替代
+        return isVertical
+            ? _buildVerticalSlideAnimation(screenHeight, offset)
+            : _buildSimulationAnimation(size);
       case PageTurnMode.none:
         return _buildNoAnimation(screenWidth, offset);
       default:
-        return _buildSlideAnimation(screenWidth, offset);
+        return isVertical
+            ? _buildVerticalSlideAnimation(screenHeight, offset)
+            : _buildSlideAnimation(screenWidth, offset);
     }
   }
 
-  /// 滑动模式
+  /// 垂直滑动模式
+  Widget _buildVerticalSlideAnimation(double screenHeight, double offset) {
+    return Stack(
+      children: [
+        if (offset < 0)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: screenHeight + offset,
+            height: screenHeight,
+            child: _buildPageWidget(_factory.nextPage),
+          ),
+        if (offset > 0)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: offset - screenHeight,
+            height: screenHeight,
+            child: _buildPageWidget(_factory.prevPage),
+          ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: offset,
+          height: screenHeight,
+          child: _buildPageWidget(_factory.curPage),
+        ),
+      ],
+    );
+  }
+
+  /// 垂直覆盖模式
+  Widget _buildVerticalCoverAnimation(double screenHeight, double offset) {
+    final shadowOpacity = (offset.abs() / screenHeight * 0.4).clamp(0.0, 0.4);
+
+    return Stack(
+      children: [
+        if (offset < 0)
+          Positioned.fill(child: _buildPageWidget(_factory.nextPage)),
+        if (offset > 0)
+          Positioned.fill(child: _buildPageWidget(_factory.prevPage)),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: offset,
+          height: screenHeight,
+          child: Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: shadowOpacity),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                  offset: Offset(0, offset > 0 ? -8 : 8),
+                ),
+              ],
+            ),
+            child: _buildPageWidget(_factory.curPage),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 水平滑动模式
   Widget _buildSlideAnimation(double screenWidth, double offset) {
     return Stack(
       children: [
@@ -536,8 +633,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final screenWidth = MediaQuery.of(context).size.width;
     final velocity = details.primaryVelocity ?? 0;
 
-    final shouldTurn =
-        _dragOffset.abs() > screenWidth * 0.25 || velocity.abs() > 800;
+    // 使用配置的灵敏度 (pageTouchSlop 是百分比 0-100)
+    final threshold = screenWidth * (widget.pageTouchSlop / 100);
+    final shouldTurn = _dragOffset.abs() > threshold || velocity.abs() > 800;
 
     if (shouldTurn && _direction != _PageDirection.none) {
       bool canTurn = _direction == _PageDirection.prev
@@ -580,6 +678,104 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         _isAnimating = false;
         _invalidatePictures();
         setState(() {});
+        _animController.removeListener(listener);
+        _animController.removeStatusListener(statusListener);
+      }
+    }
+
+    _animController.addListener(listener);
+    _animController.addStatusListener(statusListener);
+    _animController.forward();
+  }
+
+  // === 垂直翻页手势处理 ===
+  void _onVerticalDragStart(DragStartDetails details) {
+    if (_isAnimating) return;
+    _isDragging = true;
+    _direction = _PageDirection.none;
+
+    _startX = details.localPosition.dx;
+    _startY = details.localPosition.dy;
+    _touchX = _startX;
+    _touchY = _startY;
+
+    _invalidatePictures();
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging || _isAnimating) return;
+
+    // 垂直方向：向上滑动为下一页，向下滑动为上一页
+    _dragOffset += details.delta.dy;
+    _touchX = details.localPosition.dx;
+    _touchY = details.localPosition.dy;
+
+    if (_direction == _PageDirection.none && _dragOffset.abs() > 10) {
+      // 向上滑动（负值）= 下一页，向下滑动（正值）= 上一页
+      _direction = _dragOffset > 0 ? _PageDirection.prev : _PageDirection.next;
+      _invalidatePictures();
+    }
+
+    if (_direction == _PageDirection.prev && !_factory.hasPrev()) {
+      _dragOffset = (_dragOffset * 0.3).clamp(-50.0, 50.0);
+    }
+    if (_direction == _PageDirection.next && !_factory.hasNext()) {
+      _dragOffset = (_dragOffset * 0.3).clamp(-50.0, 50.0);
+    }
+
+    setState(() {});
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if (!_isDragging || _isAnimating) return;
+    _isDragging = false;
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final velocity = details.primaryVelocity ?? 0;
+
+    // 使用配置的灵敏度
+    final threshold = screenHeight * (widget.pageTouchSlop / 100);
+    final shouldTurn = _dragOffset.abs() > threshold || velocity.abs() > 800;
+
+    if (shouldTurn && _direction != _PageDirection.none) {
+      bool canTurn = _direction == _PageDirection.prev
+          ? _factory.hasPrev()
+          : _factory.hasNext();
+
+      if (canTurn) {
+        _startVerticalAnimation();
+        return;
+      }
+    }
+
+    _cancelDrag();
+  }
+
+  void _startVerticalAnimation() {
+    if (_isAnimating) return;
+    _isAnimating = true;
+
+    final size = MediaQuery.of(context).size;
+    final screenHeight = size.height;
+
+    final startDragOffset = _dragOffset;
+    final targetDragOffset =
+        _direction == _PageDirection.next ? -screenHeight : screenHeight;
+
+    _animController.reset();
+
+    void listener() {
+      if (mounted) {
+        final progress = Curves.easeOutCubic.transform(_animController.value);
+        _dragOffset =
+            startDragOffset + (targetDragOffset - startDragOffset) * progress;
+        (context as Element).markNeedsBuild();
+      }
+    }
+
+    void statusListener(AnimationStatus status) {
+      if (status == AnimationStatus.completed) {
+        _onAnimStop();
         _animController.removeListener(listener);
         _animController.removeStatusListener(statusListener);
       }

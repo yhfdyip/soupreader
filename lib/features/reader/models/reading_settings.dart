@@ -40,6 +40,14 @@ class ReadingSettings {
   // 自动阅读
   final int autoReadSpeed; // 自动阅读速度 (1-100)
 
+  // === 翻页动画增强 ===
+  final int pageAnimDuration; // 翻页动画时长 (100-600ms)
+  final PageDirection pageDirection; // 翻页方向 (水平/垂直)
+  final bool noAnimScrollPage; // 滚动模式无动画翻页
+  final int pageTouchSlop; // 翻页触发灵敏度 (0-100, 百分比)
+  final bool volumeKeyPage; // 音量键翻页
+  final bool mouseWheelPage; // 鼠标滚轮翻页
+
   const ReadingSettings({
     this.fontSize = 18.0,
     this.lineHeight = 1.8,
@@ -71,6 +79,13 @@ class ReadingSettings {
     this.paddingRight = 20.0,
     this.clickActions = const {},
     this.autoReadSpeed = 50,
+    // 翻页动画增强默认值
+    this.pageAnimDuration = 300,
+    this.pageDirection = PageDirection.horizontal,
+    this.noAnimScrollPage = false,
+    this.pageTouchSlop = 25,
+    this.volumeKeyPage = true,
+    this.mouseWheelPage = true,
   });
 
   /// 获取 padding（兼容旧代码）
@@ -118,6 +133,13 @@ class ReadingSettings {
           ) ??
           const {},
       autoReadSpeed: json['autoReadSpeed'] as int? ?? 50,
+      // 翻页动画增强
+      pageAnimDuration: json['pageAnimDuration'] as int? ?? 300,
+      pageDirection: PageDirection.values[json['pageDirection'] as int? ?? 0],
+      noAnimScrollPage: json['noAnimScrollPage'] as bool? ?? false,
+      pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
+      volumeKeyPage: json['volumeKeyPage'] as bool? ?? true,
+      mouseWheelPage: json['mouseWheelPage'] as bool? ?? true,
     );
   }
 
@@ -153,6 +175,13 @@ class ReadingSettings {
       'paddingRight': paddingRight,
       'clickActions': clickActions,
       'autoReadSpeed': autoReadSpeed,
+      // 翻页动画增强
+      'pageAnimDuration': pageAnimDuration,
+      'pageDirection': pageDirection.index,
+      'noAnimScrollPage': noAnimScrollPage,
+      'pageTouchSlop': pageTouchSlop,
+      'volumeKeyPage': volumeKeyPage,
+      'mouseWheelPage': mouseWheelPage,
     };
   }
 
@@ -187,6 +216,13 @@ class ReadingSettings {
     double? paddingRight,
     Map<String, int>? clickActions,
     int? autoReadSpeed,
+    // 翻页动画增强
+    int? pageAnimDuration,
+    PageDirection? pageDirection,
+    bool? noAnimScrollPage,
+    int? pageTouchSlop,
+    bool? volumeKeyPage,
+    bool? mouseWheelPage,
   }) {
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -219,6 +255,13 @@ class ReadingSettings {
       paddingRight: paddingRight ?? this.paddingRight,
       clickActions: clickActions ?? this.clickActions,
       autoReadSpeed: autoReadSpeed ?? this.autoReadSpeed,
+      // 翻页动画增强
+      pageAnimDuration: pageAnimDuration ?? this.pageAnimDuration,
+      pageDirection: pageDirection ?? this.pageDirection,
+      noAnimScrollPage: noAnimScrollPage ?? this.noAnimScrollPage,
+      pageTouchSlop: pageTouchSlop ?? this.pageTouchSlop,
+      volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
+      mouseWheelPage: mouseWheelPage ?? this.mouseWheelPage,
     );
   }
 }
@@ -305,3 +348,30 @@ extension PageTurnModeExtension on PageTurnMode {
     }
   }
 }
+
+/// 翻页方向
+enum PageDirection {
+  horizontal, // 水平（左右）
+  vertical, // 垂直（上下）
+}
+
+extension PageDirectionExtension on PageDirection {
+  String get name {
+    switch (this) {
+      case PageDirection.horizontal:
+        return '水平';
+      case PageDirection.vertical:
+        return '垂直';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case PageDirection.horizontal:
+        return Icons.swap_horiz;
+      case PageDirection.vertical:
+        return Icons.swap_vert;
+    }
+  }
+}
+
