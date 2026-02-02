@@ -146,7 +146,7 @@ void main() {
         if (p2.x <= aspect && p2.y <= 1.0 && p2.x > 0.0 && p2.y > 0.0) {
             uv = p2;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
-            fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.05);
+            fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.0);
             fragColor.rgb *= pow(clamp((radius - dist) / radius, 0.0, 1.0), 0.2);
         } else {
             uv = p1;
@@ -161,7 +161,7 @@ void main() {
         if (p.x <= aspect && p.y <= 1.0 && p.x > 0.0 && p.y > 0.0) {
             uv = p;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
-            fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.05);
+            fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.0);
         } else {
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
             if (p.x <= aspect+shadowWidth && p.y <= 1.0+shadowWidth && p.x > 0.0-shadowWidth && p.y > 0.0-shadowWidth) {
