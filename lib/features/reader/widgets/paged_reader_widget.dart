@@ -609,7 +609,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // === 对标 Legado: if (!isRunning) return ===
     // 静止状态直接返回当前页面Widget，不使用 CustomPaint
     // 这样避免了状态切换时的闪烁
-    final isRunning = _isDragging || _isAnimating;
+    final isRunning = _isMoved || _isRunning;
     if (!isRunning) {
       return _buildPageWidget(_factory.curPage);
     }
