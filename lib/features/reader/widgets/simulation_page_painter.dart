@@ -225,10 +225,13 @@ class SimulationPagePainter extends CustomPainter {
     mTopPagePath.close();
 
     canvas.save();
-    // 使用 inverseWinding 裁剪，保留路径“外部”的区域（即剩余的平整页面）
-    // 这比 Path.combine(Difference) 更稳定且性能更好
-    mTopPagePath.fillType = PathFillType.inverseWinding;
-    canvas.clipPath(mTopPagePath);
+    // 使用 evenOdd 规则模拟 inverseWinding (Android clipOutPath)
+    // 构造一个包含全屏和 LiftedArea 的路径，重叠部分会被剔除（挖孔）
+    Path punchPath = Path();
+    punchPath.addRect(Rect.fromLTWH(0, 0, viewSize.width, viewSize.height));
+    punchPath.addPath(mTopPagePath, Offset.zero);
+    punchPath.fillType = PathFillType.evenOdd;
+    canvas.clipPath(punchPath);
     
     canvas.drawPicture(curPagePicture!);
     _drawTopPageShadow(canvas);
@@ -405,7 +408,7 @@ class SimulationPagePainter extends CustomPainter {
     // 不需要使用 Path.combine
     canvas.save();
     // 1. 裁剪到“被卷起的区域”内 (mTopPagePath 已经是 Lifted Area)
-    mTopPagePath.fillType = PathFillType.winding; // 恢复正常 winding
+    // 不需要 restore fillType，因为我们上面没有改 mTopPagePath 的属性，只是构造了一个新的 punchPath
     canvas.clipPath(mTopPagePath); 
     // 2. 裁剪到“背面五边形”内
     canvas.clipPath(tempBackAreaPath);
