@@ -211,8 +211,8 @@ class SimulationPagePainter extends CustomPainter {
 
   /// 画在最顶上的那页
   void _drawTopPageCanvas(Canvas canvas) {
-    // 构造 mTopPagePath 为“被卷起的区域” (Lifted Area)
-    // 路径: Start1 -> Control1 -> End1 -> Touch -> End2 -> Control2 -> Start2 -> Corner
+    // 1. 构造 mTopPagePath 为“被卷起的区域” (Lifted Area)
+    // 供 _drawTopPageBackArea 使用
     mTopPagePath.reset();
     mTopPagePath.moveTo(mBezierStart1.dx, mBezierStart1.dy);
     mTopPagePath.quadraticBezierTo(
@@ -224,18 +224,55 @@ class SimulationPagePainter extends CustomPainter {
     mTopPagePath.lineTo(mCornerX, mCornerY);
     mTopPagePath.close();
 
+    // 2. 构造 remainingAreaPath 为“当前页剩余区域”
+    // 路径: Start1 -> ... -> Start2 -> (其余角点) -> Start1
+    Path remainingAreaPath = Path();
+    remainingAreaPath.moveTo(mBezierStart1.dx, mBezierStart1.dy);
+    remainingAreaPath.quadraticBezierTo(
+        mBezierControl1.dx, mBezierControl1.dy, mBezierEnd1.dx, mBezierEnd1.dy);
+    remainingAreaPath.lineTo(mTouch.dx, mTouch.dy);
+    remainingAreaPath.lineTo(mBezierEnd2.dx, mBezierEnd2.dy);
+    remainingAreaPath.quadraticBezierTo(mBezierControl2.dx, mBezierControl2.dy,
+        mBezierStart2.dx, mBezierStart2.dy);
+    
+    // 添加剩余的角点
+    _addRestCorners(remainingAreaPath);
+    remainingAreaPath.close();
+
     canvas.save();
-    // 使用 evenOdd 规则模拟 inverseWinding (Android clipOutPath)
-    // 构造一个包含全屏和 LiftedArea 的路径，重叠部分会被剔除（挖孔）
-    Path punchPath = Path();
-    punchPath.addRect(Rect.fromLTWH(0, 0, viewSize.width, viewSize.height));
-    punchPath.addPath(mTopPagePath, Offset.zero);
-    punchPath.fillType = PathFillType.evenOdd;
-    canvas.clipPath(punchPath);
+    // 直接裁剪到剩余区域，无需 Path.combine，极致性能与稳定
+    canvas.clipPath(remainingAreaPath);
     
     canvas.drawPicture(curPagePicture!);
     _drawTopPageShadow(canvas);
     canvas.restore();
+  }
+
+  /// 添加剩余的角点，闭合剩余区域路径
+  void _addRestCorners(Path path) {
+    // 顺序: Start2 -> Next Corner -> ... -> Last Corner -> (Close to Start1)
+    
+    if (mCornerX == 0 && mCornerY == 0) {
+      // TL (0,0) -> 剩余: BL -> BR -> TR
+      path.lineTo(0, viewSize.height); // BL
+      path.lineTo(viewSize.width, viewSize.height); // BR
+      path.lineTo(viewSize.width, 0); // TR
+    } else if (mCornerX == viewSize.width && mCornerY == 0) {
+      // TR (w,0) -> 剩余: BR -> BL -> TL
+      path.lineTo(viewSize.width, viewSize.height); // BR
+      path.lineTo(0, viewSize.height); // BL
+      path.lineTo(0, 0); // TL
+    } else if (mCornerX == viewSize.width && mCornerY == viewSize.height) {
+      // BR (w,h) -> 剩余: TR -> TL -> BL
+      path.lineTo(viewSize.width, 0); // TR
+      path.lineTo(0, 0); // TL
+      path.lineTo(0, viewSize.height); // BL
+    } else if (mCornerX == 0 && mCornerY == viewSize.height) {
+      // BL (0,h) -> 剩余: TL -> TR -> BR
+      path.lineTo(0, 0); // TL
+      path.lineTo(viewSize.width, 0); // TR
+      path.lineTo(viewSize.width, viewSize.height); // BR
+    }
   }
 
   /// 画顶部页的阴影
