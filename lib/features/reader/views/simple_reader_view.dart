@@ -211,7 +211,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         safeArea.top -
         topOffset -
         safeArea.bottom -
-        bottomOffset; // Metrics fixed, no extra buffer needed
+        bottomOffset -
+        8.0; // Small buffer for descents/snapping
     final contentWidth =
         screenWidth - _settings.marginHorizontal - _settings.marginHorizontal;
 
