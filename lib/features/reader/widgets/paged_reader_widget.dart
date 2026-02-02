@@ -71,8 +71,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   double _scrollStartY = 0;
   double _scrollDx = 0;
   double _scrollDy = 0;
-  int _scrollDuration = 300;
-  DateTime? _scrollStartTime;
 
   // 页面 Picture 缓存（仿真模式用）
   ui.Picture? _curPagePicture;
@@ -81,7 +79,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // Shader Program
   static ui.FragmentProgram? pageCurlProgram;
-  static ui.FragmentProgram? pageCurlMirrorProgram;
   ui.Image? _curPageImage;
   ui.Image? _targetPageImage;
 
@@ -112,12 +109,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Future<void> _loadShader() async {
-    if (pageCurlProgram != null && pageCurlMirrorProgram != null) return;
+    if (pageCurlProgram != null) return;
     try {
       pageCurlProgram = await ui.FragmentProgram.fromAsset(
           'lib/features/reader/shaders/page_curl.frag');
-      pageCurlMirrorProgram = await ui.FragmentProgram.fromAsset(
-          'lib/features/reader/shaders/page_curl_mirror.frag');
       if (mounted) {
         setState(() {});
       }
@@ -479,8 +474,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _scrollStartY = startY;
     _scrollDx = dx;
     _scrollDy = dy;
-    _scrollDuration = duration;
-    _scrollStartTime = DateTime.now();
+
     _isRunning = true;
     _isStarted = true;
     _animController.duration = Duration(milliseconds: duration);
@@ -736,29 +730,46 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 静止状态直接返回当前页面Widget，不使用 CustomPaint
     // 这样避免了状态切换时的闪烁
     final isRunning = _isMoved || _isRunning;
-    if (!isRunning ||
-        pageCurlProgram == null ||
-        pageCurlMirrorProgram == null ||
-        _curPageImage == null) {
+    if (!isRunning || pageCurlProgram == null || _curPageImage == null) {
       return _buildPageWidget(_factory.curPage);
     }
 
     final isNext = _direction == _PageDirection.next;
 
-    // === 恢复统一逻辑：无论是上一页还是下一页，都表现为"揭开当前页" ===
-    // Next: 揭开当前页(Current)，露出下一页(Target). 使用标准Shader.
-    // Prev: 揭开当前页(Current)，露出上一页(Target). 使用镜像Shader (从左到右揭开).
+    // === P6: 仿真逻辑修正 ===
+    // Next: Peel Current(Top) to reveal Next(Bottom). Curl from Right.
+    // Prev: Un-curl Prev(Top) to cover Current(Bottom). Curl from Right (simulating unrolling).
 
-    ui.Image? imageToCurl = _curPageImage;
-    // 底层永远是目标页
-    ui.Picture? bottomPicture = _targetPagePicture;
+    ui.Image? imageToCurl;
+    ui.Picture? bottomPicture;
+    double effectiveCornerX;
+
+    if (isNext) {
+      imageToCurl = _curPageImage;
+      bottomPicture = _targetPagePicture;
+      effectiveCornerX = _cornerX;
+    } else {
+      // Prev: Use Target as the Curling Page (Top), Current as Background (Bottom)
+      imageToCurl = _targetPageImage;
+      bottomPicture = _curPagePicture;
+      // Force Corner to be Right side (simulating we are holding the right edge of the prev page)
+      effectiveCornerX = size.width;
+    }
 
     if (imageToCurl == null) {
       return _buildPageWidget(_factory.curPage);
     }
 
-    // 选择对应的 Shader
-    final program = isNext ? pageCurlProgram! : pageCurlMirrorProgram!;
+    double simulationTouchX = _touchX;
+    if (!isNext) {
+      // Prev: Apply coordinate mapping to ensure the page un-curls from the left edge (0)
+      // instead of starting half-open.
+      // Relationship: FoldX = (TouchX + CornerX) / 2
+      // We want FoldX = _touchX (approximately, for visual tracking).
+      // Since CornerX = width, we solve: _touchX = (VirtualTouchX + width) / 2
+      // => VirtualTouchX = 2 * _touchX - size.width
+      simulationTouchX = 2 * _touchX - size.width;
+    }
 
     return CustomPaint(
       size: size,
@@ -767,13 +778,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         // We only care about 'nextPagePicture' which is the Bottom Layer.
         curPagePicture: null,
         nextPagePicture: bottomPicture,
-        touch: Offset(_touchX, _touchY),
+        touch: Offset(simulationTouchX, _touchY),
         viewSize: size,
         isTurnToNext: isNext,
         backgroundColor: widget.backgroundColor,
-        cornerX: _cornerX,
+        cornerX: effectiveCornerX,
         cornerY: _cornerY,
-        shaderProgram: program,
+        shaderProgram: pageCurlProgram!,
         curPageImage: imageToCurl,
         devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
       ),
