@@ -284,11 +284,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _nextPageByAnim() {
     _abortAnim();
     if (!_factory.hasNext()) return;
+    
+    // 对标 Legado: 先 setDirection 后 setStartPoint
     _setDirection(_PageDirection.next);
-
+    
     final size = MediaQuery.of(context).size;
     // 从右下角开始
     _setStartPoint(size.width * 0.9, size.height * 0.9);
+    // 重新计算角点（因为 startPoint 变了）
+    _calcCornerXY(size.width * 0.9, size.height * 0.9);
     _onAnimStart();
   }
 
@@ -296,11 +300,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _prevPageByAnim() {
     _abortAnim();
     if (!_factory.hasPrev()) return;
+    
+    // 对标 Legado: 先 setDirection 后 setStartPoint
     _setDirection(_PageDirection.prev);
-
+    
     final size = MediaQuery.of(context).size;
     // 从左下角开始
     _setStartPoint(0, size.height);
+    // 重新计算角点：上一页强制使用右下角
+    _calcCornerXY(size.width, size.height);
     _onAnimStart();
   }
 
@@ -356,30 +364,28 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final size = MediaQuery.of(context).size;
     double dx, dy;
 
-    // 计算 cornerX, cornerY（对标 Legado mCornerX, mCornerY）
-    final cornerX = _startX > size.width / 2 ? size.width : 0.0;
-    final cornerY = _startY > size.height / 2 ? size.height : 0.0;
+    // 使用预先计算的角点（对标 Legado mCornerX, mCornerY）
+    // 不要重新计算，因为 _setDirection 已经计算好了
 
     if (_isCancel) {
       // === 取消翻页，回到原位 ===
-      if (_direction == _PageDirection.next) {
-        // NEXT 方向取消：回到右边
-        dx = cornerX > 0 ? (size.width - _touchX) : -_touchX;
+      if (_cornerX > 0 && _direction == _PageDirection.next) {
+        dx = size.width - _touchX;
       } else {
-        // PREV 方向取消：回到左边（对标 Legado: dx = -(viewWidth + touchX)）
+        dx = -_touchX;
+      }
+      if (_direction != _PageDirection.next) {
         dx = -(size.width + _touchX);
       }
-      dy = cornerY > 0 ? (size.height - _touchY) : -_touchY;
+      dy = _cornerY > 0 ? (size.height - _touchY) : -_touchY;
     } else {
       // === 完成翻页 ===
-      if (_direction == _PageDirection.next) {
-        // NEXT 方向：翻到左边（对标 Legado: dx = -(viewWidth + touchX)）
-        dx = cornerX > 0 ? -(size.width + _touchX) : (size.width - _touchX);
+      if (_cornerX > 0 && _direction == _PageDirection.next) {
+        dx = -(size.width + _touchX);
       } else {
-        // PREV 方向：翻到右边覆盖整个屏幕
         dx = size.width - _touchX;
       }
-      dy = cornerY > 0 ? (size.height - _touchY) : (1 - _touchY);
+      dy = _cornerY > 0 ? (size.height - _touchY) : (1 - _touchY);
     }
 
     _startScroll(_touchX, _touchY, dx, dy, widget.animDuration);
@@ -728,21 +734,31 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _isMoved = distance > slopSquare;
 
       if (_isMoved) {
-        if (focusX - _startX > 0) {
+        // 先保存原始起始点用于方向判断
+        final originalStartX = _startX;
+        
+        // 判断方向
+        final goingRight = focusX - originalStartX > 0;
+        
+        if (goingRight) {
           // 向右滑动 = 上一页
           if (!_factory.hasPrev()) {
+            _isMoved = false;
             return;
           }
+          // 先设置起始点，再设置方向（这样角点计算使用最新坐标）
+          _setStartPoint(focusX, focusY);
           _setDirection(_PageDirection.prev);
         } else {
           // 向左滑动 = 下一页
           if (!_factory.hasNext()) {
+            _isMoved = false;
             return;
           }
+          // 先设置起始点，再设置方向（这样角点计算使用最新坐标）
+          _setStartPoint(focusX, focusY);
           _setDirection(_PageDirection.next);
         }
-        // 设置起始点为当前位置
-        _setStartPoint(focusX, focusY);
       }
     }
 
