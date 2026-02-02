@@ -60,13 +60,11 @@ class SimulationPagePainter extends CustomPainter {
     }
 
     // 1. 绘制底层页面 (Bottom Page)
-    // 如果是翻向下一页 (Next): 底层是 NextPage
-    // 如果是翻向上一页 (Prev): 底层是 CurPage (因为 PrevPage 是卷进来的那个)
-    // 注意：PagedReaderWidget 传参时:
-    // curPagePicture = Factory.curPage
-    // nextPagePicture = Factory.nextPage OR Factory.prevPage
-    // 所以逻辑如下：
-    final bottomPicture = isTurnToNext ? nextPagePicture : curPagePicture;
+    // 统一逻辑：底层永远是目标页 (NextPage/TargetPage)
+    // PagedReaderWidget 传参时:
+    // curPagePicture = Current Page (Top Layer)
+    // nextPagePicture = Target Page (Bottom Layer, can be Next or Prev content)
+    final bottomPicture = nextPagePicture;
     if (bottomPicture != null) {
       canvas.save();
       canvas.drawPicture(bottomPicture);
@@ -79,9 +77,9 @@ class SimulationPagePainter extends CustomPainter {
     // 2. 绘制顶层卷起页面 (Top Page) using Shader
     // Shader 将负责绘制 curled area, shadow, 和 backside.
     // Shader 会自动剔除已卷走的部分(透明)，从而露出底下的 Bottom Page
-    
+
     final shader = shaderProgram!.fragmentShader();
-    
+
     // Uniforms:
     // float resolution.x
     // float resolution.y
@@ -89,7 +87,7 @@ class SimulationPagePainter extends CustomPainter {
     // float iMouse.y (touch y)
     // float iMouse.z (click x - unused)
     // float iMouse.w (corner y - used to determine corner side)
-    
+
     // Uniforms:
     // float resolution.x
     // float resolution.y
@@ -101,24 +99,24 @@ class SimulationPagePainter extends CustomPainter {
     // FIX: Flutter Shader uses Logical Coordinates for FragCoord usually (or local).
     // Passing physical resolution while FragCoord is logical causes zooming effect.
     // Let's us Logical Size for resolution and touch.
-    
+
     // final double physicalWidth = size.width * devicePixelRatio;
     // final double physicalHeight = size.height * devicePixelRatio;
-    
+
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
-    
+
     // config iMouse
     shader.setFloat(2, touch.dx);
     shader.setFloat(3, touch.dy);
     shader.setFloat(4, cornerX); // Pass cornerX (logical)
     shader.setFloat(5, cornerY); // pass cornerY (logical)
-    
+
     // Sampler: image
     shader.setImageSampler(0, curPageImage!);
-    
+
     final paint = Paint()..shader = shader;
-    
+
     canvas.drawRect(Offset.zero & size, paint);
   }
 

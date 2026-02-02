@@ -84,8 +84,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   ui.Image? _curPageImage;
   ui.Image? _targetPageImage;
 
-
-
   @override
   void initState() {
     super.initState();
@@ -117,7 +115,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     try {
       pageCurlProgram = await ui.FragmentProgram.fromAsset(
           'lib/features/reader/shaders/page_curl.frag');
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       debugPrint('Failed to load shader: $e');
     }
@@ -149,8 +149,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _invalidatePictures();
     super.dispose();
   }
-
-
 
   PageFactory get _factory => widget.pageFactory;
 
@@ -245,8 +243,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return recorder.endRecording();
   }
 
-
-
   void _invalidatePictures() {
     _curPagePicture = null;
     _targetPagePicture = null;
@@ -260,15 +256,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final dpr = MediaQuery.of(context).devicePixelRatio;
     final int w = (size.width * dpr).toInt();
     final int h = (size.height * dpr).toInt();
-    
+
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.scale(dpr);
     canvas.drawPicture(picture);
     final highResPicture = recorder.endRecording();
-    
+
     final img = await highResPicture.toImage(w, h);
-    // highResPicture.dispose(); // Picture.toImage consumes or we can dispose? 
+    // highResPicture.dispose(); // Picture.toImage consumes or we can dispose?
     // Actually ui.Picture.toImage doesn't consume, but we should dispose the picture after use.
     highResPicture.dispose();
     return img;
@@ -284,7 +280,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (_curPagePicture == null) {
       _curPagePicture = _recordPage(_factory.curPage, size);
       _convertToHighResImage(_curPagePicture!, size).then((img) {
-        if (mounted) setState(() { _curPageImage = img; });
+        if (mounted) {
+          setState(() {
+            _curPageImage = img;
+          });
+        }
       });
     }
 
@@ -292,14 +292,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.nextPage, size);
         _convertToHighResImage(_targetPagePicture!, size).then((img) {
-          if (mounted) setState(() { _targetPageImage = img; });
+          if (mounted) {
+            setState(() {
+              _targetPageImage = img;
+            });
+          }
         });
       }
     } else if (_direction == _PageDirection.prev) {
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.prevPage, size);
         _convertToHighResImage(_targetPagePicture!, size).then((img) {
-          if (mounted) setState(() { _targetPageImage = img; });
+          if (mounted) {
+            setState(() {
+              _targetPageImage = img;
+            });
+          }
         });
       }
     }
@@ -324,7 +332,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onTap(Offset position) {
-    if (_isRunning) return;
+// if (_isRunning) return; // Allow rapid tapping
 
     final screenWidth = MediaQuery.of(context).size.width;
     final xRate = position.dx / screenWidth;
@@ -342,10 +350,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _nextPageByAnim() {
     _abortAnim();
     if (!_factory.hasNext()) return;
-    
+
     // 对标 Legado: 先 setDirection 后 setStartPoint
     _setDirection(_PageDirection.next);
-    
+
     final size = MediaQuery.of(context).size;
     // 从右下角开始
     _setStartPoint(size.width * 0.9, size.height * 0.9);
@@ -358,10 +366,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _prevPageByAnim() {
     _abortAnim();
     if (!_factory.hasPrev()) return;
-    
+
     // 对标 Legado: 先 setDirection 后 setStartPoint
     _setDirection(_PageDirection.prev);
-    
+
     final size = MediaQuery.of(context).size;
     // 从左下角开始
     _setStartPoint(0, size.height);
@@ -374,7 +382,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _setDirection(_PageDirection direction) {
     _direction = direction;
     final size = MediaQuery.of(context).size;
-    
+
     // === P2/P4: 在方向确定时计算角点（对标 Legado SimulationPageDelegate.setDirection）===
     if (direction == _PageDirection.prev) {
       // 上一页滑动不出现对角（对标 Legado: 强制使用底边）
@@ -392,11 +400,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         _calcCornerXY(_startX, _startY);
       }
     }
-    
+
     _invalidatePictures();
     _ensurePictures(size);
   }
-  
+
   // === P2: 计算角点（对标 Legado calcCornerXY）===
   void _calcCornerXY(double x, double y) {
     final size = MediaQuery.of(context).size;
@@ -451,7 +459,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado: startScroll ===
   // P5: 动态动画时长计算（对标 Legado PageDelegate.startScroll）
-  void _startScroll(double startX, double startY, double dx, double dy, int animationSpeed) {
+  void _startScroll(
+      double startX, double startY, double dx, double dy, int animationSpeed) {
     final size = MediaQuery.of(context).size;
     // 根据移动距离动态计算时长
     int duration;
@@ -462,7 +471,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
     // 限制在合理范围内
     duration = duration.clamp(100, 600);
-    
+
     _scrollStartX = startX;
     _scrollStartY = startY;
     _scrollDx = dx;
@@ -733,9 +742,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 确保 Picture 已预渲染
     _ensurePictures(size);
 
-    // 对于 Previous 翻页，我们需要 "Target Page" 作为捲起的页面
-    // check if we have the necessary image
-    ui.Image? imageToCurl = isNext ? _curPageImage : _targetPageImage;
+    // 统一逻辑：无论是上一页还是下一页，都表现为"揭开当前页"
+    // Next: 揭开当前页(Current)，露出下一页(Target)
+    // Prev: 揭开当前页(Current)，露出上一页(Target)
+    ui.Image? imageToCurl = _curPageImage;
     if (imageToCurl == null) {
       return _buildPageWidget(_factory.curPage);
     }
@@ -801,10 +811,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       if (_isMoved) {
         // 先保存原始起始点用于方向判断
         final originalStartX = _startX;
-        
+
         // 判断方向
         final goingRight = focusX - originalStartX > 0;
-        
+
         if (goingRight) {
           // 向右滑动 = 上一页
           if (!_factory.hasPrev()) {
@@ -829,26 +839,26 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     if (_isMoved) {
       final size = MediaQuery.of(context).size;
-      
+
       // === P3: 中间区域Y坐标强制调整（对标 Legado SimulationPageDelegate.onTouch）===
       double adjustedY = focusY;
       if (widget.pageTurnMode == PageTurnMode.simulation) {
         // 中间区域或上一页：强制使用底边
-        if ((_startY > size.height / 3 && _startY < size.height * 2 / 3)
-            || _direction == _PageDirection.prev) {
+        if ((_startY > size.height / 3 && _startY < size.height * 2 / 3) ||
+            _direction == _PageDirection.prev) {
           adjustedY = size.height;
         }
         // 中间偏上区域且是下一页：强制使用顶边
-        if (_startY > size.height / 3 && _startY < size.height / 2
-            && _direction == _PageDirection.next) {
+        if (_startY > size.height / 3 &&
+            _startY < size.height / 2 &&
+            _direction == _PageDirection.next) {
           adjustedY = 1.0;
         }
       }
-      
+
       // 判断是否取消（方向改变）
-      _isCancel = _direction == _PageDirection.next
-          ? focusX > _lastX
-          : focusX < _lastX;
+      _isCancel =
+          _direction == _PageDirection.next ? focusX > _lastX : focusX < _lastX;
       _isRunning = true;
 
       // 设置触摸点
@@ -865,12 +875,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     // 开始动画（完成翻页或取消）
-    _onAnimStart();
-  }
-
-  // === 取消动画（不再需要，使用 _isCancel 控制） ===
-  void _cancelDrag() {
-    _isCancel = true;
     _onAnimStart();
   }
 
@@ -919,9 +923,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (_isMoved) {
-      _isCancel = _direction == _PageDirection.next
-          ? focusY > _lastY
-          : focusY < _lastY;
+      _isCancel =
+          _direction == _PageDirection.next ? focusY > _lastY : focusY < _lastY;
       _isRunning = true;
       _setTouchPoint(focusX, focusY);
       setState(() {});
@@ -935,8 +938,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
     _onAnimStart();
   }
-
-
 
   Widget _buildPageWidget(String content) {
     if (content.isEmpty) {
@@ -1011,23 +1012,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         ),
       ),
     );
-  }
-}
-
-/// 静态页面绘制器
-class _StaticPagePainter extends CustomPainter {
-  final ui.Picture picture;
-
-  _StaticPagePainter({required this.picture});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawPicture(picture);
-  }
-
-  @override
-  bool shouldRepaint(covariant _StaticPagePainter oldDelegate) {
-    return picture != oldDelegate.picture;
   }
 }
 
