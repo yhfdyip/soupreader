@@ -326,22 +326,30 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final size = MediaQuery.of(context).size;
     double dx, dy;
 
+    // 计算 cornerX, cornerY（对标 Legado mCornerX, mCornerY）
+    final cornerX = _startX > size.width / 2 ? size.width : 0.0;
+    final cornerY = _startY > size.height / 2 ? size.height : 0.0;
+
     if (_isCancel) {
-      // 取消翻页，回到原位
+      // === 取消翻页，回到原位 ===
       if (_direction == _PageDirection.next) {
-        dx = size.width - _touchX;
+        // NEXT 方向取消：回到右边
+        dx = cornerX > 0 ? (size.width - _touchX) : -_touchX;
       } else {
-        dx = -_touchX;
-      }
-      dy = size.height - _touchY;
-    } else {
-      // 完成翻页
-      if (_direction == _PageDirection.next) {
+        // PREV 方向取消：回到左边（对标 Legado: dx = -(viewWidth + touchX)）
         dx = -(size.width + _touchX);
+      }
+      dy = cornerY > 0 ? (size.height - _touchY) : -_touchY;
+    } else {
+      // === 完成翻页 ===
+      if (_direction == _PageDirection.next) {
+        // NEXT 方向：翻到左边（对标 Legado: dx = -(viewWidth + touchX)）
+        dx = cornerX > 0 ? -(size.width + _touchX) : (size.width - _touchX);
       } else {
+        // PREV 方向：翻到右边覆盖整个屏幕
         dx = size.width - _touchX;
       }
-      dy = size.height - _touchY;
+      dy = cornerY > 0 ? (size.height - _touchY) : (1 - _touchY);
     }
 
     _startScroll(_touchX, _touchY, dx, dy, widget.animDuration);
@@ -663,7 +671,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado HorizontalPageDelegate.onTouch ===
   void _onDragStart(DragStartDetails details) {
-    if (_isRunning) return;
+    // 动画已启动时不开始新拖拽
+    if (_isStarted) return;
     _abortAnim();
     _setStartPoint(details.localPosition.dx, details.localPosition.dy);
     _isMoved = false;
@@ -673,7 +682,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado HorizontalPageDelegate.onScroll ===
   void _onDragUpdate(DragUpdateDetails details) {
-    if (_isRunning) return;
+    // 动画已启动时不处理拖拽
+    if (_isStarted) return;
 
     final focusX = details.localPosition.dx;
     final focusY = details.localPosition.dy;
@@ -738,7 +748,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 垂直翻页手势处理（对标水平方式） ===
   void _onVerticalDragStart(DragStartDetails details) {
-    if (_isRunning) return;
+    // 动画已启动时不开始新拖拽
+    if (_isStarted) return;
     _abortAnim();
     _setStartPoint(details.localPosition.dx, details.localPosition.dy);
     _isMoved = false;
@@ -747,7 +758,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
-    if (_isRunning) return;
+    // 动画已启动时不处理拖拽
+    if (_isStarted) return;
 
     final focusX = details.localPosition.dx;
     final focusY = details.localPosition.dy;
