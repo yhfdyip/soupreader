@@ -540,14 +540,23 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
-  /// 仿真模式 - 使用 Picture 预渲染
+  /// 仿真模式 - 对标 Legado SimulationPageDelegate.onDraw
+  /// 关键：只在 isRunning (拖拽或动画) 时渲染仿真效果
   Widget _buildSimulationAnimation(Size size) {
+    // === 对标 Legado: if (!isRunning) return ===
+    // 静止状态直接返回当前页面Widget，不使用 CustomPaint
+    // 这样避免了状态切换时的闪烁
+    final isRunning = _isDragging || _isAnimating;
+    if (!isRunning) {
+      return _buildPageWidget(_factory.curPage);
+    }
+
     final isNext = _direction == _PageDirection.next;
 
     // 确保 Picture 已预渲染
     _ensurePictures(size);
 
-    // 计算角点
+    // 计算角点（对标 Legado calcCornerXY）
     double cornerX;
     double cornerY;
 
@@ -560,16 +569,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     } else {
       cornerX = _startX > size.width / 2 ? size.width : 0;
       cornerY = size.height;
-    }
-
-    // 如果没有拖拽，静止状态显示当前页
-    if (!_isDragging && !_isAnimating) {
-      return CustomPaint(
-        size: size,
-        painter: _StaticPagePainter(
-          picture: _recordPage(_factory.curPage, size),
-        ),
-      );
     }
 
     return CustomPaint(
