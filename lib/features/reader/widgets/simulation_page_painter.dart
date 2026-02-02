@@ -79,8 +79,8 @@ class SimulationPagePainter extends CustomPainter {
     mCornerY = cornerY;
 
     // 判断是否右上左下
-    mIsRTandLB = (mCornerX == 0 && mCornerY == viewSize.height) ||
-        (mCornerX == viewSize.width && mCornerY == 0);
+    mIsRTandLB = (mCornerX == 0 && (mCornerY - viewSize.height).abs() < 0.5) ||
+        ((mCornerX - viewSize.width).abs() < 0.5 && mCornerY == 0);
 
     // 计算贝塞尔曲线点
     _calBezierPoint();
@@ -211,44 +211,35 @@ class SimulationPagePainter extends CustomPainter {
 
   /// 画在最顶上的那页
   void _drawTopPageCanvas(Canvas canvas) {
+    // 构造 mTopPagePath 为“被卷起的区域” (Lifted Area)
+    // 路径: Start1 -> Control1 -> End1 -> Touch -> End2 -> Control2 -> Start2 -> Corner
     mTopPagePath.reset();
-
-    mTopPagePath.moveTo(mCornerX == 0 ? viewSize.width : 0, mCornerY);
-    mTopPagePath.lineTo(mBezierStart1.dx, mBezierStart1.dy);
+    mTopPagePath.moveTo(mBezierStart1.dx, mBezierStart1.dy);
     mTopPagePath.quadraticBezierTo(
         mBezierControl1.dx, mBezierControl1.dy, mBezierEnd1.dx, mBezierEnd1.dy);
     mTopPagePath.lineTo(mTouch.dx, mTouch.dy);
     mTopPagePath.lineTo(mBezierEnd2.dx, mBezierEnd2.dy);
     mTopPagePath.quadraticBezierTo(mBezierControl2.dx, mBezierControl2.dy,
         mBezierStart2.dx, mBezierStart2.dy);
-    mTopPagePath.lineTo(mCornerX, mCornerY == 0 ? viewSize.height : 0);
-    mTopPagePath.lineTo(mCornerX == 0 ? viewSize.width : 0,
-        mCornerY == 0 ? viewSize.height : 0);
+    mTopPagePath.lineTo(mCornerX, mCornerY);
     mTopPagePath.close();
 
-    // 去掉PATH圈在屏幕外的区域
-    mTopPagePath = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      mTopPagePath,
-    );
-
     canvas.save();
+    // 使用 inverseWinding 裁剪，保留路径“外部”的区域（即剩余的平整页面）
+    // 这比 Path.combine(Difference) 更稳定且性能更好
+    mTopPagePath.fillType = PathFillType.inverseWinding;
     canvas.clipPath(mTopPagePath);
+    
     canvas.drawPicture(curPagePicture!);
     _drawTopPageShadow(canvas);
     canvas.restore();
   }
 
-  /// 画顶部页的阴影（P6: 对标 Legado drawCurrentPageShadow）
-  /// 增强阴影效果，添加两条边缘阴影（水平和垂直方向）
+  /// 画顶部页的阴影
   void _drawTopPageShadow(Canvas canvas) {
-    // === 第一条阴影：对应 Legado 的第一个 mPath1 ===
+    // Canvas 已经被裁剪为“剩余区域”，直接绘制阴影即可，超出部分会自动被裁剪
+    
+    // === 第一条阴影 ===
     final double degree = mIsRTandLB
         ? math.pi / 4 - math.atan2(mBezierControl1.dy - mTouch.dy, mTouch.dx - mBezierControl1.dx)
         : math.pi / 4 - math.atan2(mTouch.dy - mBezierControl1.dy, mTouch.dx - mBezierControl1.dx);
@@ -258,7 +249,6 @@ class SimulationPagePainter extends CustomPainter {
     final double x = mTouch.dx + d1;
     final double y = mIsRTandLB ? (mTouch.dy + d2) : (mTouch.dy - d2);
     
-    // 第一条阴影路径
     Path shadowPath1 = Path()
       ..moveTo(x, y)
       ..lineTo(mTouch.dx, mTouch.dy)
@@ -266,29 +256,10 @@ class SimulationPagePainter extends CustomPainter {
       ..lineTo(mBezierStart1.dx, mBezierStart1.dy)
       ..close();
     
-    // 裁剪到屏幕内
-    shadowPath1 = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      shadowPath1,
-    );
-    
-    // 排除 mTopPagePath 区域
-    shadowPath1 = Path.combine(
-      PathOperation.difference,
-      shadowPath1,
-      mTopPagePath,
-    );
-    
+    // 绘制第一条阴影
     canvas.save();
     canvas.clipPath(shadowPath1);
     
-    // 绘制第一条阴影
     double leftX = mIsRTandLB ? mBezierControl1.dx : (mBezierControl1.dx - 25);
     double rightX = mIsRTandLB ? (mBezierControl1.dx + 25) : (mBezierControl1.dx + 1);
     List<Color> colors1 = mIsRTandLB
@@ -317,30 +288,13 @@ class SimulationPagePainter extends CustomPainter {
     );
     canvas.restore();
     
-    // === 第二条阴影：对应 Legado 的第二个 mPath1 ===
+    // === 第二条阴影 ===
     Path shadowPath2 = Path()
       ..moveTo(x, y)
       ..lineTo(mTouch.dx, mTouch.dy)
       ..lineTo(mBezierControl2.dx, mBezierControl2.dy)
       ..lineTo(mBezierStart2.dx, mBezierStart2.dy)
       ..close();
-    
-    shadowPath2 = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      shadowPath2,
-    );
-    
-    shadowPath2 = Path.combine(
-      PathOperation.difference,
-      shadowPath2,
-      mTopPagePath,
-    );
     
     canvas.save();
     canvas.clipPath(shadowPath2);
@@ -378,40 +332,19 @@ class SimulationPagePainter extends CustomPainter {
   void _drawBottomPageCanvas(Canvas canvas) {
     if (nextPagePicture == null) return;
 
+    // 构造 mBottomPagePath 为“露出的下一页区域” (Revealed Area)
+    // 对应 Legado 的做法，只绘制折痕以下的部分，避免使用复杂的布尔运算
+    // 路径: Corner -> Start1 -> Vertex1 -> Vertex2 -> Start2 -> Corner
     mBottomPagePath.reset();
     mBottomPagePath.moveTo(mCornerX, mCornerY);
     mBottomPagePath.lineTo(mBezierStart1.dx, mBezierStart1.dy);
-    mBottomPagePath.quadraticBezierTo(
-        mBezierControl1.dx, mBezierControl1.dy, mBezierEnd1.dx, mBezierEnd1.dy);
-    mBottomPagePath.lineTo(mBezierEnd2.dx, mBezierEnd2.dy);
-    mBottomPagePath.quadraticBezierTo(mBezierControl2.dx, mBezierControl2.dy,
-        mBezierStart2.dx, mBezierStart2.dy);
+    mBottomPagePath.lineTo(mBezierVertex1.dx, mBezierVertex1.dy);
+    mBottomPagePath.lineTo(mBezierVertex2.dx, mBezierVertex2.dy);
+    mBottomPagePath.lineTo(mBezierStart2.dx, mBezierStart2.dy);
     mBottomPagePath.close();
 
-    // 排除三角形区域
-    Path extraRegion = Path();
-    extraRegion.moveTo(mTouch.dx, mTouch.dy);
-    extraRegion.lineTo(mBezierVertex1.dx, mBezierVertex1.dy);
-    extraRegion.lineTo(mBezierVertex2.dx, mBezierVertex2.dy);
-    extraRegion.close();
-
-    mBottomPagePath =
-        Path.combine(PathOperation.difference, mBottomPagePath, extraRegion);
-
-    // 去掉PATH圈在屏幕外的区域
-    mBottomPagePath = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      mBottomPagePath,
-    );
-
     canvas.save();
-    canvas.clipPath(mBottomPagePath, doAntiAlias: false);
+    canvas.clipPath(mBottomPagePath, doAntiAlias: true);
     canvas.drawPicture(nextPagePicture!);
     _drawBottomPageShadow(canvas);
     canvas.restore();
@@ -462,29 +395,20 @@ class SimulationPagePainter extends CustomPainter {
     mBottomPagePath.close();
 
     Path tempBackAreaPath = Path();
-    tempBackAreaPath.moveTo(mBezierVertex1.dx, mBezierVertex1.dy);
-    tempBackAreaPath.lineTo(mBezierVertex2.dx, mBezierVertex2.dy);
+    tempBackAreaPath.moveTo(mBezierVertex2.dx, mBezierVertex2.dy);
+    tempBackAreaPath.lineTo(mBezierVertex1.dx, mBezierVertex1.dy);
+    tempBackAreaPath.lineTo(mBezierEnd1.dx, mBezierEnd1.dy);
     tempBackAreaPath.lineTo(mTouch.dx, mTouch.dy);
+    tempBackAreaPath.lineTo(mBezierEnd2.dx, mBezierEnd2.dy);
     tempBackAreaPath.close();
 
-    // 取path相交部分
-    mTopBackAreaPagePath = Path.combine(
-        PathOperation.intersect, tempBackAreaPath, mBottomPagePath);
-
-    // 去掉PATH圈在屏幕外的区域
-    mTopBackAreaPagePath = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      mTopBackAreaPagePath,
-    );
-
+    // 不需要使用 Path.combine
     canvas.save();
-    canvas.clipPath(mTopBackAreaPagePath);
+    // 1. 裁剪到“被卷起的区域”内 (mTopPagePath 已经是 Lifted Area)
+    mTopPagePath.fillType = PathFillType.winding; // 恢复正常 winding
+    canvas.clipPath(mTopPagePath); 
+    // 2. 裁剪到“背面五边形”内
+    canvas.clipPath(tempBackAreaPath);
 
     // 先画背景色
     canvas.drawPaint(Paint()..color = backgroundColor);
