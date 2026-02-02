@@ -498,30 +498,24 @@ class SimulationPagePainter extends CustomPainter {
     double sinAngle = (mCornerX - mBezierControl1.dx) / dis;
     double cosAngle = (mBezierControl2.dy - mCornerY) / dis;
 
-    // 使用镜像变换矩阵
+    // 使用镜像变换矩阵（沿着翻页方向的轴镜像）
+    // 注意: Matrix4 是 column-major, 需要按列填充
     final a = -(1 - 2 * sinAngle * sinAngle);
     final b = 2 * sinAngle * cosAngle;
     final c = 2 * sinAngle * cosAngle;
     final d = 1 - 2 * sinAngle * sinAngle;
-
-    Matrix4 matrix4 = Matrix4(
-      a,
-      c,
-      0,
-      0,
-      b,
-      d,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-      -mBezierControl1.dx * a - mBezierControl1.dy * b,
-      -mBezierControl1.dx * c - mBezierControl1.dy * d,
-      0,
-      1,
-    );
+    
+    // 使用 Matrix4.identity() 并通过 setEntry 设置，更清晰且不易出错
+    final matrix4 = Matrix4.identity();
+    // 设置 2x2 变换矩阵 (column-major)
+    matrix4.setEntry(0, 0, a);  // 第0列第0行
+    matrix4.setEntry(1, 0, c);  // 第0列第1行
+    matrix4.setEntry(0, 1, b);  // 第1列第0行
+    matrix4.setEntry(1, 1, d);  // 第1列第1行
+    // 设置平移分量
+    matrix4.setEntry(0, 3, -mBezierControl1.dx * a - mBezierControl1.dy * b);
+    matrix4.setEntry(1, 3, -mBezierControl1.dx * c - mBezierControl1.dy * d);
+    
     canvas.transform(matrix4.storage);
 
     // 绘制翻转的页面
@@ -551,12 +545,17 @@ class SimulationPagePainter extends CustomPainter {
     if (mIsRTandLB) {
       left = mBezierStart1.dx - 1;
       right = mBezierStart1.dx + f3 + 1;
-      width = right - left;
     } else {
       left = mBezierStart1.dx - f3 - 1;
       right = mBezierStart1.dx + 1;
-      width = left - right;
     }
+    // 确保 left <= right，避免负宽度
+    if (left > right) {
+      final temp = left;
+      left = right;
+      right = temp;
+    }
+    width = right - left;
 
     canvas.translate(mBezierStart1.dx, mBezierStart1.dy);
     canvas.rotate(math.atan2(
