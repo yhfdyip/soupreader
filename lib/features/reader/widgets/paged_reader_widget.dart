@@ -288,6 +288,55 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
 
 
+  void _invalidatePictures() {
+    _curPagePicture = null;
+    _targetPagePicture = null;
+    _curPageImage?.dispose();
+    _curPageImage = null;
+    _targetPageImage?.dispose();
+    _targetPageImage = null;
+  }
+
+  void _ensurePictures(Size size) {
+    if (_lastSize != size) {
+      _invalidatePictures();
+      _lastSize = size;
+    }
+
+    // 对标 flutter_novel：当前页永远是翻起的页面
+    if (_curPagePicture == null) {
+      _curPagePicture = _recordPage(_factory.curPage, size);
+      
+      // Get DPR to generate high-res texture
+      final dpr = MediaQuery.of(context).devicePixelRatio;
+      final int w = (size.width * dpr).toInt();
+      final int h = (size.height * dpr).toInt();
+
+      // toImage is async but acceptable here.
+      _curPagePicture!.toImage(w, h).then((img) {
+        if (mounted) setState(() { _curPageImage = img; });
+      });
+    }
+
+    if (_direction == _PageDirection.next) {
+      if (_targetPagePicture == null) {
+        _targetPagePicture = _recordPage(_factory.nextPage, size);
+        final dpr = MediaQuery.of(context).devicePixelRatio;
+        _targetPagePicture!.toImage((size.width * dpr).toInt(), (size.height * dpr).toInt()).then((img) {
+          if (mounted) setState(() { _targetPageImage = img; });
+        });
+      }
+    } else if (_direction == _PageDirection.prev) {
+      if (_targetPagePicture == null) {
+        _targetPagePicture = _recordPage(_factory.prevPage, size);
+        final dpr = MediaQuery.of(context).devicePixelRatio;
+        _targetPagePicture!.toImage((size.width * dpr).toInt(), (size.height * dpr).toInt()).then((img) {
+          if (mounted) setState(() { _targetPageImage = img; });
+        });
+      }
+    }
+  }
+
   // === 对标 Legado: setStartPoint ===
   void _setStartPoint(double x, double y) {
     _startX = x;

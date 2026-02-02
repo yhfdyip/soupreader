@@ -90,17 +90,29 @@ class SimulationPagePainter extends CustomPainter {
     // float iMouse.z (click x - unused)
     // float iMouse.w (corner y - used to determine corner side)
     
-    final double physicalWidth = size.width * devicePixelRatio;
-    final double physicalHeight = size.height * devicePixelRatio;
+    // Uniforms:
+    // float resolution.x
+    // float resolution.y
+    // float iMouse.x (touch x)
+    // float iMouse.y (touch y)
+    // float iMouse.z (click x - unused)
+    // float iMouse.w (corner y - used to determine corner side)
+
+    // FIX: Flutter Shader uses Logical Coordinates for FragCoord usually (or local).
+    // Passing physical resolution while FragCoord is logical causes zooming effect.
+    // Let's us Logical Size for resolution and touch.
     
-    shader.setFloat(0, physicalWidth);
-    shader.setFloat(1, physicalHeight);
+    // final double physicalWidth = size.width * devicePixelRatio;
+    // final double physicalHeight = size.height * devicePixelRatio;
+    
+    shader.setFloat(0, size.width);
+    shader.setFloat(1, size.height);
     
     // config iMouse
-    shader.setFloat(2, touch.dx * devicePixelRatio);
-    shader.setFloat(3, touch.dy * devicePixelRatio);
-    shader.setFloat(4, cornerX * devicePixelRatio); // Pass cornerX to determine L/R
-    shader.setFloat(5, cornerY * devicePixelRatio); // pass cornerY for logic
+    shader.setFloat(2, touch.dx);
+    shader.setFloat(3, touch.dy);
+    shader.setFloat(4, cornerX); // Pass cornerX (logical)
+    shader.setFloat(5, cornerY); // pass cornerY (logical)
     
     // Sampler: image
     shader.setImageSampler(0, curPageImage!);
