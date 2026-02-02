@@ -319,31 +319,39 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onAnimStop() {
-    // 1. 先保存方向
+    // === 对标 Legado: onAnimStop + stopScroll ===
+    // Legado 的关键：先更新内容，再用 post{} 延迟重置状态
+    // 确保内容更新和状态重置不在同一帧，避免闪烁
+
+    // 1. 保存方向
     final direction = _direction;
 
-    // 2. 先更新 Factory（这会改变 curPage 的内容）
-    //    必须在重置状态前执行，否则会闪烁
+    // 2. 更新 Factory（fillPage）
     if (direction == _PageDirection.next) {
       _factory.moveToNext();
     } else if (direction == _PageDirection.prev) {
       _factory.moveToPrev();
     }
 
-    // 3. 清除缓存，下次渲染时会重新生成正确的 Picture
+    // 3. 清除缓存
     _invalidatePictures();
 
-    // 4. 重置状态（放在最后，避免中间状态渲染导致闪烁）
+    // 4. 立即重置状态并触发重绘（显示新页面）
     _dragOffset = 0;
     _touchX = 0;
     _touchY = 0;
     _direction = _PageDirection.none;
-    _isAnimating = false;
 
-    // 5. 使用 setState 触发重绘
     if (mounted) {
       setState(() {});
     }
+
+    // 5. 延迟到下一帧再设置 isAnimating = false（对标 Legado 的 post{}）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _isAnimating = false;
+      }
+    });
   }
 
   @override
