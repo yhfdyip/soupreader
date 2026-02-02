@@ -20,6 +20,7 @@ class PageFactory {
   double _fontSize = 18;
   double _lineHeight = 1.5;
   double _letterSpacing = 0;
+  String? _fontFamily;
 
   // 回调
   VoidCallback? onContentChanged;
@@ -40,12 +41,14 @@ class PageFactory {
     required double fontSize,
     double lineHeight = 1.5,
     double letterSpacing = 0,
+    String? fontFamily,
   }) {
     _contentHeight = contentHeight;
     _contentWidth = contentWidth;
     _fontSize = fontSize;
     _lineHeight = lineHeight;
     _letterSpacing = letterSpacing;
+    _fontFamily = fontFamily;
   }
 
   /// 分页所有章节
@@ -66,6 +69,7 @@ class PageFactory {
       _fontSize,
       lineHeight: _lineHeight,
       letterSpacing: _letterSpacing,
+      fontFamily: _fontFamily,
       title: chapter.title,
     );
 

@@ -223,6 +223,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       fontSize: _settings.fontSize,
       lineHeight: _settings.lineHeight,
       letterSpacing: _settings.letterSpacing,
+      fontFamily: _currentFontFamily,
     );
     _pageFactory.paginateAll();
 

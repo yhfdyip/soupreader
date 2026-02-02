@@ -17,6 +17,7 @@ class ReaderPageAgent {
     double fontSize, {
     double lineHeight = 1.5,
     double letterSpacing = 0,
+    String? fontFamily,
   }) {
     String tempStr = content;
     List<Map<String, int>> pageConfig = [];
@@ -34,6 +35,7 @@ class ReaderPageAgent {
             fontSize: fontSize,
             height: lineHeight,
             letterSpacing: letterSpacing,
+            fontFamily: fontFamily,
           ),
         ),
       );
@@ -62,6 +64,7 @@ class ReaderPageAgent {
     double fontSize, {
     double lineHeight = 1.5,
     double letterSpacing = 0,
+    String? fontFamily,
     String? title,
   }) {
     // 预处理内容：添加首行缩进
@@ -84,6 +87,7 @@ class ReaderPageAgent {
       fontSize,
       lineHeight: lineHeight,
       letterSpacing: letterSpacing,
+      fontFamily: fontFamily,
     );
 
     // 转换为页面内容列表
