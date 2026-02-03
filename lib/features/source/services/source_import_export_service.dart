@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../models/book_source.dart';
+import 'package:flutter/foundation.dart';
 
 /// 书源导入导出服务
 class SourceImportExportService {
@@ -56,7 +57,7 @@ class SourceImportExportService {
             try {
               sources.add(BookSource.fromJson(item));
             } catch (e) {
-              print('解析书源失败: $e');
+              debugPrint('解析书源失败: $e');
             }
           }
         }
@@ -129,7 +130,7 @@ class SourceImportExportService {
       await File(outputPath).writeAsString(jsonString);
       return true;
     } catch (e) {
-      print('导出失败: $e');
+      debugPrint('导出失败: $e');
       return false;
     }
   }

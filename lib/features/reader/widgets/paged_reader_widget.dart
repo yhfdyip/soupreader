@@ -366,7 +366,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _abortAnim();
     if (!_factory.hasPrev()) return;
 
-    // 修正：点击翻页统一使用底部微偏位置
+    final size = MediaQuery.of(context).size;
+
     // 修正：点击翻页统一使用底部微偏位置
     // 使用配置的 simulationClickBias
     final y = size.height * widget.simulationClickBias;

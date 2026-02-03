@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:epubx/epubx.dart';
 import 'package:uuid/uuid.dart';
 import '../bookshelf/models/book.dart';
-import '../import/txt_parser.dart';
+
 
 /// EPUB 文件解析器
 class EpubParser {
@@ -119,7 +119,7 @@ class EpubParser {
         for (final tocItem in tocItems) {
           if (tocItem.Content?.Source?.contains(href) == true) {
             chapterTitle =
-                tocItem.NavigationLabels?.first?.Text ?? chapterTitle;
+                tocItem.NavigationLabels?.first.Text ?? chapterTitle;
             break;
           }
         }

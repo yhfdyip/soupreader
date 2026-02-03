@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart';
 import '../models/book_source.dart';
+import 'package:flutter/foundation.dart';
 
 /// 书源规则解析引擎
 /// 支持 CSS 选择器、XPath（简化版）和正则表达式
@@ -64,7 +65,7 @@ class RuleParserEngine {
 
       return results;
     } catch (e) {
-      print('搜索失败: $e');
+      debugPrint('搜索失败: $e');
       return [];
     }
   }
@@ -101,7 +102,7 @@ class RuleParserEngine {
         bookUrl: fullUrl,
       );
     } catch (e) {
-      print('获取书籍详情失败: $e');
+      debugPrint('获取书籍详情失败: $e');
       return null;
     }
   }
@@ -138,7 +139,7 @@ class RuleParserEngine {
 
       return chapters;
     } catch (e) {
-      print('获取目录失败: $e');
+      debugPrint('获取目录失败: $e');
       return [];
     }
   }
@@ -171,7 +172,7 @@ class RuleParserEngine {
 
       return content;
     } catch (e) {
-      print('获取正文失败: $e');
+      debugPrint('获取正文失败: $e');
       return '';
     }
   }
@@ -197,7 +198,7 @@ class RuleParserEngine {
       final response = await _dio.get(url, options: options);
       return response.data?.toString();
     } catch (e) {
-      print('请求失败: $url - $e');
+      debugPrint('请求失败: $url - $e');
       return null;
     }
   }
@@ -304,7 +305,7 @@ class RuleParserEngine {
         return parent.querySelector(selector);
       }
     } catch (e) {
-      print('选择器解析失败: $selector - $e');
+      debugPrint('选择器解析失败: $selector - $e');
     }
 
     return null;
@@ -321,7 +322,7 @@ class RuleParserEngine {
         return parent.querySelectorAll(selector);
       }
     } catch (e) {
-      print('选择器解析失败: $selector - $e');
+      debugPrint('选择器解析失败: $selector - $e');
     }
 
     return [];
@@ -338,7 +339,7 @@ class RuleParserEngine {
         content = content.replaceAll(regex, replacement);
       }
     } catch (e) {
-      print('替换正则失败: $e');
+      debugPrint('替换正则失败: $e');
     }
     return content;
   }

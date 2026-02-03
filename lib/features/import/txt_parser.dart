@@ -219,7 +219,7 @@ class TxtParser {
       final chapterContent = content.substring(start, end).trim();
       if (chapterContent.isNotEmpty) {
         chapters.add(_ChapterInfo(
-          title: '第${chapterIndex}章',
+          title: '第$chapterIndex章',
           content: chapterContent,
         ));
         chapterIndex++;

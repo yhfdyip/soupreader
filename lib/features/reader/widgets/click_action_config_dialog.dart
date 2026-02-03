@@ -215,11 +215,11 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
                 margin: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   color: _getActionColor(action)
-                      .withOpacity(isSelected ? 0.5 : 0.2),
+                      .withValues(alpha: isSelected ? 0.5 : 0.2),
                   border: Border.all(
                     color: isSelected
                         ? Colors.white
-                        : _getActionColor(action).withOpacity(0.5),
+                        : _getActionColor(action).withValues(alpha: 0.5),
                     width: isSelected ? 2 : 1,
                   ),
                   borderRadius: BorderRadius.circular(4),
@@ -261,9 +261,9 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _getActionColor(action).withOpacity(0.2),
+            color: _getActionColor(action).withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: _getActionColor(action).withOpacity(0.5)),
+            border: Border.all(color: _getActionColor(action).withValues(alpha: 0.5)),
           ),
           child: Text(
             ClickAction.getName(action),

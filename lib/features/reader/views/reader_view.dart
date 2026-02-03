@@ -183,14 +183,14 @@ class _ReaderViewState extends State<ReaderView> {
             Text(
               _getCurrentTime(),
               style: TextStyle(
-                color: _currentTheme.text.withOpacity(0.5),
+                color: _currentTheme.text.withValues(alpha: 0.5),
                 fontSize: 12,
               ),
             ),
           Text(
             '${_currentPage + 1}/${_pages.length}',
             style: TextStyle(
-              color: _currentTheme.text.withOpacity(0.5),
+              color: _currentTheme.text.withValues(alpha: 0.5),
               fontSize: 12,
             ),
           ),
@@ -198,7 +198,7 @@ class _ReaderViewState extends State<ReaderView> {
             Text(
               '${(progress * 100).toStringAsFixed(0)}%',
               style: TextStyle(
-                color: _currentTheme.text.withOpacity(0.5),
+                color: _currentTheme.text.withValues(alpha: 0.5),
                 fontSize: 12,
               ),
             ),
@@ -223,7 +223,7 @@ class _ReaderViewState extends State<ReaderView> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+            colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent],
           ),
         ),
         child: AppBar(
@@ -268,7 +268,7 @@ class _ReaderViewState extends State<ReaderView> {
           gradient: LinearGradient(
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
-            colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+            colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
           ),
         ),
         child: Column(
@@ -586,7 +586,7 @@ class _ReaderViewState extends State<ReaderView> {
                           border: Border.all(
                             color: isSelected
                                 ? AppColors.accent
-                                : Colors.grey.withOpacity(0.3),
+                                : Colors.grey.withValues(alpha: 0.3),
                             width: isSelected ? 2 : 1,
                           ),
                         ),

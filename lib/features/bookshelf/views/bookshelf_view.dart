@@ -88,10 +88,10 @@ class _BookshelfViewState extends State<BookshelfView> {
         middle: const Text('书架'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
+          onPressed: _isImporting ? null : _importTxtFile,
           child: _isImporting
               ? const CupertinoActivityIndicator()
               : const Icon(CupertinoIcons.add),
-          onPressed: _isImporting ? null : _importTxtFile,
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -134,8 +134,8 @@ class _BookshelfViewState extends State<BookshelfView> {
           ),
           const SizedBox(height: 24),
           CupertinoButton.filled(
-            child: const Text('导入本地书籍'),
             onPressed: _importTxtFile,
+            child: const Text('导入本地书籍'),
           ),
         ],
       ),

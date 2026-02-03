@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import '../models/book_source.dart';
-import '../services/rule_parser_engine.dart';
+import '../../source/models/book_source.dart';
+import '../../source/services/rule_parser_engine.dart';
 
 /// 搜索页面 - Cupertino 风格
 class SearchView extends StatefulWidget {
@@ -31,7 +31,7 @@ class _SearchViewState extends State<SearchView> {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) return;
 
-    final enabledSources = widget.sources.where((s) => s.enabled).toList();
+    final enabledSources = widget.sources.where((s) => s.enabled == true).toList();
     if (enabledSources.isEmpty) {
       _showMessage('没有启用的书源');
       return;
@@ -60,7 +60,7 @@ class _SearchViewState extends State<SearchView> {
           });
         }
       } catch (e) {
-        print('搜索 ${source.bookSourceName} 失败: $e');
+        debugPrint('搜索 ${source.bookSourceName} 失败: $e');
       }
     }
 
@@ -117,7 +117,7 @@ class _SearchViewState extends State<SearchView> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '正在搜索: $_searchingSource ($_completedSources/${widget.sources.where((s) => s.enabled).length})',
+                        '正在搜索: $_searchingSource ($_completedSources/${widget.sources.where((s) => s.enabled == true).length})',
                         style: TextStyle(
                           fontSize: 13,
                           color: CupertinoColors.secondaryLabel

@@ -58,13 +58,13 @@ class _SourceListViewState extends State<SourceListView> {
           children: [
             CupertinoButton(
               padding: EdgeInsets.zero,
-              child: const Icon(CupertinoIcons.add),
               onPressed: _showImportOptions,
+              child: const Icon(CupertinoIcons.add),
             ),
             CupertinoButton(
               padding: EdgeInsets.zero,
-              child: const Icon(CupertinoIcons.ellipsis_vertical),
               onPressed: _showMoreOptions,
+              child: const Icon(CupertinoIcons.ellipsis_vertical),
             ),
           ],
         ),
@@ -145,8 +145,8 @@ class _SourceListViewState extends State<SourceListView> {
           ),
           const SizedBox(height: 16),
           CupertinoButton.filled(
-            child: const Text('导入书源'),
             onPressed: _showImportOptions,
+            child: const Text('导入书源'),
           ),
         ],
       ),
@@ -165,7 +165,7 @@ class _SourceListViewState extends State<SourceListView> {
             height: 40,
             decoration: BoxDecoration(
               color: source.enabled
-                  ? CupertinoTheme.of(context).primaryColor.withOpacity(0.1)
+                  ? CupertinoTheme.of(context).primaryColor.withValues(alpha: 0.1)
                   : CupertinoColors.systemGrey5.resolveFrom(context),
               borderRadius: BorderRadius.circular(8),
             ),

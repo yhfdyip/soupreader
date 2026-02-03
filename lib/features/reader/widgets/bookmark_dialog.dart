@@ -172,13 +172,13 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
           Icon(
             Icons.bookmark_border,
             size: 64,
-            color: Colors.white.withOpacity(0.3),
+            color: Colors.white.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
             '暂无书签',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               fontSize: 16,
             ),
           ),
@@ -186,7 +186,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
           Text(
             '点击上方"添加"按钮添加当前位置',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
               fontSize: 14,
             ),
           ),
@@ -228,11 +228,11 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
         ),
         subtitle: Text(
           _formatTime(bookmark.createdTime),
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
         ),
         trailing: IconButton(
           icon:
-              Icon(Icons.delete_outline, color: Colors.white.withOpacity(0.5)),
+              Icon(Icons.delete_outline, color: Colors.white.withValues(alpha: 0.5)),
           onPressed: () => _deleteBookmark(bookmark),
         ),
       ),

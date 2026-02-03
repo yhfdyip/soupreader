@@ -180,7 +180,7 @@ class _ExploreViewState extends State<ExploreView> {
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 color: CupertinoColors.systemGrey5.darkColor,
                 borderRadius: BorderRadius.circular(18),
-                minSize: 0,
+
                 onPressed: () {
                   _searchController.text = keyword;
                   _onSearch(keyword);
@@ -251,7 +251,7 @@ class _ExploreViewState extends State<ExploreView> {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: color, size: 26),
@@ -305,7 +305,7 @@ class _ExploreViewState extends State<ExploreView> {
               trailing: CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                minSize: 0,
+
                 child: const Text('加入'),
                 onPressed: () {},
               ),

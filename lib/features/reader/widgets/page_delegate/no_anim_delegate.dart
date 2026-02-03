@@ -6,8 +6,8 @@ import 'page_delegate.dart';
 class NoAnimPageDelegate extends PageDelegate {
   VoidCallback? _onUpdate;
   PageTurnCallback? onPageTurn;
-  bool _shouldShowNext = false;
-  bool _shouldShowPrev = false;
+  final bool _shouldShowNext = false;
+  final bool _shouldShowPrev = false;
 
   @override
   void init(TickerProvider vsync, VoidCallback onUpdate) {

@@ -64,7 +64,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
-  List<String> _contentPages = []; // 保留兼容滚动模式
 
   @override
   void initState() {
@@ -229,7 +228,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     // 保留兼容滚动模式
     setState(() {
-      _contentPages = _pageFactory.currentPages;
     });
   }
 

@@ -42,7 +42,7 @@ class ReaderPageAgent {
     bool hasTitle = title != null && title.isNotEmpty;
     if (hasTitle) {
       paragraphs.insert(0, ''); // 标题后的空行
-      paragraphs.insert(0, title!);
+      paragraphs.insert(0, title);
     }
 
     // 3. 分页状态变量
@@ -109,7 +109,9 @@ class ReaderPageAgent {
         // 计算当前行文本范围 (TextRange)
         // 累加之前行的高度，尽量取每行的垂直中点来命中该行
         double lineTop = 0;
-        for(int k=0; k<lineIndex; k++) lineTop += lines[k].height;
+        for (int k = 0; k < lineIndex; k++) {
+          lineTop += lines[k].height;
+        }
         double lineCenterY = lineTop + lineH / 2;
         
         // 技巧：利用 getPositionForOffset 获取行首位置
