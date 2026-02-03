@@ -433,6 +433,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       animDuration: _settings.pageAnimDuration,
       pageDirection: _settings.pageDirection,
       pageTouchSlop: _settings.pageTouchSlop,
+      simulationClickBias: _settings.simulationClickBias,
     );
   }
 
@@ -1266,6 +1267,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     displayValue: '${_settings.pageTouchSlop}%',
                   ),
                   const SizedBox(height: 16),
+
+                  // 仿真翻页角度偏转
+                  if (_settings.pageTurnMode == PageTurnMode.simulation) ...[
+                    _buildSliderRow(
+                      '点击翻页角度',
+                      _settings.simulationClickBias,
+                      0.8,
+                      1.0,
+                      (value) {
+                        _updateSettings(
+                            _settings.copyWith(simulationClickBias: value));
+                        setPopupState(() {});
+                      },
+                      displayValue: _settings.simulationClickBias.toStringAsFixed(2),
+                    ),
+                    const Text('值越接近 1.0 越垂直，越小角度越大',
+                        style: TextStyle(color: Colors.white30, fontSize: 10)),
+                    const SizedBox(height: 16),
+                  ],
 
                   // 滚动模式无动画
                   Row(
