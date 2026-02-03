@@ -129,4 +129,6 @@ class ReadingThemeColors {
     required this.text,
     required this.name,
   });
+
+  bool get isDark => background.computeLuminance() < 0.5;
 }
