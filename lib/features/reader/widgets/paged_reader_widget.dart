@@ -330,22 +330,20 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onTap(Offset position) {
-// if (_isRunning) return; // Allow rapid tapping
-
     final screenWidth = MediaQuery.of(context).size.width;
     final xRate = position.dx / screenWidth;
 
     if (xRate > 0.33 && xRate < 0.66) {
       widget.onTap?.call();
     } else if (xRate >= 0.66) {
-      _nextPageByAnim();
+      _nextPageByAnim(startY: position.dy);
     } else {
-      _prevPageByAnim();
+      _prevPageByAnim(startY: position.dy);
     }
   }
 
   // === 对标 Legado: nextPageByAnim ===
-  void _nextPageByAnim() {
+  void _nextPageByAnim({double? startY}) {
     _abortAnim();
     if (!_factory.hasNext()) return;
 
@@ -353,15 +351,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _setDirection(_PageDirection.next);
 
     final size = MediaQuery.of(context).size;
-    // 从右下角开始
-    _setStartPoint(size.width * 0.9, size.height * 0.9);
+    // 从右下角开始，或者点击位置
+    final y = startY ?? size.height * 0.9;
+    _setStartPoint(size.width * 0.9, y);
     // 重新计算角点（因为 startPoint 变了）
-    _calcCornerXY(size.width * 0.9, size.height * 0.9);
+    _calcCornerXY(size.width * 0.9, y);
     _onAnimStart();
   }
 
   // === 对标 Legado: prevPageByAnim ===
-  void _prevPageByAnim() {
+  void _prevPageByAnim({double? startY}) {
     _abortAnim();
     if (!_factory.hasPrev()) return;
 
@@ -369,15 +368,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _setDirection(_PageDirection.prev);
 
     final size = MediaQuery.of(context).size;
-    // 从左下角开始，稍微偏移制造 45度卷角
-    // 配合 Left Curl: Start X=0.05W, Corner X=0. Delta X=0.05W.
-    // Start Y=0.9H, Corner Y=H. Delta Y=0.1H.
-    // 这样会有不错的倾斜角度
-    _setStartPoint(size.width * 0.05, size.height * 0.9);
-
-    // 重新计算角点：上一页强制使用左下角 (Left Curl)
-    // _calcCornerXY(0, size.height) => CornerX=0, CornerY=H
-    _calcCornerXY(0, size.height);
+    // 从左下角开始，或者点击位置
+    final y = startY ?? size.height;
+    _setStartPoint(0, y);
+    // 重新计算角点：上一页不再强制使用右下角，而是跟随点击高度
+    _calcCornerXY(size.width, y);
     _onAnimStart();
   }
 
@@ -388,10 +383,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     // === P2/P4: 在方向确定时计算角点（对标 Legado SimulationPageDelegate.setDirection）===
     if (direction == _PageDirection.prev) {
-      // 上一页滑动不出现对角（对标 Legado: 强制使用底边）
-      // 改为原生 Left Curl: 如果在左边拖动，CornerX 自动为 0.
-      // 强制 Y = Bottom 保持 Legado 风格
-      _calcCornerXY(_startX, size.height);
+      // 上一页滑动不出现对角（原对标 Legado: 强制使用底边，现移除限制）
+      // 现在跟随手指位置 (_startY)
+      if (_startX > size.width / 2) {
+        _calcCornerXY(_startX, _startY);
+      } else {
+        // P4: 左半边镜像处理
+        _calcCornerXY(size.width - _startX, _startY);
+      }
     } else if (direction == _PageDirection.next) {
       if (size.width / 2 > _startX) {
         // 左半边点击时，强制使用右边角点
@@ -740,23 +739,38 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     // === P6: 仿真逻辑修正 ===
     // Next: Peel Current(Top) to reveal Next(Bottom). Curl from Right.
-    // Prev: Peel Current(Top) to reveal Prev(Bottom). Curl from Left.
-    // 统一逻辑：始终卷起当前页 (Top)，露出目标页 (Bottom)
+    // Prev: Un-curl Prev(Top) to cover Current(Bottom). Curl from Right (simulating unrolling).
 
-    ui.Image? imageToCurl = _curPageImage;
-    ui.Picture? bottomPicture = _targetPagePicture; // Bottom is always Target (Next or Prev)
-    // Remove forced Right Corner for Prev. Let _cornerX decide.
-    // _cornerX will be 0 for Prev in most cases (Left Curl).
+    ui.Image? imageToCurl;
+    ui.Picture? bottomPicture;
+    double effectiveCornerX;
 
-    // Old logic branch removed because both directions now use the same layer hierarchy.
-
+    if (isNext) {
+      imageToCurl = _curPageImage;
+      bottomPicture = _targetPagePicture;
+      effectiveCornerX = _cornerX;
+    } else {
+      // Prev: Use Target as the Curling Page (Top), Current as Background (Bottom)
+      imageToCurl = _targetPageImage;
+      bottomPicture = _curPagePicture;
+      // Force Corner to be Right side (simulating we are holding the right edge of the prev page)
+      effectiveCornerX = size.width;
+    }
 
     if (imageToCurl == null) {
       return _buildPageWidget(_factory.curPage);
     }
 
-    // Use actual touch X. No mapping needed for native Left Curl.
     double simulationTouchX = _touchX;
+    if (!isNext) {
+      // Prev: Apply coordinate mapping to ensure the page un-curls from the left edge (0)
+      // instead of starting half-open.
+      // Relationship: FoldX = (TouchX + CornerX) / 2
+      // We want FoldX = _touchX (approximately, for visual tracking).
+      // Since CornerX = width, we solve: _touchX = (VirtualTouchX + width) / 2
+      // => VirtualTouchX = 2 * _touchX - size.width
+      simulationTouchX = 2 * _touchX - size.width;
+    }
 
     return CustomPaint(
       size: size,
@@ -769,7 +783,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         viewSize: size,
         isTurnToNext: isNext,
         backgroundColor: widget.backgroundColor,
-        cornerX: _cornerX, // Use calculated corner (0 for Prev)
+        cornerX: effectiveCornerX,
         cornerY: _cornerY,
         shaderProgram: pageCurlProgram!,
         curPageImage: imageToCurl,
@@ -853,9 +867,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       // === P3: 中间区域Y坐标强制调整（对标 Legado SimulationPageDelegate.onTouch）===
       double adjustedY = focusY;
       if (widget.pageTurnMode == PageTurnMode.simulation) {
-        // 中间区域或上一页：强制使用底边
-        if ((_startY > size.height / 3 && _startY < size.height * 2 / 3) ||
-            _direction == _PageDirection.prev) {
+        // 中间区域：强制使用底边（仅保留中间区域点击的优化，移除上一页的强制锁定）
+        if (_startY > size.height / 3 && _startY < size.height * 2 / 3) {
           adjustedY = size.height;
         }
         // 中间偏上区域且是下一页：强制使用顶边
