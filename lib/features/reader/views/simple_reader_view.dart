@@ -909,67 +909,29 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       // 2. 翻页动画
                       _buildSectionTitle('翻页动画'),
                       const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: CupertinoSlidingSegmentedControl<PageTurnMode>(
-                          groupValue: _settings.pageTurnMode,
-                          thumbColor: CupertinoColors.activeBlue,
-                          backgroundColor: Colors.white10,
-                          children: {
-                            PageTurnMode.simulation: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('仿真',
-                                    style: TextStyle(
-                                        color: _settings.pageTurnMode ==
-                                                PageTurnMode.simulation
-                                            ? Colors.white
-                                            : Colors.white70))),
-                            PageTurnMode.cover: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('覆盖',
-                                    style: TextStyle(
-                                        color: _settings.pageTurnMode ==
-                                                PageTurnMode.cover
-                                            ? Colors.white
-                                            : Colors.white70))),
-                            PageTurnMode.slide: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('滑动',
-                                    style: TextStyle(
-                                        color: _settings.pageTurnMode ==
-                                                PageTurnMode.slide
-                                            ? Colors.white
-                                            : Colors.white70))),
-                            PageTurnMode.scroll: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('滚动',
-                                    style: TextStyle(
-                                        color: _settings.pageTurnMode ==
-                                                PageTurnMode.scroll
-                                            ? Colors.white
-                                            : Colors.white70))),
-                            PageTurnMode.none: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('无',
-                                    style: TextStyle(
-                                        color: _settings.pageTurnMode ==
-                                                PageTurnMode.none
-                                            ? Colors.white
-                                            : Colors.white70))),
-                          },
-                          onValueChanged: (mode) {
-                            if (mode != null) {
-                              _updateSettings(
-                                  _settings.copyWith(pageTurnMode: mode));
-                              setPopupState(() {});
-                            }
-                          },
-                        ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: PageTurnMode.values.map((mode) {
+                          final isSelected = _settings.pageTurnMode == mode;
+                          return ChoiceChip(
+                            label: Text(mode.name),
+                            selected: isSelected,
+                            selectedColor: CupertinoColors.activeBlue,
+                            backgroundColor: Colors.white10,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.white70,
+                              fontSize: 13,
+                            ),
+                            onSelected: (selected) {
+                              if (selected) {
+                                _updateSettings(
+                                    _settings.copyWith(pageTurnMode: mode));
+                                setPopupState(() {});
+                              }
+                            },
+                          );
+                        }).toList(),
                       ),
 
                       const SizedBox(height: 24),
