@@ -519,12 +519,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         ),
         child: NotificationListener<ScrollNotification>(
           onNotification: (notification) {
-            if (notification is ScrollUpdateNotification) {
+            // 只在滚动结束时更新进度显示，避免频繁重建
+            if (notification is ScrollEndNotification) {
               setState(() {}); // 更新进度显示
             }
             
-            // 处理滑动翻页
-            if (!_isLoadingChapter && notification is ScrollUpdateNotification) {
+            // 处理滑动翻页（菜单显示时不处理）
+            if (!_showMenu && !_isLoadingChapter && notification is ScrollUpdateNotification) {
               final metrics = notification.metrics;
               // 顶部上拉 -> 上一章
               if (metrics.pixels < -60 && _currentChapterIndex > 0) {
@@ -1352,50 +1353,359 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _showChapterList() {
     showCupertinoModalPopup(
       context: context,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Color(0xFF1C1C1E),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: Column(
-          children: [
-            Container(
-                margin: const EdgeInsets.only(top: 10),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2))),
-            const Padding(
-                padding: EdgeInsets.all(20),
-                child: Text('目录',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold))),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _chapters.length,
-                itemBuilder: (context, index) {
-                  final isCurrent = index == _currentChapterIndex;
-                  return CupertinoListTile(
-                    title: Text(_chapters[index].title,
-                        style: TextStyle(
-                            color: isCurrent
-                                ? CupertinoColors.activeBlue
-                                : Colors.white)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _loadChapter(index);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+      builder: (context) => _ChapterListSheet(
+        bookTitle: widget.bookTitle,
+        bookAuthor: _bookAuthor,
+        chapters: _chapters,
+        currentChapterIndex: _currentChapterIndex,
+        onChapterTap: (index) {
+          Navigator.pop(context);
+          _loadChapter(index);
+        },
       ),
     );
   }
 }
+
+/// 目录面板 - 参考 Legado 设计
+class _ChapterListSheet extends StatefulWidget {
+  final String bookTitle;
+  final String bookAuthor;
+  final List<Chapter> chapters;
+  final int currentChapterIndex;
+  final ValueChanged<int> onChapterTap;
+
+  const _ChapterListSheet({
+    required this.bookTitle,
+    required this.bookAuthor,
+    required this.chapters,
+    required this.currentChapterIndex,
+    required this.onChapterTap,
+  });
+
+  @override
+  State<_ChapterListSheet> createState() => _ChapterListSheetState();
+}
+
+class _ChapterListSheetState extends State<_ChapterListSheet> {
+  int _selectedTab = 0; // 0=目录, 1=书签, 2=笔记
+  bool _isReversed = false; // 倒序排列
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    // 初始滚动到当前章节位置
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrentChapter();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToCurrentChapter() {
+    final index = _isReversed 
+        ? widget.chapters.length - 1 - widget.currentChapterIndex
+        : widget.currentChapterIndex;
+    if (index > 0 && index < widget.chapters.length) {
+      _scrollController.animateTo(
+        index * 56.0, // 估算每个 item 高度
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  List<Chapter> get _filteredChapters {
+    var chapters = widget.chapters;
+    if (_searchQuery.isNotEmpty) {
+      chapters = chapters
+          .where((c) => c.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .toList();
+    }
+    if (_isReversed) {
+      chapters = chapters.reversed.toList();
+    }
+    return chapters;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Color(0xFFFAF8F5), // Legado 风格的暖色背景
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // 拖动指示器
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 8),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.black12,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          
+          // 顶部书籍信息
+          _buildHeader(),
+          
+          // Tab 栏
+          _buildTabBar(),
+          
+          // 搜索和排序
+          _buildSearchAndSort(),
+          
+          // 内容区
+          Expanded(
+            child: _selectedTab == 0 
+                ? _buildChapterList()
+                : _buildEmptyTab(_selectedTab == 1 ? '暂无书签' : '暂无笔记'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // 书封（占位）
+          Container(
+            width: 50,
+            height: 70,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8E4DF),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.black12),
+            ),
+            child: const Center(
+              child: Icon(CupertinoIcons.book, color: Colors.black38, size: 24),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 书名和作者
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.bookTitle,
+                  style: const TextStyle(
+                    color: Color(0xFF333333),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.bookAuthor.isNotEmpty ? widget.bookAuthor : '未知作者',
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '共${widget.chapters.length}章',
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE0E0E0)),
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildTab(0, '目录'),
+          _buildTab(1, '书签'),
+          _buildTab(2, '笔记'),
+          const Spacer(),
+          // 删除缓存、检查更新按钮
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            onPressed: () {},
+            child: const Icon(CupertinoIcons.trash, size: 20, color: Color(0xFF666666)),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            onPressed: () {},
+            child: const Icon(CupertinoIcons.arrow_clockwise, size: 20, color: Color(0xFF666666)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab(int index, String label) {
+    final isSelected = _selectedTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? const Color(0xFF4CAF50) : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF4CAF50) : const Color(0xFF666666),
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndSort() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          // 搜索框
+          Expanded(
+            child: Container(
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0EDE8),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: CupertinoTextField(
+                controller: _searchController,
+                placeholder: '输入关键字搜索目录',
+                placeholderStyle: const TextStyle(color: Color(0xFF999999), fontSize: 13),
+                style: const TextStyle(color: Color(0xFF333333), fontSize: 13),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: null,
+                prefix: const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: Icon(CupertinoIcons.search, size: 16, color: Color(0xFF999999)),
+                ),
+                onChanged: (value) => setState(() => _searchQuery = value),
+              ),
+            ),
+          ),
+          // 排序按钮
+          CupertinoButton(
+            padding: const EdgeInsets.only(left: 12),
+            onPressed: () {
+              setState(() => _isReversed = !_isReversed);
+            },
+            child: Icon(
+              _isReversed ? CupertinoIcons.sort_up : CupertinoIcons.sort_down,
+              size: 22,
+              color: const Color(0xFF666666),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChapterList() {
+    final chapters = _filteredChapters;
+    if (chapters.isEmpty) {
+      return _buildEmptyTab('无匹配章节');
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: chapters.length,
+      itemBuilder: (context, index) {
+        final chapter = chapters[index];
+        final originalIndex = _isReversed 
+            ? widget.chapters.length - 1 - widget.chapters.indexOf(chapter)
+            : widget.chapters.indexOf(chapter);
+        final isCurrent = originalIndex == widget.currentChapterIndex;
+
+        return GestureDetector(
+          onTap: () => widget.onChapterTap(widget.chapters.indexOf(chapter)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Color(0xFFEEEEEE)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    chapter.title,
+                    style: TextStyle(
+                      color: isCurrent ? const Color(0xFF4CAF50) : const Color(0xFF333333),
+                      fontSize: 14,
+                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isCurrent)
+                  const Icon(
+                    CupertinoIcons.checkmark_circle_fill,
+                    color: Color(0xFF4CAF50),
+                    size: 18,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyTab(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(CupertinoIcons.doc_text, size: 48, color: Color(0xFFCCCCCC)),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: const TextStyle(color: Color(0xFF999999), fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

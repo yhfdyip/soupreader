@@ -42,6 +42,10 @@ class ReaderBottomMenuNew extends StatefulWidget {
 class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   // 当前选中的 Tab
   int _selectedTab = -1; // -1 表示未选中任何 Tab
+  
+  // 进度条拖动状态
+  bool _isDragging = false;
+  double _dragValue = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -161,11 +165,21 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                     thumbColor: CupertinoColors.white,
                   ),
                   child: Slider(
-                    value: widget.currentPageIndex.toDouble().clamp(0, maxPage.toDouble()),
+                    value: _isDragging 
+                        ? _dragValue.clamp(0, maxPage.toDouble())
+                        : widget.currentPageIndex.toDouble().clamp(0, maxPage.toDouble()),
                     min: 0,
                     max: maxPage.toDouble(),
-                    onChanged: (value) {},
+                    onChanged: (value) {
+                      setState(() {
+                        _isDragging = true;
+                        _dragValue = value;
+                      });
+                    },
                     onChangeEnd: (value) {
+                      setState(() {
+                        _isDragging = false;
+                      });
                       widget.onPageChanged(value.toInt());
                     },
                   ),
