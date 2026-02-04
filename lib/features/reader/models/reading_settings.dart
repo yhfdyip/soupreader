@@ -48,6 +48,22 @@ class ReadingSettings {
   final bool volumeKeyPage; // 音量键翻页
   final bool mouseWheelPage; // 鼠标滚轮翻页
 
+  // === 页眉/页脚配置 ===
+  final bool hideHeader; // 隐藏页眉
+  final bool hideFooter; // 隐藏页脚
+  final bool showHeaderLine; // 显示页眉分割线
+  final bool showFooterLine; // 显示页脚分割线
+  final int headerLeftContent; // 页眉左侧内容：0=书名 1=章节名 2=无
+  final int headerCenterContent; // 页眉中间内容
+  final int headerRightContent; // 页眉右侧内容
+  final int footerLeftContent; // 页脚左侧内容：0=进度 1=页码 2=时间 3=电量 4=无
+  final int footerCenterContent; // 页脚中间内容
+  final int footerRightContent; // 页脚右侧内容
+
+  // === 其他功能开关 ===
+  final bool chineseTraditional; // 繁简体转换（true=繁体）
+  final bool cleanChapterTitle; // 净化正文章节名称
+
 
   const ReadingSettings({
     this.fontSize = 18.0,
@@ -87,7 +103,20 @@ class ReadingSettings {
     this.pageTouchSlop = 25,
     this.volumeKeyPage = true,
     this.mouseWheelPage = true,
-
+    // 页眉/页脚配置默认值
+    this.hideHeader = false,
+    this.hideFooter = false,
+    this.showHeaderLine = false,
+    this.showFooterLine = false,
+    this.headerLeftContent = 0, // 书名
+    this.headerCenterContent = 2, // 无
+    this.headerRightContent = 1, // 章节名
+    this.footerLeftContent = 2, // 时间
+    this.footerCenterContent = 0, // 进度
+    this.footerRightContent = 3, // 电量
+    // 其他功能开关
+    this.chineseTraditional = false,
+    this.cleanChapterTitle = false,
   });
 
   /// 获取 padding（兼容旧代码）
@@ -142,7 +171,20 @@ class ReadingSettings {
       pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
       volumeKeyPage: json['volumeKeyPage'] as bool? ?? true,
       mouseWheelPage: json['mouseWheelPage'] as bool? ?? true,
-
+      // 页眉/页脚配置
+      hideHeader: json['hideHeader'] as bool? ?? false,
+      hideFooter: json['hideFooter'] as bool? ?? false,
+      showHeaderLine: json['showHeaderLine'] as bool? ?? false,
+      showFooterLine: json['showFooterLine'] as bool? ?? false,
+      headerLeftContent: json['headerLeftContent'] as int? ?? 0,
+      headerCenterContent: json['headerCenterContent'] as int? ?? 2,
+      headerRightContent: json['headerRightContent'] as int? ?? 1,
+      footerLeftContent: json['footerLeftContent'] as int? ?? 2,
+      footerCenterContent: json['footerCenterContent'] as int? ?? 0,
+      footerRightContent: json['footerRightContent'] as int? ?? 3,
+      // 其他功能开关
+      chineseTraditional: json['chineseTraditional'] as bool? ?? false,
+      cleanChapterTitle: json['cleanChapterTitle'] as bool? ?? false,
     );
   }
 
@@ -185,7 +227,20 @@ class ReadingSettings {
       'pageTouchSlop': pageTouchSlop,
       'volumeKeyPage': volumeKeyPage,
       'mouseWheelPage': mouseWheelPage,
-
+      // 页眉/页脚配置
+      'hideHeader': hideHeader,
+      'hideFooter': hideFooter,
+      'showHeaderLine': showHeaderLine,
+      'showFooterLine': showFooterLine,
+      'headerLeftContent': headerLeftContent,
+      'headerCenterContent': headerCenterContent,
+      'headerRightContent': headerRightContent,
+      'footerLeftContent': footerLeftContent,
+      'footerCenterContent': footerCenterContent,
+      'footerRightContent': footerRightContent,
+      // 其他功能开关
+      'chineseTraditional': chineseTraditional,
+      'cleanChapterTitle': cleanChapterTitle,
     };
   }
 
@@ -227,7 +282,20 @@ class ReadingSettings {
     int? pageTouchSlop,
     bool? volumeKeyPage,
     bool? mouseWheelPage,
-
+    // 页眉/页脚配置
+    bool? hideHeader,
+    bool? hideFooter,
+    bool? showHeaderLine,
+    bool? showFooterLine,
+    int? headerLeftContent,
+    int? headerCenterContent,
+    int? headerRightContent,
+    int? footerLeftContent,
+    int? footerCenterContent,
+    int? footerRightContent,
+    // 其他功能开关
+    bool? chineseTraditional,
+    bool? cleanChapterTitle,
   }) {
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -267,7 +335,20 @@ class ReadingSettings {
       pageTouchSlop: pageTouchSlop ?? this.pageTouchSlop,
       volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
       mouseWheelPage: mouseWheelPage ?? this.mouseWheelPage,
-
+      // 页眉/页脚配置
+      hideHeader: hideHeader ?? this.hideHeader,
+      hideFooter: hideFooter ?? this.hideFooter,
+      showHeaderLine: showHeaderLine ?? this.showHeaderLine,
+      showFooterLine: showFooterLine ?? this.showFooterLine,
+      headerLeftContent: headerLeftContent ?? this.headerLeftContent,
+      headerCenterContent: headerCenterContent ?? this.headerCenterContent,
+      headerRightContent: headerRightContent ?? this.headerRightContent,
+      footerLeftContent: footerLeftContent ?? this.footerLeftContent,
+      footerCenterContent: footerCenterContent ?? this.footerCenterContent,
+      footerRightContent: footerRightContent ?? this.footerRightContent,
+      // 其他功能开关
+      chineseTraditional: chineseTraditional ?? this.chineseTraditional,
+      cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
     );
   }
 }

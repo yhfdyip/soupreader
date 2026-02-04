@@ -23,6 +23,7 @@ import '../widgets/click_action_config_dialog.dart';
 import '../widgets/paged_reader_widget.dart';
 import '../widgets/page_factory.dart';
 import '../widgets/reader_menus.dart';
+import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
@@ -389,9 +390,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     onShowChapterList: _showChapterList,
                   ),
 
-                // 底部菜单
+                // 底部菜单 (新版 Tab 导航)
                 if (_showMenu)
-                  ReaderBottomMenu(
+                  ReaderBottomMenuNew(
                     currentChapterIndex: _currentChapterIndex,
                     totalChapters: _chapters.length,
                     settings: _settings,
