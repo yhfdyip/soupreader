@@ -38,7 +38,8 @@ class ReaderTopMenu extends StatelessWidget {
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     onPressed: () => Navigator.pop(context),
-                    child: const Icon(CupertinoIcons.back, color: CupertinoColors.white),
+                    child: const Icon(CupertinoIcons.back,
+                        color: CupertinoColors.white),
                   ),
                   // 书名
                   Expanded(
@@ -57,7 +58,8 @@ class ReaderTopMenu extends StatelessWidget {
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     onPressed: onShowChapterList,
-                    child: const Icon(CupertinoIcons.list_bullet, color: CupertinoColors.white),
+                    child: const Icon(CupertinoIcons.list_bullet,
+                        color: CupertinoColors.white),
                   ),
                 ],
               ),
@@ -68,7 +70,8 @@ class ReaderTopMenu extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: CupertinoColors.white.withValues(alpha: 0.1)),
+                  top: BorderSide(
+                      color: CupertinoColors.white.withValues(alpha: 0.1)),
                 ),
               ),
               child: Text(
@@ -87,7 +90,6 @@ class ReaderTopMenu extends StatelessWidget {
     );
   }
 }
-
 
 class ReaderBottomMenu extends StatelessWidget {
   final int currentChapterIndex;
@@ -246,8 +248,15 @@ class ReaderBottomMenu extends StatelessWidget {
                         settings.copyWith(themeIndex: targetIndex));
                   }
                 }),
-                _buildMenuBtn(CupertinoIcons.arrow_down_circle, '缓存', () {
-                  // TODO: 实现缓存
+                // 翻页模式切换（参考 flutter_novel）
+                _buildMenuBtn(_getPageTurnModeIcon(settings.pageTurnMode),
+                    settings.pageTurnMode.name, () {
+                  // 循环切换翻页模式
+                  final modes = PageTurnMode.values;
+                  final currentIndex = modes.indexOf(settings.pageTurnMode);
+                  final nextIndex = (currentIndex + 1) % modes.length;
+                  onSettingsChanged(
+                      settings.copyWith(pageTurnMode: modes[nextIndex]));
                 }),
                 _buildMenuBtn(
                     CupertinoIcons.ellipsis_circle, '更多', onShowMoreMenu),
@@ -295,5 +304,22 @@ class ReaderBottomMenu extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// 根据翻页模式返回对应图标
+  IconData _getPageTurnModeIcon(PageTurnMode mode) {
+    switch (mode) {
+      case PageTurnMode.slide:
+        return CupertinoIcons.arrow_left_right;
+      case PageTurnMode.simulation:
+      case PageTurnMode.simulation2:
+        return CupertinoIcons.book;
+      case PageTurnMode.cover:
+        return CupertinoIcons.square_stack;
+      case PageTurnMode.none:
+        return CupertinoIcons.stop;
+      case PageTurnMode.scroll:
+        return CupertinoIcons.arrow_up_arrow_down;
+    }
   }
 }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 import 'page_factory.dart';
 import 'simulation_page_painter.dart';
+import 'simulation_page_painter2.dart';
 
 /// 翻页阅读器组件（对标 Legado ReadView + flutter_novel）
 /// 核心优化：使用 PictureRecorder 预渲染页面，避免截图开销
@@ -543,7 +544,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       if (!wasCancel) {
         _fillPage(direction); // 更新内容
       }
-      
+
       // 强制重绘以立即应用新的状态（offset=0），防止阴影残留
       setState(() {});
     }
@@ -599,10 +600,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             ? _buildVerticalCoverAnimation(screenHeight, offset)
             : _buildCoverAnimation(screenWidth, offset);
       case PageTurnMode.simulation:
-        // 仿真模式使用 touchX/touchY
+        // 仿真模式使用 touchX/touchY (Shader)
         return isVertical
             ? _buildVerticalSlideAnimation(screenHeight, offset)
             : _buildSimulationAnimation(size);
+      case PageTurnMode.simulation2:
+        // 仿真模式2 使用贝塞尔曲线
+        return isVertical
+            ? _buildVerticalSlideAnimation(screenHeight, offset)
+            : _buildSimulation2Animation(size);
       case PageTurnMode.none:
         return _buildNoAnimation(screenWidth, offset);
       default:
@@ -810,6 +816,56 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         shaderProgram: pageCurlProgram!,
         curPageImage: imageToCurl,
         devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
+      ),
+    );
+  }
+
+  /// 仿真模式2 - 使用贝塞尔曲线（参考 flutter_novel）
+  Widget _buildSimulation2Animation(Size size) {
+    final isRunning = _isMoved || _isRunning;
+    if (!isRunning) {
+      return _buildPageWidget(_factory.curPage);
+    }
+
+    final isNext = _direction == _PageDirection.next;
+
+    // 确保 Picture 已生成
+    _ensurePictures(size);
+
+    ui.Picture? pictureToCurl;
+    ui.Picture? bottomPicture;
+    double effectiveCornerX;
+
+    if (isNext) {
+      pictureToCurl = _curPagePicture;
+      bottomPicture = _targetPagePicture;
+      effectiveCornerX = _cornerX;
+    } else {
+      pictureToCurl = _targetPagePicture;
+      bottomPicture = _curPagePicture;
+      effectiveCornerX = size.width;
+    }
+
+    if (pictureToCurl == null) {
+      return _buildPageWidget(_factory.curPage);
+    }
+
+    double simulationTouchX = _touchX;
+    if (!isNext) {
+      simulationTouchX = 2 * _touchX - size.width;
+    }
+
+    return CustomPaint(
+      size: size,
+      painter: SimulationPagePainter2(
+        curPagePicture: pictureToCurl,
+        nextPagePicture: bottomPicture,
+        touch: Offset(simulationTouchX, _touchY),
+        viewSize: size,
+        isTurnToNext: isNext,
+        backgroundColor: widget.backgroundColor,
+        cornerX: effectiveCornerX,
+        cornerY: _cornerY,
       ),
     );
   }

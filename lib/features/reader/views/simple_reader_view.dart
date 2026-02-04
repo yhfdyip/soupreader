@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' hide Slider; // 隐藏 Slider 以避免与 Cupertino 冲突
+import 'package:flutter/material.dart'
+    hide Slider; // 隐藏 Slider 以避免与 Cupertino 冲突
 import 'package:flutter/services.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -66,9 +67,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
-  
-  // 章节加载锁
-  bool _isLoadingChapter = false;
+
+  // 章节加载锁（用于翻页模式）
+  // ignore: unused_field
+  final bool _isLoadingChapter = false;
 
   @override
   void initState() {
@@ -222,10 +224,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         topOffset -
         safeArea.bottom -
         bottomOffset -
-        8.0; 
+        8.0;
     final contentWidth =
         screenWidth - _settings.marginHorizontal - _settings.marginHorizontal;
-    
+
     // 防止宽度过小导致死循环或异常
     if (contentWidth < 50 || contentHeight < 100) return;
 
@@ -248,21 +250,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 1. 从滚动模式切换到翻页模式
     // 2. 也是翻页模式且排版参数变更
     bool needRepaginate = false;
-    
-    if (_settings.pageTurnMode == PageTurnMode.scroll && 
+
+    if (_settings.pageTurnMode == PageTurnMode.scroll &&
         newSettings.pageTurnMode != PageTurnMode.scroll) {
       needRepaginate = true;
     } else if (newSettings.pageTurnMode != PageTurnMode.scroll) {
-       if (_settings.fontSize != newSettings.fontSize ||
-           _settings.lineHeight != newSettings.lineHeight ||
-           _settings.letterSpacing != newSettings.letterSpacing ||
-           _settings.paragraphSpacing != newSettings.paragraphSpacing || // 监听段间距变化
-           _settings.marginHorizontal != newSettings.marginHorizontal ||
-           // fontFamily 变化通常意味着需要全量刷新，但也需要重排
-           _settings.themeIndex != newSettings.themeIndex // 主题变化可能影响字体? 暂时不用
-           ) {
-         needRepaginate = true;
-       }
+      if (_settings.fontSize != newSettings.fontSize ||
+              _settings.lineHeight != newSettings.lineHeight ||
+              _settings.letterSpacing != newSettings.letterSpacing ||
+              _settings.paragraphSpacing !=
+                  newSettings.paragraphSpacing || // 监听段间距变化
+              _settings.marginHorizontal != newSettings.marginHorizontal ||
+              // fontFamily 变化通常意味着需要全量刷新，但也需要重排
+              _settings.themeIndex != newSettings.themeIndex // 主题变化可能影响字体? 暂时不用
+          ) {
+        needRepaginate = true;
+      }
     }
 
     setState(() {
@@ -506,78 +509,129 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  /// 滚动模式内容
+  /// 滚动模式内容 - 使用 ListView.builder 实现章节丝滑连接
   Widget _buildScrollContent() {
     return SafeArea(
       bottom: false,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: _settings.marginHorizontal,
-          right: _settings.marginHorizontal,
-          top: _settings.marginVertical,
-          bottom: _settings.showStatusBar ? 30 : _settings.marginVertical,
-        ),
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            // 只在滚动结束时更新进度显示，避免频繁重建
-            if (notification is ScrollEndNotification) {
-              setState(() {}); // 更新进度显示
-            }
-            
-            // 处理滑动翻页（菜单显示时不处理）
-            if (!_showMenu && !_isLoadingChapter && notification is ScrollUpdateNotification) {
-              final metrics = notification.metrics;
-              // 顶部上拉 -> 上一章
-              if (metrics.pixels < -60 && _currentChapterIndex > 0) {
-                 _isLoadingChapter = true;
-                 // 震动反馈
-                 HapticFeedback.lightImpact();
-                 _loadChapter(_currentChapterIndex - 1, goToLastPage: true)
-                     .whenComplete(() => _isLoadingChapter = false);
-              }
-              // 底部下拉 -> 下一章
-              else if (metrics.pixels > metrics.maxScrollExtent + 60 && 
-                       _currentChapterIndex < _chapters.length - 1) {
-                 _isLoadingChapter = true;
-                 HapticFeedback.lightImpact();
-                 _loadChapter(_currentChapterIndex + 1)
-                     .whenComplete(() => _isLoadingChapter = false);
-              }
-            }
-            return false;
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // 滚动时实时更新当前章节索引
+          if (notification is ScrollUpdateNotification) {
+            _updateCurrentChapterFromScroll();
+          }
+          // 滚动结束时保存进度
+          if (notification is ScrollEndNotification) {
+            _saveProgress();
+            setState(() {}); // 更新进度显示
+          }
+          return false;
+        },
+        child: ListView.builder(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          // 预加载前后 2 个章节的内容
+          cacheExtent: MediaQuery.of(context).size.height * 3,
+          itemCount: _chapters.length,
+          itemBuilder: (context, index) {
+            return _buildChapterItem(index);
           },
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-                // 章节标题
-                Text(
-                  _currentTitle,
-                  style: TextStyle(
-                    fontSize: _settings.fontSize + 6,
-                    fontWeight: FontWeight.bold,
-                    color: _currentTheme.text,
-                    fontFamily: _currentFontFamily,
-                  ),
-                ),
-                SizedBox(height: _settings.paragraphSpacing * 1.5),
-                // 正文内容
-                _buildFormattedContent(),
-                const SizedBox(height: 60),
-                _buildChapterNav(_currentTheme.text),
-                const SizedBox(height: 100),
-              ],
-            ),
-          ),
         ),
       ),
     );
   }
 
-  /// 构建格式化的正文内容（支持段落间距）
+  /// 根据滚动位置更新当前章节索引
+  void _updateCurrentChapterFromScroll() {
+    if (!_scrollController.hasClients || _chapters.isEmpty) return;
+
+    // 使用 _lastBuiltChapterIndex 作为当前章节的估算
+    // 因为 ListView.builder 优先构建首个可见 item
+    if (_lastBuiltChapterIndex >= 0 &&
+        _lastBuiltChapterIndex != _currentChapterIndex) {
+      _currentChapterIndex = _lastBuiltChapterIndex;
+      _currentTitle = _chapters[_currentChapterIndex].title;
+      _currentContent = _chapters[_currentChapterIndex].content ?? '';
+    }
+  }
+
+  // 追踪最后构建的章节索引（用于估算可见章节）
+  int _lastBuiltChapterIndex = 0;
+
+  /// 构建单个章节的内容 Widget
+  Widget _buildChapterItem(int chapterIndex) {
+    // 追踪当前构建的章节（ListView 优先构建首个可见 item）
+    _lastBuiltChapterIndex = chapterIndex;
+
+    final chapter = _chapters[chapterIndex];
+    final content = chapter.content ?? '';
+    final paragraphs = content.split(RegExp(r'\n\s*\n|\n'));
+
+    return Container(
+      // 对每个章节使用 Key 以便追踪
+      key: ValueKey('chapter_$chapterIndex'),
+      padding: EdgeInsets.only(
+        left: _settings.marginHorizontal,
+        right: _settings.marginHorizontal,
+        top: chapterIndex == 0 ? _settings.marginVertical : 0,
+        bottom: _settings.showStatusBar ? 30 : _settings.marginVertical,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          // 章节标题
+          Text(
+            chapter.title,
+            style: TextStyle(
+              fontSize: _settings.fontSize + 6,
+              fontWeight: FontWeight.bold,
+              color: _currentTheme.text,
+              fontFamily: _currentFontFamily,
+            ),
+          ),
+          SizedBox(height: _settings.paragraphSpacing * 1.5),
+          // 正文内容
+          ...paragraphs.map((paragraph) {
+            final trimmed = paragraph.trim();
+            if (trimmed.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
+              child: Text(
+                '　　$trimmed',
+                style: TextStyle(
+                  fontSize: _settings.fontSize,
+                  height: _settings.lineHeight,
+                  color: _currentTheme.text,
+                  letterSpacing: _settings.letterSpacing,
+                  fontFamily: _currentFontFamily,
+                ),
+              ),
+            );
+          }),
+          // 章节分隔（不是最后一章）
+          if (chapterIndex < _chapters.length - 1) ...[
+            const SizedBox(height: 40),
+            Center(
+              child: Container(
+                width: 100,
+                height: 1,
+                color: _currentTheme.text.withValues(alpha: 0.2),
+              ),
+            ),
+            const SizedBox(height: 40),
+          ] else ...[
+            // 最后一章显示导航
+            const SizedBox(height: 60),
+            _buildChapterNav(_currentTheme.text),
+            const SizedBox(height: 100),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 构建格式化的正文内容（支持段落间距，用于翻页模式）
+  // ignore: unused_element
   Widget _buildFormattedContent() {
     // 按段落分割
     final paragraphs = _currentContent.split(RegExp(r'\n\s*\n|\n'));
@@ -1412,7 +1466,7 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
   }
 
   void _scrollToCurrentChapter() {
-    final index = _isReversed 
+    final index = _isReversed
         ? widget.chapters.length - 1 - widget.currentChapterIndex
         : widget.currentChapterIndex;
     if (index > 0 && index < widget.chapters.length) {
@@ -1428,7 +1482,8 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
     var chapters = widget.chapters;
     if (_searchQuery.isNotEmpty) {
       chapters = chapters
-          .where((c) => c.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .where(
+              (c) => c.title.toLowerCase().contains(_searchQuery.toLowerCase()))
           .toList();
     }
     if (_isReversed) {
@@ -1459,19 +1514,19 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
               ),
             ),
           ),
-          
+
           // 顶部书籍信息
           _buildHeader(),
-          
+
           // Tab 栏
           _buildTabBar(),
-          
+
           // 搜索和排序
           _buildSearchAndSort(),
-          
+
           // 内容区
           Expanded(
-            child: _selectedTab == 0 
+            child: _selectedTab == 0
                 ? _buildChapterList()
                 : _buildEmptyTab(_selectedTab == 1 ? '暂无书签' : '暂无笔记'),
           ),
@@ -1555,12 +1610,14 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             onPressed: () {},
-            child: const Icon(CupertinoIcons.trash, size: 20, color: Color(0xFF666666)),
+            child: const Icon(CupertinoIcons.trash,
+                size: 20, color: Color(0xFF666666)),
           ),
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             onPressed: () {},
-            child: const Icon(CupertinoIcons.arrow_clockwise, size: 20, color: Color(0xFF666666)),
+            child: const Icon(CupertinoIcons.arrow_clockwise,
+                size: 20, color: Color(0xFF666666)),
           ),
         ],
       ),
@@ -1584,7 +1641,8 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF4CAF50) : const Color(0xFF666666),
+            color:
+                isSelected ? const Color(0xFF4CAF50) : const Color(0xFF666666),
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -1609,13 +1667,15 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
               child: CupertinoTextField(
                 controller: _searchController,
                 placeholder: '输入关键字搜索目录',
-                placeholderStyle: const TextStyle(color: Color(0xFF999999), fontSize: 13),
+                placeholderStyle:
+                    const TextStyle(color: Color(0xFF999999), fontSize: 13),
                 style: const TextStyle(color: Color(0xFF333333), fontSize: 13),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: null,
                 prefix: const Padding(
                   padding: EdgeInsets.only(left: 8),
-                  child: Icon(CupertinoIcons.search, size: 16, color: Color(0xFF999999)),
+                  child: Icon(CupertinoIcons.search,
+                      size: 16, color: Color(0xFF999999)),
                 ),
                 onChanged: (value) => setState(() => _searchQuery = value),
               ),
@@ -1650,7 +1710,7 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
       itemCount: chapters.length,
       itemBuilder: (context, index) {
         final chapter = chapters[index];
-        final originalIndex = _isReversed 
+        final originalIndex = _isReversed
             ? widget.chapters.length - 1 - widget.chapters.indexOf(chapter)
             : widget.chapters.indexOf(chapter);
         final isCurrent = originalIndex == widget.currentChapterIndex;
@@ -1670,9 +1730,12 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
                   child: Text(
                     chapter.title,
                     style: TextStyle(
-                      color: isCurrent ? const Color(0xFF4CAF50) : const Color(0xFF333333),
+                      color: isCurrent
+                          ? const Color(0xFF4CAF50)
+                          : const Color(0xFF333333),
                       fontSize: 14,
-                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isCurrent ? FontWeight.w600 : FontWeight.normal,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1697,7 +1760,8 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(CupertinoIcons.doc_text, size: 48, color: Color(0xFFCCCCCC)),
+          const Icon(CupertinoIcons.doc_text,
+              size: 48, color: Color(0xFFCCCCCC)),
           const SizedBox(height: 12),
           Text(
             message,
@@ -1708,4 +1772,3 @@ class _ChapterListSheetState extends State<_ChapterListSheet> {
     );
   }
 }
-

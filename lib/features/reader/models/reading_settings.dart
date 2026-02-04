@@ -64,7 +64,6 @@ class ReadingSettings {
   final bool chineseTraditional; // 繁简体转换（true=繁体）
   final bool cleanChapterTitle; // 净化正文章节名称
 
-
   const ReadingSettings({
     this.fontSize = 18.0,
     this.lineHeight = 1.8,
@@ -398,10 +397,11 @@ class ClickAction {
 /// 翻页模式
 enum PageTurnMode {
   slide, // 滑动
-  simulation, // 仿真翻页
+  simulation, // 仿真翻页 (Shader)
   cover, // 覆盖
   none, // 无动画
   scroll, // 滚动
+  simulation2, // 仿真翻页2 (贝塞尔曲线，参考 flutter_novel)
 }
 
 extension PageTurnModeExtension on PageTurnMode {
@@ -417,6 +417,8 @@ extension PageTurnModeExtension on PageTurnMode {
         return '无';
       case PageTurnMode.scroll:
         return '滚动';
+      case PageTurnMode.simulation2:
+        return '仿真2';
     }
   }
 
@@ -432,6 +434,8 @@ extension PageTurnModeExtension on PageTurnMode {
         return Icons.block;
       case PageTurnMode.scroll:
         return Icons.unfold_more;
+      case PageTurnMode.simulation2:
+        return Icons.menu_book;
     }
   }
 }
@@ -461,4 +465,3 @@ extension PageDirectionExtension on PageDirection {
     }
   }
 }
-

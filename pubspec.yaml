@@ -49,7 +49,7 @@ dependencies:
   package_info_plus: ^9.0.0
   
   # 电池状态
-  battery_plus: ^6.0.0
+  battery_plus: ^7.0.0
 
 dev_dependencies:
   flutter_test:
