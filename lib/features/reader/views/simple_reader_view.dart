@@ -1,13 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart'
-    show
-        Colors,
-        Slider,
-        showModalBottomSheet,
-        Material,
-        InkWell,
-        Icons,
-        ListTile;
+import 'package:flutter/material.dart' hide Slider; // 隐藏 Slider 以避免与 Cupertino 冲突
 import 'package:flutter/services.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -74,6 +66,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
+  
+  // 章节加载锁
+  bool _isLoadingChapter = false;
 
   @override
   void initState() {
@@ -204,10 +199,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   /// 将内容分页（使用 PageFactory 对标 Legado）
+  /// 将内容分页（使用 PageFactory 对标 Legado）
   void _paginateContent() {
     if (!mounted) return;
+    _paginateContentLogicOnly();
+    setState(() {});
+  }
 
-    // 获取屏幕可用尺寸（对标 flutter_reader fetchArticle）
+  /// 仅执行分页计算逻辑，不触发 setState (用于在 setState 内部调用)
+  void _paginateContentLogicOnly() {
+    // 获取屏幕可用尺寸
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     final safeArea = MediaQuery.of(context).padding;
@@ -221,29 +222,54 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         topOffset -
         safeArea.bottom -
         bottomOffset -
-        8.0; // Small buffer for descents/snapping
+        8.0; 
     final contentWidth =
         screenWidth - _settings.marginHorizontal - _settings.marginHorizontal;
+    
+    // 防止宽度过小导致死循环或异常
+    if (contentWidth < 50 || contentHeight < 100) return;
 
-    // 使用 PageFactory 进行三章节分页（对标 Legado）
+    // 使用 PageFactory 进行三章节分页
     _pageFactory.setLayoutParams(
       contentHeight: contentHeight,
       contentWidth: contentWidth,
       fontSize: _settings.fontSize,
       lineHeight: _settings.lineHeight,
       letterSpacing: _settings.letterSpacing,
+      paragraphSpacing: _settings.paragraphSpacing, // 传递段间距
       fontFamily: _currentFontFamily,
     );
     _pageFactory.paginateAll();
-
-    // 保留兼容滚动模式
-    setState(() {});
   }
 
   /// 更新设置
   void _updateSettings(ReadingSettings newSettings) {
+    // 检查是否需要重新分页
+    // 1. 从滚动模式切换到翻页模式
+    // 2. 也是翻页模式且排版参数变更
+    bool needRepaginate = false;
+    
+    if (_settings.pageTurnMode == PageTurnMode.scroll && 
+        newSettings.pageTurnMode != PageTurnMode.scroll) {
+      needRepaginate = true;
+    } else if (newSettings.pageTurnMode != PageTurnMode.scroll) {
+       if (_settings.fontSize != newSettings.fontSize ||
+           _settings.lineHeight != newSettings.lineHeight ||
+           _settings.letterSpacing != newSettings.letterSpacing ||
+           _settings.paragraphSpacing != newSettings.paragraphSpacing || // 监听段间距变化
+           _settings.marginHorizontal != newSettings.marginHorizontal ||
+           // fontFamily 变化通常意味着需要全量刷新，但也需要重排
+           _settings.themeIndex != newSettings.themeIndex // 主题变化可能影响字体? 暂时不用
+           ) {
+         needRepaginate = true;
+       }
+    }
+
     setState(() {
       _settings = newSettings;
+      if (needRepaginate) {
+        _paginateContentLogicOnly();
+      }
     });
     _settingsService.saveReadingSettings(newSettings);
   }
@@ -395,9 +421,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   ReaderBottomMenuNew(
                     currentChapterIndex: _currentChapterIndex,
                     totalChapters: _chapters.length,
+                    currentPageIndex: _pageFactory.currentPageIndex,
+                    totalPages: _pageFactory.totalPages.clamp(1, 9999),
                     settings: _settings,
                     currentTheme: _currentTheme,
                     onChapterChanged: (index) => _loadChapter(index),
+                    onPageChanged: (pageIndex) {
+                      // 跳转到指定页码
+                      setState(() {
+                        // PageFactory 内部管理页码
+                        while (_pageFactory.currentPageIndex < pageIndex) {
+                          if (!_pageFactory.moveToNext()) break;
+                        }
+                        while (_pageFactory.currentPageIndex > pageIndex) {
+                          if (!_pageFactory.moveToPrev()) break;
+                        }
+                      });
+                    },
                     onSettingsChanged: (settings) => _updateSettings(settings),
                     onShowChapterList: _showChapterList,
                     onShowInterfaceSettings: _showInterfaceSettingsSheet,
@@ -451,6 +491,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ),
       backgroundColor: _currentTheme.background,
       padding: EdgeInsets.symmetric(horizontal: _settings.marginHorizontal),
+      enableGestures: !_showMenu, // 菜单显示时禁止翻页手势
       onTap: () {
         setState(() {
           _showMenu = !_showMenu;
@@ -479,6 +520,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           onNotification: (notification) {
             if (notification is ScrollUpdateNotification) {
               setState(() {}); // 更新进度显示
+            }
+            
+            // 处理滑动翻页
+            if (!_isLoadingChapter && notification is ScrollUpdateNotification) {
+              final metrics = notification.metrics;
+              // 顶部上拉 -> 上一章
+              if (metrics.pixels < -60 && _currentChapterIndex > 0) {
+                 _isLoadingChapter = true;
+                 // 震动反馈
+                 HapticFeedback.lightImpact();
+                 _loadChapter(_currentChapterIndex - 1, goToLastPage: true)
+                     .whenComplete(() => _isLoadingChapter = false);
+              }
+              // 底部下拉 -> 下一章
+              else if (metrics.pixels > metrics.maxScrollExtent + 60 && 
+                       _currentChapterIndex < _chapters.length - 1) {
+                 _isLoadingChapter = true;
+                 HapticFeedback.lightImpact();
+                 _loadChapter(_currentChapterIndex + 1)
+                     .whenComplete(() => _isLoadingChapter = false);
+              }
             }
             return false;
           },
@@ -897,13 +959,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             }
                           }),
                           Expanded(
-                            child: Slider(
+                            child: CupertinoSlider(
                               value: _settings.fontSize,
                               min: 10,
                               max: 40,
                               divisions: 30,
                               activeColor: CupertinoColors.activeBlue,
-                              inactiveColor: Colors.white24,
                               onChanged: (val) {
                                 _updateSettings(
                                     _settings.copyWith(fontSize: val));
@@ -1048,12 +1109,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             child: Text(label,
                 style: const TextStyle(color: Colors.white70, fontSize: 13))),
         Expanded(
-          child: Slider(
+          child: CupertinoSlider(
             value: value,
             min: min,
             max: max,
             activeColor: CupertinoColors.activeBlue,
-            inactiveColor: Colors.white24,
             onChanged: onChanged,
           ),
         ),

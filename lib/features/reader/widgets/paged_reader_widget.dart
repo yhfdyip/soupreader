@@ -37,7 +37,10 @@ class PagedReaderWidget extends StatefulWidget {
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
     this.pageTouchSlop = 25,
+    this.enableGestures = true,
   });
+
+  final bool enableGestures;
 
   @override
   State<PagedReaderWidget> createState() => _PagedReaderWidgetState();
@@ -330,6 +333,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onTap(Offset position) {
+    if (!widget.enableGestures) return;
     final screenWidth = MediaQuery.of(context).size.width;
     final xRate = position.dx / screenWidth;
 
@@ -534,10 +538,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
       // 先重置视觉状态，再更新内容
       if (!wasCancel) {
-        _fillPage(direction); // 触发内容更新 -> setState
-      } else {
-        setState(() {}); // 仅重置视觉
+        _fillPage(direction); // 更新内容
       }
+      
+      // 强制重绘以立即应用新的状态（offset=0），防止阴影残留
+      setState(() {});
     }
   }
 
@@ -820,6 +825,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado HorizontalPageDelegate.onTouch ===
   void _onDragStart(DragStartDetails details) {
+    if (!widget.enableGestures) return;
     // 动画已启动时不开始新拖拽
     if (_isStarted) return;
     _abortAnim();
@@ -918,6 +924,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 垂直翻页手势处理（对标水平方式） ===
   void _onVerticalDragStart(DragStartDetails details) {
+    if (!widget.enableGestures) return;
     // 动画已启动时不开始新拖拽
     if (_isStarted) return;
     _abortAnim();

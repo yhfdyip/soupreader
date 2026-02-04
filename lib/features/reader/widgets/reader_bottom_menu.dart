@@ -8,9 +8,12 @@ import '../models/reading_settings.dart';
 class ReaderBottomMenuNew extends StatefulWidget {
   final int currentChapterIndex;
   final int totalChapters;
+  final int currentPageIndex;  // 章节内当前页码
+  final int totalPages;        // 章节内总页数
   final ReadingSettings settings;
   final ReadingThemeColors currentTheme;
   final ValueChanged<int> onChapterChanged;
+  final ValueChanged<int> onPageChanged;  // 页码变化回调
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback onShowChapterList;
   final VoidCallback onShowInterfaceSettings;
@@ -20,9 +23,12 @@ class ReaderBottomMenuNew extends StatefulWidget {
     super.key,
     required this.currentChapterIndex,
     required this.totalChapters,
+    required this.currentPageIndex,
+    required this.totalPages,
     required this.settings,
     required this.currentTheme,
     required this.onChapterChanged,
+    required this.onPageChanged,
     required this.onSettingsChanged,
     required this.onShowChapterList,
     required this.onShowInterfaceSettings,
@@ -109,14 +115,15 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     );
   }
 
-  /// 章节进度滑块
+  /// 章节内页码进度滑块
   Widget _buildChapterSlider() {
+    final maxPage = (widget.totalPages - 1).clamp(0, 9999);
+    
     return Row(
       children: [
         // 上一章按钮
         CupertinoButton(
           padding: EdgeInsets.zero,
-          // minimumSize 需要 Size 类型，这里暂时省略或使用默认值
           onPressed: widget.currentChapterIndex > 0
               ? () => widget.onChapterChanged(widget.currentChapterIndex - 1)
               : null,
@@ -131,7 +138,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           ),
         ),
 
-        // 进度滑块
+        // 页码进度滑块
         Expanded(
           child: Column(
             children: [
@@ -148,17 +155,17 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                   thumbColor: CupertinoColors.white,
                 ),
                 child: Slider(
-                  value: widget.currentChapterIndex.toDouble(),
+                  value: widget.currentPageIndex.toDouble().clamp(0, maxPage.toDouble()),
                   min: 0,
-                  max: (widget.totalChapters - 1).toDouble().clamp(0, double.infinity),
+                  max: maxPage.toDouble(),
                   onChanged: (value) {},
                   onChangeEnd: (value) {
-                    widget.onChapterChanged(value.toInt());
+                    widget.onPageChanged(value.toInt());
                   },
                 ),
               ),
               Text(
-                '${widget.currentChapterIndex + 1} / ${widget.totalChapters}',
+                '${widget.currentPageIndex + 1} / ${widget.totalPages}',
                 style: const TextStyle(
                   color: CupertinoColors.systemGrey,
                   fontSize: 11,

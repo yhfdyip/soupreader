@@ -20,6 +20,7 @@ class PageFactory {
   double _fontSize = 18;
   double _lineHeight = 1.5;
   double _letterSpacing = 0;
+  double _paragraphSpacing = 0;
   String? _fontFamily;
 
   // 回调
@@ -41,6 +42,7 @@ class PageFactory {
     required double fontSize,
     double lineHeight = 1.5,
     double letterSpacing = 0,
+    double paragraphSpacing = 0,
     String? fontFamily,
   }) {
     _contentHeight = contentHeight;
@@ -48,6 +50,7 @@ class PageFactory {
     _fontSize = fontSize;
     _lineHeight = lineHeight;
     _letterSpacing = letterSpacing;
+    _paragraphSpacing = paragraphSpacing;
     _fontFamily = fontFamily;
   }
 
@@ -67,8 +70,10 @@ class PageFactory {
       _contentHeight,
       _contentWidth,
       _fontSize,
+
       lineHeight: _lineHeight,
       letterSpacing: _letterSpacing,
+      paragraphSpacing: _paragraphSpacing,
       fontFamily: _fontFamily,
       title: chapter.title,
     );
