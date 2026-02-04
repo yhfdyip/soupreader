@@ -290,7 +290,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       });
     }
 
-    if (_direction == _PageDirection.next) {
+    if (_direction == _PageDirection.next && _factory.hasNext()) {
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.nextPage, size);
         _convertToHighResImage(_targetPagePicture!, size).then((img) {
@@ -301,7 +301,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           }
         });
       }
-    } else if (_direction == _PageDirection.prev) {
+    } else if (_direction == _PageDirection.prev && _factory.hasPrev()) {
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.prevPage, size);
         _convertToHighResImage(_targetPagePicture!, size).then((img) {

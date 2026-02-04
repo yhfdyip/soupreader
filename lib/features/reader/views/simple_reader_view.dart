@@ -812,7 +812,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setPopupState) => Container(
-          height: MediaQuery.of(context).size.height * 0.75, // 更高的面板
+          height: MediaQuery.of(context).size.height * 0.55, // 更紧凑的面板
           decoration: const BoxDecoration(
             color: Color(0xFF1C1C1E),
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
