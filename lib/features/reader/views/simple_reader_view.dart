@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart'
@@ -378,8 +379,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       letterSpacing: _settings.letterSpacing,
       paragraphSpacing: _settings.paragraphSpacing, // 传递段间距
       fontFamily: _currentFontFamily,
-      // 段首缩进已在 `_processContent` 中按 Legado 逻辑预处理，这里避免二次缩进
-      paragraphIndent: '',
+      // 对标 legado：缩进属于“排版参数”，由分页排版层统一处理
+      paragraphIndent: _settings.paragraphIndent,
       textAlign: _bodyTextAlign,
       titleFontSize: _settings.fontSize + _settings.titleSize,
       titleAlign: _titleTextAlign,
@@ -680,12 +681,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return processed;
   }
 
-  /// 参考 Legado 的正文处理方式，对章节内容进行“段落化 + 段首缩进”格式化：
+  /// 参考 Legado 的正文处理方式，对章节内容进行“段落化”格式化：
   /// - 清理段落首尾空白
   /// - 压缩多余换行（段落之间仅保留一个换行）
-  /// - 开启缩进时：每段统一加上 `paragraphIndent`
   ///
   /// 额外兼容：清理常见 HTML 空白实体（&emsp; 等），避免缩进显示异常。
+  ///
+  /// 注意：段首缩进不在这里“改文本”完成，而是交给渲染层按 `ReadingSettings.paragraphIndent`
+  /// 做“首行缩进”。原因：
+  /// - Flutter 的 `TextAlign.justify` 等对“前导空格”显示不稳定，容易出现看起来不缩进
+  /// - 对标 legado：其翻页排版会根据配置计算缩进宽度，而不是依赖文本里塞空格
   String _formatContentLikeLegado(String content) {
     var text = content;
 
@@ -713,12 +718,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         .toList(growable: false);
 
     if (paragraphs.isEmpty) return '';
-
-    final indent = _settings.paragraphIndent;
-    if (indent.isEmpty) {
-      return paragraphs.join('\n');
-    }
-    return paragraphs.map((p) => '$indent$p').join('\n');
+    return paragraphs.join('\n');
   }
 
   /// 对齐 legado 的段落 trim 行为：
@@ -1056,6 +1056,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final chapter = _chapters[chapterIndex];
     final content = _processContent(chapter.content ?? '', chapter.title);
     final paragraphs = content.split(RegExp(r'\n\s*\n|\n'));
+    final paragraphStyle = TextStyle(
+      fontSize: _settings.fontSize,
+      height: _settings.lineHeight,
+      color: _currentTheme.text,
+      letterSpacing: _settings.letterSpacing,
+      fontFamily: _currentFontFamily,
+      fontWeight: _currentFontWeight,
+      decoration: _currentTextDecoration,
+    );
+    final indent = _settings.paragraphIndent;
+    final indentWidth = indent.isEmpty
+        ? 0.0
+        : _measureTextWidth(
+            indent,
+            paragraphStyle,
+          );
 
     return Container(
       // 对每个章节使用 Key 以便追踪
@@ -1099,18 +1115,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
             return Padding(
               padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
-              child: Text(
+              child: _buildParagraphWithFirstLineIndent(
                 paragraphText,
+                style: paragraphStyle,
                 textAlign: _bodyTextAlign,
-                style: TextStyle(
-                  fontSize: _settings.fontSize,
-                  height: _settings.lineHeight,
-                  color: _currentTheme.text,
-                  letterSpacing: _settings.letterSpacing,
-                  fontFamily: _currentFontFamily,
-                  fontWeight: _currentFontWeight,
-                  decoration: _currentTextDecoration,
-                ),
+                indentWidth: indentWidth,
               ),
             );
           }),
@@ -1162,6 +1171,52 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  double _measureTextWidth(String text, TextStyle style) {
+    if (text.isEmpty) return 0;
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+    );
+    painter.layout();
+    return painter.width;
+  }
+
+  /// 段落渲染（首行缩进，对标 legado 的 `paragraphIndent` 体验）
+  ///
+  /// 说明：
+  /// - 不依赖段首前导空格，避免在 `TextAlign.justify` 下出现“看起来不缩进”
+  /// - 通过 `WidgetSpan(SizedBox(width))` 做首行缩进，后续换行仍顶格
+  Widget _buildParagraphWithFirstLineIndent(
+    String paragraph, {
+    required TextStyle style,
+    required TextAlign textAlign,
+    required double indentWidth,
+  }) {
+    if (indentWidth <= 0) {
+      return Text(
+        paragraph,
+        textAlign: textAlign,
+        style: style,
+      );
+    }
+
+    return RichText(
+      textAlign: textAlign,
+      text: TextSpan(
+        style: style,
+        children: [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: SizedBox(width: indentWidth),
+          ),
+          TextSpan(text: paragraph),
+        ],
+      ),
     );
   }
 

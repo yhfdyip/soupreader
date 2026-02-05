@@ -67,16 +67,19 @@ class ReadingSettings {
   final bool cleanChapterTitle; // 净化正文章节名称
 
   const ReadingSettings({
+    // 安装后默认值：尽量对齐 Legado 的阅读默认体验
     this.fontSize = 18.0,
-    this.lineHeight = 1.8,
-    this.letterSpacing = 0.5,
-    this.paragraphSpacing = 16.0,
+    this.lineHeight = 1.5,
+    this.letterSpacing = 0.0,
+    this.paragraphSpacing = 0.0,
     this.marginHorizontal = 20.0,
     this.marginVertical = 16.0,
-    this.themeIndex = 0,
+    // Legado 常见默认主题更偏“护眼纸色”，对应本项目的 index=2（护眼）
+    this.themeIndex = 2,
     this.fontFamilyIndex = 0,
-    this.pageTurnMode = PageTurnMode.scroll,
-    this.keepScreenOn = true,
+    // Legado 默认翻页通常为“仿真”
+    this.pageTurnMode = PageTurnMode.simulation,
+    this.keepScreenOn = false,
     this.showStatusBar = true,
     this.showBattery = true,
     this.showTime = true,
@@ -104,7 +107,7 @@ class ReadingSettings {
     this.pageDirection = PageDirection.horizontal,
     this.noAnimScrollPage = false,
     this.pageTouchSlop = 25,
-    this.volumeKeyPage = true,
+    this.volumeKeyPage = false,
     this.mouseWheelPage = true,
     // 页眉/页脚配置默认值
     this.hideHeader = false,
@@ -129,21 +132,30 @@ class ReadingSettings {
       );
 
   factory ReadingSettings.fromJson(Map<String, dynamic> json) {
+    final rawPageTurnMode = json['pageTurnMode'];
+    final pageTurnModeIndex = rawPageTurnMode is int
+        ? rawPageTurnMode
+        : rawPageTurnMode is num
+            ? rawPageTurnMode.toInt()
+            : PageTurnMode.simulation.index;
+    final safePageTurnModeIndex =
+        pageTurnModeIndex.clamp(0, PageTurnMode.values.length - 1);
+
     return ReadingSettings(
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 18.0,
-      lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.8,
-      letterSpacing: (json['letterSpacing'] as num?)?.toDouble() ?? 0.5,
-      paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble() ?? 16.0,
+      lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.5,
+      letterSpacing: (json['letterSpacing'] as num?)?.toDouble() ?? 0.0,
+      paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble() ?? 0.0,
       marginHorizontal: (json['marginHorizontal'] as num?)?.toDouble() ??
           (json['paddingH'] as num?)?.toDouble() ??
           20.0,
       marginVertical: (json['marginVertical'] as num?)?.toDouble() ??
           (json['paddingV'] as num?)?.toDouble() ??
           16.0,
-      themeIndex: json['themeIndex'] as int? ?? 0,
+      themeIndex: json['themeIndex'] as int? ?? 2,
       fontFamilyIndex: json['fontFamilyIndex'] as int? ?? 0,
-      pageTurnMode: PageTurnMode.values[json['pageTurnMode'] as int? ?? 4],
-      keepScreenOn: json['keepScreenOn'] as bool? ?? true,
+      pageTurnMode: PageTurnMode.values[safePageTurnModeIndex],
+      keepScreenOn: json['keepScreenOn'] as bool? ?? false,
       showStatusBar: json['showStatusBar'] as bool? ?? true,
       showBattery: json['showBattery'] as bool? ?? true,
       showTime: json['showTime'] as bool? ?? true,
@@ -174,7 +186,7 @@ class ReadingSettings {
       pageDirection: PageDirection.values[json['pageDirection'] as int? ?? 0],
       noAnimScrollPage: json['noAnimScrollPage'] as bool? ?? false,
       pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
-      volumeKeyPage: json['volumeKeyPage'] as bool? ?? true,
+      volumeKeyPage: json['volumeKeyPage'] as bool? ?? false,
       mouseWheelPage: json['mouseWheelPage'] as bool? ?? true,
       // 页眉/页脚配置
       hideHeader: json['hideHeader'] as bool? ?? false,
