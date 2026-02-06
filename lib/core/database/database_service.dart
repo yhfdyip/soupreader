@@ -10,11 +10,13 @@ class DatabaseService {
   static const String _booksBoxName = 'books';
   static const String _chaptersBoxName = 'chapters';
   static const String _sourcesBoxName = 'sources';
+  static const String _replaceRulesBoxName = 'replace_rules';
   static const String _settingsBoxName = 'settings';
 
   late Box<BookEntity> _booksBox;
   late Box<ChapterEntity> _chaptersBox;
   late Box<BookSourceEntity> _sourcesBox;
+  late Box<ReplaceRuleEntity> _replaceRulesBox;
   late Box<dynamic> _settingsBox;
 
   bool _isInitialized = false;
@@ -36,11 +38,16 @@ class DatabaseService {
     if (!Hive.isAdapterRegistered(2)) {
       Hive.registerAdapter(BookSourceEntityAdapter());
     }
+    if (!Hive.isAdapterRegistered(3)) {
+      Hive.registerAdapter(ReplaceRuleEntityAdapter());
+    }
 
     // 打开 Box
     _booksBox = await Hive.openBox<BookEntity>(_booksBoxName);
     _chaptersBox = await Hive.openBox<ChapterEntity>(_chaptersBoxName);
     _sourcesBox = await Hive.openBox<BookSourceEntity>(_sourcesBoxName);
+    _replaceRulesBox =
+        await Hive.openBox<ReplaceRuleEntity>(_replaceRulesBoxName);
     _settingsBox = await Hive.openBox(_settingsBoxName);
 
     _isInitialized = true;
@@ -64,6 +71,11 @@ class DatabaseService {
     return _sourcesBox;
   }
 
+  Box<ReplaceRuleEntity> get replaceRulesBox {
+    _checkInitialized();
+    return _replaceRulesBox;
+  }
+
   /// 获取设置 Box
   Box<dynamic> get settingsBox {
     _checkInitialized();
@@ -81,6 +93,7 @@ class DatabaseService {
     await _booksBox.clear();
     await _chaptersBox.clear();
     await _sourcesBox.clear();
+    await _replaceRulesBox.clear();
     await _settingsBox.clear();
   }
 

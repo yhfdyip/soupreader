@@ -5,6 +5,9 @@ import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../../import/import_service.dart';
 import '../../reader/views/simple_reader_view.dart';
+import '../services/bookshelf_booklist_import_service.dart';
+import '../services/bookshelf_import_export_service.dart';
+import '../views/reading_history_view.dart';
 import '../models/book.dart';
 
 /// 书架页面 - 纯 iOS 原生风格
@@ -20,6 +23,8 @@ class _BookshelfViewState extends State<BookshelfView> {
   late final BookRepository _bookRepo;
   late final ImportService _importService;
   late final SettingsService _settingsService;
+  late final BookshelfImportExportService _bookshelfIo;
+  late final BookshelfBooklistImportService _booklistImporter;
   List<Book> _books = [];
   bool _isImporting = false;
 
@@ -29,6 +34,8 @@ class _BookshelfViewState extends State<BookshelfView> {
     _bookRepo = BookRepository(DatabaseService());
     _importService = ImportService();
     _settingsService = SettingsService();
+    _bookshelfIo = BookshelfImportExportService();
+    _booklistImporter = BookshelfBooklistImportService();
     _isGridView =
         _settingsService.appSettings.bookshelfViewMode == BookshelfViewMode.grid;
     _loadBooks();
@@ -65,13 +72,13 @@ class _BookshelfViewState extends State<BookshelfView> {
     });
   }
 
-  Future<void> _importTxtFile() async {
+  Future<void> _importLocalBook() async {
     if (_isImporting) return;
 
     setState(() => _isImporting = true);
 
     try {
-      final result = await _importService.importTxtFile();
+      final result = await _importService.importLocalBook();
 
       if (result.success && result.book != null) {
         _loadBooks();
@@ -89,6 +96,235 @@ class _BookshelfViewState extends State<BookshelfView> {
         setState(() => _isImporting = false);
       }
     }
+  }
+
+  Future<void> _openReadingHistory() async {
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const ReadingHistoryView(),
+      ),
+    );
+    _loadBooks();
+  }
+
+  Future<void> _exportBookshelf() async {
+    final result = await _bookshelfIo.exportToFile(_books);
+    if (!result.success) {
+      if (result.cancelled) return;
+      _showMessage(result.errorMessage ?? '导出失败');
+      return;
+    }
+    final hint = result.outputPathOrHint;
+    _showMessage(hint == null ? '导出成功' : '导出成功：$hint');
+  }
+
+  Future<void> _importBookshelf() async {
+    if (_isImporting) return;
+    setState(() => _isImporting = true);
+
+    final parseResult = await _bookshelfIo.importFromFile();
+    if (!parseResult.success) {
+      if (mounted) setState(() => _isImporting = false);
+      if (parseResult.cancelled) return;
+      _showMessage(parseResult.errorMessage ?? '导入失败');
+      return;
+    }
+
+    final progress = ValueNotifier<BooklistImportProgress>(
+      BooklistImportProgress(
+        done: 0,
+        total: parseResult.items.length,
+        currentName: '',
+        currentSource: '',
+      ),
+    );
+
+    if (!mounted) return;
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('正在导入书单'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: ValueListenableBuilder<BooklistImportProgress>(
+            valueListenable: progress,
+            builder: (context, p, _) {
+              final name = p.currentName.isEmpty ? '—' : p.currentName;
+              final src = p.currentSource.isEmpty ? '—' : p.currentSource;
+              return Column(
+                children: [
+                  const CupertinoActivityIndicator(),
+                  const SizedBox(height: 10),
+                  Text('进度：${p.done}/${p.total}'),
+                  const SizedBox(height: 6),
+                  Text('当前：$name'),
+                  const SizedBox(height: 6),
+                  Text('书源：$src'),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final summary = await _booklistImporter.importBySearching(
+      parseResult.items,
+      onProgress: (p) => progress.value = p,
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context);
+    setState(() => _isImporting = false);
+    _loadBooks();
+
+    final details = summary.errors.isEmpty
+        ? ''
+        : '\n\n失败详情（最多 5 条）：\n${summary.errors.take(5).join('\n')}';
+    _showMessage('${summary.summaryText}$details');
+  }
+
+  Future<void> _showSortMenu() async {
+    final current = _settingsService.appSettings.bookshelfSortMode;
+    BookshelfSortMode? selected;
+
+    String label(BookshelfSortMode m) {
+      switch (m) {
+        case BookshelfSortMode.recentRead:
+          return '最近阅读';
+        case BookshelfSortMode.recentAdded:
+          return '最近加入';
+        case BookshelfSortMode.title:
+          return '书名';
+        case BookshelfSortMode.author:
+          return '作者';
+      }
+    }
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('排序方式'),
+        actions: [
+          for (final mode in BookshelfSortMode.values)
+            CupertinoActionSheetAction(
+              isDefaultAction: mode == current,
+              child: Text(label(mode)),
+              onPressed: () {
+                selected = mode;
+                Navigator.pop(context);
+              },
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+
+    final next = selected;
+    if (next == null || next == current) return;
+
+    await _settingsService.saveAppSettings(
+      _settingsService.appSettings.copyWith(bookshelfSortMode: next),
+    );
+    _loadBooks();
+  }
+
+  Future<void> _showLayoutMenu() async {
+    final current = _settingsService.appSettings.bookshelfViewMode;
+    BookshelfViewMode? selected;
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('书架布局'),
+        actions: [
+          CupertinoActionSheetAction(
+            isDefaultAction: current == BookshelfViewMode.grid,
+            child: const Text('图墙模式'),
+            onPressed: () {
+              selected = BookshelfViewMode.grid;
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            isDefaultAction: current == BookshelfViewMode.list,
+            child: const Text('列表模式'),
+            onPressed: () {
+              selected = BookshelfViewMode.list;
+              Navigator.pop(context);
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+
+    final next = selected;
+    if (next == null || next == current) return;
+
+    setState(() {
+      _isGridView = next == BookshelfViewMode.grid;
+    });
+    await _settingsService.saveAppSettings(
+      _settingsService.appSettings.copyWith(bookshelfViewMode: next),
+    );
+  }
+
+  void _showMoreMenu() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('书架'),
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('本机导入（TXT/EPUB）'),
+            onPressed: () {
+              Navigator.pop(context);
+              _importLocalBook();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('书架布局'),
+            onPressed: () {
+              Navigator.pop(context);
+              _showLayoutMenu();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('排序方式'),
+            onPressed: () {
+              Navigator.pop(context);
+              _showSortMenu();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('导出书单（JSON）'),
+            onPressed: () {
+              Navigator.pop(context);
+              _exportBookshelf();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('导入书单（JSON）'),
+            onPressed: () {
+              Navigator.pop(context);
+              _importBookshelf();
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
   }
 
   void _showMessage(String message) {
@@ -113,7 +349,7 @@ class _BookshelfViewState extends State<BookshelfView> {
         middle: const Text('书架'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: _isImporting ? null : _importTxtFile,
+          onPressed: _isImporting ? null : _importLocalBook,
           child: _isImporting
               ? const CupertinoActivityIndicator()
               : const Icon(CupertinoIcons.add),
@@ -123,21 +359,13 @@ class _BookshelfViewState extends State<BookshelfView> {
           children: [
             CupertinoButton(
               padding: EdgeInsets.zero,
-              child: Icon(
-                _isGridView
-                    ? CupertinoIcons.list_bullet
-                    : CupertinoIcons.square_grid_2x2,
-              ),
-              onPressed: () async {
-                final next = !_isGridView;
-                setState(() => _isGridView = next);
-                await _settingsService.saveAppSettings(
-                  _settingsService.appSettings.copyWith(
-                    bookshelfViewMode:
-                        next ? BookshelfViewMode.grid : BookshelfViewMode.list,
-                  ),
-                );
-              },
+              onPressed: _openReadingHistory,
+              child: const Icon(CupertinoIcons.clock),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: _showMoreMenu,
+              child: const Icon(CupertinoIcons.ellipsis),
             ),
           ],
         ),
@@ -168,7 +396,7 @@ class _BookshelfViewState extends State<BookshelfView> {
           ),
           const SizedBox(height: 24),
           CupertinoButton.filled(
-            onPressed: _importTxtFile,
+            onPressed: _importLocalBook,
             child: const Text('导入本地书籍'),
           ),
         ],

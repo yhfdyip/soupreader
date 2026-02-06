@@ -71,6 +71,32 @@ class BookRepository {
     }
   }
 
+  /// 清除阅读记录（不删除书籍/章节）
+  ///
+  /// 对标“阅读记录列表 -> 删除阅读记录”的基础语义：清空上次阅读时间与进度。
+  Future<void> clearReadingRecord(String bookId) async {
+    final entity = _db.booksBox.get(bookId);
+    if (entity == null) return;
+    final updated = BookEntity(
+      id: entity.id,
+      title: entity.title,
+      author: entity.author,
+      coverUrl: entity.coverUrl,
+      intro: entity.intro,
+      sourceId: entity.sourceId,
+      sourceUrl: entity.sourceUrl,
+      latestChapter: entity.latestChapter,
+      totalChapters: entity.totalChapters,
+      currentChapter: 0,
+      readProgress: 0.0,
+      lastReadTime: null,
+      addedTime: entity.addedTime,
+      isLocal: entity.isLocal,
+      localPath: entity.localPath,
+    );
+    await _db.booksBox.put(bookId, updated);
+  }
+
   /// 检查书籍是否存在
   bool hasBook(String id) => _db.booksBox.containsKey(id);
 

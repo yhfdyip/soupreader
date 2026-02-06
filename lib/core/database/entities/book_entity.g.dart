@@ -159,13 +159,14 @@ class BookSourceEntityAdapter extends TypeAdapter<BookSourceEntity> {
       header: fields[11] as String?,
       loginUrl: fields[12] as String?,
       lastUpdateTime: fields[13] as DateTime?,
+      rawJson: fields[14] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, BookSourceEntity obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.bookSourceUrl)
       ..writeByte(1)
@@ -193,7 +194,9 @@ class BookSourceEntityAdapter extends TypeAdapter<BookSourceEntity> {
       ..writeByte(12)
       ..write(obj.loginUrl)
       ..writeByte(13)
-      ..write(obj.lastUpdateTime);
+      ..write(obj.lastUpdateTime)
+      ..writeByte(14)
+      ..write(obj.rawJson);
   }
 
   @override
@@ -203,6 +206,76 @@ class BookSourceEntityAdapter extends TypeAdapter<BookSourceEntity> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is BookSourceEntityAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class ReplaceRuleEntityAdapter extends TypeAdapter<ReplaceRuleEntity> {
+  @override
+  final int typeId = 3;
+
+  @override
+  ReplaceRuleEntity read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return ReplaceRuleEntity(
+      id: fields[0] as int,
+      name: fields[1] as String,
+      group: fields[2] as String?,
+      pattern: fields[3] as String,
+      replacement: fields[4] as String,
+      scope: fields[5] as String?,
+      scopeTitle: fields[6] as bool,
+      scopeContent: fields[7] as bool,
+      excludeScope: fields[8] as String?,
+      isEnabled: fields[9] as bool,
+      isRegex: fields[10] as bool,
+      timeoutMillisecond: fields[11] as int,
+      order: fields[12] as int,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, ReplaceRuleEntity obj) {
+    writer
+      ..writeByte(13)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.name)
+      ..writeByte(2)
+      ..write(obj.group)
+      ..writeByte(3)
+      ..write(obj.pattern)
+      ..writeByte(4)
+      ..write(obj.replacement)
+      ..writeByte(5)
+      ..write(obj.scope)
+      ..writeByte(6)
+      ..write(obj.scopeTitle)
+      ..writeByte(7)
+      ..write(obj.scopeContent)
+      ..writeByte(8)
+      ..write(obj.excludeScope)
+      ..writeByte(9)
+      ..write(obj.isEnabled)
+      ..writeByte(10)
+      ..write(obj.isRegex)
+      ..writeByte(11)
+      ..write(obj.timeoutMillisecond)
+      ..writeByte(12)
+      ..write(obj.order);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReplaceRuleEntityAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

@@ -16,8 +16,9 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
 
     tempDir = await Directory.systemTemp.createTemp('soupreader_test_');
-    const MethodChannel('plugins.flutter.io/path_provider')
-        .setMockMethodCallHandler((MethodCall call) async {
+    const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (MethodCall call) async {
       return tempDir.path;
     });
 

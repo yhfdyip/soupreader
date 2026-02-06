@@ -8,6 +8,7 @@ import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../reader/models/reading_settings.dart';
+import '../../bookshelf/views/reading_history_view.dart';
 import '../../source/views/source_list_view.dart';
 import 'about_settings_view.dart';
 import 'backup_settings_view.dart';
@@ -33,6 +34,7 @@ class _SettingsViewState extends State<SettingsView> {
 
   String _version = '';
   int? _sourceCount;
+  int? _readingHistoryCount;
   ChapterCacheInfo _cacheInfo = const ChapterCacheInfo(bytes: 0, chapters: 0);
 
   @override
@@ -61,6 +63,10 @@ class _SettingsViewState extends State<SettingsView> {
     final chapterRepo = ChapterRepository(db);
 
     final sourceCount = db.sourcesBox.length;
+    final readingHistoryCount = db.booksBox.values
+        .where((b) =>
+            b.lastReadTime != null && (b.readProgress > 0 || b.currentChapter > 0))
+        .length;
     final localBookIds = db.booksBox.values
         .where((b) => b.isLocal)
         .map((b) => b.id)
@@ -71,6 +77,7 @@ class _SettingsViewState extends State<SettingsView> {
     if (!mounted) return;
     setState(() {
       _sourceCount = sourceCount;
+      _readingHistoryCount = readingHistoryCount;
       _cacheInfo = cacheInfo;
       _readingSettings = _settingsService.readingSettings;
     });
@@ -97,17 +104,6 @@ class _SettingsViewState extends State<SettingsView> {
     return '$_appearanceSummary · $themeName';
   }
 
-  String get _readingSummary {
-    final fontSize = _readingSettings.fontSize.toInt();
-    final lineHeight = _readingSettings.lineHeight.toStringAsFixed(1);
-    final themeIndex = _readingSettings.themeIndex;
-    final themeName = (themeIndex >= 0 &&
-            themeIndex < AppColors.readingThemes.length)
-        ? AppColors.readingThemes[themeIndex].name
-        : AppColors.readingThemes.first.name;
-    return '$fontSize · $themeName · $lineHeight';
-  }
-
   String get _sourceSummary {
     final count = _sourceCount;
     final auto = _settingsService.appSettings.autoUpdateSources ? '自动更新开' : '自动更新关';
@@ -119,6 +115,12 @@ class _SettingsViewState extends State<SettingsView> {
     final wifi = _settingsService.appSettings.wifiOnlyDownload ? '仅 Wi‑Fi' : '不限网络';
     final cache = FormatUtils.formatBytes(_cacheInfo.bytes);
     return '$wifi · 缓存 $cache';
+  }
+
+  String get _readingHistorySummary {
+    final count = _readingHistoryCount;
+    if (count == null) return '—';
+    return '$count 本';
   }
 
   @override
@@ -139,7 +141,7 @@ class _SettingsViewState extends State<SettingsView> {
                     CupertinoColors.systemCyan,
                   ),
                   title: const Text('书源管理'),
-                  additionalInfo: Text(_sourceCount == null ? '—' : '${_sourceCount!} 个'),
+                  additionalInfo: Text(_sourceSummary),
                   trailing: const CupertinoListTileChevron(),
                   onTap: _openSourceList,
                 ),
@@ -240,12 +242,9 @@ class _SettingsViewState extends State<SettingsView> {
                     CupertinoColors.systemBlue,
                   ),
                   title: const Text('阅读记录'),
-                  additionalInfo: const Text('暂未实现'),
+                  additionalInfo: Text(_readingHistorySummary),
                   trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '阅读记录暂未实现',
-                  ),
+                  onTap: _openReadingHistory,
                 ),
                 CupertinoListTile.notched(
                   leading: _buildIconBox(
@@ -381,6 +380,15 @@ class _SettingsViewState extends State<SettingsView> {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (context) => const TextRulesSettingsView(),
+      ),
+    );
+    await _refreshStats();
+  }
+
+  Future<void> _openReadingHistory() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const ReadingHistoryView(),
       ),
     );
     await _refreshStats();

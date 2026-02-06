@@ -20,7 +20,8 @@ class RuleParserEngine {
   /// 搜索书籍
   Future<List<SearchResult>> search(BookSource source, String keyword) async {
     final searchRule = source.ruleSearch;
-    if (searchRule == null || searchRule.url == null) {
+    final searchUrlRule = source.searchUrl;
+    if (searchRule == null || searchUrlRule == null || searchUrlRule.isEmpty) {
       return [];
     }
 
@@ -28,7 +29,7 @@ class RuleParserEngine {
       // 构建搜索URL
       final searchUrl = _buildUrl(
         source.bookSourceUrl,
-        searchRule.url!,
+        searchUrlRule,
         {'key': keyword, 'searchKey': keyword},
       );
 
@@ -67,6 +68,64 @@ class RuleParserEngine {
       return results;
     } catch (e) {
       debugPrint('搜索失败: $e');
+      return [];
+    }
+  }
+
+  /// 发现书籍
+  ///
+  /// 对标 Legado：`exploreUrl` + `ruleExplore`
+  Future<List<SearchResult>> explore(
+    BookSource source, {
+    String? exploreUrlOverride,
+  }) async {
+    final exploreRule = source.ruleExplore;
+    final exploreUrlRule = exploreUrlOverride ?? source.exploreUrl;
+    if (exploreRule == null ||
+        exploreUrlRule == null ||
+        exploreUrlRule.trim().isEmpty) {
+      return [];
+    }
+
+    try {
+      final exploreUrl = _buildUrl(
+        source.bookSourceUrl,
+        exploreUrlRule,
+        const {},
+      );
+
+      final response = await _fetch(exploreUrl, source.header);
+      if (response == null) return [];
+
+      final document = html_parser.parse(response);
+      final results = <SearchResult>[];
+
+      final bookListRule = exploreRule.bookList ?? '';
+      final bookElements = _querySelectorAll(document, bookListRule);
+
+      for (final element in bookElements) {
+        final result = SearchResult(
+          name: _parseRule(element, exploreRule.name, source.bookSourceUrl),
+          author: _parseRule(element, exploreRule.author, source.bookSourceUrl),
+          coverUrl:
+              _parseRule(element, exploreRule.coverUrl, source.bookSourceUrl),
+          intro: _parseRule(element, exploreRule.intro, source.bookSourceUrl),
+          lastChapter:
+              _parseRule(element, exploreRule.lastChapter, source.bookSourceUrl),
+          bookUrl:
+              _parseRule(element, exploreRule.bookUrl, source.bookSourceUrl),
+          sourceUrl: source.bookSourceUrl,
+          sourceName: source.bookSourceName,
+        );
+
+        if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+          results.add(result);
+        }
+      }
+
+      return results;
+    } catch (e) {
+      debugPrint('发现失败: $e');
       return [];
     }
   }

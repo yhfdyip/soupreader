@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:soupreader/features/import/txt_parser.dart';
 
 void main() {
-  Uint8List _bytes(String s) => Uint8List.fromList(utf8.encode(s));
+  Uint8List bytes(String s) => Uint8List.fromList(utf8.encode(s));
 
   group('TxtParser typography normalization', () {
     test('merges hard-wrapped lines into paragraphs', () {
@@ -30,7 +30,7 @@ void main() {
         ...secondParaLines,
       ].join('\n');
 
-      final result = TxtParser.importFromBytes(_bytes(input), 'demo.txt');
+      final result = TxtParser.importFromBytes(bytes(input), 'demo.txt');
       expect(result.chapters.length, 1);
 
       final c = result.chapters.first.content ?? '';
@@ -50,7 +50,7 @@ void main() {
         '　　第二段也有缩进。',
       ].join('\n');
 
-      final result = TxtParser.importFromBytes(_bytes(input), 'demo.txt');
+      final result = TxtParser.importFromBytes(bytes(input), 'demo.txt');
       final c = result.chapters.first.content ?? '';
       expect(
         c,
@@ -68,7 +68,7 @@ void main() {
         '长相思兮长相忆',
       ].join('\n');
 
-      final result = TxtParser.importFromBytes(_bytes(input), 'demo.txt');
+      final result = TxtParser.importFromBytes(bytes(input), 'demo.txt');
       final c = result.chapters.first.content ?? '';
 
       // 诗歌短句不应被合并成一段

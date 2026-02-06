@@ -14,6 +14,7 @@ import '../../../core/services/settings_service.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/typography.dart';
 import '../../bookshelf/models/book.dart';
+import '../../replace/services/replace_rule_service.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/reading_settings.dart';
 import '../widgets/auto_pager.dart';
@@ -47,6 +48,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   late final ChapterRepository _chapterRepo;
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
+  late final ReplaceRuleService _replaceService;
   late final SettingsService _settingsService;
   final ScreenBrightnessService _brightnessService =
       ScreenBrightnessService.instance;
@@ -76,9 +78,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // 当前书籍信息
   final String _bookAuthor = '';
+  String? _currentSourceUrl;
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
+
+  final _replaceStageCache = <String, _ReplaceStageCache>{};
 
   static const List<_TipOption> _headerTipOptions = [
     _TipOption(0, '书名'),
@@ -116,6 +121,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _chapterRepo = ChapterRepository(db);
     _bookRepo = BookRepository(db);
     _sourceRepo = SourceRepository(db);
+    _replaceService = ReplaceRuleService(db);
     _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
     _settings = _settingsService.readingSettings;
@@ -149,6 +155,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Future<void> _initReader() async {
+    final book = _bookRepo.getBookById(widget.bookId);
+    _currentSourceUrl = book?.sourceUrl ?? book?.sourceId;
+
     _chapters = _chapterRepo.getChaptersForBook(widget.bookId);
     if (_chapters.isNotEmpty) {
       if (_currentChapterIndex >= _chapters.length) {
@@ -159,7 +168,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       final chapterDataList = _chapters
           .map((c) => ChapterData(
                 title: c.title,
-                content: _processContent(c.content ?? '', c.title),
+                content: _postProcessContent(c.content ?? '', c.title),
               ))
           .toList();
       _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
@@ -253,10 +262,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       content = await _fetchChapterContent(book, chapter, index);
     }
 
-    final processedContent = _processContent(content, chapter.title);
+    final stage = await _computeReplaceStage(
+      chapterId: chapter.id,
+      rawTitle: chapter.title,
+      rawContent: content,
+    );
+    final processedContent = _postProcessContent(stage.content, stage.title);
     setState(() {
       _currentChapterIndex = index;
-      _currentTitle = chapter.title;
+      _currentTitle = stage.title;
       _currentContent = processedContent;
     });
 
@@ -293,10 +307,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _syncPageFactoryChapters({bool keepPosition = false}) {
     final chapterDataList = _chapters
-        .map((chapter) => ChapterData(
-              title: chapter.title,
-              content: _processContent(chapter.content ?? '', chapter.title),
-            ))
+        .map((chapter) {
+          final cached = _replaceStageCache[chapter.id];
+          final title = cached?.title ?? chapter.title;
+          final content = cached?.content ?? (chapter.content ?? '');
+          return ChapterData(
+            title: title,
+            content: _postProcessContent(content, title),
+          );
+        })
         .toList();
     if (keepPosition) {
       _pageFactory.replaceChaptersKeepingPosition(chapterDataList);
@@ -444,7 +463,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _settings = newSettings;
       if (contentTransformChanged && _chapters.isNotEmpty) {
         final chapter = _chapters[_currentChapterIndex];
-        _currentContent = _processContent(chapter.content ?? '', chapter.title);
+        final cached = _replaceStageCache[chapter.id];
+        final title = cached?.title ?? chapter.title;
+        final content = cached?.content ?? (chapter.content ?? '');
+        _currentTitle = title;
+        _currentContent = _postProcessContent(content, title);
       }
       if (contentTransformChanged) {
         _syncPageFactoryChapters(
@@ -665,16 +688,49 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
-  String _processContent(String content, String title) {
+  String _postProcessContent(String content, String processedTitle) {
     var processed = content;
     if (_settings.cleanChapterTitle) {
-      processed = _removeDuplicateTitle(processed, title);
+      processed = _removeDuplicateTitle(processed, processedTitle);
     }
     if (_settings.chineseTraditional) {
       processed = _convertToTraditional(processed);
     }
     processed = _formatContentLikeLegado(processed);
     return processed;
+  }
+
+  Future<_ReplaceStageCache> _computeReplaceStage({
+    required String chapterId,
+    required String rawTitle,
+    required String rawContent,
+  }) async {
+    final cached = _replaceStageCache[chapterId];
+    if (cached != null &&
+        cached.rawTitle == rawTitle &&
+        cached.rawContent == rawContent) {
+      return cached;
+    }
+
+    final title = await _replaceService.applyTitle(
+      rawTitle,
+      bookName: widget.bookTitle,
+      sourceUrl: _currentSourceUrl,
+    );
+    final content = await _replaceService.applyContent(
+      rawContent,
+      bookName: widget.bookTitle,
+      sourceUrl: _currentSourceUrl,
+    );
+
+    final stage = _ReplaceStageCache(
+      rawTitle: rawTitle,
+      rawContent: rawContent,
+      title: title,
+      content: content,
+    );
+    _replaceStageCache[chapterId] = stage;
+    return stage;
   }
 
   /// 参考 Legado 的正文处理方式，对章节内容进行“段落化”格式化：
@@ -1036,8 +1092,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (_lastBuiltChapterIndex >= 0 &&
         _lastBuiltChapterIndex != _currentChapterIndex) {
       _currentChapterIndex = _lastBuiltChapterIndex;
-      _currentTitle = _chapters[_currentChapterIndex].title;
-      _currentContent = _chapters[_currentChapterIndex].content ?? '';
+      final chapter = _chapters[_currentChapterIndex];
+      final cached = _replaceStageCache[chapter.id];
+      final title = cached?.title ?? chapter.title;
+      final content = cached?.content ?? (chapter.content ?? '');
+      _currentTitle = title;
+      _currentContent = _postProcessContent(content, title);
     }
   }
 
@@ -1050,7 +1110,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _lastBuiltChapterIndex = chapterIndex;
 
     final chapter = _chapters[chapterIndex];
-    final content = _processContent(chapter.content ?? '', chapter.title);
+    final cached = _replaceStageCache[chapter.id];
+    final title = cached?.title ?? chapter.title;
+    final content = _postProcessContent(
+      cached?.content ?? (chapter.content ?? ''),
+      title,
+    );
     final paragraphs = content.split(RegExp(r'\n\s*\n|\n'));
     final paragraphStyle = TextStyle(
       fontSize: _settings.fontSize,
@@ -1478,6 +1543,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         return _buildThemeSettingsTab(setPopupState);
       case 2:
         return _buildPageSettingsTab(setPopupState);
+      case 10:
+        return _buildQuickSettingsTab(setPopupState);
+      case 11:
+        return _buildFontSettingsTab(setPopupState);
+      case 12:
+        return _buildLayoutSettingsTab(setPopupState);
       default:
         return _buildMoreSettingsTab(setPopupState);
     }
@@ -3544,4 +3615,18 @@ class _TipOption {
   final String label;
 
   const _TipOption(this.value, this.label);
+}
+
+class _ReplaceStageCache {
+  final String rawTitle;
+  final String rawContent;
+  final String title;
+  final String content;
+
+  const _ReplaceStageCache({
+    required this.rawTitle,
+    required this.rawContent,
+    required this.title,
+    required this.content,
+  });
 }

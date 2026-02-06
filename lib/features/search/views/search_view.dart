@@ -1,9 +1,7 @@
 import 'package:flutter/cupertino.dart';
-import 'package:uuid/uuid.dart';
 import '../../../core/database/database_service.dart';
-import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
-import '../../bookshelf/models/book.dart';
+import '../../bookshelf/services/book_add_service.dart';
 import '../../source/services/rule_parser_engine.dart';
 
 /// 搜索页面 - Cupertino 风格
@@ -15,13 +13,10 @@ class SearchView extends StatefulWidget {
 }
 
 class _SearchViewState extends State<SearchView> {
-  static const _uuid = Uuid();
-
   final TextEditingController _searchController = TextEditingController();
   final RuleParserEngine _engine = RuleParserEngine();
   late final SourceRepository _sourceRepo;
-  late final BookRepository _bookRepo;
-  late final ChapterRepository _chapterRepo;
+  late final BookAddService _addService;
 
   List<SearchResult> _results = [];
   bool _isSearching = false;
@@ -34,8 +29,7 @@ class _SearchViewState extends State<SearchView> {
     super.initState();
     final db = DatabaseService();
     _sourceRepo = SourceRepository(db);
-    _bookRepo = BookRepository(db);
-    _chapterRepo = ChapterRepository(db);
+    _addService = BookAddService(database: db, engine: _engine);
   }
 
   @override
@@ -96,76 +90,11 @@ class _SearchViewState extends State<SearchView> {
   Future<void> _importBook(SearchResult result) async {
     if (_isImporting) return;
 
-    final source = _sourceRepo.getSourceByUrl(result.sourceUrl);
-    if (source == null) {
-      _showMessage('书源不存在或已被删除');
-      return;
-    }
-
     setState(() => _isImporting = true);
 
     try {
-      final detail = await _engine.getBookInfo(source, result.bookUrl);
-      final tocUrl = detail?.tocUrl.isNotEmpty == true
-          ? detail!.tocUrl
-          : result.bookUrl;
-      final tocItems = await _engine.getToc(source, tocUrl);
-      if (tocItems.isEmpty) {
-        _showMessage('目录解析失败');
-        return;
-      }
-
-      final bookId = _uuid.v5(
-        Namespace.url.value,
-        '${source.bookSourceUrl}|${detail?.bookUrl ?? result.bookUrl}',
-      );
-
-      if (_bookRepo.hasBook(bookId)) {
-        _showMessage('已在书架中');
-        return;
-      }
-
-      final book = Book(
-        id: bookId,
-        title: detail?.name ?? result.name,
-        author: detail?.author ?? result.author,
-        coverUrl: detail?.coverUrl.isNotEmpty == true
-            ? detail!.coverUrl
-            : result.coverUrl,
-        intro: detail?.intro ?? result.intro,
-        sourceId: source.bookSourceUrl,
-        sourceUrl: source.bookSourceUrl,
-        latestChapter: detail?.lastChapter ?? result.lastChapter,
-        totalChapters: tocItems.length,
-        currentChapter: 0,
-        readProgress: 0,
-        lastReadTime: null,
-        addedTime: DateTime.now(),
-        isLocal: false,
-        localPath: null,
-      );
-
-      final chapters = tocItems.map((item) {
-        return Chapter(
-          id: _uuid.v5(
-            Namespace.url.value,
-            '$bookId|${item.index}|${item.url}',
-          ),
-          bookId: bookId,
-          title: item.name,
-          url: item.url,
-          index: item.index,
-          isDownloaded: false,
-          content: null,
-        );
-      }).toList();
-
-      await _bookRepo.addBook(book);
-      await _chapterRepo.addChapters(chapters);
-
-      _showMessage('已加入书架');
-    } catch (e) {
-      _showMessage('导入失败: $e');
+      final addResult = await _addService.addFromSearchResult(result);
+      _showMessage(addResult.message);
     } finally {
       if (mounted) {
         setState(() => _isImporting = false);

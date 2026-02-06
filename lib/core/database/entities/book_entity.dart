@@ -149,6 +149,13 @@ class BookSourceEntity extends HiveObject {
   @HiveField(13)
   final DateTime? lastUpdateTime;
 
+  /// 保真保存 Legado 书源 JSON（用于严格对齐字段与 null 序列化行为）
+  ///
+  /// - 导入 Legado 后，将原始对象（去除 null 字段）编码后存入此字段。
+  /// - 导出时优先使用此字段，避免丢字段。
+  @HiveField(14)
+  final String? rawJson;
+
   BookSourceEntity({
     required this.bookSourceUrl,
     required this.bookSourceName,
@@ -164,5 +171,65 @@ class BookSourceEntity extends HiveObject {
     this.header,
     this.loginUrl,
     this.lastUpdateTime,
+    this.rawJson,
+  });
+}
+
+/// Hive 存储用的替换净化规则实体（对齐 Legado ReplaceRule 字段）
+@HiveType(typeId: 3)
+class ReplaceRuleEntity extends HiveObject {
+  @HiveField(0)
+  final int id;
+
+  @HiveField(1)
+  final String name;
+
+  @HiveField(2)
+  final String? group;
+
+  @HiveField(3)
+  final String pattern;
+
+  @HiveField(4)
+  final String replacement;
+
+  @HiveField(5)
+  final String? scope;
+
+  @HiveField(6)
+  final bool scopeTitle;
+
+  @HiveField(7)
+  final bool scopeContent;
+
+  @HiveField(8)
+  final String? excludeScope;
+
+  @HiveField(9)
+  final bool isEnabled;
+
+  @HiveField(10)
+  final bool isRegex;
+
+  @HiveField(11)
+  final int timeoutMillisecond;
+
+  @HiveField(12)
+  final int order;
+
+  ReplaceRuleEntity({
+    required this.id,
+    this.name = '',
+    this.group,
+    this.pattern = '',
+    this.replacement = '',
+    this.scope,
+    this.scopeTitle = false,
+    this.scopeContent = true,
+    this.excludeScope,
+    this.isEnabled = true,
+    this.isRegex = true,
+    this.timeoutMillisecond = 3000,
+    this.order = -2147483648,
   });
 }

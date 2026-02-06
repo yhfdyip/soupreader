@@ -326,19 +326,18 @@ class ReaderBottomMenu extends StatelessWidget {
     ReadingSettings settings,
     ValueChanged<ReadingSettings> onSettingsChanged,
   ) {
+    final rootContext = context;
     showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
+      context: rootContext,
+      builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('选择翻页模式'),
         actions: PageTurnModeUi.values(current: settings.pageTurnMode).map((mode) {
           final isSelected = mode == settings.pageTurnMode;
           return CupertinoActionSheetAction(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(sheetContext);
               if (PageTurnModeUi.isHidden(mode)) {
-                Future<void>.delayed(Duration.zero, () {
-                  _showMessage(context, '仿真2模式已隐藏');
-                });
+                _showMessage(rootContext, '仿真2模式已隐藏');
                 return;
               }
               onSettingsChanged(settings.copyWith(pageTurnMode: mode));

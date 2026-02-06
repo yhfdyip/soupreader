@@ -17,6 +17,8 @@
 
 - ✅ 书架显示方式：网格 / 列表（`AppSettings.bookshelfViewMode`）
 - ✅ 书架排序：最近阅读 / 最近加入 / 书名 / 作者（`AppSettings.bookshelfSortMode`）
+- 🟡 阅读记录列表：按上次阅读时间展示 + 清除记录（`Book.lastReadTime`）
+- 🟡 书单导入/导出：JSON（对标 Legado 的 `[{name, author, intro}]`）
 - ⬜ 分组/标签/自定义分类
 - ⬜ 书架过滤（本地/在线/已读/未读/更新等）
 - ⬜ 批量管理（多选、批量删除、批量换源等）

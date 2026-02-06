@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/utils/legado_json.dart';
 
 /// 书源导入导出服务
 class SourceImportExportService {
@@ -105,8 +106,8 @@ class SourceImportExportService {
 
   /// 导出书源为JSON
   String exportToJson(List<BookSource> sources) {
-    final jsonList = sources.map((s) => s.toJson()).toList();
-    return const JsonEncoder.withIndent('  ').convert(jsonList);
+    final jsonList = sources.map((s) => s.toJson()).toList(growable: false);
+    return LegadoJson.encode(jsonList);
   }
 
   /// 导出书源到文件

@@ -108,6 +108,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       if (confirmed != true) return;
     }
 
+    if (!mounted) return;
     showCupertinoDialog(
       context: context,
       barrierDismissible: false,
@@ -142,4 +143,3 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     );
   }
 }
-

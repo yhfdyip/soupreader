@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -8,6 +6,8 @@ import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../models/book_source.dart';
 import '../services/source_import_export_service.dart';
+import '../../../core/utils/legado_json.dart';
+import 'source_edit_view.dart';
 
 /// 书源管理页面 - 纯 iOS 原生风格
 class SourceListView extends StatefulWidget {
@@ -211,6 +211,13 @@ class _SourceListViewState extends State<SourceListView> {
         title: const Text('导入书源'),
         actions: [
           CupertinoActionSheetAction(
+            child: const Text('新建书源'),
+            onPressed: () {
+              Navigator.pop(context);
+              _createNewSource();
+            },
+          ),
+          CupertinoActionSheetAction(
             child: const Text('从剪贴板导入'),
             onPressed: () {
               Navigator.pop(context);
@@ -286,7 +293,7 @@ class _SourceListViewState extends State<SourceListView> {
             child: const Text('编辑'),
             onPressed: () {
               Navigator.pop(context);
-              _showMessage('暂未实现书源编辑');
+              _openEditor(source.bookSourceUrl);
             },
           ),
           CupertinoActionSheetAction(
@@ -301,7 +308,7 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () {
               Navigator.pop(context);
               Clipboard.setData(
-                ClipboardData(text: json.encode(source.toJson())),
+                ClipboardData(text: LegadoJson.encode(source.toJson())),
               );
               _showMessage('已复制书源 JSON');
             },
@@ -319,6 +326,47 @@ class _SourceListViewState extends State<SourceListView> {
           child: const Text('取消'),
           onPressed: () => Navigator.pop(context),
         ),
+      ),
+    );
+  }
+
+  Future<void> _createNewSource() async {
+    final template = {
+      'bookSourceUrl': '',
+      'bookSourceName': '',
+      'bookSourceGroup': null,
+      'bookSourceType': 0,
+      'customOrder': 0,
+      'enabled': true,
+      'enabledExplore': true,
+      'respondTime': 180000,
+      'weight': 0,
+      'searchUrl': null,
+      'exploreUrl': null,
+      'ruleSearch': null,
+      'ruleBookInfo': null,
+      'ruleToc': null,
+      'ruleContent': null,
+    };
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceEditView(
+          initialRawJson: LegadoJson.encode(template),
+          originalUrl: null,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openEditor(String bookSourceUrl) async {
+    final entity = _db.sourcesBox.get(bookSourceUrl);
+    if (entity == null) {
+      _showMessage('书源不存在或已被删除');
+      return;
+    }
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceEditView.fromEntity(entity),
       ),
     );
   }

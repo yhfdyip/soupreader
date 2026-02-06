@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
-import 'settings_placeholders.dart';
+import '../../replace/views/replace_rule_list_view.dart';
 
 class TextRulesSettingsView extends StatefulWidget {
   const TextRulesSettingsView({super.key});
@@ -63,21 +63,15 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
               children: [
                 CupertinoListTile.notched(
                   title: const Text('文本替换规则'),
-                  additionalInfo: const Text('暂未实现'),
                   trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '文本替换规则（正则/分组/导入导出）暂未实现',
-                  ),
+                  onTap: _openReplaceRules,
                 ),
               ],
             ),
             CupertinoListSection.insetGrouped(
               header: const Text('说明'),
               children: const [
-                CupertinoListTile(
-                  title: Text('本页用于净化正文内容与标题。后续会补齐规则列表（导入/导出/测试）。'),
-                ),
+                CupertinoListTile(title: Text('本页用于净化正文内容与标题。')),
               ],
             ),
             const SizedBox(height: 24),
@@ -86,5 +80,12 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
       ),
     );
   }
-}
 
+  Future<void> _openReplaceRules() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const ReplaceRuleListView(),
+      ),
+    );
+  }
+}
