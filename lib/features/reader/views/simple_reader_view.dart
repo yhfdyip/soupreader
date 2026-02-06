@@ -420,6 +420,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   /// 更新设置
   void _updateSettings(ReadingSettings newSettings) {
     final oldSettings = _settings;
+    final oldMode = oldSettings.pageTurnMode;
+    final newMode = newSettings.pageTurnMode;
+    final modeChanged = oldMode != newMode;
+
+    double? desiredChapterProgress;
+    if (modeChanged) {
+      if (oldMode == PageTurnMode.scroll) {
+        if (_scrollController.hasClients) {
+          final max = _scrollController.position.maxScrollExtent;
+          desiredChapterProgress =
+              max <= 0 ? 0.0 : (_scrollController.offset / max).clamp(0.0, 1.0);
+        } else {
+          desiredChapterProgress = 0.0;
+        }
+      } else {
+        final total = _pageFactory.totalPages;
+        if (total <= 1) {
+          desiredChapterProgress = 0.0;
+        } else {
+          desiredChapterProgress =
+              (_pageFactory.currentPageIndex / (total - 1)).clamp(0.0, 1.0);
+        }
+      }
+    }
     // 检查是否需要重新分页
     // 1. 从滚动模式切换到翻页模式
     // 2. 也是翻页模式且排版参数变更
@@ -489,6 +513,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
     _syncNativeBrightnessForSettings(oldSettings, newSettings);
     unawaited(_settingsService.saveReadingSettings(newSettings));
+
+    if (modeChanged) {
+      final progress = desiredChapterProgress ?? 0.0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (newMode == PageTurnMode.scroll) {
+          if (!_scrollController.hasClients) return;
+          final max = _scrollController.position.maxScrollExtent;
+          if (max <= 0) return;
+          final target = (progress * max).clamp(0.0, max).toDouble();
+          _scrollController.jumpTo(target);
+          return;
+        }
+
+        final total = _pageFactory.totalPages;
+        if (total <= 1) return;
+        final target = (progress * (total - 1)).round().clamp(0, total - 1);
+        _pageFactory.jumpToPage(target);
+      });
+    }
   }
 
   /// 获取当前主题
@@ -1061,16 +1105,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  /// 滚动模式内容 - 使用 ListView.builder 实现章节丝滑连接
+  /// 滚动模式内容（按当前章节滚动）
   Widget _buildScrollContent() {
     return SafeArea(
       bottom: false,
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
-          // 滚动时实时更新当前章节索引
-          if (notification is ScrollUpdateNotification) {
-            _updateCurrentChapterFromScroll();
-          }
           // 滚动结束时保存进度
           if (notification is ScrollEndNotification) {
             _saveProgress();
@@ -1078,16 +1118,80 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           }
           return false;
         },
-        child: ListView.builder(
+        child: SingleChildScrollView(
           controller: _scrollController,
           physics: const BouncingScrollPhysics(),
-          // 预加载前后 2 个章节的内容
-          cacheExtent: MediaQuery.of(context).size.height * 3,
-          itemCount: _chapters.length,
-          itemBuilder: (context, index) {
-            return _buildChapterItem(index);
-          },
+          child: _buildScrollChapterBody(),
         ),
+      ),
+    );
+  }
+
+  Widget _buildScrollChapterBody() {
+    final paragraphs = _currentContent.split(RegExp(r'\n\s*\n|\n'));
+    final paragraphStyle = TextStyle(
+      fontSize: _settings.fontSize,
+      height: _settings.lineHeight,
+      color: _currentTheme.text,
+      letterSpacing: _settings.letterSpacing,
+      fontFamily: _currentFontFamily,
+      fontWeight: _currentFontWeight,
+      decoration: _currentTextDecoration,
+    );
+    final indent = _settings.paragraphIndent;
+    final indentWidth =
+        indent.isEmpty ? 0.0 : _measureTextWidth(indent, paragraphStyle);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: _settings.paddingLeft,
+        right: _settings.paddingRight,
+        top: _settings.paddingTop,
+        bottom: _settings.showStatusBar ? 30 : _settings.paddingBottom,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_settings.titleMode != 2) ...[
+            SizedBox(
+              height: _settings.titleTopSpacing > 0
+                  ? _settings.titleTopSpacing
+                  : 20,
+            ),
+            Text(
+              _currentTitle,
+              textAlign: _titleTextAlign,
+              style: TextStyle(
+                fontSize: _settings.fontSize + _settings.titleSize,
+                fontWeight: FontWeight.w600,
+                color: _currentTheme.text,
+                fontFamily: _currentFontFamily,
+              ),
+            ),
+            SizedBox(
+              height: _settings.titleBottomSpacing > 0
+                  ? _settings.titleBottomSpacing
+                  : _settings.paragraphSpacing * 1.5,
+            ),
+          ],
+          ...paragraphs.map((paragraph) {
+            final paragraphText = paragraph.trimRight();
+            if (paragraphText.trim().isEmpty) return const SizedBox.shrink();
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
+              child: _buildParagraphWithFirstLineIndent(
+                paragraphText,
+                style: paragraphStyle,
+                textAlign: _bodyTextAlign,
+                indentWidth: indentWidth,
+              ),
+            );
+          }),
+          const SizedBox(height: 60),
+          _buildChapterNav(_currentTheme.text),
+          const SizedBox(height: 100),
+        ],
       ),
     );
   }

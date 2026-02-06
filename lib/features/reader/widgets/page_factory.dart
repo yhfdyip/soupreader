@@ -252,6 +252,19 @@ class PageFactory {
     onContentChanged?.call();
   }
 
+  /// 章节内跳转到指定页（不会跨章节）。
+  ///
+  /// 用于“滚动/翻页模式切换”时尽量保持阅读位置。
+  void jumpToPage(int pageIndex) {
+    if (_currentChapterPages.isEmpty) {
+      _currentPageIndex = 0;
+      onContentChanged?.call();
+      return;
+    }
+    _currentPageIndex = pageIndex.clamp(0, _currentChapterPages.length - 1);
+    onContentChanged?.call();
+  }
+
   // ============ 获取三个页面内容 ============
 
   /// 上一页内容
