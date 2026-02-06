@@ -44,7 +44,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final SourceRepository _repo;
   final RuleParserEngine _engine = RuleParserEngine();
 
-  int _tab = 0; // 0 基础 1 JSON 2 调试
+  int _tab = 0; // 0 基础 1 规则 2 JSON 3 调试
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _urlCtrl;
@@ -53,6 +53,39 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final TextEditingController _headerCtrl;
   late final TextEditingController _searchUrlCtrl;
   late final TextEditingController _exploreUrlCtrl;
+
+  // 规则（常用字段）
+  late final TextEditingController _searchBookListCtrl;
+  late final TextEditingController _searchNameCtrl;
+  late final TextEditingController _searchAuthorCtrl;
+  late final TextEditingController _searchBookUrlCtrl;
+  late final TextEditingController _searchCoverUrlCtrl;
+  late final TextEditingController _searchIntroCtrl;
+  late final TextEditingController _searchLastChapterCtrl;
+
+  late final TextEditingController _exploreBookListCtrl;
+  late final TextEditingController _exploreNameCtrl;
+  late final TextEditingController _exploreAuthorCtrl;
+  late final TextEditingController _exploreBookUrlCtrl;
+  late final TextEditingController _exploreCoverUrlCtrl;
+  late final TextEditingController _exploreIntroCtrl;
+  late final TextEditingController _exploreLastChapterCtrl;
+
+  late final TextEditingController _infoInitCtrl;
+  late final TextEditingController _infoNameCtrl;
+  late final TextEditingController _infoAuthorCtrl;
+  late final TextEditingController _infoIntroCtrl;
+  late final TextEditingController _infoCoverUrlCtrl;
+  late final TextEditingController _infoTocUrlCtrl;
+  late final TextEditingController _infoLastChapterCtrl;
+
+  late final TextEditingController _tocChapterListCtrl;
+  late final TextEditingController _tocChapterNameCtrl;
+  late final TextEditingController _tocChapterUrlCtrl;
+
+  late final TextEditingController _contentContentCtrl;
+  late final TextEditingController _contentTitleCtrl;
+  late final TextEditingController _contentReplaceRegexCtrl;
 
   late final TextEditingController _jsonCtrl;
   String? _jsonError;
@@ -91,6 +124,63 @@ class _SourceEditViewState extends State<SourceEditView> {
     _enabled = source?.enabled ?? true;
     _enabledExplore = source?.enabledExplore ?? true;
 
+    _searchBookListCtrl =
+        TextEditingController(text: source?.ruleSearch?.bookList ?? '');
+    _searchNameCtrl = TextEditingController(text: source?.ruleSearch?.name ?? '');
+    _searchAuthorCtrl =
+        TextEditingController(text: source?.ruleSearch?.author ?? '');
+    _searchBookUrlCtrl =
+        TextEditingController(text: source?.ruleSearch?.bookUrl ?? '');
+    _searchCoverUrlCtrl =
+        TextEditingController(text: source?.ruleSearch?.coverUrl ?? '');
+    _searchIntroCtrl =
+        TextEditingController(text: source?.ruleSearch?.intro ?? '');
+    _searchLastChapterCtrl =
+        TextEditingController(text: source?.ruleSearch?.lastChapter ?? '');
+
+    _exploreBookListCtrl =
+        TextEditingController(text: source?.ruleExplore?.bookList ?? '');
+    _exploreNameCtrl =
+        TextEditingController(text: source?.ruleExplore?.name ?? '');
+    _exploreAuthorCtrl =
+        TextEditingController(text: source?.ruleExplore?.author ?? '');
+    _exploreBookUrlCtrl =
+        TextEditingController(text: source?.ruleExplore?.bookUrl ?? '');
+    _exploreCoverUrlCtrl =
+        TextEditingController(text: source?.ruleExplore?.coverUrl ?? '');
+    _exploreIntroCtrl =
+        TextEditingController(text: source?.ruleExplore?.intro ?? '');
+    _exploreLastChapterCtrl =
+        TextEditingController(text: source?.ruleExplore?.lastChapter ?? '');
+
+    _infoInitCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.init ?? '');
+    _infoNameCtrl = TextEditingController(text: source?.ruleBookInfo?.name ?? '');
+    _infoAuthorCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.author ?? '');
+    _infoIntroCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.intro ?? '');
+    _infoCoverUrlCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.coverUrl ?? '');
+    _infoTocUrlCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.tocUrl ?? '');
+    _infoLastChapterCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.lastChapter ?? '');
+
+    _tocChapterListCtrl =
+        TextEditingController(text: source?.ruleToc?.chapterList ?? '');
+    _tocChapterNameCtrl =
+        TextEditingController(text: source?.ruleToc?.chapterName ?? '');
+    _tocChapterUrlCtrl =
+        TextEditingController(text: source?.ruleToc?.chapterUrl ?? '');
+
+    _contentContentCtrl =
+        TextEditingController(text: source?.ruleContent?.content ?? '');
+    _contentTitleCtrl =
+        TextEditingController(text: source?.ruleContent?.title ?? '');
+    _contentReplaceRegexCtrl =
+        TextEditingController(text: source?.ruleContent?.replaceRegex ?? '');
+
     _validateJson(silent: true);
   }
 
@@ -103,6 +193,33 @@ class _SourceEditViewState extends State<SourceEditView> {
     _headerCtrl.dispose();
     _searchUrlCtrl.dispose();
     _exploreUrlCtrl.dispose();
+    _searchBookListCtrl.dispose();
+    _searchNameCtrl.dispose();
+    _searchAuthorCtrl.dispose();
+    _searchBookUrlCtrl.dispose();
+    _searchCoverUrlCtrl.dispose();
+    _searchIntroCtrl.dispose();
+    _searchLastChapterCtrl.dispose();
+    _exploreBookListCtrl.dispose();
+    _exploreNameCtrl.dispose();
+    _exploreAuthorCtrl.dispose();
+    _exploreBookUrlCtrl.dispose();
+    _exploreCoverUrlCtrl.dispose();
+    _exploreIntroCtrl.dispose();
+    _exploreLastChapterCtrl.dispose();
+    _infoInitCtrl.dispose();
+    _infoNameCtrl.dispose();
+    _infoAuthorCtrl.dispose();
+    _infoIntroCtrl.dispose();
+    _infoCoverUrlCtrl.dispose();
+    _infoTocUrlCtrl.dispose();
+    _infoLastChapterCtrl.dispose();
+    _tocChapterListCtrl.dispose();
+    _tocChapterNameCtrl.dispose();
+    _tocChapterUrlCtrl.dispose();
+    _contentContentCtrl.dispose();
+    _contentTitleCtrl.dispose();
+    _contentReplaceRegexCtrl.dispose();
     _jsonCtrl.dispose();
     _debugKeyCtrl.dispose();
     _debugExploreUrlCtrl.dispose();
@@ -115,8 +232,9 @@ class _SourceEditViewState extends State<SourceEditView> {
       groupValue: _tab,
       children: const {
         0: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('基础')),
-        1: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('JSON')),
-        2: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('调试')),
+        1: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('规则')),
+        2: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('JSON')),
+        3: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('调试')),
       },
       onValueChanged: (v) {
         if (v == null) return;
@@ -132,7 +250,7 @@ class _SourceEditViewState extends State<SourceEditView> {
           children: [
             CupertinoButton(
               padding: EdgeInsets.zero,
-              onPressed: _jsonError == null ? _save : null,
+              onPressed: _save,
               child: const Text('保存'),
             ),
             CupertinoButton(
@@ -155,6 +273,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                 index: _tab,
                 children: [
                   _buildBasicTab(),
+                  _buildRulesTab(),
                   _buildJsonTab(),
                   _buildDebugTab(),
                 ],
@@ -163,6 +282,112 @@ class _SourceEditViewState extends State<SourceEditView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRulesTab() {
+    return ListView(
+      children: [
+        CupertinoListSection.insetGrouped(
+          header: const Text('搜索规则（ruleSearch）'),
+          footer: const Text(
+            '常用规则为 CSS 选择器，可用 “selector@href/@src/@text/@html” 等形式取值。',
+          ),
+          children: [
+            _buildTextFieldTile('书籍列表', _searchBookListCtrl,
+                placeholder: 'ruleSearch.bookList（CSS 选择器）'),
+            _buildTextFieldTile('书名', _searchNameCtrl,
+                placeholder: 'ruleSearch.name'),
+            _buildTextFieldTile('作者', _searchAuthorCtrl,
+                placeholder: 'ruleSearch.author'),
+            _buildTextFieldTile('封面', _searchCoverUrlCtrl,
+                placeholder: 'ruleSearch.coverUrl（@src）'),
+            _buildTextFieldTile('简介', _searchIntroCtrl,
+                placeholder: 'ruleSearch.intro'),
+            _buildTextFieldTile('最新章节', _searchLastChapterCtrl,
+                placeholder: 'ruleSearch.lastChapter'),
+            _buildTextFieldTile('详情链接', _searchBookUrlCtrl,
+                placeholder: 'ruleSearch.bookUrl（@href）'),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          header: const Text('发现规则（ruleExplore）'),
+          children: [
+            _buildTextFieldTile('书籍列表', _exploreBookListCtrl,
+                placeholder: 'ruleExplore.bookList'),
+            _buildTextFieldTile('书名', _exploreNameCtrl,
+                placeholder: 'ruleExplore.name'),
+            _buildTextFieldTile('作者', _exploreAuthorCtrl,
+                placeholder: 'ruleExplore.author'),
+            _buildTextFieldTile('封面', _exploreCoverUrlCtrl,
+                placeholder: 'ruleExplore.coverUrl'),
+            _buildTextFieldTile('简介', _exploreIntroCtrl,
+                placeholder: 'ruleExplore.intro'),
+            _buildTextFieldTile('最新章节', _exploreLastChapterCtrl,
+                placeholder: 'ruleExplore.lastChapter'),
+            _buildTextFieldTile('详情链接', _exploreBookUrlCtrl,
+                placeholder: 'ruleExplore.bookUrl'),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          header: const Text('详情规则（ruleBookInfo）'),
+          children: [
+            _buildTextFieldTile('根节点', _infoInitCtrl,
+                placeholder: 'ruleBookInfo.init（可选）'),
+            _buildTextFieldTile('书名', _infoNameCtrl,
+                placeholder: 'ruleBookInfo.name'),
+            _buildTextFieldTile('作者', _infoAuthorCtrl,
+                placeholder: 'ruleBookInfo.author'),
+            _buildTextFieldTile('封面', _infoCoverUrlCtrl,
+                placeholder: 'ruleBookInfo.coverUrl'),
+            _buildTextFieldTile('简介', _infoIntroCtrl,
+                placeholder: 'ruleBookInfo.intro', maxLines: 3),
+            _buildTextFieldTile('最新章节', _infoLastChapterCtrl,
+                placeholder: 'ruleBookInfo.lastChapter'),
+            _buildTextFieldTile('目录链接', _infoTocUrlCtrl,
+                placeholder: 'ruleBookInfo.tocUrl（@href）'),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          header: const Text('目录规则（ruleToc）'),
+          children: [
+            _buildTextFieldTile('章节列表', _tocChapterListCtrl,
+                placeholder: 'ruleToc.chapterList'),
+            _buildTextFieldTile('章节名', _tocChapterNameCtrl,
+                placeholder: 'ruleToc.chapterName'),
+            _buildTextFieldTile('章节链接', _tocChapterUrlCtrl,
+                placeholder: 'ruleToc.chapterUrl（@href）'),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          header: const Text('正文规则（ruleContent）'),
+          children: [
+            _buildTextFieldTile('标题（可选）', _contentTitleCtrl,
+                placeholder: 'ruleContent.title'),
+            _buildTextFieldTile('正文', _contentContentCtrl,
+                placeholder: 'ruleContent.content（@text/@html）', maxLines: 4),
+            _buildTextFieldTile('替换正则', _contentReplaceRegexCtrl,
+                placeholder: 'ruleContent.replaceRegex（regex##rep##...）',
+                maxLines: 4),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          children: [
+            CupertinoListTile.notched(
+              title: const Text('同步到 JSON'),
+              subtitle: const Text('把基础与规则字段写入 JSON（保留未知字段）'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: () => _syncFieldsToJson(switchToJsonTab: true),
+            ),
+            CupertinoListTile.notched(
+              title: const Text('从 JSON 解析'),
+              subtitle: const Text('用当前 JSON 刷新规则表单字段'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _syncJsonToFields,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -206,7 +431,7 @@ class _SourceEditViewState extends State<SourceEditView> {
               title: const Text('同步到 JSON'),
               subtitle: const Text('把上面常用字段写入 JSON（剥离 null）'),
               trailing: const CupertinoListTileChevron(),
-              onTap: _syncFieldsToJson,
+              onTap: () => _syncFieldsToJson(switchToJsonTab: true),
             ),
             CupertinoListTile.notched(
               title: const Text('从 JSON 解析'),
@@ -538,28 +763,132 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
   }
 
-  void _syncFieldsToJson() {
+  void _syncFieldsToJson({required bool switchToJsonTab}) {
     final map = _tryDecodeJsonMap(_jsonCtrl.text) ?? <String, dynamic>{};
+
+    void setOrRemove(String key, String? value) {
+      if (value == null) {
+        map.remove(key);
+      } else {
+        map[key] = value;
+      }
+    }
+
+    String? textOrNull(
+      TextEditingController ctrl, {
+      bool trimValue = true,
+    }) {
+      final raw = ctrl.text;
+      if (raw.trim().isEmpty) return null;
+      return trimValue ? raw.trim() : raw;
+    }
+
     int parseInt(String text, int fallback) =>
         int.tryParse(text.trim()) ?? fallback;
 
-    map['bookSourceName'] = _nameCtrl.text.trim();
-    map['bookSourceUrl'] = _urlCtrl.text.trim();
-    map['bookSourceGroup'] =
-        _groupCtrl.text.trim().isEmpty ? null : _groupCtrl.text.trim();
+    // 基础字段
+    setOrRemove('bookSourceName', textOrNull(_nameCtrl));
+    setOrRemove('bookSourceUrl', textOrNull(_urlCtrl));
+    setOrRemove('bookSourceGroup', textOrNull(_groupCtrl));
     map['enabled'] = _enabled;
     map['enabledExplore'] = _enabledExplore;
     map['weight'] = parseInt(_weightCtrl.text, 0);
-    map['header'] = _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text;
-    map['searchUrl'] =
-        _searchUrlCtrl.text.trim().isEmpty ? null : _searchUrlCtrl.text.trim();
-    map['exploreUrl'] =
-        _exploreUrlCtrl.text.trim().isEmpty ? null : _exploreUrlCtrl.text.trim();
+    setOrRemove('header', textOrNull(_headerCtrl, trimValue: false));
+    setOrRemove('searchUrl', textOrNull(_searchUrlCtrl));
+    setOrRemove('exploreUrl', textOrNull(_exploreUrlCtrl));
+
+    Map<String, dynamic> ensureMap(dynamic raw) {
+      if (raw is Map<String, dynamic>) return Map<String, dynamic>.from(raw);
+      if (raw is Map) {
+        return raw.map((key, value) => MapEntry('$key', value));
+      }
+      return <String, dynamic>{};
+    }
+
+    Map<String, dynamic>? mergeRule(dynamic rawRule, Map<String, String?> updates) {
+      final m = ensureMap(rawRule);
+      updates.forEach((k, v) {
+        if (v == null) {
+          m.remove(k);
+        } else {
+          m[k] = v;
+        }
+      });
+      return m.isEmpty ? null : m;
+    }
+
+    // 规则字段：在“保留未知字段”的前提下只覆盖常用键
+    final ruleSearch = mergeRule(map['ruleSearch'], {
+      'bookList': textOrNull(_searchBookListCtrl),
+      'name': textOrNull(_searchNameCtrl),
+      'author': textOrNull(_searchAuthorCtrl),
+      'bookUrl': textOrNull(_searchBookUrlCtrl),
+      'coverUrl': textOrNull(_searchCoverUrlCtrl),
+      'intro': textOrNull(_searchIntroCtrl),
+      'lastChapter': textOrNull(_searchLastChapterCtrl),
+    });
+    if (ruleSearch == null) {
+      map.remove('ruleSearch');
+    } else {
+      map['ruleSearch'] = ruleSearch;
+    }
+
+    final ruleExplore = mergeRule(map['ruleExplore'], {
+      'bookList': textOrNull(_exploreBookListCtrl),
+      'name': textOrNull(_exploreNameCtrl),
+      'author': textOrNull(_exploreAuthorCtrl),
+      'bookUrl': textOrNull(_exploreBookUrlCtrl),
+      'coverUrl': textOrNull(_exploreCoverUrlCtrl),
+      'intro': textOrNull(_exploreIntroCtrl),
+      'lastChapter': textOrNull(_exploreLastChapterCtrl),
+    });
+    if (ruleExplore == null) {
+      map.remove('ruleExplore');
+    } else {
+      map['ruleExplore'] = ruleExplore;
+    }
+
+    final ruleBookInfo = mergeRule(map['ruleBookInfo'], {
+      'init': textOrNull(_infoInitCtrl),
+      'name': textOrNull(_infoNameCtrl),
+      'author': textOrNull(_infoAuthorCtrl),
+      'intro': textOrNull(_infoIntroCtrl, trimValue: false),
+      'coverUrl': textOrNull(_infoCoverUrlCtrl),
+      'tocUrl': textOrNull(_infoTocUrlCtrl),
+      'lastChapter': textOrNull(_infoLastChapterCtrl),
+    });
+    if (ruleBookInfo == null) {
+      map.remove('ruleBookInfo');
+    } else {
+      map['ruleBookInfo'] = ruleBookInfo;
+    }
+
+    final ruleToc = mergeRule(map['ruleToc'], {
+      'chapterList': textOrNull(_tocChapterListCtrl),
+      'chapterName': textOrNull(_tocChapterNameCtrl),
+      'chapterUrl': textOrNull(_tocChapterUrlCtrl),
+    });
+    if (ruleToc == null) {
+      map.remove('ruleToc');
+    } else {
+      map['ruleToc'] = ruleToc;
+    }
+
+    final ruleContent = mergeRule(map['ruleContent'], {
+      'title': textOrNull(_contentTitleCtrl),
+      'content': textOrNull(_contentContentCtrl, trimValue: false),
+      'replaceRegex': textOrNull(_contentReplaceRegexCtrl, trimValue: false),
+    });
+    if (ruleContent == null) {
+      map.remove('ruleContent');
+    } else {
+      map['ruleContent'] = ruleContent;
+    }
 
     final normalized = LegadoJson.encode(map);
     setState(() {
       _jsonCtrl.text = _prettyJson(normalized);
-      _tab = 1;
+      if (switchToJsonTab) _tab = 2;
     });
     _validateJson();
   }
@@ -581,14 +910,52 @@ class _SourceEditViewState extends State<SourceEditView> {
       _exploreUrlCtrl.text = source.exploreUrl ?? '';
       _enabled = source.enabled;
       _enabledExplore = source.enabledExplore;
+
+      _searchBookListCtrl.text = source.ruleSearch?.bookList ?? '';
+      _searchNameCtrl.text = source.ruleSearch?.name ?? '';
+      _searchAuthorCtrl.text = source.ruleSearch?.author ?? '';
+      _searchBookUrlCtrl.text = source.ruleSearch?.bookUrl ?? '';
+      _searchCoverUrlCtrl.text = source.ruleSearch?.coverUrl ?? '';
+      _searchIntroCtrl.text = source.ruleSearch?.intro ?? '';
+      _searchLastChapterCtrl.text = source.ruleSearch?.lastChapter ?? '';
+
+      _exploreBookListCtrl.text = source.ruleExplore?.bookList ?? '';
+      _exploreNameCtrl.text = source.ruleExplore?.name ?? '';
+      _exploreAuthorCtrl.text = source.ruleExplore?.author ?? '';
+      _exploreBookUrlCtrl.text = source.ruleExplore?.bookUrl ?? '';
+      _exploreCoverUrlCtrl.text = source.ruleExplore?.coverUrl ?? '';
+      _exploreIntroCtrl.text = source.ruleExplore?.intro ?? '';
+      _exploreLastChapterCtrl.text = source.ruleExplore?.lastChapter ?? '';
+
+      _infoInitCtrl.text = source.ruleBookInfo?.init ?? '';
+      _infoNameCtrl.text = source.ruleBookInfo?.name ?? '';
+      _infoAuthorCtrl.text = source.ruleBookInfo?.author ?? '';
+      _infoIntroCtrl.text = source.ruleBookInfo?.intro ?? '';
+      _infoCoverUrlCtrl.text = source.ruleBookInfo?.coverUrl ?? '';
+      _infoTocUrlCtrl.text = source.ruleBookInfo?.tocUrl ?? '';
+      _infoLastChapterCtrl.text = source.ruleBookInfo?.lastChapter ?? '';
+
+      _tocChapterListCtrl.text = source.ruleToc?.chapterList ?? '';
+      _tocChapterNameCtrl.text = source.ruleToc?.chapterName ?? '';
+      _tocChapterUrlCtrl.text = source.ruleToc?.chapterUrl ?? '';
+
+      _contentTitleCtrl.text = source.ruleContent?.title ?? '';
+      _contentContentCtrl.text = source.ruleContent?.content ?? '';
+      _contentReplaceRegexCtrl.text = source.ruleContent?.replaceRegex ?? '';
     });
     _validateJson();
     _showMessage('已从 JSON 同步到表单');
   }
 
   Future<void> _save() async {
+    // 优先用表单内容生成 JSON，避免用户忘记点“同步到 JSON”导致保存旧数据。
+    // 若用户只编辑 JSON，可直接切换到 JSON 页保存（此处仍会做一次规范化）。
+    _syncFieldsToJson(switchToJsonTab: false);
     _validateJson();
-    if (_jsonError != null) return;
+    if (_jsonError != null) {
+      _showMessage(_jsonError!);
+      return;
+    }
 
     try {
       await _repo.upsertSourceRawJson(
