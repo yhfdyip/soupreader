@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'core/database/database_service.dart';
 import 'core/models/app_settings.dart';
+import 'core/services/cookie_store.dart';
 import 'core/services/settings_service.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
 import 'features/search/views/search_view.dart';
@@ -16,6 +17,9 @@ void main() async {
 
   // 初始化全局设置
   await SettingsService().init();
+
+  // 初始化 Cookie 存储（对标“读不舍手”：持久化 CookieJar，便于反爬站点维持会话）
+  await CookieStore.setup();
 
   runApp(const SoupReaderApp());
 }

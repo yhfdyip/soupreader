@@ -137,6 +137,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   final List<_DebugLine> _debugLines = <_DebugLine>[];
   final List<_DebugLine> _debugLinesAll = <_DebugLine>[];
   int _debugConsoleMode = 1; // 0 分段 1 文本 2 逐行
+  bool _debugShowAllLines = false; // 全量展示（可能卡顿）
+  bool _debugWrapLines = false; // 逐行模式自动换行
+  String _debugFilter = ''; // 控制台过滤关键字（大小写不敏感）
   final Set<int> _expandedDebugBlocks = <int>{};
   String? _debugListSrcHtml; // state=10（搜索/发现列表页）
   String? _debugBookSrcHtml; // state=20（详情页）
@@ -730,8 +733,16 @@ class _SourceEditViewState extends State<SourceEditView> {
               onTap: _openWebVerify,
             ),
             CupertinoListTile.notched(
-              title: const Text('导出调试包'),
-              subtitle: const Text('包含：控制台、书源 JSON、源码、正文结果'),
+              title: const Text('一键导出调试包（推荐）'),
+              subtitle: const Text('保存到文件：控制台 + 书源 JSON（不含网页源码）'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _debugLinesAll.isEmpty
+                  ? null
+                  : () => _exportDebugBundleToFile(includeRawSources: false),
+            ),
+            CupertinoListTile.notched(
+              title: const Text('导出调试包（更多选项）'),
+              subtitle: const Text('可选择：复制 / 保存（含源码）'),
               trailing: const CupertinoListTileChevron(),
               onTap:
                   _debugLinesAll.isEmpty ? null : _showExportDebugBundleSheet,
@@ -972,8 +983,18 @@ class _SourceEditViewState extends State<SourceEditView> {
     final modeLabel = mode == 0 ? '分段' : mode == 1 ? '文本' : '逐行';
     final allText =
         hasLines ? _debugLinesAll.map((e) => e.text).join('\n') : '';
-    final uiLines = _debugLines.length;
     final totalLines = _debugLinesAll.length;
+    final baseLines = _debugShowAllLines ? _debugLinesAll : _debugLines;
+    final filterActive = _debugFilter.trim().isNotEmpty;
+    final visibleLines = filterActive
+        ? baseLines
+            .where(
+              (e) => e.text.toLowerCase().contains(_debugFilter.toLowerCase()),
+            )
+            .toList(growable: false)
+        : baseLines;
+    final uiLines = visibleLines.length;
+    final effectiveMode = filterActive ? 2 : mode;
 
     final children = <Widget>[
       CupertinoListTile.notched(
@@ -989,6 +1010,30 @@ class _SourceEditViewState extends State<SourceEditView> {
             if (v == null) return;
             setState(() => _debugConsoleMode = v);
           },
+        ),
+      ),
+      CupertinoListTile.notched(
+        title: const Text('显示全部日志（全局放开）'),
+        subtitle: const Text('开启后可能卡顿；建议排查时临时开启'),
+        trailing: CupertinoSwitch(
+          value: _debugShowAllLines,
+          onChanged: (v) => setState(() => _debugShowAllLines = v),
+        ),
+      ),
+      CupertinoListTile.notched(
+        title: const Text('过滤关键字'),
+        subtitle: CupertinoSearchTextField(
+          placeholder: '输入后仅展示命中行（不区分大小写）',
+          onChanged: (v) => setState(() => _debugFilter = v),
+          onSuffixTap: () => setState(() => _debugFilter = ''),
+        ),
+      ),
+      CupertinoListTile.notched(
+        title: const Text('逐行自动换行'),
+        subtitle: const Text('仅影响“逐行”模式；关闭时更清爽'),
+        trailing: CupertinoSwitch(
+          value: _debugWrapLines,
+          onChanged: (v) => setState(() => _debugWrapLines = v),
         ),
       ),
       CupertinoListTile.notched(
@@ -1011,7 +1056,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       );
     }
 
-    if (mode == 1) {
+    if (effectiveMode == 1) {
       const previewLines = 40;
       final preview = _debugLinesAll.length <= previewLines
           ? allText
@@ -1036,8 +1081,33 @@ class _SourceEditViewState extends State<SourceEditView> {
           onTap: () => _openDebugText(title: '控制台', text: allText),
         ),
       );
-    } else if (mode == 2) {
-      for (final line in _debugLines) {
+    } else if (effectiveMode == 2) {
+      String buildContextText(_DebugLine picked, {int radius = 28}) {
+        final idx = _debugLinesAll.indexOf(picked);
+        if (idx < 0) return picked.text;
+        final start = (idx - radius) < 0 ? 0 : (idx - radius);
+        final end = (idx + radius + 1) > _debugLinesAll.length
+            ? _debugLinesAll.length
+            : (idx + radius + 1);
+        final slice = _debugLinesAll.sublist(start, end);
+        final buf = StringBuffer();
+        for (var i = 0; i < slice.length; i++) {
+          final lineNo = start + i + 1;
+          buf.writeln('${lineNo.toString().padLeft(4)}│ ${slice[i].text}');
+        }
+        return buf.toString().trimRight();
+      }
+
+      if (filterActive && mode == 0) {
+        children.add(
+          const CupertinoListTile.notched(
+            title: Text('提示'),
+            subtitle: Text('过滤开启时，分段模式会自动按逐行展示'),
+          ),
+        );
+      }
+
+      for (final line in visibleLines) {
         if (line.text.trim().isEmpty) continue;
         final color = line.state == -1
             ? CupertinoColors.systemRed.resolveFrom(context)
@@ -1048,8 +1118,8 @@ class _SourceEditViewState extends State<SourceEditView> {
           CupertinoListTile.notched(
             title: Text(
               line.text,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+              maxLines: _debugWrapLines ? null : 3,
+              overflow: _debugWrapLines ? TextOverflow.visible : TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 12.5,
@@ -1067,12 +1137,15 @@ class _SourceEditViewState extends State<SourceEditView> {
                 size: 18,
               ),
             ),
-            onTap: () => _openDebugText(title: '日志', text: line.text),
+            onTap: () => _openDebugText(
+              title: '日志上下文',
+              text: buildContextText(line),
+            ),
           ),
         );
       }
     } else {
-      final blocks = _buildDebugBlocks();
+      final blocks = _buildDebugBlocks(lines: visibleLines);
       for (var i = 0; i < blocks.length; i++) {
         final block = blocks[i];
         final expanded = _expandedDebugBlocks.contains(i);
@@ -1139,9 +1212,16 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     return CupertinoListSection.insetGrouped(
       header: Text(
-        mode == 1
-            ? '控制台（$modeLabel，$totalLines）'
-            : '控制台（$modeLabel，仅展示最近 $uiLines/$totalLines）',
+        () {
+          if (effectiveMode == 1) {
+            return '控制台（$modeLabel，总 $totalLines 行）';
+          }
+          final baseCount = baseLines.length;
+          final scopeLabel = _debugShowAllLines ? '全量' : '最近';
+          final filterLabel = filterActive ? '过滤+逐行' : modeLabel;
+          final shown = uiLines;
+          return '控制台（$filterLabel，$scopeLabel $shown/$baseCount，总 $totalLines 行）';
+        }(),
       ),
       children: children,
     );
@@ -1220,10 +1300,17 @@ class _SourceEditViewState extends State<SourceEditView> {
             },
           ),
           CupertinoActionSheetAction(
+            child: const Text('保存调试包到文件（不含源码，推荐）'),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _exportDebugBundleToFile(includeRawSources: false);
+            },
+          ),
+          CupertinoActionSheetAction(
             child: const Text('保存调试包到文件（含源码）'),
             onPressed: () async {
               Navigator.pop(context);
-              await _exportDebugBundleToFile();
+              await _exportDebugBundleToFile(includeRawSources: true);
             },
           ),
         ],
@@ -1235,11 +1322,15 @@ class _SourceEditViewState extends State<SourceEditView> {
     );
   }
 
-  Future<void> _exportDebugBundleToFile() async {
-    final bundle = _buildDebugBundle(includeRawSources: true);
+  Future<void> _exportDebugBundleToFile({
+    required bool includeRawSources,
+  }) async {
+    final bundle = _buildDebugBundle(includeRawSources: includeRawSources);
     final json = _prettyJson(LegadoJson.encode(bundle));
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final fileName = 'soupreader_debug_bundle_$ts.json';
+    final fileName = includeRawSources
+        ? 'soupreader_debug_bundle_full_$ts.json'
+        : 'soupreader_debug_bundle_$ts.json';
 
     final ok = await _debugExportService.exportJsonToFile(
       json: json,
@@ -1249,7 +1340,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     _showMessage(ok ? '已导出：$fileName' : '导出取消或失败');
   }
 
-  List<_DebugBlock> _buildDebugBlocks() {
+  List<_DebugBlock> _buildDebugBlocks({required List<_DebugLine> lines}) {
     final blocks = <_DebugBlock>[];
     _DebugBlock? current;
 
@@ -1261,7 +1352,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       return t.substring(idx + 2);
     }
 
-    for (final line in _debugLines) {
+    for (final line in lines) {
       final plain = stripTimePrefix(line.text).trimLeft();
       if (plain.startsWith('︾')) {
         current = _DebugBlock(title: line.text);

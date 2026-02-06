@@ -6,7 +6,10 @@ import 'package:html/dom.dart';
 import 'dart:convert';
 import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fast_gbk/fast_gbk.dart';
+import 'package:flutter_js/flutter_js.dart';
 import '../../../core/utils/html_text_formatter.dart';
+import '../../../core/services/cookie_store.dart';
 
 /// 书源规则解析引擎
 /// 支持 CSS 选择器、XPath（简化版）和正则表达式
@@ -17,6 +20,7 @@ class RuleParserEngine {
     'Accept':
         'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Upgrade-Insecure-Requests': '1',
   };
 
   static final Dio _dioPlain = Dio(
@@ -30,7 +34,12 @@ class RuleParserEngine {
     ),
   );
 
-  static final CookieJar _cookieJar = CookieJar();
+  static CookieJar get _cookieJar {
+    // 这里依赖 main() 启动阶段的 CookieStore.setup()，对标 dbss 的 PersistCookieJar 逻辑。
+    // 若调用方未初始化，将抛出异常，便于早发现配置问题。
+    return CookieStore.jar;
+  }
+
   static final Dio _dioCookie = Dio(
     BaseOptions(
       connectTimeout: const Duration(seconds: 15),
@@ -40,6 +49,11 @@ class RuleParserEngine {
       maxRedirects: 8,
     ),
   )..interceptors.add(CookieManager(_cookieJar));
+
+  // URL 选项里的 js（Legado 格式）需要一个 JS 执行环境。
+  // iOS 下为 JavaScriptCore；Android/Linux 下为 QuickJS（flutter_js）。
+  // 这里只用于“URL 参数处理”，不做复杂脚本引擎承诺。
+  static final JavascriptRuntime _jsRuntime = getJavascriptRuntime(xhr: false);
 
   Dio _selectDio({bool? enabledCookieJar}) {
     final enabled = enabledCookieJar ?? true;
@@ -51,12 +65,12 @@ class RuleParserEngine {
     List<Cookie> cookies,
   ) async {
     final uri = Uri.parse(url);
-    await _cookieJar.saveFromResponse(uri, cookies);
+    await CookieStore.saveFromResponse(uri, cookies);
   }
 
   static Future<List<Cookie>> loadCookiesForUrl(String url) async {
     final uri = Uri.parse(url);
-    return _cookieJar.loadForRequest(uri);
+    return CookieStore.loadForRequest(uri);
   }
 
   Map<String, String> _buildEffectiveRequestHeaders(
@@ -67,7 +81,14 @@ class RuleParserEngine {
 
     // 先放入通用头，再用书源自定义 header 覆盖同名 key
     headers.addAll(_defaultHeaders);
-    headers.addAll(customHeaders);
+    // 再保险：无论 header 来自何处，最终写入 Dio 前都做一次 key 过滤，
+    // 避免出现 `{"User-Agent"` 这类非法 key 直接触发 dart:io FormatException。
+    customHeaders.forEach((k, v) {
+      final key = k.trim();
+      if (key.isEmpty) return;
+      if (!_httpHeaderTokenRegex.hasMatch(key)) return;
+      headers[key] = v;
+    });
 
     // 自动补齐 Referer/Origin（对标 legado 常见用法）
     // - 防盗链/反爬站点常见会校验 Referer / Origin
@@ -289,10 +310,193 @@ class RuleParserEngine {
       final key = trimmed.substring(0, idx).trim();
       final value = trimmed.substring(idx + 1).trim();
       if (key.isEmpty) continue;
-      if (!_httpHeaderTokenRegex.hasMatch(key)) continue;
+      if (!_httpHeaderTokenRegex.hasMatch(key)) {
+        warning ??= '存在非法 header key（已忽略）: $key';
+        continue;
+      }
       headers[key] = value;
     }
     return _ParsedHeaders(headers: headers, warning: warning);
+  }
+
+  _LegadoUrlParsed _parseLegadoStyleUrl(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return _LegadoUrlParsed(url: '', option: null);
+
+    // Legado 常见：url,{jsonOption}
+    // - 用“最后一个 ,{”做分割，尽量避免 url 本身包含逗号时误拆。
+    final idx = trimmed.lastIndexOf(',{');
+    if (idx <= 0) return _LegadoUrlParsed(url: trimmed, option: null);
+
+    final urlPart = trimmed.substring(0, idx).trim();
+    final optPart = trimmed.substring(idx + 1).trim(); // starts with '{'
+    if (!optPart.startsWith('{') || !optPart.endsWith('}')) {
+      return _LegadoUrlParsed(url: trimmed, option: null);
+    }
+
+    try {
+      final decoded = jsonDecode(optPart);
+      if (decoded is! Map) {
+        return _LegadoUrlParsed(url: trimmed, option: null);
+      }
+      final map = decoded.map((k, v) => MapEntry(k.toString(), v));
+      return _LegadoUrlParsed(
+        url: urlPart.isEmpty ? trimmed : urlPart,
+        option: _LegadoUrlOption.fromJson(map),
+      );
+    } catch (_) {
+      return _LegadoUrlParsed(url: trimmed, option: null);
+    }
+  }
+
+  _UrlJsPatchResult? _applyLegadoUrlOptionJs({
+    required String js,
+    required String url,
+    required Map<String, String> headerMap,
+  }) {
+    // 对标 legado 的 url 参数 js：
+    // - java.url 可读写
+    // - java.headerMap.put(k,v) / putAll({}) 等
+    // - 只用于“在请求前修改 url/header”
+    final safeUrl = jsonEncode(url);
+    final safeHeaders = jsonEncode(headerMap);
+    final wrapped = '''
+      (function(){
+        var java = {};
+        java.url = $safeUrl;
+        java.headerMap = $safeHeaders;
+        java.headerMap.put = function(k,v){ this[String(k)] = String(v); };
+        java.headerMap.putAll = function(obj){
+          if(!obj) return;
+          for (var key in obj) { this[String(key)] = String(obj[key]); }
+        };
+        java.log = function(){ try { console.log.apply(console, arguments); } catch(e) {} };
+        try {
+          (function(){ $js })();
+        } catch (e) {
+          return JSON.stringify({ok:false, error: String(e && (e.stack||e.message||e)), url: java.url, headers: java.headerMap});
+        }
+        return JSON.stringify({ok:true, url: java.url, headers: java.headerMap});
+      })()
+    ''';
+
+    try {
+      final res = _jsRuntime.evaluate(wrapped);
+      final text = res.stringResult.trim();
+      if (text.isEmpty || text == 'null' || text == 'undefined') return null;
+      final decoded = jsonDecode(text);
+      if (decoded is! Map) return null;
+      final ok = decoded['ok'] == true;
+      final patchedUrl = decoded['url']?.toString() ?? url;
+      final headersRaw = decoded['headers'];
+      final patchedHeaders = <String, String>{};
+      if (headersRaw is Map) {
+        headersRaw.forEach((k, v) {
+          if (k == null || v == null) return;
+          patchedHeaders[k.toString()] = v.toString();
+        });
+      }
+      return _UrlJsPatchResult(
+        ok: ok,
+        url: patchedUrl,
+        headers: patchedHeaders.isEmpty ? headerMap : patchedHeaders,
+        error: decoded['error']?.toString(),
+      );
+    } catch (e) {
+      return _UrlJsPatchResult(
+        ok: false,
+        url: url,
+        headers: headerMap,
+        error: e.toString(),
+      );
+    }
+  }
+
+  String _normalizeCharset(String raw) {
+    final c = raw.trim().toLowerCase();
+    if (c.isEmpty) return '';
+    if (c == 'utf8') return 'utf-8';
+    if (c == 'utf_8') return 'utf-8';
+    if (c == 'gb2312' || c == 'gbk' || c == 'gb18030') return 'gbk';
+    return c;
+  }
+
+  String? _tryParseCharsetFromContentType(String? contentType) {
+    final ct = (contentType ?? '').trim();
+    if (ct.isEmpty) return null;
+    final m = RegExp(r'charset\s*=\s*([^;\s]+)', caseSensitive: false)
+        .firstMatch(ct);
+    if (m == null) return null;
+    final v = m.group(1);
+    if (v == null) return null;
+    return _normalizeCharset(v.replaceAll('"', '').replaceAll("'", ''));
+  }
+
+  String? _tryParseCharsetFromHtmlHead(Uint8List bytes) {
+    // 用 latin1 作为“无损映射”，只为查 meta charset（不用于最终文本）
+    final headLen = bytes.length < 4096 ? bytes.length : 4096;
+    final head = latin1.decode(bytes.sublist(0, headLen), allowInvalid: true);
+    final m1 = RegExp(
+            r'''<meta[^>]+charset\s*=\s*['"]?\s*([^'"\s/>]+)''',
+            caseSensitive: false)
+        .firstMatch(head);
+    final c1 = m1?.group(1);
+    if (c1 != null && c1.trim().isNotEmpty) return _normalizeCharset(c1);
+
+    final m2 = RegExp(
+            r'''<meta[^>]+http-equiv\s*=\s*['"]content-type['"][^>]+content\s*=\s*['"][^'"]*charset\s*=\s*([^'"\s;]+)''',
+            caseSensitive: false)
+        .firstMatch(head);
+    final c2 = m2?.group(1);
+    if (c2 != null && c2.trim().isNotEmpty) return _normalizeCharset(c2);
+    return null;
+  }
+
+  _DecodedText _decodeResponseBytes({
+    required Uint8List bytes,
+    required Map<String, String> responseHeaders,
+    String? optionCharset,
+  }) {
+    final forced = optionCharset != null && optionCharset.trim().isNotEmpty
+        ? _normalizeCharset(optionCharset)
+        : '';
+    final headerCharset = _tryParseCharsetFromContentType(
+      responseHeaders['content-type'] ?? responseHeaders['Content-Type'],
+    );
+    final htmlCharset = _tryParseCharsetFromHtmlHead(bytes);
+
+    final charset = (forced.isNotEmpty
+            ? forced
+            : (headerCharset?.isNotEmpty == true ? headerCharset! : ''))
+        .trim();
+
+    final effective = charset.isNotEmpty ? charset : (htmlCharset ?? 'utf-8');
+    final normalized = _normalizeCharset(effective);
+
+    try {
+      if (normalized == 'gbk') {
+        return _DecodedText(
+          text: gbk.decode(bytes, allowMalformed: true),
+          charset: 'gbk',
+        );
+      }
+      if (normalized == 'utf-8') {
+        return _DecodedText(
+          text: utf8.decode(bytes, allowMalformed: true),
+          charset: 'utf-8',
+        );
+      }
+      // 其它编码先走 utf-8 容错；失败再回退 latin1
+      return _DecodedText(
+        text: utf8.decode(bytes, allowMalformed: true),
+        charset: normalized,
+      );
+    } catch (_) {
+      return _DecodedText(
+        text: latin1.decode(bytes, allowInvalid: true),
+        charset: normalized.isEmpty ? 'latin1' : normalized,
+      );
+    }
   }
 
   /// 搜索书籍
@@ -326,7 +530,7 @@ class RuleParserEngine {
 
       // 获取书籍列表
       final bookListRule = searchRule.bookList ?? '';
-      final bookElements = _querySelectorAll(document, bookListRule);
+      final bookElements = _selectAllElementsByRule(document, bookListRule);
 
       for (final element in bookElements) {
         var bookUrl =
@@ -431,6 +635,20 @@ class RuleParserEngine {
         state: 1,
         showTime: false,
       );
+      if (res.requestBodySnippet != null &&
+          res.requestBodySnippet!.trim().isNotEmpty) {
+        log(
+          '└请求体（${res.method}）\n${res.requestBodySnippet}',
+          state: 1,
+          showTime: false,
+        );
+      } else {
+        log(
+          '└请求方法：${res.method}',
+          state: 1,
+          showTime: false,
+        );
+      }
       final status = res.statusCode;
       final statusText = status != null ? ' ($status)' : '';
       final isBadStatus = status != null && status >= 400;
@@ -440,6 +658,10 @@ class RuleParserEngine {
           '$statusText ${res.elapsedMs}ms',
           state: isBadStatus ? -1 : 1,
         );
+        if (res.responseCharset != null &&
+            res.responseCharset!.trim().isNotEmpty) {
+          log('└响应编码：${res.responseCharset}', state: 1, showTime: false);
+        }
         rawHtml(rawState, res.body!);
         if (isBadStatus) {
           log('└HTTP 状态码异常：$status', state: -1, showTime: false);
@@ -615,7 +837,7 @@ class RuleParserEngine {
     final listSelector = bookListRule.bookList ?? '';
 
     log('┌获取书籍列表');
-    final elements = _querySelectorAll(document, listSelector);
+    final elements = _selectAllElementsByRule(document, listSelector);
     log('└列表大小:${elements.length}');
 
     if (elements.isEmpty) {
@@ -734,7 +956,7 @@ class RuleParserEngine {
 
     if (rule.init != null && rule.init!.trim().isNotEmpty) {
       log('≡执行详情页初始化规则');
-      final initEl = _querySelector(document, rule.init!.trim());
+      final initEl = _selectFirstElementByRule(document, rule.init!.trim());
       if (initEl != null) {
         root = initEl;
       } else {
@@ -802,7 +1024,7 @@ class RuleParserEngine {
     final normalized = _normalizeListRule(rule.chapterList);
 
     log('┌获取章节列表');
-    final elements = _querySelectorAll(document, normalized.selector);
+    final elements = _selectAllElementsByRule(document, normalized.selector);
     log('└列表大小:${elements.length}');
 
     var toc = <TocItem>[];
@@ -953,7 +1175,7 @@ class RuleParserEngine {
     try {
       final document = html_parser.parse(fetch.body);
       final bookListRule = searchRule.bookList ?? '';
-      final bookElements = _querySelectorAll(document, bookListRule);
+      final bookElements = _selectAllElementsByRule(document, bookListRule);
 
       final results = <SearchResult>[];
       Map<String, String> fieldSample = const {};
@@ -1056,7 +1278,7 @@ class RuleParserEngine {
       final results = <SearchResult>[];
 
       final bookListRule = exploreRule.bookList ?? '';
-      final bookElements = _querySelectorAll(document, bookListRule);
+      final bookElements = _selectAllElementsByRule(document, bookListRule);
 
       for (final element in bookElements) {
         var bookUrl =
@@ -1141,7 +1363,7 @@ class RuleParserEngine {
     try {
       final document = html_parser.parse(fetch.body);
       final bookListRule = exploreRule.bookList ?? '';
-      final bookElements = _querySelectorAll(document, bookListRule);
+      final bookElements = _selectAllElementsByRule(document, bookListRule);
 
       final results = <SearchResult>[];
       Map<String, String> fieldSample = const {};
@@ -1233,7 +1455,7 @@ class RuleParserEngine {
 
       // 如果有 init 规则，先定位根元素
       if (bookInfoRule.init != null && bookInfoRule.init!.isNotEmpty) {
-        root = _querySelector(document, bookInfoRule.init!);
+        root = _selectFirstElementByRule(document, bookInfoRule.init!);
       }
 
       if (root == null) return null;
@@ -1313,7 +1535,7 @@ class RuleParserEngine {
       var initMatched = true;
 
       if (bookInfoRule.init != null && bookInfoRule.init!.isNotEmpty) {
-        root = _querySelector(document, bookInfoRule.init!);
+        root = _selectFirstElementByRule(document, bookInfoRule.init!);
         initMatched = root != null;
       }
       if (root == null) {
@@ -1411,7 +1633,8 @@ class RuleParserEngine {
 
       // 获取章节列表
       final normalized = _normalizeListRule(tocRule.chapterList);
-      final chapterElements = _querySelectorAll(document, normalized.selector);
+      final chapterElements =
+          _selectAllElementsByRule(document, normalized.selector);
 
       for (int i = 0; i < chapterElements.length; i++) {
         final element = chapterElements[i];
@@ -1478,7 +1701,8 @@ class RuleParserEngine {
     try {
       final document = html_parser.parse(fetch.body);
       final normalized = _normalizeListRule(tocRule.chapterList);
-      final chapterElements = _querySelectorAll(document, normalized.selector);
+      final chapterElements =
+          _selectAllElementsByRule(document, normalized.selector);
 
       final chapters = <TocItem>[];
       Map<String, String> sample = const {};
@@ -1684,23 +1908,77 @@ class RuleParserEngine {
     bool? enabledCookieJar,
   }) async {
     try {
-      final timeout =
-          (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
-      final options = Options(
+      final parsedHeaders = _parseRequestHeaders(header);
+      final parsedUrl = _parseLegadoStyleUrl(url);
+
+      // URL option headers 覆盖书源 headers
+      final mergedCustomHeaders = <String, String>{}
+        ..addAll(parsedHeaders.headers)
+        ..addAll(parsedUrl.option?.headers ?? const <String, String>{});
+
+      // URL option js 允许二次修改 url/header
+      var finalUrl = parsedUrl.url;
+      if (parsedUrl.option?.js != null && parsedUrl.option!.js!.trim().isNotEmpty) {
+        final patched = _applyLegadoUrlOptionJs(
+          js: parsedUrl.option!.js!.trim(),
+          url: finalUrl,
+          headerMap: mergedCustomHeaders,
+        );
+        if (patched != null) {
+          finalUrl = patched.url;
+          mergedCustomHeaders
+            ..clear()
+            ..addAll(patched.headers);
+        }
+      }
+
+      final requestHeaders = _buildEffectiveRequestHeaders(
+        finalUrl,
+        customHeaders: mergedCustomHeaders,
+      );
+
+      final method = (parsedUrl.option?.method ?? 'GET').trim().toUpperCase();
+      final body = parsedUrl.option?.body;
+
+      if ((method == 'POST' || method == 'PUT' || method == 'PATCH') &&
+          body != null &&
+          body.isNotEmpty &&
+          !requestHeaders.keys.any((k) => k.toLowerCase() == 'content-type')) {
+        requestHeaders['Content-Type'] =
+            'application/x-www-form-urlencoded; charset=UTF-8';
+      }
+
+      final timeout = (timeoutMs != null && timeoutMs > 0)
+          ? Duration(milliseconds: timeoutMs)
+          : null;
+
+      final opts = Options(
+        method: method,
         connectTimeout: timeout,
         sendTimeout: timeout,
         receiveTimeout: timeout,
+        responseType: ResponseType.bytes,
+        validateStatus: (_) => true,
+        headers: requestHeaders,
       );
-      final parsedHeaders = _parseRequestHeaders(header);
-      final requestHeaders = _buildEffectiveRequestHeaders(
-        url,
-        customHeaders: parsedHeaders.headers,
-      );
-      options.headers = requestHeaders;
 
-      final response = await _selectDio(enabledCookieJar: enabledCookieJar)
-          .get(url, options: options);
-      return response.data?.toString();
+      final dio = _selectDio(enabledCookieJar: enabledCookieJar);
+      final resp = await dio.request<List<int>>(
+        finalUrl,
+        data: (method == 'POST' || method == 'PUT' || method == 'PATCH')
+            ? (body ?? '')
+            : null,
+        options: opts,
+      );
+      final bytes = Uint8List.fromList(resp.data ?? const <int>[]);
+      final respHeaders =
+          resp.headers.map.map((k, v) => MapEntry(k, v.join(', ')));
+      final decoded = _decodeResponseBytes(
+        bytes: bytes,
+        responseHeaders: respHeaders,
+        optionCharset: parsedUrl.option?.charset,
+      );
+      return decoded.text;
     } catch (e) {
       debugPrint('请求失败: $url - $e');
       return null;
@@ -1715,15 +1993,37 @@ class RuleParserEngine {
   }) async {
     final sw = Stopwatch()..start();
     final parsedHeaders = _parseRequestHeaders(header);
+    final parsedUrl = _parseLegadoStyleUrl(url);
+
+    final mergedCustomHeaders = <String, String>{}
+      ..addAll(parsedHeaders.headers)
+      ..addAll(parsedUrl.option?.headers ?? const <String, String>{});
+
+    var finalUrl = parsedUrl.url;
+    _UrlJsPatchResult? urlJsPatch;
+    if (parsedUrl.option?.js != null && parsedUrl.option!.js!.trim().isNotEmpty) {
+      urlJsPatch = _applyLegadoUrlOptionJs(
+        js: parsedUrl.option!.js!.trim(),
+        url: finalUrl,
+        headerMap: mergedCustomHeaders,
+      );
+      if (urlJsPatch != null) {
+        finalUrl = urlJsPatch.url;
+        mergedCustomHeaders
+          ..clear()
+          ..addAll(urlJsPatch.headers);
+      }
+    }
+
     final requestHeaders = _buildEffectiveRequestHeaders(
-      url,
-      customHeaders: parsedHeaders.headers,
+      finalUrl,
+      customHeaders: mergedCustomHeaders,
     );
     final forLog = Map<String, String>.from(requestHeaders);
     final cookieJarOn = enabledCookieJar ?? true;
     if (cookieJarOn) {
       try {
-        final cookies = await RuleParserEngine.loadCookiesForUrl(url);
+        final cookies = await RuleParserEngine.loadCookiesForUrl(finalUrl);
         if (cookies.isNotEmpty &&
             !forLog.keys.any((k) => k.toLowerCase() == 'cookie')) {
           forLog['Cookie'] =
@@ -1734,47 +2034,87 @@ class RuleParserEngine {
       }
     }
     try {
-      final timeout =
-          (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
+      final method = (parsedUrl.option?.method ?? 'GET').trim().toUpperCase();
+      final body = parsedUrl.option?.body;
+
+      // 若需要 body 且未指定 content-type，按 legado 默认补 urlencoded
+      if ((method == 'POST' || method == 'PUT' || method == 'PATCH') &&
+          body != null &&
+          body.isNotEmpty &&
+          !requestHeaders.keys.any((k) => k.toLowerCase() == 'content-type')) {
+        requestHeaders['Content-Type'] =
+            'application/x-www-form-urlencoded; charset=UTF-8';
+        forLog['Content-Type'] = requestHeaders['Content-Type']!;
+      }
+
+      final timeout = (timeoutMs != null && timeoutMs > 0)
+          ? Duration(milliseconds: timeoutMs)
+          : null;
       final options = Options(
+        method: method,
         connectTimeout: timeout,
         sendTimeout: timeout,
         receiveTimeout: timeout,
         validateStatus: (_) => true,
+        responseType: ResponseType.bytes,
+        headers: requestHeaders,
       );
-      options.headers = requestHeaders;
 
       final response = await _selectDio(enabledCookieJar: enabledCookieJar)
-          .get(url, options: options);
-      final body = response.data?.toString();
+          .request<List<int>>(
+        finalUrl,
+        data: (method == 'POST' || method == 'PUT' || method == 'PATCH')
+            ? (body ?? '')
+            : null,
+        options: options,
+      );
       final respHeaders = response.headers.map.map(
         (k, v) => MapEntry(k, v.join(', ')),
       );
+      final bytes = Uint8List.fromList(response.data ?? const <int>[]);
+      final decoded = _decodeResponseBytes(
+        bytes: bytes,
+        responseHeaders: respHeaders,
+        optionCharset: parsedUrl.option?.charset,
+      );
       sw.stop();
       return FetchDebugResult(
-        requestUrl: url,
+        requestUrl: parsedUrl.url,
         finalUrl: response.realUri.toString(),
         statusCode: response.statusCode,
         elapsedMs: sw.elapsedMilliseconds,
-        responseLength: body?.length ?? 0,
-        responseSnippet: _snippet(body),
+        method: method,
+        requestBodySnippet: _snippet(body),
+        responseCharset: decoded.charset,
+        responseLength: decoded.text.length,
+        responseSnippet: _snippet(decoded.text),
         requestHeaders: forLog,
         headersWarning: parsedHeaders.warning,
         responseHeaders: respHeaders,
-        error: null,
-        body: body,
+        error: urlJsPatch?.error,
+        body: decoded.text,
       );
     } catch (e) {
       sw.stop();
       if (e is DioException) {
         final response = e.response;
-        final body = response?.data?.toString();
+        String? bodyText;
         final statusCode = response?.statusCode;
         final finalUrl = response?.realUri.toString();
         final respHeaders = response?.headers.map.map(
               (k, v) => MapEntry(k, v.join(', ')),
             ) ??
             const <String, String>{};
+        if (response?.data is List<int>) {
+          final decoded = _decodeResponseBytes(
+            bytes: Uint8List.fromList(response?.data ?? const <int>[]),
+            responseHeaders: respHeaders,
+            optionCharset: parsedUrl.option?.charset,
+          );
+          bodyText = decoded.text;
+        } else {
+          bodyText = response?.data?.toString();
+        }
         final parts = <String>[
           'DioException(${e.type})',
           if (parsedHeaders.warning != null) 'header警告=${parsedHeaders.warning}',
@@ -1782,24 +2122,30 @@ class RuleParserEngine {
           if (e.error != null) 'error=${e.error}',
         ];
         return FetchDebugResult(
-          requestUrl: url,
+          requestUrl: parsedUrl.url,
           finalUrl: finalUrl,
           statusCode: statusCode,
           elapsedMs: sw.elapsedMilliseconds,
-          responseLength: body?.length ?? 0,
-          responseSnippet: _snippet(body),
+          method: (parsedUrl.option?.method ?? 'GET').trim().toUpperCase(),
+          requestBodySnippet: _snippet(parsedUrl.option?.body),
+          responseCharset: null,
+          responseLength: bodyText?.length ?? 0,
+          responseSnippet: _snippet(bodyText),
           requestHeaders: forLog,
           headersWarning: parsedHeaders.warning,
           responseHeaders: respHeaders,
           error: parts.join('：'),
-          body: body,
+          body: bodyText,
         );
       }
       return FetchDebugResult(
-        requestUrl: url,
+        requestUrl: parsedUrl.url,
         finalUrl: null,
         statusCode: null,
         elapsedMs: sw.elapsedMilliseconds,
+        method: (parsedUrl.option?.method ?? 'GET').trim().toUpperCase(),
+        requestBodySnippet: _snippet(parsedUrl.option?.body),
+        responseCharset: null,
         responseLength: 0,
         responseSnippet: null,
         requestHeaders: forLog,
@@ -1841,11 +2187,20 @@ class RuleParserEngine {
     if (url.startsWith('//')) {
       return 'https:$url';
     }
-    if (url.startsWith('/')) {
-      final uri = Uri.parse(baseUrl);
-      return '${uri.scheme}://${uri.host}$url';
+    try {
+      final base = Uri.parse(baseUrl);
+      return base.resolve(url).toString();
+    } catch (_) {
+      if (url.startsWith('/')) {
+        final uri = Uri.tryParse(baseUrl);
+        if (uri != null && uri.scheme.isNotEmpty && uri.host.isNotEmpty) {
+          return '${uri.scheme}://${uri.host}$url';
+        }
+      }
+      final trimmedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+      final trimmedUrl = url.startsWith('/') ? url.substring(1) : url;
+      return '$trimmedBase/$trimmedUrl';
     }
-    return '$baseUrl/$url';
   }
 
   /// 解析规则
@@ -1864,84 +2219,192 @@ class RuleParserEngine {
     return result.trim();
   }
 
-  /// 解析单个规则
+  static const Set<String> _specialExtractors = {
+    'text',
+    'textnodes',
+    'owntext',
+    'html',
+    'innerhtml',
+    'outerhtml',
+  };
+
+  static const Set<String> _commonAttrExtractors = {
+    'href',
+    'src',
+    'title',
+    'alt',
+    'value',
+    'content',
+    'data-src',
+    'data-original',
+    'data-url',
+  };
+
+  bool _looksLikeCssSelector(String token) {
+    // 命中常见 selector 结构（伪类/组合器/属性选择器等）
+    return token.contains(RegExp(r'[ #.:\[\]\(\)>+~*,]')) ||
+        token.startsWith('.') ||
+        token.startsWith('#') ||
+        token.startsWith('class.') ||
+        token.startsWith('id.') ||
+        token.startsWith('tag.') ||
+        token.startsWith('css.');
+  }
+
+  bool _isExtractorToken(String token) {
+    final t = token.trim();
+    if (t.isEmpty) return false;
+    // 像 selector 的一律不当 extractor（例如 li:not(...)）
+    if (_looksLikeCssSelector(t)) return false;
+    final lower = t.toLowerCase();
+    if (_specialExtractors.contains(lower)) return true;
+    if (_commonAttrExtractors.contains(lower)) return true;
+    if (lower.startsWith('data-') || lower.startsWith('aria-')) return true;
+    // 自定义属性一般会带连接符/下划线/命名空间（尽量别把 img/a/p 这类 tag 误判为属性）
+    if (t.contains('-') || t.contains('_') || t.contains(':')) return true;
+    return false;
+  }
+
+  /// 解析单个规则（对标 Legado 规则链：selector@selector@index@attr@text + ##replace）
   String _parseSingleRule(Element element, String rule, String baseUrl) {
     if (rule.isEmpty) return '';
 
-    // 提取属性规则 @attr 或 @text
-    String? attrRule;
-    String selectorRule = rule;
+    final parsed = _LegadoTextRule.parse(
+      rule,
+      isExtractor: _isExtractorToken,
+    );
 
-    if (rule.contains('@')) {
-      final atIndex = rule.lastIndexOf('@');
-      selectorRule = rule.substring(0, atIndex).trim();
-      attrRule = rule.substring(atIndex + 1).trim();
-    }
-
-    // 如果选择器为空，使用当前元素
-    Element? target = element;
-    if (selectorRule.isNotEmpty) {
-      target = _querySelector(element, selectorRule);
-    }
-
+    final target = parsed.selectors.isEmpty
+        ? element
+        : _selectFirstBySelectors(element, parsed.selectors);
     if (target == null) return '';
 
-    // 获取内容
-    String result;
-    if (attrRule == null || attrRule == 'text') {
-      result = target.text;
-    } else if (attrRule == 'textNodes') {
-      result = target.nodes.whereType<Text>().map((t) => t.text).join('');
-    } else if (attrRule == 'ownText') {
-      result = target.nodes.whereType<Text>().map((t) => t.text).join('');
-    } else if (attrRule == 'html' || attrRule == 'innerHTML') {
-      result = target.innerHtml;
-    } else if (attrRule == 'outerHtml') {
-      result = target.outerHtml;
-    } else {
-      result = target.attributes[attrRule] ?? '';
-    }
-
-    // 如果是URL属性，转换为绝对路径
-    if (attrRule == 'href' || attrRule == 'src') {
-      result = _absoluteUrl(baseUrl, result);
-    }
-
+    var result = _extractWithFallbacks(
+      target,
+      parsed.extractors,
+      baseUrl: baseUrl,
+    );
+    result = _applyInlineReplacements(result, parsed.replacements);
     return result.trim();
   }
 
-  /// CSS选择器查询单个元素
-  Element? _querySelector(dynamic parent, String selector) {
-    if (selector.isEmpty) return null;
-
-    try {
-      if (parent is Document) {
-        return parent.querySelector(selector);
-      } else if (parent is Element) {
-        return parent.querySelector(selector);
-      }
-    } catch (e) {
-      debugPrint('选择器解析失败: $selector - $e');
-    }
-
-    return null;
+  Element? _selectFirstBySelectors(
+    dynamic parent,
+    List<_LegadoSelectorStep> steps,
+  ) {
+    final all = _selectAllBySelectors(parent, steps);
+    return all.isEmpty ? null : all.first;
   }
 
-  /// CSS选择器查询多个元素
-  List<Element> _querySelectorAll(dynamic parent, String selector) {
-    if (selector.isEmpty) return [];
+  List<Element> _selectAllBySelectors(
+    dynamic parent,
+    List<_LegadoSelectorStep> steps,
+  ) {
+    List<dynamic> contexts = <dynamic>[parent];
 
-    try {
-      if (parent is Document) {
-        return parent.querySelectorAll(selector);
-      } else if (parent is Element) {
-        return parent.querySelectorAll(selector);
+    List<Element> queryAll(dynamic ctx, String css) {
+      if (css.trim().isEmpty) return const <Element>[];
+      try {
+        if (ctx is Document) return ctx.querySelectorAll(css);
+        if (ctx is Element) return ctx.querySelectorAll(css);
+      } catch (e) {
+        debugPrint('选择器解析失败: $css - $e');
       }
-    } catch (e) {
-      debugPrint('选择器解析失败: $selector - $e');
+      return const <Element>[];
     }
 
-    return [];
+    for (final step in steps) {
+      final css = step.cssSelector.trim();
+      if (css.isEmpty) continue;
+
+      final matched = <Element>[];
+      for (final ctx in contexts) {
+        matched.addAll(queryAll(ctx, css));
+      }
+
+      final idx = step.index;
+      if (idx != null) {
+        if (matched.isEmpty) return const <Element>[];
+        var effective = idx >= 0 ? idx : matched.length + idx;
+        if (effective < 0 || effective >= matched.length) {
+          return const <Element>[];
+        }
+        contexts = <dynamic>[matched[effective]];
+      } else {
+        contexts = matched;
+      }
+    }
+
+    return contexts.whereType<Element>().toList(growable: false);
+  }
+
+  List<Element> _selectAllElementsByRule(dynamic parent, String selectorRule) {
+    final parsed = _LegadoTextRule.parse(
+      selectorRule,
+      isExtractor: _isExtractorToken,
+    );
+    return _selectAllBySelectors(parent, parsed.selectors);
+  }
+
+  Element? _selectFirstElementByRule(dynamic parent, String selectorRule) {
+    final all = _selectAllElementsByRule(parent, selectorRule);
+    return all.isEmpty ? null : all.first;
+  }
+
+  String _extractWithFallbacks(
+    Element target,
+    List<String> extractors, {
+    required String baseUrl,
+  }) {
+    for (final ex in extractors) {
+      final token = ex.trim();
+      if (token.isEmpty) continue;
+      final lower = token.toLowerCase();
+
+      String value;
+      if (lower == 'text') {
+        value = target.text;
+      } else if (lower == 'textnodes' || lower == 'owntext') {
+        value = target.nodes.whereType<Text>().map((t) => t.text).join('');
+      } else if (lower == 'html' || lower == 'innerhtml') {
+        value = target.innerHtml;
+      } else if (lower == 'outerhtml') {
+        value = target.outerHtml;
+      } else {
+        value = target.attributes[token] ??
+            target.attributes[lower] ??
+            target.attributes[token.toLowerCase()] ??
+            '';
+      }
+
+      value = value.trim();
+      if (value.isEmpty) continue;
+
+      // 常见 URL 属性：自动转绝对链接
+      if (lower == 'href' || lower == 'src') {
+        value = _absoluteUrl(baseUrl, value);
+      }
+      return value;
+    }
+    return '';
+  }
+
+  String _applyInlineReplacements(
+    String input,
+    List<_LegadoReplacePair> replacements,
+  ) {
+    var result = input;
+    for (final r in replacements) {
+      final pattern = r.pattern;
+      final replacement = r.replacement;
+      if (pattern.isEmpty) continue;
+      try {
+        result = result.replaceAll(RegExp(pattern), replacement);
+      } catch (_) {
+        result = result.replaceAll(pattern, replacement);
+      }
+    }
+    return result;
   }
 
   /// 应用替换正则
@@ -1967,6 +2430,143 @@ class RuleParserEngine {
   }
 }
 
+class _LegadoTextRule {
+  final List<_LegadoSelectorStep> selectors;
+  final List<String> extractors;
+  final List<_LegadoReplacePair> replacements;
+
+  const _LegadoTextRule({
+    required this.selectors,
+    required this.extractors,
+    required this.replacements,
+  });
+
+  static _LegadoTextRule parse(
+    String raw, {
+    required bool Function(String token) isExtractor,
+  }) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return const _LegadoTextRule(
+        selectors: <_LegadoSelectorStep>[],
+        extractors: <String>['text'],
+        replacements: <_LegadoReplacePair>[],
+      );
+    }
+
+    final parts = trimmed.split('##');
+    final pipeline = parts.first.trim();
+
+    final replacements = <_LegadoReplacePair>[];
+    if (parts.length > 1) {
+      final rep = parts.sublist(1).map((e) => e).toList(growable: false);
+      for (var i = 0; i < rep.length; i += 2) {
+        final pattern = rep[i].trim();
+        final replacement = (i + 1) < rep.length ? rep[i + 1] : '';
+        if (pattern.isEmpty) continue;
+        replacements.add(
+          _LegadoReplacePair(pattern: pattern, replacement: replacement),
+        );
+      }
+    }
+
+    final tokens = pipeline
+        .split('@')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+
+    // 从末尾识别 extractor（对标 legado：h1@title@text 表示 title 为空则取 text）
+    final startsWithAt = pipeline.startsWith('@');
+    var cut = tokens.length;
+    final extractors = <String>[];
+    if (startsWithAt) {
+      // 兼容 legado 写法：@href / @textNodes 等表示“当前元素取属性/文本”
+      for (final t in tokens) {
+        if (isExtractor(t)) extractors.add(t);
+      }
+      cut = 0;
+    } else if (tokens.length >= 2) {
+      while (cut > 0) {
+        final candidate = tokens[cut - 1];
+        if (!isExtractor(candidate)) break;
+        extractors.insert(0, candidate);
+        cut--;
+      }
+    }
+
+    final selectors = <_LegadoSelectorStep>[];
+    for (final t in tokens.take(cut)) {
+      final step = _LegadoSelectorStep.tryParse(t);
+      if (step != null) selectors.add(step);
+    }
+
+    return _LegadoTextRule(
+      selectors: selectors,
+      extractors: extractors.isEmpty ? const <String>['text'] : extractors,
+      replacements: replacements,
+    );
+  }
+}
+
+class _LegadoSelectorStep {
+  final String cssSelector;
+  final int? index;
+
+  const _LegadoSelectorStep({
+    required this.cssSelector,
+    required this.index,
+  });
+
+  static _LegadoSelectorStep? tryParse(String token) {
+    final t = token.trim();
+    if (t.isEmpty) return null;
+
+    int? index;
+    var base = t;
+    final lastDot = t.lastIndexOf('.');
+    if (lastDot > 0 && lastDot < t.length - 1) {
+      final maybeIndex = t.substring(lastDot + 1);
+      final parsed = int.tryParse(maybeIndex);
+      if (parsed != null) {
+        index = parsed;
+        base = t.substring(0, lastDot);
+      }
+    }
+
+    final css = _toCssSelector(base);
+    if (css.trim().isEmpty) return null;
+    return _LegadoSelectorStep(cssSelector: css, index: index);
+  }
+
+  static String _toCssSelector(String raw) {
+    final t = raw.trim();
+    if (t.startsWith('class.')) {
+      return '.${t.substring('class.'.length)}';
+    }
+    if (t.startsWith('id.')) {
+      return '#${t.substring('id.'.length)}';
+    }
+    if (t.startsWith('tag.')) {
+      return t.substring('tag.'.length);
+    }
+    if (t.startsWith('css.')) {
+      return t.substring('css.'.length);
+    }
+    return t;
+  }
+}
+
+class _LegadoReplacePair {
+  final String pattern;
+  final String replacement;
+
+  const _LegadoReplacePair({
+    required this.pattern,
+    required this.replacement,
+  });
+}
+
 enum _DebugListMode { search, explore }
 
 class SourceDebugEvent {
@@ -1988,6 +2588,9 @@ class FetchDebugResult {
   final String? finalUrl;
   final int? statusCode;
   final int elapsedMs;
+  final String method;
+  final String? requestBodySnippet;
+  final String? responseCharset;
   final int responseLength;
   final String? responseSnippet;
   final Map<String, String> requestHeaders;
@@ -2003,6 +2606,9 @@ class FetchDebugResult {
     required this.finalUrl,
     required this.statusCode,
     required this.elapsedMs,
+    this.method = 'GET',
+    this.requestBodySnippet,
+    this.responseCharset,
     required this.responseLength,
     required this.responseSnippet,
     required this.requestHeaders,
@@ -2018,6 +2624,9 @@ class FetchDebugResult {
       finalUrl: null,
       statusCode: null,
       elapsedMs: 0,
+      method: 'GET',
+      requestBodySnippet: null,
+      responseCharset: null,
       responseLength: 0,
       responseSnippet: null,
       requestHeaders: {},
@@ -2027,6 +2636,82 @@ class FetchDebugResult {
       body: null,
     );
   }
+}
+
+class _LegadoUrlParsed {
+  final String url;
+  final _LegadoUrlOption? option;
+
+  const _LegadoUrlParsed({
+    required this.url,
+    required this.option,
+  });
+}
+
+class _LegadoUrlOption {
+  final String? method;
+  final String? body;
+  final String? charset;
+  final Map<String, String> headers;
+  final String? js;
+
+  const _LegadoUrlOption({
+    required this.method,
+    required this.body,
+    required this.charset,
+    required this.headers,
+    required this.js,
+  });
+
+  factory _LegadoUrlOption.fromJson(Map<String, dynamic> json) {
+    String? getString(String key) {
+      final v = json[key];
+      if (v == null) return null;
+      final t = v.toString().trim();
+      return t.isEmpty ? null : t;
+    }
+
+    final headers = <String, String>{};
+    final h = json['headers'];
+    if (h is Map) {
+      h.forEach((k, v) {
+        if (k == null || v == null) return;
+        headers[k.toString()] = v.toString();
+      });
+    }
+
+    return _LegadoUrlOption(
+      method: getString('method'),
+      body: getString('body'),
+      charset: getString('charset'),
+      headers: headers,
+      js: getString('js'),
+    );
+  }
+}
+
+class _UrlJsPatchResult {
+  final bool ok;
+  final String url;
+  final Map<String, String> headers;
+  final String? error;
+
+  const _UrlJsPatchResult({
+    required this.ok,
+    required this.url,
+    required this.headers,
+    required this.error,
+  });
+}
+
+class _DecodedText {
+  final String text;
+  final String charset;
+
+  const _DecodedText({
+    required this.text,
+    required this.charset,
+  });
 }
 
 class _ParsedHeaders {
