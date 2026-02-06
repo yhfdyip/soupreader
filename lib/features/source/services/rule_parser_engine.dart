@@ -41,20 +41,30 @@ class RuleParserEngine {
     return CookieStore.jar;
   }
 
-  static final Dio _dioCookie = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      headers: _defaultHeaders,
-      followRedirects: true,
-      maxRedirects: 8,
-    ),
-  )..interceptors.add(CookieManager(_cookieJar));
+  static Dio? _dioCookieInstance;
+  static Dio get _dioCookie {
+    final existing = _dioCookieInstance;
+    if (existing != null) return existing;
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        headers: _defaultHeaders,
+        followRedirects: true,
+        maxRedirects: 8,
+      ),
+    )..interceptors.add(CookieManager(_cookieJar));
+    _dioCookieInstance = dio;
+    return dio;
+  }
 
   // URL 选项里的 js（Legado 格式）需要一个 JS 执行环境。
   // iOS 下为 JavaScriptCore；Android/Linux 下为 QuickJS（flutter_js）。
   // 这里只用于“URL 参数处理”，不做复杂脚本引擎承诺。
-  static final JavascriptRuntime _jsRuntime = getJavascriptRuntime(xhr: false);
+  static JavascriptRuntime? _jsRuntimeInstance;
+  static JavascriptRuntime get _jsRuntime {
+    return _jsRuntimeInstance ??= getJavascriptRuntime(xhr: false);
+  }
 
   String _evalJsMaybeString({
     required String js,
@@ -3748,24 +3758,13 @@ class RuleParserEngine {
   ) {
     List<dynamic> contexts = <dynamic>[parent];
 
-    List<Element> queryAll(dynamic ctx, String css) {
-      if (css.trim().isEmpty) return const <Element>[];
-      try {
-        if (ctx is Document) return ctx.querySelectorAll(css);
-        if (ctx is Element) return ctx.querySelectorAll(css);
-      } catch (e) {
-        debugPrint('选择器解析失败: $css - $e');
-      }
-      return const <Element>[];
-    }
-
     for (final step in steps) {
       final css = step.cssSelector.trim();
       if (css.isEmpty) continue;
 
       final matched = <Element>[];
       for (final ctx in contexts) {
-        matched.addAll(queryAll(ctx, css));
+        matched.addAll(_queryAllElements(ctx, css));
       }
 
       final idx = step.index;
@@ -3782,6 +3781,380 @@ class RuleParserEngine {
     }
 
     return contexts.whereType<Element>().toList(growable: false);
+  }
+
+  List<Element> _queryAllElements(dynamic ctx, String css) {
+    if (css.trim().isEmpty) return const <Element>[];
+    try {
+      // `package:html` 的 querySelector 对 `:nth-child/:nth-of-type` 等伪类支持不完整：
+      // - nth-of-type 直接抛 UnimplementedError
+      // - nth-child 常见返回空（不报错）
+      // 为对标 legado 的书源兼容性，这里对包含 nth 的选择器走兼容实现。
+      if (_containsNthPseudo(css)) {
+        return _querySelectorAllCompat(ctx, css);
+      }
+      if (ctx is Document) return ctx.querySelectorAll(css);
+      if (ctx is Element) return ctx.querySelectorAll(css);
+    } catch (e) {
+      debugPrint('选择器解析失败: $css - $e');
+    }
+    return const <Element>[];
+  }
+
+  @visibleForTesting
+  List<Element> debugQueryAllElements(dynamic ctx, String css) {
+    return _queryAllElements(ctx, css);
+  }
+
+  bool _containsNthPseudo(String css) {
+    final t = css.toLowerCase();
+    return t.contains(':nth-child(') ||
+        t.contains(':nth-last-child(') ||
+        t.contains(':nth-of-type(') ||
+        t.contains(':nth-last-of-type(');
+  }
+
+  List<String> _splitSelectorGroups(String selector) {
+    // 按顶层逗号拆分：`a, b > c` => [a, b > c]
+    final out = <String>[];
+    final buf = StringBuffer();
+    var bracket = 0;
+    var paren = 0;
+    String? quote;
+
+    void flush() {
+      final s = buf.toString().trim();
+      buf.clear();
+      if (s.isNotEmpty) out.add(s);
+    }
+
+    for (var i = 0; i < selector.length; i++) {
+      final ch = selector[i];
+      if (quote != null) {
+        buf.write(ch);
+        if (ch == quote) quote = null;
+        continue;
+      }
+      if (ch == '"' || ch == "'") {
+        quote = ch;
+        buf.write(ch);
+        continue;
+      }
+      if (ch == '[') bracket++;
+      if (ch == ']') bracket = bracket > 0 ? (bracket - 1) : 0;
+      if (ch == '(') paren++;
+      if (ch == ')') paren = paren > 0 ? (paren - 1) : 0;
+
+      if (ch == ',' && bracket == 0 && paren == 0) {
+        flush();
+        continue;
+      }
+      buf.write(ch);
+    }
+    flush();
+    return out;
+  }
+
+  _NthExpr? _parseNthExpr(String raw) {
+    final t = raw.trim().toLowerCase().replaceAll(' ', '');
+    if (t.isEmpty) return null;
+    if (t == 'odd') return const _NthExpr(a: 2, b: 1);
+    if (t == 'even') return const _NthExpr(a: 2, b: 0);
+
+    if (!t.contains('n')) {
+      final v = int.tryParse(t);
+      return v == null ? null : _NthExpr(a: 0, b: v);
+    }
+
+    final parts = t.split('n');
+    final aPart = parts.isNotEmpty ? parts.first : '';
+    final bPart = parts.length >= 2 ? parts[1] : '';
+
+    int a;
+    if (aPart.isEmpty || aPart == '+') {
+      a = 1;
+    } else if (aPart == '-') {
+      a = -1;
+    } else {
+      a = int.tryParse(aPart) ?? 0;
+    }
+
+    int b = 0;
+    if (bPart.isNotEmpty) {
+      b = int.tryParse(bPart) ?? 0;
+    }
+
+    return _NthExpr(a: a, b: b);
+  }
+
+  bool _matchesNth(_NthExpr expr, int position1Based) {
+    final a = expr.a;
+    final b = expr.b;
+    final p = position1Based;
+    if (p <= 0) return false;
+
+    if (a == 0) return p == b;
+
+    // 存在 n>=0 使 p = a*n + b
+    if (a > 0) {
+      final diff = p - b;
+      if (diff < 0) return false;
+      return diff % a == 0;
+    } else {
+      final diff = b - p;
+      if (diff < 0) return false;
+      return diff % (-a) == 0;
+    }
+  }
+
+  List<_SelectorStepCompat> _tokenizeSelectorChain(String selector) {
+    // 仅实现 legado 常见链式：后代（空格）/子代（>）/兄弟（+、~）
+    final steps = <_SelectorStepCompat>[];
+    final buf = StringBuffer();
+
+    var bracket = 0;
+    var paren = 0;
+    String? quote;
+
+    void pushStep(String combinator) {
+      final raw = buf.toString().trim();
+      buf.clear();
+      if (raw.isEmpty) return;
+      final extracted = _extractNthFilters(raw);
+      steps.add(
+        _SelectorStepCompat(
+          combinator: combinator,
+          selector: extracted.baseSelector,
+          nthFilters: extracted.filters,
+        ),
+      );
+    }
+
+    String pendingCombinator = '';
+
+    for (var i = 0; i < selector.length; i++) {
+      final ch = selector[i];
+      if (quote != null) {
+        buf.write(ch);
+        if (ch == quote) quote = null;
+        continue;
+      }
+      if (ch == '"' || ch == "'") {
+        quote = ch;
+        buf.write(ch);
+        continue;
+      }
+      if (ch == '[') bracket++;
+      if (ch == ']') bracket = bracket > 0 ? (bracket - 1) : 0;
+      if (ch == '(') paren++;
+      if (ch == ')') paren = paren > 0 ? (paren - 1) : 0;
+
+      final isTopLevel = bracket == 0 && paren == 0;
+      if (isTopLevel && (ch == '>' || ch == '+' || ch == '~')) {
+        pushStep(pendingCombinator);
+        pendingCombinator = ch;
+        continue;
+      }
+
+      if (isTopLevel && ch.trim().isEmpty) {
+        // 多个空白 => 一个后代 combinator
+        if (buf.isNotEmpty) {
+          pushStep(pendingCombinator);
+          pendingCombinator = ' ';
+        } else {
+          pendingCombinator = pendingCombinator.isEmpty ? ' ' : pendingCombinator;
+        }
+        continue;
+      }
+
+      buf.write(ch);
+    }
+    pushStep(pendingCombinator);
+
+    // 规范：第一个 step combinator 置空（不管前面怎么解析的）
+    if (steps.isNotEmpty) {
+      final first = steps.first;
+      steps[0] = _SelectorStepCompat(
+        combinator: '',
+        selector: first.selector,
+        nthFilters: first.nthFilters,
+      );
+    }
+    return steps;
+  }
+
+  _NthExtractResult _extractNthFilters(String rawSelectorPart) {
+    var s = rawSelectorPart;
+    final filters = <_NthFilter>[];
+
+    // 只处理最常用的四种；避免误伤其它伪类（例如 :not(...)）
+    final kinds = <String>[
+      'nth-child',
+      'nth-last-child',
+      'nth-of-type',
+      'nth-last-of-type',
+    ];
+
+    // 简单扫描：找 `:kind(...)` 并剥离
+    // 注意：这里不解析嵌套 :not(:nth-...) 的复杂情况（少见），保持实现可控。
+    for (final kind in kinds) {
+      while (true) {
+        final lower = s.toLowerCase();
+        final idx = lower.indexOf(':$kind(');
+        if (idx < 0) break;
+
+        // 找到对应的 ')'
+        var start = idx + kind.length + 2; // : + kind + (
+        var depth = 1;
+        var end = -1;
+        for (var i = start; i < s.length; i++) {
+          final ch = s[i];
+          if (ch == '(') depth++;
+          if (ch == ')') depth--;
+          if (depth == 0) {
+            end = i;
+            break;
+          }
+        }
+        if (end < 0) break;
+        final exprText = s.substring(start, end);
+        final expr = _parseNthExpr(exprText);
+        if (expr != null) {
+          filters.add(_NthFilter(kind: kind, expr: expr));
+        }
+        s = (s.substring(0, idx) + s.substring(end + 1)).trim();
+      }
+    }
+
+    if (s.trim().isEmpty) s = '*';
+    return _NthExtractResult(baseSelector: s.trim(), filters: filters);
+  }
+
+  List<Element> _querySelectorAllCompat(dynamic ctx, String selector) {
+    final groups = _splitSelectorGroups(selector);
+    if (groups.isEmpty) return const <Element>[];
+
+    final out = <Element>[];
+    final seen = <Element>{};
+    for (final g in groups) {
+      final one = _querySelectorAllCompatSingle(ctx, g);
+      for (final el in one) {
+        if (seen.add(el)) out.add(el);
+      }
+    }
+    return out;
+  }
+
+  List<Element> _querySelectorAllCompatSingle(dynamic ctx, String selector) {
+    final chain = _tokenizeSelectorChain(selector);
+    if (chain.isEmpty) return const <Element>[];
+
+    List<Element> contexts;
+    if (ctx is Document) {
+      final root = ctx.documentElement;
+      contexts = root == null ? const <Element>[] : <Element>[root];
+    } else if (ctx is Element) {
+      contexts = <Element>[ctx];
+    } else {
+      return const <Element>[];
+    }
+
+    List<Element> queryDescendants(Element root, String css) {
+      try {
+        return root.querySelectorAll(css);
+      } catch (e) {
+        debugPrint('选择器解析失败(compat): $css - $e');
+        return const <Element>[];
+      }
+    }
+
+    List<Element> applyNthFilters(List<Element> elements, List<_NthFilter> filters) {
+      if (filters.isEmpty || elements.isEmpty) return elements;
+      return elements.where((el) {
+        final parent = el.parent;
+        if (parent is! Element) return false;
+        final siblings = parent.children;
+        final idx = siblings.indexOf(el);
+        if (idx < 0) return false;
+
+        for (final f in filters) {
+          int pos;
+          if (f.kind == 'nth-child') {
+            pos = idx + 1;
+          } else if (f.kind == 'nth-last-child') {
+            pos = siblings.length - idx;
+          } else if (f.kind == 'nth-of-type' || f.kind == 'nth-last-of-type') {
+            final tag = (el.localName ?? '').toLowerCase();
+            final sameType = siblings
+                .where((e) => (e.localName ?? '').toLowerCase() == tag)
+                .toList(growable: false);
+            final typeIdx = sameType.indexOf(el);
+            if (typeIdx < 0) return false;
+            pos = f.kind == 'nth-of-type'
+                ? (typeIdx + 1)
+                : (sameType.length - typeIdx);
+          } else {
+            continue;
+          }
+
+          if (!_matchesNth(f.expr, pos)) return false;
+        }
+        return true;
+      }).toList(growable: false);
+    }
+
+    for (final step in chain) {
+      final combinator = step.combinator.isEmpty ? ' ' : step.combinator;
+      final css = step.selector.trim();
+      if (css.isEmpty) return const <Element>[];
+
+      final matched = <Element>[];
+      if (combinator == ' ') {
+        for (final c in contexts) {
+          matched.addAll(queryDescendants(c, css));
+        }
+      } else if (combinator == '>') {
+        for (final c in contexts) {
+          final all = queryDescendants(c, css);
+          matched.addAll(all.where((e) => e.parent == c));
+        }
+      } else if (combinator == '+') {
+        for (final c in contexts) {
+          final parent = c.parent;
+          if (parent is! Element) continue;
+          final siblings = parent.children;
+          final idx = siblings.indexOf(c);
+          if (idx < 0 || idx + 1 >= siblings.length) continue;
+          final cand = siblings[idx + 1];
+          // 通过“父节点内筛选”判断是否命中 selector（避免依赖 Element.matches）
+          final allowed = queryDescendants(parent, css).toSet();
+          if (allowed.contains(cand)) matched.add(cand);
+        }
+      } else if (combinator == '~') {
+        for (final c in contexts) {
+          final parent = c.parent;
+          if (parent is! Element) continue;
+          final siblings = parent.children;
+          final idx = siblings.indexOf(c);
+          if (idx < 0) continue;
+          final allowed = queryDescendants(parent, css).toSet();
+          for (var i = idx + 1; i < siblings.length; i++) {
+            final cand = siblings[i];
+            if (allowed.contains(cand)) matched.add(cand);
+          }
+        }
+      } else {
+        // 未知 combinator：退化为后代选择（尽量不让解析直接挂掉）
+        for (final c in contexts) {
+          matched.addAll(queryDescendants(c, css));
+        }
+      }
+
+      contexts = applyNthFilters(matched, step.nthFilters);
+      if (contexts.isEmpty) return const <Element>[];
+    }
+
+    return contexts;
   }
 
   List<Element> _selectAllElementsByRule(
@@ -4317,6 +4690,41 @@ class _ParsedHeaders {
 
   @override
   String toString() => 'headers=$headers warning=$warning';
+}
+
+class _SelectorStepCompat {
+  // '' for first, ' ' descendant, '>' child, '+' adjacent, '~' sibling
+  final String combinator;
+  final String selector;
+  final List<_NthFilter> nthFilters;
+
+  const _SelectorStepCompat({
+    required this.combinator,
+    required this.selector,
+    required this.nthFilters,
+  });
+}
+
+class _NthFilter {
+  // nth-child / nth-last-child / nth-of-type / nth-last-of-type
+  final String kind;
+  final _NthExpr expr;
+
+  const _NthFilter({required this.kind, required this.expr});
+}
+
+class _NthExpr {
+  final int a;
+  final int b;
+
+  const _NthExpr({required this.a, required this.b});
+}
+
+class _NthExtractResult {
+  final String baseSelector;
+  final List<_NthFilter> filters;
+
+  const _NthExtractResult({required this.baseSelector, required this.filters});
 }
 
 class _NormalizedListRule {
