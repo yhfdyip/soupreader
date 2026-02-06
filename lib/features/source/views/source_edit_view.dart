@@ -132,6 +132,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   bool _debugLoading = false;
   String? _debugError;
   final List<_DebugLine> _debugLines = <_DebugLine>[];
+  int _debugConsoleMode = 0; // 0 文本 1 逐行
   String? _debugListSrcHtml; // state=10（搜索/发现列表页）
   String? _debugBookSrcHtml; // state=20（详情页）
   String? _debugTocSrcHtml; // state=30（目录页）
@@ -885,50 +886,111 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildDebugConsoleSection() {
-    if (_debugLines.isEmpty) {
+    final hasLines = _debugLines.isNotEmpty;
+    final mode = _debugConsoleMode;
+    final modeLabel = mode == 0 ? '文本' : '逐行';
+    final allText = hasLines ? _debugLines.map((e) => e.text).join('\n') : '';
+
+    final children = <Widget>[
+      CupertinoListTile.notched(
+        title: const Text('显示模式'),
+        subtitle: CupertinoSlidingSegmentedControl<int>(
+          groupValue: _debugConsoleMode,
+          children: const {
+            0: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('文本')),
+            1: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('逐行')),
+          },
+          onValueChanged: (v) {
+            if (v == null) return;
+            setState(() => _debugConsoleMode = v);
+          },
+        ),
+      ),
+      CupertinoListTile.notched(
+        title: const Text('打开全文控制台'),
+        additionalInfo: Text('${_debugLines.length} 行'),
+        trailing: const CupertinoListTileChevron(),
+        onTap: hasLines ? () => _openDebugText(title: '控制台', text: allText) : null,
+      ),
+    ];
+
+    if (!hasLines) {
+      children.add(
+        const CupertinoListTile.notched(
+          title: Text('暂无日志'),
+        ),
+      );
       return CupertinoListSection.insetGrouped(
         header: const Text('控制台'),
-        children: const [
-          CupertinoListTile.notched(
-            title: Text('暂无日志'),
-          ),
-        ],
+        children: children,
       );
     }
 
-    return CupertinoListSection.insetGrouped(
-      header: Text('控制台（${_debugLines.length}）'),
-      children: _debugLines.map((line) {
+    if (mode == 0) {
+      const previewLines = 40;
+      final preview = _debugLines.length <= previewLines
+          ? allText
+          : _debugLines
+              .sublist(_debugLines.length - previewLines)
+              .map((e) => e.text)
+              .join('\n');
+      children.add(
+        CupertinoListTile.notched(
+          title: const Text('预览（最近 40 行）'),
+          subtitle: Text(
+            preview,
+            maxLines: 16,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          trailing: const CupertinoListTileChevron(),
+          onTap: () => _openDebugText(title: '控制台', text: allText),
+        ),
+      );
+    } else {
+      for (final line in _debugLines) {
+        if (line.text.trim().isEmpty) continue;
         final color = line.state == -1
             ? CupertinoColors.systemRed.resolveFrom(context)
             : line.state == 1000
                 ? CupertinoColors.systemGreen.resolveFrom(context)
                 : CupertinoColors.label.resolveFrom(context);
-        return CupertinoListTile.notched(
-          title: Text(
-            line.text,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12.5,
-              color: color,
+        children.add(
+          CupertinoListTile.notched(
+            title: Text(
+              line.text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                color: color,
+              ),
             ),
-          ),
-          trailing: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: line.text));
-              _showMessage('已复制该行日志');
-            },
-            child: const Icon(
-              CupertinoIcons.doc_on_doc,
-              size: 18,
+            trailing: CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: line.text));
+                _showMessage('已复制该行日志');
+              },
+              child: const Icon(
+                CupertinoIcons.doc_on_doc,
+                size: 18,
+              ),
             ),
+            onTap: () => _openDebugText(title: '日志', text: line.text),
           ),
-          onTap: () => _openDebugText(title: '日志', text: line.text),
         );
-      }).toList(),
+      }
+    }
+
+    return CupertinoListSection.insetGrouped(
+      header: Text('控制台（$modeLabel，${_debugLines.length}）'),
+      children: children,
     );
   }
 
