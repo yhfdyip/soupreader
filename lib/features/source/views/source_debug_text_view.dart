@@ -42,13 +42,13 @@ class _SourceDebugTextViewState extends State<SourceDebugTextView> {
             if (!context.mounted) return;
             showCupertinoDialog(
               context: context,
-              builder: (_) => CupertinoAlertDialog(
+              builder: (dialogContext) => CupertinoAlertDialog(
                 title: const Text('提示'),
                 content: const Text('\n已复制到剪贴板'),
                 actions: [
                   CupertinoDialogAction(
                     child: const Text('好'),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => Navigator.pop(dialogContext),
                   ),
                 ],
               ),

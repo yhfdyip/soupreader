@@ -242,13 +242,13 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
     if (!mounted) return;
     await showCupertinoDialog<void>(
       context: context,
-      builder: (_) => CupertinoAlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
         content: const Text('\n已复制检测报告'),
         actions: [
           CupertinoDialogAction(
             child: const Text('好'),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.pop(dialogContext),
           ),
         ],
       ),
@@ -279,13 +279,13 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
     if (entity == null) {
       await showCupertinoDialog<void>(
         context: context,
-        builder: (_) => CupertinoAlertDialog(
+        builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('提示'),
           content: const Text('\n书源不存在或已被删除'),
           actions: [
             CupertinoDialogAction(
               child: const Text('好'),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.pop(dialogContext),
             ),
           ],
         ),
