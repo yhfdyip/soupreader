@@ -195,6 +195,18 @@ class BookSource {
       return fallback;
     }
 
+    bool? parseNullableBool(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is bool) return raw;
+      if (raw is num) return raw != 0;
+      if (raw is String) {
+        final t = raw.trim().toLowerCase();
+        if (t == 'true' || t == '1') return true;
+        if (t == 'false' || t == '0') return false;
+      }
+      return null;
+    }
+
     return BookSource(
       bookSourceUrl: (json['bookSourceUrl'] ?? '').toString(),
       bookSourceName: (json['bookSourceName'] ?? '').toString(),
@@ -206,11 +218,7 @@ class BookSource {
       enabledExplore: parseBool(json['enabledExplore'], true),
       jsLib: json['jsLib']?.toString(),
       enabledCookieJar: json.containsKey('enabledCookieJar')
-          ? (json['enabledCookieJar'] as dynamic) is bool
-              ? json['enabledCookieJar'] as bool?
-              : (json['enabledCookieJar'] as dynamic) is num
-                  ? ((json['enabledCookieJar'] as num).toInt() != 0)
-                  : null
+          ? (parseNullableBool(json['enabledCookieJar']) ?? true)
           : true,
       concurrentRate: json['concurrentRate']?.toString(),
       header: json['header']?.toString(),
@@ -647,4 +655,3 @@ class ReviewRule {
     };
   }
 }
-

@@ -26,6 +26,8 @@ class _SourceListViewState extends State<SourceListView> {
       SourceImportExportService();
   final TextEditingController _urlController = TextEditingController();
 
+  static final RegExp _splitGroupRegex = RegExp(r'[,;，；]');
+
   @override
   void initState() {
     super.initState();
@@ -96,9 +98,11 @@ class _SourceListViewState extends State<SourceListView> {
   List<String> _buildGroups(List<BookSource> sources) {
     final groups = <String>{};
     for (final source in sources) {
-      final group = source.bookSourceGroup?.trim();
-      if (group != null && group.isNotEmpty) {
-        groups.add(group);
+      final raw = source.bookSourceGroup?.trim();
+      if (raw == null || raw.isEmpty) continue;
+      for (final g in raw.split(_splitGroupRegex)) {
+        final group = g.trim();
+        if (group.isNotEmpty) groups.add(group);
       }
     }
     return ['全部', ...groups.toList()..sort(), '失效'];
@@ -112,7 +116,15 @@ class _SourceListViewState extends State<SourceListView> {
     if (activeGroup == '失效') {
       return sources.where((s) => !s.enabled).toList();
     }
-    return sources.where((s) => s.bookSourceGroup == activeGroup).toList();
+    return sources.where((s) {
+      final raw = s.bookSourceGroup;
+      if (raw == null || raw.trim().isEmpty) return false;
+      return raw
+          .split(_splitGroupRegex)
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .contains(activeGroup);
+    }).toList();
   }
 
   Widget _buildGroupFilter(List<String> groups, String activeGroup) {

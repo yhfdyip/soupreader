@@ -18,6 +18,9 @@ class RuleParserEngine {
     },
   ));
 
+  static final RegExp _httpHeaderTokenRegex =
+      RegExp(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$");
+
   Map<String, String> _parseRequestHeaders(String? header) {
     if (header == null) return const {};
     final raw = header.trim();
@@ -34,12 +37,34 @@ class RuleParserEngine {
             final key = k.toString().trim();
             if (key.isEmpty) return;
             if (v == null) return;
-            m[key] = v.toString();
+            if (_httpHeaderTokenRegex.hasMatch(key)) {
+              m[key] = v.toString();
+            }
           });
           return m;
         }
       } catch (_) {
-        // fallthrough: try "key:value" lines below
+        // fallthrough: try other formats below
+      }
+
+      // 一些导入/编辑路径可能把 Map 变成 Dart 的 toString 形式：
+      // {User-Agent: xxx, Referer: yyy}
+      // 这种不是 JSON，但我们也尽量解析，避免直接崩溃。
+      final inner = raw.substring(1, raw.length - 1).trim();
+      if (inner.isNotEmpty && !inner.contains('"')) {
+        final m = <String, String>{};
+        for (final part in inner.split(',')) {
+          final p = part.trim();
+          if (p.isEmpty) continue;
+          final idx = p.indexOf(':');
+          if (idx <= 0) continue;
+          final key = p.substring(0, idx).trim();
+          final value = p.substring(idx + 1).trim();
+          if (key.isEmpty) continue;
+          if (!_httpHeaderTokenRegex.hasMatch(key)) continue;
+          m[key] = value;
+        }
+        if (m.isNotEmpty) return m;
       }
     }
 
@@ -53,6 +78,7 @@ class RuleParserEngine {
       final key = trimmed.substring(0, idx).trim();
       final value = trimmed.substring(idx + 1).trim();
       if (key.isEmpty) continue;
+      if (!_httpHeaderTokenRegex.hasMatch(key)) continue;
       headers[key] = value;
     }
     return headers;
