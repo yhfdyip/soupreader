@@ -47,8 +47,7 @@
 - 方向：对用户隐藏，统一使用“垂直”
 - 动画时长：`pageAnimDuration`
 - 灵敏度：`pageTouchSlop`
-- 滚动无动画：`noAnimScrollPage`
-- 音量键/滚轮：`volumeKeyPage`、`mouseWheelPage`
+- 音量键：`volumeKeyPage`
 
 ### 更多
 

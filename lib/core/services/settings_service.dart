@@ -12,7 +12,6 @@ class SettingsService {
 
   static const String _keyReadingSettings = 'reading_settings';
   static const String _keyAppSettings = 'app_settings';
-  static const String _keyBookReadingSettingsPrefix = 'book_reading_settings_';
 
   late SharedPreferences _prefs;
   late ReadingSettings _readingSettings;
@@ -66,92 +65,11 @@ class SettingsService {
         json.encode(_readingSettings.toJson()),
       );
     }
-
-    final keys = _prefs
-        .getKeys()
-        .where((k) => k.startsWith(_keyBookReadingSettingsPrefix))
-        .toList(growable: false);
-    for (final key in keys) {
-      final bookId = key.substring(_keyBookReadingSettingsPrefix.length);
-      final settings = getBookReadingSettings(bookId);
-      if (settings == null) continue;
-      if (settings.pageDirection == target) continue;
-      await saveBookReadingSettings(
-        bookId,
-        settings.copyWith(pageDirection: target),
-      );
-    }
   }
 
   Future<void> saveReadingSettings(ReadingSettings settings) async {
     _readingSettings = settings;
     await _prefs.setString(_keyReadingSettings, json.encode(settings.toJson()));
-  }
-
-  String _bookReadingSettingsKey(String bookId) =>
-      '$_keyBookReadingSettingsPrefix$bookId';
-
-  bool hasBookReadingSettings(String bookId) {
-    final jsonStr = _prefs.getString(_bookReadingSettingsKey(bookId));
-    return jsonStr != null && jsonStr.trim().isNotEmpty;
-  }
-
-  ReadingSettings? getBookReadingSettings(String bookId) {
-    final jsonStr = _prefs.getString(_bookReadingSettingsKey(bookId));
-    if (jsonStr == null || jsonStr.trim().isEmpty) return null;
-    try {
-      final raw = json.decode(jsonStr);
-      if (raw is Map<String, dynamic>) {
-        return ReadingSettings.fromJson(raw);
-      }
-      if (raw is Map) {
-        return ReadingSettings.fromJson(
-          raw.map((key, value) => MapEntry('$key', value)),
-        );
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  ReadingSettings getEffectiveReadingSettingsForBook(String bookId) {
-    return getBookReadingSettings(bookId) ?? _readingSettings;
-  }
-
-  Future<void> saveBookReadingSettings(
-    String bookId,
-    ReadingSettings settings,
-  ) async {
-    await _prefs.setString(
-      _bookReadingSettingsKey(bookId),
-      json.encode(settings.toJson()),
-    );
-  }
-
-  Future<void> clearBookReadingSettings(String bookId) async {
-    await _prefs.remove(_bookReadingSettingsKey(bookId));
-  }
-
-  Map<String, ReadingSettings> exportAllBookReadingSettings() {
-    final result = <String, ReadingSettings>{};
-    for (final key in _prefs.getKeys()) {
-      if (!key.startsWith(_keyBookReadingSettingsPrefix)) continue;
-      final bookId = key.substring(_keyBookReadingSettingsPrefix.length);
-      final settings = getBookReadingSettings(bookId);
-      if (settings != null) {
-        result[bookId] = settings;
-      }
-    }
-    return result;
-  }
-
-  Future<void> clearAllBookReadingSettings() async {
-    final keys = _prefs
-        .getKeys()
-        .where((k) => k.startsWith(_keyBookReadingSettingsPrefix))
-        .toList(growable: false);
-    for (final key in keys) {
-      await _prefs.remove(key);
-    }
   }
 
   Future<void> saveAppSettings(AppSettings settings) async {

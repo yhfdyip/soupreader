@@ -59,7 +59,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // 阅读设置
   late ReadingSettings _settings;
-  bool _useBookReadingSettings = false;
 
   // UI 状态
   bool _showMenu = false;
@@ -119,9 +118,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _sourceRepo = SourceRepository(db);
     _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
-    _useBookReadingSettings =
-        _settingsService.hasBookReadingSettings(widget.bookId);
-    _settings = _settingsService.getEffectiveReadingSettingsForBook(widget.bookId);
+    _settings = _settingsService.readingSettings;
     _autoPager.setSpeed(_settings.autoReadSpeed);
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
@@ -467,76 +464,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           : AutoPagerMode.page);
     }
     _syncNativeBrightnessForSettings(oldSettings, newSettings);
-    if (_useBookReadingSettings) {
-      unawaited(
-        _settingsService.saveBookReadingSettings(widget.bookId, newSettings),
-      );
-    } else {
-      unawaited(_settingsService.saveReadingSettings(newSettings));
-    }
-  }
-
-  Future<void> _setUseBookReadingSettings(
-    bool enabled,
-    StateSetter setPopupState,
-  ) async {
-    if (enabled == _useBookReadingSettings) return;
-
-    if (enabled) {
-      // 开启：把当前“有效设置”（通常是全局）拷贝成“本书设置”
-      await _settingsService.saveBookReadingSettings(widget.bookId, _settings);
-      if (!mounted) return;
-      setState(() => _useBookReadingSettings = true);
-      setPopupState(() {});
-      return;
-    }
-
-    // 关闭：删除本书覆盖，回到全局默认
-    await _settingsService.clearBookReadingSettings(widget.bookId);
-    if (!mounted) return;
-    setState(() => _useBookReadingSettings = false);
-    _updateSettingsFromSheet(
-      setPopupState,
-      _settingsService.readingSettings,
-    );
-  }
-
-  Future<void> _applyGlobalToBook(StateSetter setPopupState) async {
-    if (!_useBookReadingSettings) return;
-    final global = _settingsService.readingSettings;
-    await _settingsService.saveBookReadingSettings(widget.bookId, global);
-    if (!mounted) return;
-    _updateSettingsFromSheet(setPopupState, global);
-  }
-
-  Future<void> _applyCurrentToGlobal(StateSetter setPopupState) async {
-    // 把当前（可能是本书）设置写回全局默认
-    await _settingsService.saveReadingSettings(_settings);
-    if (!mounted) return;
-    if (_useBookReadingSettings) {
-      // 提示用户：当前仍处于“本书独立”，继续编辑不会影响全局
-      setPopupState(() {});
-      _showToast('已保存为全局默认（当前仍在编辑本书设置）');
-    } else {
-      _showToast('已保存为全局默认');
-    }
-  }
-
-  void _showToast(String message) {
-    if (!mounted) return;
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text('\n$message'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('好'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
+    unawaited(_settingsService.saveReadingSettings(newSettings));
   }
 
   /// 获取当前主题
@@ -616,7 +544,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
-    if (!_settings.mouseWheelPage) return;
     if (_showMenu || _showAutoReadPanel) return;
     if (_settings.pageTurnMode == PageTurnMode.scroll) return;
     if (event is PointerScrollEvent) {
@@ -725,15 +652,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final clampedOffset = targetOffset
         .clamp(0.0, _scrollController.position.maxScrollExtent)
         .toDouble();
-    if (_settings.noAnimScrollPage) {
-      _scrollController.jumpTo(clampedOffset);
-    } else {
-      _scrollController.animateTo(
-        clampedOffset,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
-    }
+    _scrollController.animateTo(
+      clampedOffset,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   /// 获取当前时间字符串
@@ -1492,11 +1415,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildSettingsScopeHeader(setPopupState),
-                ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _buildSettingsTabs(
                     selectedTab,
                     (value) {
@@ -1519,125 +1437,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Widget _buildSettingsScopeHeader(StateSetter setPopupState) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white10,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  '设置范围',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text(
-                _useBookReadingSettings ? '本书设置' : '全局默认',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  '本书独立设置',
-                  style: TextStyle(color: Colors.white, fontSize: 14),
-                ),
-              ),
-              CupertinoSwitch(
-                value: _useBookReadingSettings,
-                activeTrackColor: CupertinoColors.activeBlue,
-                onChanged: (value) {
-                  if (!value) {
-                    unawaited(_confirmDisableBookSettings(setPopupState));
-                    return;
-                  }
-                  unawaited(_setUseBookReadingSettings(true, setPopupState));
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: CupertinoButton(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  color: Colors.white12,
-                  borderRadius: BorderRadius.circular(10),
-                  onPressed: () => unawaited(_applyCurrentToGlobal(setPopupState)),
-                  child: const Text(
-                    '保存为全局默认',
-                    style: TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: CupertinoButton(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  color: _useBookReadingSettings ? Colors.white12 : Colors.white10,
-                  borderRadius: BorderRadius.circular(10),
-                  onPressed: _useBookReadingSettings
-                      ? () => unawaited(_confirmApplyGlobalToBook(setPopupState))
-                      : null,
-                  child: Text(
-                    '全局覆盖本书',
-                    style: TextStyle(
-                      color: _useBookReadingSettings
-                          ? Colors.white
-                          : Colors.white38,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _confirmDisableBookSettings(StateSetter setPopupState) async {
-    final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('关闭本书独立设置？'),
-        content: const Text('\n关闭后将回到全局默认，本书独立设置会被清除。'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('取消'),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            child: const Text('关闭'),
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) {
-      setPopupState(() {});
-      return;
-    }
-    await _setUseBookReadingSettings(false, setPopupState);
-  }
 
   Widget _buildSettingsTabs(int selectedTab, ValueChanged<int> onChanged) {
     Widget buildTab(String label, bool isSelected) {
@@ -2772,7 +2571,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
           _buildSettingsCard(
-            title: '按键与滚轮',
+            title: '按键',
             child: Column(
               children: [
                 _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
@@ -2781,26 +2580,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(volumeKeyPage: value),
                   );
                 }),
-                _buildSwitchRow('鼠标滚轮翻页', _settings.mouseWheelPage, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(mouseWheelPage: value),
-                  );
-                }),
               ],
-            ),
-          ),
-          _buildSettingsCard(
-            title: '滚动模式',
-            child: _buildSwitchRow(
-              '无动画翻页',
-              _settings.noAnimScrollPage,
-              (value) {
-                _updateSettingsFromSheet(
-                  setPopupState,
-                  _settings.copyWith(noAnimScrollPage: value),
-                );
-              },
             ),
           ),
           const SizedBox(height: 12),
@@ -3055,29 +2835,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         ],
       ),
     );
-  }
-
-  Future<void> _confirmApplyGlobalToBook(StateSetter setPopupState) async {
-    final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('确认覆盖本书设置？'),
-        content: const Text('\n将使用全局默认覆盖当前书籍的阅读设置。'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('取消'),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: const Text('应用'),
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    await _applyGlobalToBook(setPopupState);
   }
 
   void _updateSettingsFromSheet(

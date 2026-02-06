@@ -45,10 +45,8 @@ class ReadingSettings {
   // === 翻页动画增强 ===
   final int pageAnimDuration; // 翻页动画时长 (100-600ms)
   final PageDirection pageDirection; // 翻页方向 (水平/垂直)
-  final bool noAnimScrollPage; // 滚动模式无动画翻页
   final int pageTouchSlop; // 翻页触发灵敏度 (0-100, 百分比)
   final bool volumeKeyPage; // 音量键翻页
-  final bool mouseWheelPage; // 鼠标滚轮翻页
 
   // === 页眉/页脚配置 ===
   final bool hideHeader; // 隐藏页眉
@@ -106,10 +104,8 @@ class ReadingSettings {
     this.pageAnimDuration = 300,
     // 对标专业阅读器：翻页方向默认更符合“上下”阅读习惯（尤其在滚动/连贯阅读场景）
     this.pageDirection = PageDirection.vertical,
-    this.noAnimScrollPage = false,
     this.pageTouchSlop = 25,
     this.volumeKeyPage = false,
-    this.mouseWheelPage = true,
     // 页眉/页脚配置默认值
     this.hideHeader = false,
     this.hideFooter = false,
@@ -186,10 +182,8 @@ class ReadingSettings {
       pageAnimDuration: json['pageAnimDuration'] as int? ?? 300,
       pageDirection: PageDirection.values[
           json['pageDirection'] as int? ?? PageDirection.vertical.index],
-      noAnimScrollPage: json['noAnimScrollPage'] as bool? ?? false,
       pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
       volumeKeyPage: json['volumeKeyPage'] as bool? ?? false,
-      mouseWheelPage: json['mouseWheelPage'] as bool? ?? true,
       // 页眉/页脚配置
       hideHeader: json['hideHeader'] as bool? ?? false,
       hideFooter: json['hideFooter'] as bool? ?? false,
@@ -244,10 +238,8 @@ class ReadingSettings {
       // 翻页动画增强
       'pageAnimDuration': pageAnimDuration,
       'pageDirection': pageDirection.index,
-      'noAnimScrollPage': noAnimScrollPage,
       'pageTouchSlop': pageTouchSlop,
       'volumeKeyPage': volumeKeyPage,
-      'mouseWheelPage': mouseWheelPage,
       // 页眉/页脚配置
       'hideHeader': hideHeader,
       'hideFooter': hideFooter,
@@ -301,10 +293,8 @@ class ReadingSettings {
     // 翻页动画增强
     int? pageAnimDuration,
     PageDirection? pageDirection,
-    bool? noAnimScrollPage,
     int? pageTouchSlop,
     bool? volumeKeyPage,
-    bool? mouseWheelPage,
     // 页眉/页脚配置
     bool? hideHeader,
     bool? hideFooter,
@@ -356,10 +346,8 @@ class ReadingSettings {
       // 翻页动画增强
       pageAnimDuration: pageAnimDuration ?? this.pageAnimDuration,
       pageDirection: pageDirection ?? this.pageDirection,
-      noAnimScrollPage: noAnimScrollPage ?? this.noAnimScrollPage,
       pageTouchSlop: pageTouchSlop ?? this.pageTouchSlop,
       volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
-      mouseWheelPage: mouseWheelPage ?? this.mouseWheelPage,
       // 页眉/页脚配置
       hideHeader: hideHeader ?? this.hideHeader,
       hideFooter: hideFooter ?? this.hideFooter,

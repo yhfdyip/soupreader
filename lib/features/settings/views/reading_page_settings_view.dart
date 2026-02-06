@@ -45,13 +45,6 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                   trailing: const CupertinoListTileChevron(),
                   onTap: () => _pickAnimDuration(),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('滚动模式无动画翻页'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.noAnimScrollPage,
-                    onChanged: (v) => _update(_settings.copyWith(noAnimScrollPage: v)),
-                  ),
-                ),
               ],
             ),
             CupertinoListSection.insetGrouped(
@@ -68,13 +61,6 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                   trailing: CupertinoSwitch(
                     value: _settings.volumeKeyPage,
                     onChanged: (v) => _update(_settings.copyWith(volumeKeyPage: v)),
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('鼠标滚轮翻页'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.mouseWheelPage,
-                    onChanged: (v) => _update(_settings.copyWith(mouseWheelPage: v)),
                   ),
                 ),
               ],

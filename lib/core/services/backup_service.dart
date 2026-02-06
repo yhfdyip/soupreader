@@ -106,7 +106,6 @@ class BackupService {
 
       if (overwrite) {
         await _db.clearAll();
-        await _settingsService.clearAllBookReadingSettings();
       }
 
       final settings = map['settings'];
@@ -133,27 +132,6 @@ class BackupService {
               readingSettings.map((k, v) => MapEntry('$k', v)),
             ),
           );
-        }
-      }
-
-      final bookReadingSettings = map['bookReadingSettings'];
-      if (bookReadingSettings is Map) {
-        for (final entry in bookReadingSettings.entries) {
-          final bookId = '${entry.key}';
-          final value = entry.value;
-          if (value is Map<String, dynamic>) {
-            await _settingsService.saveBookReadingSettings(
-              bookId,
-              ReadingSettings.fromJson(value),
-            );
-          } else if (value is Map) {
-            await _settingsService.saveBookReadingSettings(
-              bookId,
-              ReadingSettings.fromJson(
-                value.map((k, v) => MapEntry('$k', v)),
-              ),
-            );
-          }
         }
       }
 
@@ -223,9 +201,6 @@ class BackupService {
   Map<String, dynamic> _buildBackupData({required bool includeOnlineCache}) {
     final books = _bookRepo.getAllBooks();
     final sources = _sourceRepo.getAllSources();
-    final bookReadingSettings = _settingsService
-        .exportAllBookReadingSettings()
-        .map((key, value) => MapEntry(key, value.toJson()));
 
     final localBookIds = books.where((b) => b.isLocal).map((b) => b.id).toSet();
     final allChapters = <Chapter>[];
@@ -253,7 +228,6 @@ class BackupService {
         'appSettings': _settingsService.appSettings.toJson(),
         'readingSettings': _settingsService.readingSettings.toJson(),
       },
-      'bookReadingSettings': bookReadingSettings,
       'sources': sources.map((s) => s.toJson()).toList(),
       'books': books.map((b) => b.toJson()).toList(),
       'chapters': allChapters.map((c) => c.toJson()).toList(),
