@@ -9,6 +9,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
+import '../services/source_debug_export_service.dart';
 import 'source_debug_text_view.dart';
 
 class SourceEditView extends StatefulWidget {
@@ -62,6 +63,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final DatabaseService _db;
   late final SourceRepository _repo;
   final RuleParserEngine _engine = RuleParserEngine();
+  final SourceDebugExportService _debugExportService = SourceDebugExportService();
 
   int _tab = 0; // 0 基础 1 规则 2 JSON 3 调试
 
@@ -132,7 +134,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   bool _debugLoading = false;
   String? _debugError;
   final List<_DebugLine> _debugLines = <_DebugLine>[];
-  int _debugConsoleMode = 0; // 0 文本 1 逐行
+  int _debugConsoleMode = 0; // 0 分段 1 文本 2 逐行
+  final Set<int> _expandedDebugBlocks = <int>{};
   String? _debugListSrcHtml; // state=10（搜索/发现列表页）
   String? _debugBookSrcHtml; // state=20（详情页）
   String? _debugTocSrcHtml; // state=30（目录页）
@@ -719,6 +722,12 @@ class _SourceEditViewState extends State<SourceEditView> {
               onTap: _debugLoading ? null : _startLegadoStyleDebug,
             ),
             CupertinoListTile.notched(
+              title: const Text('导出调试包'),
+              subtitle: const Text('包含：控制台、书源 JSON、源码、正文结果'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _debugLines.isEmpty ? null : _showExportDebugBundleSheet,
+            ),
+            CupertinoListTile.notched(
               title: const Text('清空控制台'),
               trailing: const CupertinoListTileChevron(),
               onTap: _clearDebugConsole,
@@ -888,7 +897,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   Widget _buildDebugConsoleSection() {
     final hasLines = _debugLines.isNotEmpty;
     final mode = _debugConsoleMode;
-    final modeLabel = mode == 0 ? '文本' : '逐行';
+    final modeLabel = mode == 0 ? '分段' : mode == 1 ? '文本' : '逐行';
     final allText = hasLines ? _debugLines.map((e) => e.text).join('\n') : '';
 
     final children = <Widget>[
@@ -897,8 +906,9 @@ class _SourceEditViewState extends State<SourceEditView> {
         subtitle: CupertinoSlidingSegmentedControl<int>(
           groupValue: _debugConsoleMode,
           children: const {
-            0: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('文本')),
-            1: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('逐行')),
+            0: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('分段')),
+            1: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('文本')),
+            2: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('逐行')),
           },
           onValueChanged: (v) {
             if (v == null) return;
@@ -926,7 +936,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       );
     }
 
-    if (mode == 0) {
+    if (mode == 1) {
       const previewLines = 40;
       final preview = _debugLines.length <= previewLines
           ? allText
@@ -951,7 +961,7 @@ class _SourceEditViewState extends State<SourceEditView> {
           onTap: () => _openDebugText(title: '控制台', text: allText),
         ),
       );
-    } else {
+    } else if (mode == 2) {
       for (final line in _debugLines) {
         if (line.text.trim().isEmpty) continue;
         final color = line.state == -1
@@ -986,6 +996,70 @@ class _SourceEditViewState extends State<SourceEditView> {
           ),
         );
       }
+    } else {
+      final blocks = _buildDebugBlocks();
+      for (var i = 0; i < blocks.length; i++) {
+        final block = blocks[i];
+        final expanded = _expandedDebugBlocks.contains(i);
+
+        final statusColor = block.hasError
+            ? CupertinoColors.systemRed.resolveFrom(context)
+            : CupertinoColors.secondaryLabel.resolveFrom(context);
+
+        children.add(
+          CupertinoListTile.notched(
+            title: Text(block.titlePlain),
+            subtitle: Text(
+              block.summary ?? '—',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.0,
+                color: statusColor,
+              ),
+            ),
+            trailing: Icon(
+              expanded
+                  ? CupertinoIcons.chevron_down
+                  : CupertinoIcons.chevron_right,
+              size: 16,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+            onTap: () {
+              setState(() {
+                if (expanded) {
+                  _expandedDebugBlocks.remove(i);
+                } else {
+                  _expandedDebugBlocks.add(i);
+                }
+              });
+            },
+          ),
+        );
+
+        if (expanded) {
+          final preview = block.previewText(maxLines: 18);
+          children.add(
+            CupertinoListTile.notched(
+              title: const Text('内容预览'),
+              subtitle: Text(
+                preview,
+                maxLines: 18,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12.5,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+              trailing: const CupertinoListTileChevron(),
+              onTap: () =>
+                  _openDebugText(title: '日志分段', text: block.fullText),
+            ),
+          );
+        }
+      }
     }
 
     return CupertinoListSection.insetGrouped(
@@ -997,6 +1071,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   void _clearDebugConsole() {
     setState(() {
       _debugLines.clear();
+      _expandedDebugBlocks.clear();
       _debugError = null;
       _debugListSrcHtml = null;
       _debugBookSrcHtml = null;
@@ -1014,6 +1089,111 @@ class _SourceEditViewState extends State<SourceEditView> {
     final text = _debugLines.map((e) => e.text).join('\n');
     Clipboard.setData(ClipboardData(text: text));
     _showMessage('已复制全部日志');
+  }
+
+  Map<String, dynamic> _buildDebugBundle({required bool includeRawSources}) {
+    final now = DateTime.now().toIso8601String();
+    final consoleText = _debugLines.map((e) => e.text).join('\n');
+    final lines = _debugLines
+        .map((e) => <String, dynamic>{'state': e.state, 'text': e.text})
+        .toList(growable: false);
+
+    final bundle = <String, dynamic>{
+      'type': 'soupreader_debug_bundle',
+      'version': 1,
+      'createdAt': now,
+      'debugKey': _debugKeyCtrl.text.trim(),
+      'error': _debugError,
+      'sourceJson': _jsonCtrl.text,
+      'consoleText': consoleText,
+      'consoleLines': lines,
+    };
+
+    if (includeRawSources) {
+      bundle['rawSources'] = <String, dynamic>{
+        'listHtml': _debugListSrcHtml,
+        'bookHtml': _debugBookSrcHtml,
+        'tocHtml': _debugTocSrcHtml,
+        'contentHtml': _debugContentSrcHtml,
+        'contentResult': _debugContentResult,
+      };
+    }
+
+    return bundle;
+  }
+
+  Future<void> _showExportDebugBundleSheet() async {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('导出调试包'),
+        message: const Text('调试包可能很大，建议优先保存到文件。'),
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('复制调试包（不含源码，推荐）'),
+            onPressed: () {
+              Navigator.pop(context);
+              final bundle = _buildDebugBundle(includeRawSources: false);
+              final json = _prettyJson(LegadoJson.encode(bundle));
+              Clipboard.setData(ClipboardData(text: json));
+              _showMessage('已复制调试包（不含源码）');
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('保存调试包到文件（含源码）'),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _exportDebugBundleToFile();
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportDebugBundleToFile() async {
+    final bundle = _buildDebugBundle(includeRawSources: true);
+    final json = _prettyJson(LegadoJson.encode(bundle));
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final fileName = 'soupreader_debug_bundle_$ts.json';
+
+    final ok = await _debugExportService.exportJsonToFile(
+      json: json,
+      fileName: fileName,
+    );
+    if (!mounted) return;
+    _showMessage(ok ? '已导出：$fileName' : '导出取消或失败');
+  }
+
+  List<_DebugBlock> _buildDebugBlocks() {
+    final blocks = <_DebugBlock>[];
+    _DebugBlock? current;
+
+    String stripTimePrefix(String text) {
+      final t = text.trimLeft();
+      if (!t.startsWith('[')) return text;
+      final idx = t.indexOf('] ');
+      if (idx < 0) return text;
+      return t.substring(idx + 2);
+    }
+
+    for (final line in _debugLines) {
+      final plain = stripTimePrefix(line.text).trimLeft();
+      if (plain.startsWith('︾')) {
+        current = _DebugBlock(title: line.text);
+        blocks.add(current);
+      }
+      (current ??= _DebugBlock(title: '日志')).lines.add(line);
+    }
+
+    for (final b in blocks) {
+      b.updateComputed();
+    }
+    return blocks;
   }
 
   Map<String, dynamic>? _buildPatchedJsonForDebug() {
@@ -1611,4 +1791,79 @@ class _DebugLine {
     required this.state,
     required this.text,
   });
+}
+
+class _DebugBlock {
+  final String title;
+  final List<_DebugLine> lines = <_DebugLine>[];
+
+  bool hasError = false;
+  String? summary;
+
+  _DebugBlock({required this.title});
+
+  String _stripTimePrefix(String text) {
+    final t = text.trimLeft();
+    if (!t.startsWith('[')) return text;
+    final idx = t.indexOf('] ');
+    if (idx < 0) return text;
+    return t.substring(idx + 2);
+  }
+
+  String get titlePlain {
+    final plain = _stripTimePrefix(title).trim();
+    return plain.isEmpty ? '日志' : plain;
+  }
+
+  String get fullText => lines.map((e) => e.text).join('\n');
+
+  String previewText({required int maxLines}) {
+    if (maxLines <= 0) return '';
+    final nonEmpty = lines
+        .map((e) => e.text)
+        .where((e) => e.trim().isNotEmpty)
+        .toList(growable: false);
+    if (nonEmpty.isEmpty) return '';
+    final start = nonEmpty.length > maxLines ? nonEmpty.length - maxLines : 0;
+    return nonEmpty.sublist(start).join('\n');
+  }
+
+  void updateComputed() {
+    hasError = lines.any((e) => e.state == -1);
+    summary = _buildSummary();
+  }
+
+  String? _buildSummary() {
+    final plain = lines
+        .map((e) => _stripTimePrefix(e.text).trimRight())
+        .where((e) => e.trim().isNotEmpty)
+        .toList(growable: false);
+    if (plain.isEmpty) return null;
+
+    String? firstWhere(bool Function(String s) test) {
+      for (final s in plain) {
+        if (test(s)) return s;
+      }
+      return null;
+    }
+
+    String? lastWhere(bool Function(String s) test) {
+      for (var i = plain.length - 1; i >= 0; i--) {
+        final s = plain[i];
+        if (test(s)) return s;
+      }
+      return null;
+    }
+
+    final errorDetail = firstWhere(
+      (s) => s.contains('DioException') || s.contains('HTTP 状态码异常'),
+    );
+    if (hasError && errorDetail != null) return errorDetail;
+
+    final requestLine = lastWhere((s) => s.startsWith('≡'));
+    if (requestLine != null) return requestLine;
+
+    final anyLine = lastWhere((s) => s.startsWith('└') || s.startsWith('◇'));
+    return anyLine ?? plain.first;
+  }
 }
