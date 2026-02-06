@@ -944,14 +944,147 @@ class _SourceEditViewState extends State<SourceEditView> {
     _showMessage('已复制全部日志');
   }
 
+  Map<String, dynamic>? _buildPatchedJsonForDebug() {
+    final base = _tryDecodeJsonMap(_jsonCtrl.text);
+    if (base == null) return null;
+
+    Map<String, dynamic> ensureMap(dynamic raw) {
+      if (raw is Map<String, dynamic>) return Map<String, dynamic>.from(raw);
+      if (raw is Map) {
+        return raw.map((key, value) => MapEntry('$key', value));
+      }
+      return <String, dynamic>{};
+    }
+
+    final map = ensureMap(base);
+
+    String? nonEmpty(TextEditingController ctrl, {bool trimValue = true}) {
+      final raw = ctrl.text;
+      if (raw.trim().isEmpty) return null;
+      return trimValue ? raw.trim() : raw;
+    }
+
+    void setIfNonEmpty(
+      String key,
+      TextEditingController ctrl, {
+      bool trimValue = true,
+    }) {
+      final v = nonEmpty(ctrl, trimValue: trimValue);
+      if (v != null) map[key] = v;
+    }
+
+    void setIntIfParsable(String key, TextEditingController ctrl) {
+      final t = ctrl.text.trim();
+      if (t.isEmpty) return;
+      final v = int.tryParse(t);
+      if (v != null) map[key] = v;
+    }
+
+    // 基础字段：仅在表单非空时覆盖，避免“调试前同步”把 JSON 里的字段删空。
+    setIfNonEmpty('bookSourceName', _nameCtrl);
+    setIfNonEmpty('bookSourceUrl', _urlCtrl);
+    setIfNonEmpty('bookSourceGroup', _groupCtrl);
+    setIntIfParsable('bookSourceType', _typeCtrl);
+    setIntIfParsable('customOrder', _customOrderCtrl);
+    setIntIfParsable('weight', _weightCtrl);
+    setIntIfParsable('respondTime', _respondTimeCtrl);
+    map['enabled'] = _enabled;
+    map['enabledExplore'] = _enabledExplore;
+    map['enabledCookieJar'] = _enabledCookieJar;
+    setIfNonEmpty('concurrentRate', _concurrentRateCtrl);
+    setIfNonEmpty('bookUrlPattern', _bookUrlPatternCtrl);
+    setIfNonEmpty('jsLib', _jsLibCtrl, trimValue: false);
+    setIfNonEmpty('header', _headerCtrl, trimValue: false);
+    setIfNonEmpty('loginUrl', _loginUrlCtrl);
+    setIfNonEmpty('loginUi', _loginUiCtrl, trimValue: false);
+    setIfNonEmpty('loginCheckJs', _loginCheckJsCtrl, trimValue: false);
+    setIfNonEmpty('coverDecodeJs', _coverDecodeJsCtrl, trimValue: false);
+    setIfNonEmpty('bookSourceComment', _bookSourceCommentCtrl, trimValue: false);
+    setIfNonEmpty('variableComment', _variableCommentCtrl, trimValue: false);
+    setIfNonEmpty('searchUrl', _searchUrlCtrl);
+    setIfNonEmpty('exploreUrl', _exploreUrlCtrl);
+    setIfNonEmpty('exploreScreen', _exploreScreenCtrl);
+
+    Map<String, dynamic> patchRule(
+      String key,
+      Map<String, TextEditingController> updates, {
+      Set<String> noTrimKeys = const {},
+    }) {
+      final rule = ensureMap(map[key]);
+      for (final entry in updates.entries) {
+        final fieldKey = entry.key;
+        final ctrl = entry.value;
+        final v = nonEmpty(ctrl, trimValue: !noTrimKeys.contains(fieldKey));
+        if (v != null) rule[fieldKey] = v;
+      }
+      return rule;
+    }
+
+    map['ruleSearch'] = patchRule('ruleSearch', {
+      'checkKeyWord': _searchCheckKeyWordCtrl,
+      'bookList': _searchBookListCtrl,
+      'name': _searchNameCtrl,
+      'author': _searchAuthorCtrl,
+      'bookUrl': _searchBookUrlCtrl,
+      'coverUrl': _searchCoverUrlCtrl,
+      'intro': _searchIntroCtrl,
+      'lastChapter': _searchLastChapterCtrl,
+    });
+
+    map['ruleExplore'] = patchRule('ruleExplore', {
+      'bookList': _exploreBookListCtrl,
+      'name': _exploreNameCtrl,
+      'author': _exploreAuthorCtrl,
+      'bookUrl': _exploreBookUrlCtrl,
+      'coverUrl': _exploreCoverUrlCtrl,
+      'intro': _exploreIntroCtrl,
+      'lastChapter': _exploreLastChapterCtrl,
+    });
+
+    map['ruleBookInfo'] = patchRule(
+      'ruleBookInfo',
+      {
+        'init': _infoInitCtrl,
+        'name': _infoNameCtrl,
+        'author': _infoAuthorCtrl,
+        'coverUrl': _infoCoverUrlCtrl,
+        'tocUrl': _infoTocUrlCtrl,
+        'lastChapter': _infoLastChapterCtrl,
+        'intro': _infoIntroCtrl,
+      },
+      noTrimKeys: {'intro'},
+    );
+
+    map['ruleToc'] = patchRule('ruleToc', {
+      'chapterList': _tocChapterListCtrl,
+      'chapterName': _tocChapterNameCtrl,
+      'chapterUrl': _tocChapterUrlCtrl,
+    });
+
+    map['ruleContent'] = patchRule(
+      'ruleContent',
+      {
+        'title': _contentTitleCtrl,
+        'content': _contentContentCtrl,
+        'replaceRegex': _contentReplaceRegexCtrl,
+      },
+      noTrimKeys: {'content', 'replaceRegex'},
+    );
+
+    return map;
+  }
+
   Future<void> _startLegadoStyleDebug() async {
-    _syncFieldsToJson(switchToJsonTab: false);
-    final map = _tryDecodeJsonMap(_jsonCtrl.text);
+    final map = _buildPatchedJsonForDebug();
     if (map == null) {
       setState(() => _debugError = 'JSON 格式错误');
       return;
     }
     final source = BookSource.fromJson(map);
+    if (source.bookSourceUrl.trim().isEmpty) {
+      setState(() => _debugError = 'bookSourceUrl 不能为空（否则无法构建请求地址）');
+      return;
+    }
     final key = _debugKeyCtrl.text.trim();
     if (key.isEmpty) {
       setState(() => _debugError = '请输入 key');
@@ -1025,7 +1158,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       }
 
       if (event.state == -1) {
-        _debugError = _debugError ?? '调试中断（错误）';
+        _debugError = event.message;
       }
     });
   }
