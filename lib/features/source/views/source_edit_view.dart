@@ -11,6 +11,7 @@ import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
 import '../services/source_debug_export_service.dart';
 import 'source_debug_text_view.dart';
+import 'source_web_verify_view.dart';
 
 class SourceEditView extends StatefulWidget {
   final String? originalUrl;
@@ -723,6 +724,12 @@ class _SourceEditViewState extends State<SourceEditView> {
               onTap: _debugLoading ? null : _startLegadoStyleDebug,
             ),
             CupertinoListTile.notched(
+              title: const Text('网页验证（Cloudflare）'),
+              subtitle: const Text('打开 WebView 完成人机验证，然后导入 Cookie'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _openWebVerify,
+            ),
+            CupertinoListTile.notched(
               title: const Text('导出调试包'),
               subtitle: const Text('包含：控制台、书源 JSON、源码、正文结果'),
               trailing: const CupertinoListTileChevron(),
@@ -758,6 +765,69 @@ class _SourceEditViewState extends State<SourceEditView> {
         _buildDebugConsoleSection(),
       ],
     );
+  }
+
+  void _openWebVerify() {
+    final map = _buildPatchedJsonForDebug();
+    if (map == null) {
+      _showMessage('JSON 格式错误');
+      return;
+    }
+    final source = BookSource.fromJson(map);
+    if (source.bookSourceUrl.trim().isEmpty) {
+      _showMessage('bookSourceUrl 不能为空');
+      return;
+    }
+
+    final key = _debugKeyCtrl.text.trim();
+    final url = _resolveWebVerifyUrl(source: source, key: key);
+    Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceWebVerifyView(initialUrl: url),
+      ),
+    );
+  }
+
+  String _resolveWebVerifyUrl({
+    required BookSource source,
+    required String key,
+  }) {
+    String abs(String url) {
+      final t = url.trim();
+      if (t.startsWith('http://') || t.startsWith('https://')) return t;
+      if (t.startsWith('//')) return 'https:$t';
+      if (t.startsWith('/')) {
+        final uri = Uri.parse(source.bookSourceUrl);
+        return '${uri.scheme}://${uri.host}$t';
+      }
+      return '${source.bookSourceUrl}$t';
+    }
+
+    String buildSearchUrl(String template, String keyword) {
+      var url = template;
+      final enc = Uri.encodeComponent(keyword);
+      url = url.replaceAll('{{key}}', enc);
+      url = url.replaceAll('{key}', enc);
+      url = url.replaceAll('{{searchKey}}', enc);
+      url = url.replaceAll('{searchKey}', enc);
+      return url;
+    }
+
+    if (key.isEmpty) return source.bookSourceUrl;
+    if (key.startsWith('http://') || key.startsWith('https://')) return key;
+    if (key.contains('::')) {
+      final idx = key.indexOf('::');
+      final url = key.substring(idx + 2).trim();
+      return abs(url);
+    }
+    if (key.startsWith('++') || key.startsWith('--')) {
+      final url = key.substring(2).trim();
+      return abs(url);
+    }
+    if (source.searchUrl != null && source.searchUrl!.trim().isNotEmpty) {
+      return abs(buildSearchUrl(source.searchUrl!.trim(), key));
+    }
+    return source.bookSourceUrl;
   }
 
   Widget _buildDebugQuickActionsSection() {

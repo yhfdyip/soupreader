@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import WebKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -45,6 +46,78 @@ import UIKit
             self.originalBrightness = nil
           }
           result(nil)
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let cookiesChannel = FlutterMethodChannel(
+        name: "soupreader/webview_cookies",
+        binaryMessenger: controller.binaryMessenger
+      )
+
+      cookiesChannel.setMethodCallHandler { call, result in
+        let store = WKWebsiteDataStore.default().httpCookieStore
+
+        switch call.method {
+        case "getCookies":
+          guard let args = call.arguments as? [String: Any],
+                let domain = args["domain"] as? String
+          else {
+            result(FlutterError(code: "ARGUMENT_ERROR", message: "Missing domain", details: nil))
+            return
+          }
+          let includeSubdomains = args["includeSubdomains"] as? Bool ?? true
+          store.getAllCookies { cookies in
+            let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines)
+            let filtered = cookies.filter { cookie in
+              let d = cookie.domain.trimmingCharacters(in: .whitespacesAndNewlines)
+              if trimmed.isEmpty { return true }
+              if d == trimmed { return true }
+              if includeSubdomains {
+                if d.hasSuffix("." + trimmed) { return true }
+                if trimmed.hasSuffix("." + d) { return true }
+              }
+              return false
+            }
+
+            let out: [[String: Any]] = filtered.map { c in
+              var m: [String: Any] = [
+                "name": c.name,
+                "value": c.value,
+                "domain": c.domain,
+                "path": c.path,
+                "secure": c.isSecure,
+                "httpOnly": c.isHTTPOnly
+              ]
+              if let exp = c.expiresDate {
+                m["expiresMs"] = Int(exp.timeIntervalSince1970 * 1000.0)
+              }
+              return m
+            }
+            result(out)
+          }
+
+        case "clearAllCookies":
+          store.getAllCookies { cookies in
+            if cookies.isEmpty {
+              result(true)
+              return
+            }
+            let group = DispatchGroup()
+            for c in cookies {
+              group.enter()
+              store.delete(c) {
+                group.leave()
+              }
+            }
+            group.notify(queue: .main) {
+              result(true)
+            }
+          }
 
         default:
           result(FlutterMethodNotImplemented)

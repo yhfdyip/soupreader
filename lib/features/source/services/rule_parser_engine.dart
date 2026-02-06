@@ -19,7 +19,7 @@ class RuleParserEngine {
     'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
   };
 
-  late final Dio _dioPlain = Dio(
+  static final Dio _dioPlain = Dio(
     BaseOptions(
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
@@ -30,8 +30,8 @@ class RuleParserEngine {
     ),
   );
 
-  late final CookieJar _cookieJar = CookieJar();
-  late final Dio _dioCookie = Dio(
+  static final CookieJar _cookieJar = CookieJar();
+  static final Dio _dioCookie = Dio(
     BaseOptions(
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
@@ -44,6 +44,19 @@ class RuleParserEngine {
   Dio _selectDio({bool? enabledCookieJar}) {
     final enabled = enabledCookieJar ?? true;
     return enabled ? _dioCookie : _dioPlain;
+  }
+
+  static Future<void> saveCookiesForUrl(
+    String url,
+    List<Cookie> cookies,
+  ) async {
+    final uri = Uri.parse(url);
+    await _cookieJar.saveFromResponse(uri, cookies);
+  }
+
+  static Future<List<Cookie>> loadCookiesForUrl(String url) async {
+    final uri = Uri.parse(url);
+    return _cookieJar.loadForRequest(uri);
   }
 
   Map<String, String> _buildEffectiveRequestHeaders(
@@ -1701,6 +1714,20 @@ class RuleParserEngine {
       url,
       customHeaders: parsedHeaders.headers,
     );
+    final forLog = Map<String, String>.from(requestHeaders);
+    final cookieJarOn = enabledCookieJar ?? true;
+    if (cookieJarOn) {
+      try {
+        final cookies = await RuleParserEngine.loadCookiesForUrl(url);
+        if (cookies.isNotEmpty &&
+            !forLog.keys.any((k) => k.toLowerCase() == 'cookie')) {
+          forLog['Cookie'] =
+              cookies.map((c) => '${c.name}=${c.value}').join('; ');
+        }
+      } catch (_) {
+        // ignore cookie load failure
+      }
+    }
     try {
       final timeout =
           (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
@@ -1726,7 +1753,7 @@ class RuleParserEngine {
         elapsedMs: sw.elapsedMilliseconds,
         responseLength: body?.length ?? 0,
         responseSnippet: _snippet(body),
-        requestHeaders: requestHeaders,
+        requestHeaders: forLog,
         headersWarning: parsedHeaders.warning,
         responseHeaders: respHeaders,
         error: null,
@@ -1756,7 +1783,7 @@ class RuleParserEngine {
           elapsedMs: sw.elapsedMilliseconds,
           responseLength: body?.length ?? 0,
           responseSnippet: _snippet(body),
-          requestHeaders: requestHeaders,
+          requestHeaders: forLog,
           headersWarning: parsedHeaders.warning,
           responseHeaders: respHeaders,
           error: parts.join('：'),
@@ -1770,7 +1797,7 @@ class RuleParserEngine {
         elapsedMs: sw.elapsedMilliseconds,
         responseLength: 0,
         responseSnippet: null,
-        requestHeaders: requestHeaders,
+        requestHeaders: forLog,
         headersWarning: parsedHeaders.warning,
         responseHeaders: const <String, String>{},
         error: e.toString(),

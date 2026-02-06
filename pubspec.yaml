@@ -52,6 +52,7 @@ dependencies:
   battery_plus: ^7.0.0
   cookie_jar: ^4.0.8
   dio_cookie_manager: ^3.3.0
+  webview_flutter: ^4.13.1
 
 dev_dependencies:
   flutter_test:
