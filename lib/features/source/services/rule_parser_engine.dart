@@ -107,7 +107,12 @@ class RuleParserEngine {
     String redactIfSensitive(String key, String value) {
       final k = key.toLowerCase();
       if (k == 'cookie' || k == 'authorization') {
-        return '<redacted ${value.length} chars>';
+        // 调试需要“看得到差异”，但也避免整段泄露：只展示头尾片段。
+        final len = value.length;
+        if (len <= 160) return value;
+        final head = value.substring(0, 120);
+        final tail = value.substring(len - 40);
+        return '$head…$tail (len=$len)';
       }
       if (value.length <= 220) return value;
       return '${value.substring(0, 220)}…';
