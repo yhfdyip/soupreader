@@ -907,16 +907,26 @@ class _SourceEditViewState extends State<SourceEditView> {
         return CupertinoListTile.notched(
           title: Text(
             line.text,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 12.5,
               color: color,
             ),
           ),
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: line.text));
-            _showMessage('已复制该行日志');
-          },
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: line.text));
+              _showMessage('已复制该行日志');
+            },
+            child: const Icon(
+              CupertinoIcons.doc_on_doc,
+              size: 18,
+            ),
+          ),
+          onTap: () => _openDebugText(title: '日志', text: line.text),
         );
       }).toList(),
     );
@@ -1135,21 +1145,15 @@ class _SourceEditViewState extends State<SourceEditView> {
           case 40:
             _debugContentSrcHtml = event.message;
             break;
+          case 41:
+            _debugContentResult = event.message;
+            break;
         }
       });
       return;
     }
 
     setState(() {
-      // 从正文日志里粗略提取“清理后正文”，便于用户直接查看结果。
-      // 规则：遇到 “└\\n” 开头的正文输出时累积到 _debugContentResult。
-      if (event.message.contains('┌获取正文内容')) {
-        _debugContentResult = '';
-      } else if (event.message.contains('└\n') && _debugContentResult != null) {
-        final idx = event.message.indexOf('└\n');
-        _debugContentResult = event.message.substring(idx + 2).trimLeft();
-      }
-
       _debugLines.add(_DebugLine(state: event.state, text: event.message));
       // 防止日志无限增长
       const maxLines = 240;

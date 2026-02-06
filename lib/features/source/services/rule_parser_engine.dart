@@ -115,6 +115,10 @@ class RuleParserEngine {
       onEvent(SourceDebugEvent(state: state, message: html, isRaw: true));
     }
 
+    void rawText(int state, String text) {
+      onEvent(SourceDebugEvent(state: state, message: text, isRaw: true));
+    }
+
     bool isAbsUrl(String input) {
       final t = input.trim();
       return t.startsWith('http://') || t.startsWith('https://');
@@ -157,6 +161,7 @@ class RuleParserEngine {
           source: source,
           bookUrl: trimmed,
           fetchStage: fetchStage,
+          emitRaw: rawText,
           log: log,
         );
         if (!ok) return;
@@ -182,6 +187,7 @@ class RuleParserEngine {
           source: source,
           bookUrl: firstBookUrl,
           fetchStage: fetchStage,
+          emitRaw: rawText,
           log: log,
         );
         if (!ok) return;
@@ -196,6 +202,7 @@ class RuleParserEngine {
           source: source,
           tocUrl: url,
           fetchStage: fetchStage,
+          emitRaw: rawText,
           log: log,
         );
         if (!ok) return;
@@ -210,6 +217,7 @@ class RuleParserEngine {
           source: source,
           chapterUrl: url,
           fetchStage: fetchStage,
+          emitRaw: rawText,
           log: log,
         );
         if (!ok) return;
@@ -233,6 +241,7 @@ class RuleParserEngine {
         source: source,
         bookUrl: firstBookUrl,
         fetchStage: fetchStage,
+        emitRaw: rawText,
         log: log,
       );
       if (!ok) return;
@@ -348,6 +357,7 @@ class RuleParserEngine {
     required String bookUrl,
     required Future<FetchDebugResult> Function(String url, {required int rawState})
         fetchStage,
+    required void Function(int state, String payload) emitRaw,
     required void Function(String msg, {int state, bool showTime}) log,
   }) async {
     final tocUrl = await _debugBookInfo(
@@ -364,6 +374,7 @@ class RuleParserEngine {
       source: source,
       tocUrl: tocUrl,
       fetchStage: fetchStage,
+      emitRaw: emitRaw,
       log: log,
     );
   }
@@ -439,6 +450,7 @@ class RuleParserEngine {
     required String tocUrl,
     required Future<FetchDebugResult> Function(String url, {required int rawState})
         fetchStage,
+    required void Function(int state, String payload) emitRaw,
     required void Function(String msg, {int state, bool showTime}) log,
   }) async {
     log('︾开始解析目录页');
@@ -506,6 +518,7 @@ class RuleParserEngine {
       source: source,
       chapterUrl: toc.first.url,
       fetchStage: fetchStage,
+      emitRaw: emitRaw,
       log: log,
     );
   }
@@ -515,6 +528,7 @@ class RuleParserEngine {
     required String chapterUrl,
     required Future<FetchDebugResult> Function(String url, {required int rawState})
         fetchStage,
+    required void Function(int state, String payload) emitRaw,
     required void Function(String msg, {int state, bool showTime}) log,
   }) async {
     log('︾开始解析正文页');
@@ -553,6 +567,9 @@ class RuleParserEngine {
       processed = _applyReplaceRegex(processed, rule.replaceRegex!);
     }
     final cleaned = _cleanContent(processed);
+    // 额外缓存清理后的正文，便于 UI 查看全文（不依赖控制台截断）。
+    // state=41：正文结果（清理后）
+    emitRaw(41, cleaned);
 
     log('◇提取长度:${extracted.length} 清理后长度:${cleaned.length}');
     log('┌获取正文内容');
