@@ -8,6 +8,8 @@ import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fast_gbk/fast_gbk.dart';
 import 'package:flutter_js/flutter_js.dart';
+import 'package:json_path/json_path.dart';
+import 'package:xpath_selector_html_parser/xpath_selector_html_parser.dart';
 import '../../../core/utils/html_text_formatter.dart';
 import '../../../core/services/cookie_store.dart';
 
@@ -524,39 +526,81 @@ class RuleParserEngine {
       );
       if (response == null) return [];
 
-      // 解析结果
-      final document = html_parser.parse(response);
       final results = <SearchResult>[];
 
       // 获取书籍列表
       final bookListRule = searchRule.bookList ?? '';
-      final bookElements = _selectAllElementsByRule(document, bookListRule);
+      final trimmed = response.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(response)
+          : null;
 
-      for (final element in bookElements) {
-        var bookUrl =
-            _parseRule(element, searchRule.bookUrl, source.bookSourceUrl);
-        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-          bookUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
-        }
-        var coverUrl =
-            _parseRule(element, searchRule.coverUrl, source.bookSourceUrl);
-        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-          coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
-        }
-        final result = SearchResult(
-          name: _parseRule(element, searchRule.name, source.bookSourceUrl),
-          author: _parseRule(element, searchRule.author, source.bookSourceUrl),
-          coverUrl: coverUrl,
-          intro: _parseRule(element, searchRule.intro, source.bookSourceUrl),
-          lastChapter:
-              _parseRule(element, searchRule.lastChapter, source.bookSourceUrl),
-          bookUrl: bookUrl,
-          sourceUrl: source.bookSourceUrl,
-          sourceName: source.bookSourceName,
-        );
+      // JSONPath 模式（对标 legado：部分源直接返回 JSON）
+      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
+        final nodes = _selectJsonList(jsonRoot, bookListRule);
+        for (final node in nodes) {
+          final name = _parseValueOnNode(node, searchRule.name, searchUrl);
+          final author = _parseValueOnNode(node, searchRule.author, searchUrl);
+          final intro = _parseValueOnNode(node, searchRule.intro, searchUrl);
+          final lastChapter =
+              _parseValueOnNode(node, searchRule.lastChapter, searchUrl);
 
-        if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-          results.add(result);
+          var bookUrl = _parseValueOnNode(node, searchRule.bookUrl, searchUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(searchUrl, bookUrl);
+          }
+
+          var coverUrl =
+              _parseValueOnNode(node, searchRule.coverUrl, searchUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(searchUrl, coverUrl);
+          }
+
+          final result = SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
+        }
+      } else {
+        // HTML 模式
+        final document = html_parser.parse(response);
+        final bookElements = _selectAllElementsByRule(document, bookListRule);
+
+        for (final element in bookElements) {
+          var bookUrl = _parseRule(element, searchRule.bookUrl, searchUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(searchUrl, bookUrl);
+          }
+
+          var coverUrl = _parseRule(element, searchRule.coverUrl, searchUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(searchUrl, coverUrl);
+          }
+
+          final result = SearchResult(
+            name: _parseRule(element, searchRule.name, searchUrl),
+            author: _parseRule(element, searchRule.author, searchUrl),
+            coverUrl: coverUrl,
+            intro: _parseRule(element, searchRule.intro, searchUrl),
+            lastChapter: _parseRule(element, searchRule.lastChapter, searchUrl),
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
         }
       }
 
@@ -833,64 +877,129 @@ class RuleParserEngine {
       return null;
     }
 
-    final document = html_parser.parse(body);
     final listSelector = bookListRule.bookList ?? '';
 
     log('┌获取书籍列表');
-    final elements = _selectAllElementsByRule(document, listSelector);
-    log('└列表大小:${elements.length}');
-
-    if (elements.isEmpty) {
-      // 对齐 legado：列表为空时可能是“详情页”，这里仅提示，不强行走详情解析（后续可按 bookUrlPattern 补齐）
-      log('≡列表为空，可能是详情页或规则不匹配');
-    }
-
     final results = <SearchResult>[];
     var loggedSample = false;
-    for (var i = 0; i < elements.length; i++) {
-      final el = elements[i];
-      final name = _parseRule(el, bookListRule.name, source.bookSourceUrl);
-      final author = _parseRule(el, bookListRule.author, source.bookSourceUrl);
-      final coverUrl =
-          _parseRule(el, bookListRule.coverUrl, source.bookSourceUrl);
-      final intro = _parseRule(el, bookListRule.intro, source.bookSourceUrl);
-      final lastChapter =
-          _parseRule(el, bookListRule.lastChapter, source.bookSourceUrl);
-      var bookUrl = _parseRule(el, bookListRule.bookUrl, source.bookSourceUrl);
-      if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-        bookUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
+
+    final trimmed = body.trimLeft();
+    final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+        ? _tryDecodeJsonValue(body)
+        : null;
+
+    if (jsonRoot != null && _looksLikeJsonPath(listSelector)) {
+      final nodes = _selectJsonList(jsonRoot, listSelector);
+      log('└列表大小:${nodes.length}');
+      if (nodes.isEmpty) {
+        log('≡列表为空，可能是详情页或规则不匹配');
       }
 
-      // 对齐 legado：仅输出“一条有效样本”，避免 selector 命中广告/空节点导致样本全空而误导排查。
-      if (!loggedSample && name.isNotEmpty && bookUrl.isNotEmpty) {
-        loggedSample = true;
-        log('┌获取书名');
-        log('└$name');
-        log('┌获取作者');
-        log('└$author');
-        log('┌获取封面');
-        log('└$coverUrl');
-        log('┌获取简介');
-        log('└${intro.isEmpty ? '' : intro}');
-        log('┌获取最新章节');
-        log('└$lastChapter');
-        log('┌获取详情链接');
-        log('└$bookUrl');
+      for (var i = 0; i < nodes.length; i++) {
+        final node = nodes[i];
+        final name = _parseValueOnNode(node, bookListRule.name, requestUrl);
+        final author =
+            _parseValueOnNode(node, bookListRule.author, requestUrl);
+        var coverUrl =
+            _parseValueOnNode(node, bookListRule.coverUrl, requestUrl);
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(requestUrl, coverUrl);
+        }
+        final intro = _parseValueOnNode(node, bookListRule.intro, requestUrl);
+        final lastChapter =
+            _parseValueOnNode(node, bookListRule.lastChapter, requestUrl);
+        var bookUrl =
+            _parseValueOnNode(node, bookListRule.bookUrl, requestUrl);
+        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+          bookUrl = _absoluteUrl(requestUrl, bookUrl);
+        }
+
+        if (!loggedSample && name.isNotEmpty && bookUrl.isNotEmpty) {
+          loggedSample = true;
+          log('┌获取书名');
+          log('└$name');
+          log('┌获取作者');
+          log('└$author');
+          log('┌获取封面');
+          log('└$coverUrl');
+          log('┌获取简介');
+          log('└${intro.isEmpty ? '' : intro}');
+          log('┌获取最新章节');
+          log('└$lastChapter');
+          log('┌获取详情链接');
+          log('└$bookUrl');
+        }
+
+        if (name.isEmpty || bookUrl.isEmpty) continue;
+        results.add(
+          SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          ),
+        );
+      }
+    } else {
+      final document = html_parser.parse(body);
+      final elements = _selectAllElementsByRule(document, listSelector);
+      log('└列表大小:${elements.length}');
+
+      if (elements.isEmpty) {
+        // 对齐 legado：列表为空时可能是“详情页”，这里仅提示，不强行走详情解析（后续可按 bookUrlPattern 补齐）
+        log('≡列表为空，可能是详情页或规则不匹配');
       }
 
-      if (name.isEmpty || bookUrl.isEmpty) continue;
-      results.add(
-        SearchResult(
-          name: name,
-          author: author,
-          coverUrl: coverUrl,
-          intro: intro,
-          lastChapter: lastChapter,
-          bookUrl: bookUrl,
-          sourceUrl: source.bookSourceUrl,
-          sourceName: source.bookSourceName,
-        ),
-      );
+      for (var i = 0; i < elements.length; i++) {
+        final el = elements[i];
+        final name = _parseRule(el, bookListRule.name, requestUrl);
+        final author = _parseRule(el, bookListRule.author, requestUrl);
+        var coverUrl = _parseRule(el, bookListRule.coverUrl, requestUrl);
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(requestUrl, coverUrl);
+        }
+        final intro = _parseRule(el, bookListRule.intro, requestUrl);
+        final lastChapter = _parseRule(el, bookListRule.lastChapter, requestUrl);
+        var bookUrl = _parseRule(el, bookListRule.bookUrl, requestUrl);
+        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+          bookUrl = _absoluteUrl(requestUrl, bookUrl);
+        }
+
+        // 对齐 legado：仅输出“一条有效样本”，避免 selector 命中广告/空节点导致样本全空而误导排查。
+        if (!loggedSample && name.isNotEmpty && bookUrl.isNotEmpty) {
+          loggedSample = true;
+          log('┌获取书名');
+          log('└$name');
+          log('┌获取作者');
+          log('└$author');
+          log('┌获取封面');
+          log('└$coverUrl');
+          log('┌获取简介');
+          log('└${intro.isEmpty ? '' : intro}');
+          log('┌获取最新章节');
+          log('└$lastChapter');
+          log('┌获取详情链接');
+          log('└$bookUrl');
+        }
+
+        if (name.isEmpty || bookUrl.isEmpty) continue;
+        results.add(
+          SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          ),
+        );
+      }
     }
 
     log('◇书籍总数:${results.length}');
@@ -947,6 +1056,45 @@ class RuleParserEngine {
       return null;
     }
 
+    final trimmed = body.trimLeft();
+    final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+        ? _tryDecodeJsonValue(body)
+        : null;
+
+    // JSON 模式：不支持 init
+    if (jsonRoot != null) {
+      String getField(String label, String? ruleStr) {
+        log('┌$label');
+        final value = _parseValueOnNode(jsonRoot, ruleStr, fullUrl);
+        log('└$value');
+        return value;
+      }
+
+      final name = getField('获取书名', rule.name);
+      final author = getField('获取作者', rule.author);
+      getField('获取分类', rule.kind);
+      getField('获取字数', rule.wordCount);
+      final lastChapter = getField('获取最新章节', rule.lastChapter);
+      getField('获取简介', rule.intro);
+      getField('获取封面', rule.coverUrl);
+      var tocUrl = getField('获取目录链接', rule.tocUrl);
+      if (tocUrl.trim().isEmpty) {
+        log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
+        tocUrl = fullUrl;
+      } else if (!tocUrl.startsWith('http')) {
+        tocUrl = _absoluteUrl(fullUrl, tocUrl);
+      }
+
+      if (name.isEmpty && author.isEmpty && lastChapter.isEmpty && tocUrl.isEmpty) {
+        log('≡字段全为空，可能 ruleBookInfo 不匹配', state: -1);
+      }
+
+      log('︽详情页解析完成', showTime: false);
+      log('', showTime: false);
+
+      return tocUrl;
+    }
+
     final document = html_parser.parse(body);
     Element? root = document.documentElement;
     if (root == null) {
@@ -966,7 +1114,7 @@ class RuleParserEngine {
 
     String getField(String label, String? ruleStr) {
       log('┌$label');
-      final value = _parseRule(root!, ruleStr, source.bookSourceUrl);
+      final value = _parseRule(root!, ruleStr, fullUrl);
       log('└$value');
       return value;
     }
@@ -983,6 +1131,8 @@ class RuleParserEngine {
       // 对齐 legado 的容错：部分站点“详情页就是目录页”，tocUrl 规则为空/不匹配时允许直接用当前详情页继续。
       log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
       tocUrl = fullUrl;
+    } else if (!tocUrl.startsWith('http')) {
+      tocUrl = _absoluteUrl(fullUrl, tocUrl);
     }
 
     if (name.isEmpty && author.isEmpty && lastChapter.isEmpty && tocUrl.isEmpty) {
@@ -1005,50 +1155,104 @@ class RuleParserEngine {
   }) async {
     log('︾开始解析目录页');
 
-    final rule = source.ruleToc;
-    if (rule == null) {
+    final tocRule = source.ruleToc;
+    if (tocRule == null) {
       log('⇒目录规则为空', state: -1);
       return false;
     }
 
-    final fullUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
-    final fetch = await fetchStage(fullUrl, rawState: 30);
-    final body = fetch.body;
-    if (body == null) {
-      log('︽目录页解析失败', state: -1);
-      return false;
+    final normalized = _normalizeListRule(tocRule.chapterList);
+    final toc = <TocItem>[];
+
+    final visited = <String>{};
+    var currentUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+    var page = 0;
+    const maxPages = 12;
+
+    while (currentUrl.trim().isNotEmpty &&
+        !visited.contains(currentUrl) &&
+        page < maxPages) {
+      visited.add(currentUrl);
+
+      log('≡目录页请求:${page + 1}');
+      final fetch = await fetchStage(currentUrl, rawState: 30);
+      final body = fetch.body!;
+
+      final trimmed = body.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(body)
+          : null;
+
+      String? nextUrl;
+
+      log('┌获取章节列表');
+      if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
+        final nodes = _selectJsonList(jsonRoot, normalized.selector);
+        log('└列表大小:${nodes.length}');
+        for (var i = 0; i < nodes.length; i++) {
+          final node = nodes[i];
+          final name = _parseValueOnNode(node, tocRule.chapterName, currentUrl);
+          var url = _parseValueOnNode(node, tocRule.chapterUrl, currentUrl);
+          if (url.isNotEmpty && !url.startsWith('http')) {
+            url = _absoluteUrl(currentUrl, url);
+          }
+          if (toc.isEmpty && i == 0) {
+            log('┌获取章节名');
+            log('└$name');
+            log('┌获取章节链接');
+            log('└$url');
+          }
+          if (name.isEmpty || url.isEmpty) continue;
+          toc.add(TocItem(index: toc.length, name: name, url: url));
+        }
+        if (tocRule.nextTocUrl != null &&
+            tocRule.nextTocUrl!.trim().isNotEmpty) {
+          nextUrl = _parseValueOnNode(jsonRoot, tocRule.nextTocUrl, currentUrl);
+        }
+      } else {
+        final document = html_parser.parse(body);
+        final elements = _selectAllElementsByRule(document, normalized.selector);
+        log('└列表大小:${elements.length}');
+        for (var i = 0; i < elements.length; i++) {
+          final el = elements[i];
+          final name = _parseRule(el, tocRule.chapterName, currentUrl);
+          var url = _parseRule(el, tocRule.chapterUrl, currentUrl);
+          if (url.isNotEmpty && !url.startsWith('http')) {
+            url = _absoluteUrl(currentUrl, url);
+          }
+          if (toc.isEmpty && i == 0) {
+            log('┌获取章节名');
+            log('└$name');
+            log('┌获取章节链接');
+            log('└$url');
+          }
+          if (name.isEmpty || url.isEmpty) continue;
+          toc.add(TocItem(index: toc.length, name: name, url: url));
+        }
+        if (tocRule.nextTocUrl != null &&
+            tocRule.nextTocUrl!.trim().isNotEmpty) {
+          final root = document.documentElement;
+          if (root != null) {
+            nextUrl = _parseRule(root, tocRule.nextTocUrl, currentUrl);
+          }
+        }
+      }
+
+      if (nextUrl == null || nextUrl.trim().isEmpty) break;
+      var resolved = nextUrl.trim();
+      if (!resolved.startsWith('http')) {
+        resolved = _absoluteUrl(currentUrl, resolved);
+      }
+      if (resolved == currentUrl) break;
+      currentUrl = resolved;
+      page++;
     }
 
-    final document = html_parser.parse(body);
+    var out = toc;
+    if (normalized.reverse) out = out.reversed.toList(growable: true);
+    log('◇章节总数:${out.length}');
 
-    final normalized = _normalizeListRule(rule.chapterList);
-
-    log('┌获取章节列表');
-    final elements = _selectAllElementsByRule(document, normalized.selector);
-    log('└列表大小:${elements.length}');
-
-    var toc = <TocItem>[];
-    for (var i = 0; i < elements.length; i++) {
-      final el = elements[i];
-      final name = _parseRule(el, rule.chapterName, source.bookSourceUrl);
-      var url = _parseRule(el, rule.chapterUrl, source.bookSourceUrl);
-      if (url.isNotEmpty && !url.startsWith('http')) {
-        url = _absoluteUrl(source.bookSourceUrl, url);
-      }
-      if (i == 0) {
-        log('┌获取章节名');
-        log('└$name');
-        log('┌获取章节链接');
-        log('└$url');
-      }
-      if (name.isEmpty || url.isEmpty) continue;
-      toc.add(TocItem(index: i, name: name, url: url));
-    }
-
-    if (normalized.reverse) toc = toc.reversed.toList(growable: true);
-    log('◇章节总数:${toc.length}');
-
-    if (toc.isEmpty) {
+    if (out.isEmpty) {
       log('≡没有正文章节', state: -1);
       return false;
     }
@@ -1058,7 +1262,7 @@ class RuleParserEngine {
 
     return _debugContentOnly(
       source: source,
-      chapterUrl: toc.first.url,
+      chapterUrl: out.first.url,
       fetchStage: fetchStage,
       emitRaw: emitRaw,
       log: log,
@@ -1081,47 +1285,87 @@ class RuleParserEngine {
       return false;
     }
 
-    final fullUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
-    final fetch = await fetchStage(fullUrl, rawState: 40);
-    final body = fetch.body;
-    if (body == null) {
-      log('︽正文页解析失败', state: -1);
-      return false;
+    final visited = <String>{};
+    var currentUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
+    var page = 0;
+    const maxPages = 8;
+
+    final parts = <String>[];
+    var totalExtracted = 0;
+
+    while (currentUrl.trim().isNotEmpty &&
+        !visited.contains(currentUrl) &&
+        page < maxPages) {
+      visited.add(currentUrl);
+
+      log('≡正文页请求:${page + 1}');
+      final fetch = await fetchStage(currentUrl, rawState: 40);
+      final body = fetch.body!;
+
+      final trimmed = body.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(body)
+          : null;
+
+      String extracted;
+      String? nextUrl;
+
+      if (jsonRoot != null && rule.content != null && _looksLikeJsonPath(rule.content!)) {
+        extracted = _parseValueOnNode(jsonRoot, rule.content, currentUrl);
+        if (rule.nextContentUrl != null && rule.nextContentUrl!.trim().isNotEmpty) {
+          nextUrl = _parseValueOnNode(jsonRoot, rule.nextContentUrl, currentUrl);
+        }
+      } else {
+        final document = html_parser.parse(body);
+        final root = document.documentElement;
+        if (root == null) {
+          log('⇒页面无 documentElement', state: -1);
+          return false;
+        }
+
+        if (rule.content == null || rule.content!.trim().isEmpty) {
+          if (page == 0) log('⇒内容规则为空，默认获取整个网页');
+          extracted = root.text;
+        } else {
+          extracted = _parseRule(root, rule.content, currentUrl);
+        }
+
+        if (rule.nextContentUrl != null && rule.nextContentUrl!.trim().isNotEmpty) {
+          nextUrl = _parseRule(root, rule.nextContentUrl, currentUrl);
+        }
+      }
+
+      totalExtracted += extracted.length;
+
+      var processed = extracted;
+      if (rule.replaceRegex != null && rule.replaceRegex!.trim().isNotEmpty) {
+        processed = _applyReplaceRegex(processed, rule.replaceRegex!);
+      }
+      final cleaned = _cleanContent(processed);
+      if (cleaned.trim().isNotEmpty) parts.add(cleaned);
+
+      if (nextUrl == null || nextUrl.trim().isEmpty) break;
+      var resolved = nextUrl.trim();
+      if (!resolved.startsWith('http')) {
+        resolved = _absoluteUrl(currentUrl, resolved);
+      }
+      if (resolved == currentUrl) break;
+      currentUrl = resolved;
+      page++;
     }
 
-    final document = html_parser.parse(body);
-    final root = document.documentElement;
-    if (root == null) {
-      log('⇒页面无 documentElement', state: -1);
-      return false;
-    }
+    final cleanedAll = parts.join('\n');
+    emitRaw(41, cleanedAll);
 
-    String extracted;
-    if (rule.content == null || rule.content!.trim().isEmpty) {
-      log('⇒内容规则为空，默认获取整个网页');
-      extracted = root.text;
-    } else {
-      extracted = _parseRule(root, rule.content, source.bookSourceUrl);
-    }
-
-    var processed = extracted;
-    if (rule.replaceRegex != null && rule.replaceRegex!.trim().isNotEmpty) {
-      processed = _applyReplaceRegex(processed, rule.replaceRegex!);
-    }
-    final cleaned = _cleanContent(processed);
-    // 额外缓存清理后的正文，便于 UI 查看全文（不依赖控制台截断）。
-    // state=41：正文结果（清理后）
-    emitRaw(41, cleaned);
-
-    log('◇提取长度:${extracted.length} 清理后长度:${cleaned.length}');
+    log('◇分页:${parts.length} 提取总长:$totalExtracted 清理后总长:${cleanedAll.length}');
     log('┌获取正文内容');
     final maxLog = 2000;
-    final preview = cleaned.length <= maxLog
-        ? cleaned
-        : '${cleaned.substring(0, maxLog)}\n…（已截断，查看“正文结果”可看全文）';
+    final preview = cleanedAll.length <= maxLog
+        ? cleanedAll
+        : '${cleanedAll.substring(0, maxLog)}\n…（已截断，查看“正文结果”可看全文）';
     log('└\n$preview');
 
-    if (cleaned.trim().isEmpty) {
+    if (cleanedAll.trim().isEmpty) {
       log('≡内容为空', state: -1);
       return false;
     }
@@ -1173,50 +1417,107 @@ class RuleParserEngine {
     }
 
     try {
-      final document = html_parser.parse(fetch.body);
       final bookListRule = searchRule.bookList ?? '';
-      final bookElements = _selectAllElementsByRule(document, bookListRule);
-
       final results = <SearchResult>[];
       Map<String, String> fieldSample = const {};
+      var listCount = 0;
 
-      for (final element in bookElements) {
-        final name = _parseRule(element, searchRule.name, source.bookSourceUrl);
-        final author =
-            _parseRule(element, searchRule.author, source.bookSourceUrl);
-        final coverUrl =
-            _parseRule(element, searchRule.coverUrl, source.bookSourceUrl);
-        final intro =
-            _parseRule(element, searchRule.intro, source.bookSourceUrl);
-        final lastChapter =
-            _parseRule(element, searchRule.lastChapter, source.bookSourceUrl);
-        final bookUrl =
-            _parseRule(element, searchRule.bookUrl, source.bookSourceUrl);
+      final body = fetch.body!;
+      final trimmed = body.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(body)
+          : null;
 
-        final result = SearchResult(
-          name: name,
-          author: author,
-          coverUrl: coverUrl,
-          intro: intro,
-          lastChapter: lastChapter,
-          bookUrl: bookUrl,
-          sourceUrl: source.bookSourceUrl,
-          sourceName: source.bookSourceName,
-        );
+      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
+        final nodes = _selectJsonList(jsonRoot, bookListRule);
+        listCount = nodes.length;
+        for (final node in nodes) {
+          final name = _parseValueOnNode(node, searchRule.name, requestUrl);
+          final author = _parseValueOnNode(node, searchRule.author, requestUrl);
+          var coverUrl =
+              _parseValueOnNode(node, searchRule.coverUrl, requestUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(requestUrl, coverUrl);
+          }
+          final intro = _parseValueOnNode(node, searchRule.intro, requestUrl);
+          final lastChapter =
+              _parseValueOnNode(node, searchRule.lastChapter, requestUrl);
+          var bookUrl = _parseValueOnNode(node, searchRule.bookUrl, requestUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(requestUrl, bookUrl);
+          }
 
-        if (results.isEmpty) {
-          fieldSample = <String, String>{
-            'name': name,
-            'author': author,
-            'coverUrl': coverUrl,
-            'intro': intro,
-            'lastChapter': lastChapter,
-            'bookUrl': bookUrl,
-          };
+          final result = SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (results.isEmpty) {
+            fieldSample = <String, String>{
+              'name': name,
+              'author': author,
+              'coverUrl': coverUrl,
+              'intro': intro,
+              'lastChapter': lastChapter,
+              'bookUrl': bookUrl,
+            };
+          }
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
         }
+      } else {
+        final document = html_parser.parse(body);
+        final bookElements = _selectAllElementsByRule(document, bookListRule);
+        listCount = bookElements.length;
 
-        if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-          results.add(result);
+        for (final element in bookElements) {
+          final name = _parseRule(element, searchRule.name, requestUrl);
+          final author = _parseRule(element, searchRule.author, requestUrl);
+          var coverUrl = _parseRule(element, searchRule.coverUrl, requestUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(requestUrl, coverUrl);
+          }
+          final intro = _parseRule(element, searchRule.intro, requestUrl);
+          final lastChapter =
+              _parseRule(element, searchRule.lastChapter, requestUrl);
+          var bookUrl = _parseRule(element, searchRule.bookUrl, requestUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(requestUrl, bookUrl);
+          }
+
+          final result = SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (results.isEmpty) {
+            fieldSample = <String, String>{
+              'name': name,
+              'author': author,
+              'coverUrl': coverUrl,
+              'intro': intro,
+              'lastChapter': lastChapter,
+              'bookUrl': bookUrl,
+            };
+          }
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
         }
       }
 
@@ -1225,7 +1526,7 @@ class RuleParserEngine {
         requestType: DebugRequestType.search,
         requestUrlRule: searchUrlRule,
         listRule: bookListRule,
-        listCount: bookElements.length,
+        listCount: listCount,
         results: results,
         fieldSample: fieldSample,
         error: null,
@@ -1274,37 +1575,77 @@ class RuleParserEngine {
       );
       if (response == null) return [];
 
-      final document = html_parser.parse(response);
       final results = <SearchResult>[];
 
       final bookListRule = exploreRule.bookList ?? '';
-      final bookElements = _selectAllElementsByRule(document, bookListRule);
+      final trimmed = response.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(response)
+          : null;
 
-      for (final element in bookElements) {
-        var bookUrl =
-            _parseRule(element, exploreRule.bookUrl, source.bookSourceUrl);
-        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-          bookUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
-        }
-        var coverUrl =
-            _parseRule(element, exploreRule.coverUrl, source.bookSourceUrl);
-        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-          coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
-        }
-        final result = SearchResult(
-          name: _parseRule(element, exploreRule.name, source.bookSourceUrl),
-          author: _parseRule(element, exploreRule.author, source.bookSourceUrl),
-          coverUrl: coverUrl,
-          intro: _parseRule(element, exploreRule.intro, source.bookSourceUrl),
-          lastChapter:
-              _parseRule(element, exploreRule.lastChapter, source.bookSourceUrl),
-          bookUrl: bookUrl,
-          sourceUrl: source.bookSourceUrl,
-          sourceName: source.bookSourceName,
-        );
+      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
+        final nodes = _selectJsonList(jsonRoot, bookListRule);
+        for (final node in nodes) {
+          final name = _parseValueOnNode(node, exploreRule.name, exploreUrl);
+          final author =
+              _parseValueOnNode(node, exploreRule.author, exploreUrl);
+          final intro = _parseValueOnNode(node, exploreRule.intro, exploreUrl);
+          final lastChapter =
+              _parseValueOnNode(node, exploreRule.lastChapter, exploreUrl);
 
-        if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-          results.add(result);
+          var bookUrl = _parseValueOnNode(node, exploreRule.bookUrl, exploreUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(exploreUrl, bookUrl);
+          }
+
+          var coverUrl =
+              _parseValueOnNode(node, exploreRule.coverUrl, exploreUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(exploreUrl, coverUrl);
+          }
+
+          final result = SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
+        }
+      } else {
+        final document = html_parser.parse(response);
+        final bookElements = _selectAllElementsByRule(document, bookListRule);
+
+        for (final element in bookElements) {
+          var bookUrl = _parseRule(element, exploreRule.bookUrl, exploreUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(exploreUrl, bookUrl);
+          }
+          var coverUrl = _parseRule(element, exploreRule.coverUrl, exploreUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(exploreUrl, coverUrl);
+          }
+          final result = SearchResult(
+            name: _parseRule(element, exploreRule.name, exploreUrl),
+            author: _parseRule(element, exploreRule.author, exploreUrl),
+            coverUrl: coverUrl,
+            intro: _parseRule(element, exploreRule.intro, exploreUrl),
+            lastChapter: _parseRule(element, exploreRule.lastChapter, exploreUrl),
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
         }
       }
 
@@ -1361,53 +1702,108 @@ class RuleParserEngine {
     }
 
     try {
-      final document = html_parser.parse(fetch.body);
       final bookListRule = exploreRule.bookList ?? '';
-      final bookElements = _selectAllElementsByRule(document, bookListRule);
-
       final results = <SearchResult>[];
       Map<String, String> fieldSample = const {};
+      var listCount = 0;
 
-      for (final element in bookElements) {
-        final name = _parseRule(element, exploreRule.name, source.bookSourceUrl);
-        final author =
-            _parseRule(element, exploreRule.author, source.bookSourceUrl);
-        final coverUrl =
-            _parseRule(element, exploreRule.coverUrl, source.bookSourceUrl);
-        final intro =
-            _parseRule(element, exploreRule.intro, source.bookSourceUrl);
-        final lastChapter = _parseRule(
-          element,
-          exploreRule.lastChapter,
-          source.bookSourceUrl,
-        );
-        final bookUrl =
-            _parseRule(element, exploreRule.bookUrl, source.bookSourceUrl);
+      final body = fetch.body!;
+      final trimmed = body.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(body)
+          : null;
 
-        final result = SearchResult(
-          name: name,
-          author: author,
-          coverUrl: coverUrl,
-          intro: intro,
-          lastChapter: lastChapter,
-          bookUrl: bookUrl,
-          sourceUrl: source.bookSourceUrl,
-          sourceName: source.bookSourceName,
-        );
+      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
+        final nodes = _selectJsonList(jsonRoot, bookListRule);
+        listCount = nodes.length;
+        for (final node in nodes) {
+          final name = _parseValueOnNode(node, exploreRule.name, requestUrl);
+          final author = _parseValueOnNode(node, exploreRule.author, requestUrl);
+          var coverUrl =
+              _parseValueOnNode(node, exploreRule.coverUrl, requestUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(requestUrl, coverUrl);
+          }
+          final intro = _parseValueOnNode(node, exploreRule.intro, requestUrl);
+          final lastChapter =
+              _parseValueOnNode(node, exploreRule.lastChapter, requestUrl);
+          var bookUrl =
+              _parseValueOnNode(node, exploreRule.bookUrl, requestUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(requestUrl, bookUrl);
+          }
 
-        if (results.isEmpty) {
-          fieldSample = <String, String>{
-            'name': name,
-            'author': author,
-            'coverUrl': coverUrl,
-            'intro': intro,
-            'lastChapter': lastChapter,
-            'bookUrl': bookUrl,
-          };
+          final result = SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (results.isEmpty) {
+            fieldSample = <String, String>{
+              'name': name,
+              'author': author,
+              'coverUrl': coverUrl,
+              'intro': intro,
+              'lastChapter': lastChapter,
+              'bookUrl': bookUrl,
+            };
+          }
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
         }
+      } else {
+        final document = html_parser.parse(body);
+        final bookElements = _selectAllElementsByRule(document, bookListRule);
+        listCount = bookElements.length;
 
-        if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-          results.add(result);
+        for (final element in bookElements) {
+          final name = _parseRule(element, exploreRule.name, requestUrl);
+          final author = _parseRule(element, exploreRule.author, requestUrl);
+          var coverUrl = _parseRule(element, exploreRule.coverUrl, requestUrl);
+          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+            coverUrl = _absoluteUrl(requestUrl, coverUrl);
+          }
+          final intro = _parseRule(element, exploreRule.intro, requestUrl);
+          final lastChapter =
+              _parseRule(element, exploreRule.lastChapter, requestUrl);
+          var bookUrl = _parseRule(element, exploreRule.bookUrl, requestUrl);
+          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+            bookUrl = _absoluteUrl(requestUrl, bookUrl);
+          }
+
+          final result = SearchResult(
+            name: name,
+            author: author,
+            coverUrl: coverUrl,
+            intro: intro,
+            lastChapter: lastChapter,
+            bookUrl: bookUrl,
+            sourceUrl: source.bookSourceUrl,
+            sourceName: source.bookSourceName,
+          );
+
+          if (results.isEmpty) {
+            fieldSample = <String, String>{
+              'name': name,
+              'author': author,
+              'coverUrl': coverUrl,
+              'intro': intro,
+              'lastChapter': lastChapter,
+              'bookUrl': bookUrl,
+            };
+          }
+
+          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+            results.add(result);
+          }
         }
       }
 
@@ -1416,7 +1812,7 @@ class RuleParserEngine {
         requestType: DebugRequestType.explore,
         requestUrlRule: exploreUrlRule,
         listRule: bookListRule,
-        listCount: bookElements.length,
+        listCount: listCount,
         results: results,
         fieldSample: fieldSample,
         error: null,
@@ -1450,6 +1846,40 @@ class RuleParserEngine {
       );
       if (response == null) return null;
 
+      final trimmed = response.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(response)
+          : null;
+
+      // JSON 模式
+      if (jsonRoot != null) {
+        var tocUrl = _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, fullUrl);
+        if (tocUrl.trim().isEmpty && source.ruleToc != null) {
+          tocUrl = fullUrl;
+        } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
+          tocUrl = _absoluteUrl(fullUrl, tocUrl);
+        }
+
+        var coverUrl =
+            _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, fullUrl);
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(fullUrl, coverUrl);
+        }
+
+        return BookDetail(
+          name: _parseValueOnNode(jsonRoot, bookInfoRule.name, fullUrl),
+          author: _parseValueOnNode(jsonRoot, bookInfoRule.author, fullUrl),
+          coverUrl: coverUrl,
+          intro: _parseValueOnNode(jsonRoot, bookInfoRule.intro, fullUrl),
+          kind: _parseValueOnNode(jsonRoot, bookInfoRule.kind, fullUrl),
+          lastChapter:
+              _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, fullUrl),
+          tocUrl: tocUrl,
+          bookUrl: fullUrl,
+        );
+      }
+
+      // HTML 模式
       final document = html_parser.parse(response);
       Element? root = document.documentElement;
 
@@ -1460,28 +1890,26 @@ class RuleParserEngine {
 
       if (root == null) return null;
 
-      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, source.bookSourceUrl);
+      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, fullUrl);
       if (tocUrl.trim().isEmpty && source.ruleToc != null) {
         // 兼容 legado 常见用法：部分站点“详情页即目录页”，未配置 tocUrl 时默认使用当前详情页。
         tocUrl = fullUrl;
       } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
-        tocUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+        tocUrl = _absoluteUrl(fullUrl, tocUrl);
       }
 
-      var coverUrl =
-          _parseRule(root, bookInfoRule.coverUrl, source.bookSourceUrl);
+      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, fullUrl);
       if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-        coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
+        coverUrl = _absoluteUrl(fullUrl, coverUrl);
       }
 
       return BookDetail(
-        name: _parseRule(root, bookInfoRule.name, source.bookSourceUrl),
-        author: _parseRule(root, bookInfoRule.author, source.bookSourceUrl),
+        name: _parseRule(root, bookInfoRule.name, fullUrl),
+        author: _parseRule(root, bookInfoRule.author, fullUrl),
         coverUrl: coverUrl,
-        intro: _parseRule(root, bookInfoRule.intro, source.bookSourceUrl),
-        kind: _parseRule(root, bookInfoRule.kind, source.bookSourceUrl),
-        lastChapter:
-            _parseRule(root, bookInfoRule.lastChapter, source.bookSourceUrl),
+        intro: _parseRule(root, bookInfoRule.intro, fullUrl),
+        kind: _parseRule(root, bookInfoRule.kind, fullUrl),
+        lastChapter: _parseRule(root, bookInfoRule.lastChapter, fullUrl),
         tocUrl: tocUrl,
         bookUrl: fullUrl,
       );
@@ -1530,7 +1958,69 @@ class RuleParserEngine {
     }
 
     try {
-      final document = html_parser.parse(fetch.body);
+      final body = fetch.body!;
+      final trimmed = body.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(body)
+          : null;
+
+      // JSON 模式（响应为 JSON 时 init 不适用）
+      if (jsonRoot != null) {
+        final initRule = bookInfoRule.init;
+        final initMatched = initRule == null || initRule.trim().isEmpty;
+
+        final name = _parseValueOnNode(jsonRoot, bookInfoRule.name, fullUrl);
+        final author =
+            _parseValueOnNode(jsonRoot, bookInfoRule.author, fullUrl);
+        var coverUrl =
+            _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, fullUrl);
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(fullUrl, coverUrl);
+        }
+        final intro = _parseValueOnNode(jsonRoot, bookInfoRule.intro, fullUrl);
+        final kind = _parseValueOnNode(jsonRoot, bookInfoRule.kind, fullUrl);
+        final lastChapter =
+            _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, fullUrl);
+        var tocUrl = _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, fullUrl);
+        if (tocUrl.trim().isEmpty && source.ruleToc != null) {
+          tocUrl = fullUrl;
+        } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
+          tocUrl = _absoluteUrl(fullUrl, tocUrl);
+        }
+
+        final detail = BookDetail(
+          name: name,
+          author: author,
+          coverUrl: coverUrl,
+          intro: intro,
+          kind: kind,
+          lastChapter: lastChapter,
+          tocUrl: tocUrl,
+          bookUrl: fullUrl,
+        );
+
+        return BookInfoDebugResult(
+          fetch: fetch,
+          requestType: DebugRequestType.bookInfo,
+          requestUrlRule: bookUrl,
+          initRule: initRule,
+          initMatched: initMatched,
+          detail: detail,
+          fieldSample: <String, String>{
+            'name': name,
+            'author': author,
+            'coverUrl': coverUrl,
+            'intro': intro,
+            'kind': kind,
+            'lastChapter': lastChapter,
+            'tocUrl': tocUrl,
+          },
+          error: initMatched ? null : '响应为 JSON：init 规则不适用',
+        );
+      }
+
+      // HTML 模式
+      final document = html_parser.parse(body);
       Element? root = document.documentElement;
       var initMatched = true;
 
@@ -1551,23 +2041,20 @@ class RuleParserEngine {
         );
       }
 
-      final name = _parseRule(root, bookInfoRule.name, source.bookSourceUrl);
-      final author =
-          _parseRule(root, bookInfoRule.author, source.bookSourceUrl);
-      var coverUrl =
-          _parseRule(root, bookInfoRule.coverUrl, source.bookSourceUrl);
+      final name = _parseRule(root, bookInfoRule.name, fullUrl);
+      final author = _parseRule(root, bookInfoRule.author, fullUrl);
+      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, fullUrl);
       if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-        coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
+        coverUrl = _absoluteUrl(fullUrl, coverUrl);
       }
-      final intro = _parseRule(root, bookInfoRule.intro, source.bookSourceUrl);
-      final kind = _parseRule(root, bookInfoRule.kind, source.bookSourceUrl);
-      final lastChapter =
-          _parseRule(root, bookInfoRule.lastChapter, source.bookSourceUrl);
-      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, source.bookSourceUrl);
+      final intro = _parseRule(root, bookInfoRule.intro, fullUrl);
+      final kind = _parseRule(root, bookInfoRule.kind, fullUrl);
+      final lastChapter = _parseRule(root, bookInfoRule.lastChapter, fullUrl);
+      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, fullUrl);
       if (tocUrl.trim().isEmpty && source.ruleToc != null) {
         tocUrl = fullUrl;
       } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
-        tocUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+        tocUrl = _absoluteUrl(fullUrl, tocUrl);
       }
 
       final detail = BookDetail(
@@ -1619,44 +2106,91 @@ class RuleParserEngine {
     if (tocRule == null) return [];
 
     try {
-      final fullUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
-      final response = await _fetch(
-        fullUrl,
-        header: source.header,
-        timeoutMs: source.respondTime,
-        enabledCookieJar: source.enabledCookieJar,
-      );
-      if (response == null) return [];
-
-      final document = html_parser.parse(response);
+      final normalized = _normalizeListRule(tocRule.chapterList);
       final chapters = <TocItem>[];
 
-      // 获取章节列表
-      final normalized = _normalizeListRule(tocRule.chapterList);
-      final chapterElements =
-          _selectAllElementsByRule(document, normalized.selector);
+      final visited = <String>{};
+      var currentUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+      var page = 0;
+      const maxPages = 12;
 
-      for (int i = 0; i < chapterElements.length; i++) {
-        final element = chapterElements[i];
-        var url =
-            _parseRule(element, tocRule.chapterUrl, source.bookSourceUrl);
-        if (url.isNotEmpty && !url.startsWith('http')) {
-          url = _absoluteUrl(source.bookSourceUrl, url);
-        }
-        final item = TocItem(
-          index: i,
-          name: _parseRule(element, tocRule.chapterName, source.bookSourceUrl),
-          url: url,
+      while (currentUrl.trim().isNotEmpty &&
+          !visited.contains(currentUrl) &&
+          page < maxPages) {
+        visited.add(currentUrl);
+
+        final response = await _fetch(
+          currentUrl,
+          header: source.header,
+          timeoutMs: source.respondTime,
+          enabledCookieJar: source.enabledCookieJar,
         );
+        if (response == null) break;
 
-        if (item.name.isNotEmpty && item.url.isNotEmpty) {
-          chapters.add(item);
+        final trimmed = response.trimLeft();
+        final jsonRoot =
+            (trimmed.startsWith('{') || trimmed.startsWith('['))
+                ? _tryDecodeJsonValue(response)
+                : null;
+
+        String? nextUrl;
+
+        if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
+          final nodes = _selectJsonList(jsonRoot, normalized.selector);
+          for (final node in nodes) {
+            final name =
+                _parseValueOnNode(node, tocRule.chapterName, currentUrl);
+            var url = _parseValueOnNode(node, tocRule.chapterUrl, currentUrl);
+            if (url.isNotEmpty && !url.startsWith('http')) {
+              url = _absoluteUrl(currentUrl, url);
+            }
+            if (name.isEmpty || url.isEmpty) continue;
+            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+          }
+
+          if (tocRule.nextTocUrl != null &&
+              tocRule.nextTocUrl!.trim().isNotEmpty) {
+            nextUrl =
+                _parseValueOnNode(jsonRoot, tocRule.nextTocUrl, currentUrl);
+          }
+        } else {
+          final document = html_parser.parse(response);
+          final root = document.documentElement;
+          if (root == null) break;
+
+          final chapterElements =
+              _selectAllElementsByRule(document, normalized.selector);
+
+          for (final element in chapterElements) {
+            final name = _parseRule(element, tocRule.chapterName, currentUrl);
+            var url = _parseRule(element, tocRule.chapterUrl, currentUrl);
+            if (url.isNotEmpty && !url.startsWith('http')) {
+              url = _absoluteUrl(currentUrl, url);
+            }
+            if (name.isEmpty || url.isEmpty) continue;
+            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+          }
+
+          if (tocRule.nextTocUrl != null &&
+              tocRule.nextTocUrl!.trim().isNotEmpty) {
+            nextUrl = _parseRule(root, tocRule.nextTocUrl, currentUrl);
+          }
         }
+
+        if (nextUrl == null || nextUrl.trim().isEmpty) break;
+        var resolved = nextUrl.trim();
+        if (!resolved.startsWith('http')) {
+          resolved = _absoluteUrl(currentUrl, resolved);
+        }
+        if (resolved == currentUrl) break;
+        currentUrl = resolved;
+        page++;
       }
 
-      return normalized.reverse
+      final out = normalized.reverse
           ? chapters.reversed.toList(growable: false)
           : chapters;
+      return out;
     } catch (e) {
       debugPrint('获取目录失败: $e');
       return [];
@@ -1699,27 +2233,69 @@ class RuleParserEngine {
     }
 
     try {
-      final document = html_parser.parse(fetch.body);
       final normalized = _normalizeListRule(tocRule.chapterList);
-      final chapterElements =
-          _selectAllElementsByRule(document, normalized.selector);
-
       final chapters = <TocItem>[];
       Map<String, String> sample = const {};
-      for (var i = 0; i < chapterElements.length; i++) {
-        final element = chapterElements[i];
-        final name =
-            _parseRule(element, tocRule.chapterName, source.bookSourceUrl);
-        var url =
-            _parseRule(element, tocRule.chapterUrl, source.bookSourceUrl);
-        if (url.isNotEmpty && !url.startsWith('http')) {
-          url = _absoluteUrl(source.bookSourceUrl, url);
+      var listCount = 0;
+
+      final body = fetch.body!;
+      final trimmed = body.trimLeft();
+      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+          ? _tryDecodeJsonValue(body)
+          : null;
+
+      if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
+        final nodes = _selectJsonList(jsonRoot, normalized.selector);
+        listCount = nodes.length;
+        for (final node in nodes) {
+          final name =
+              _parseValueOnNode(node, tocRule.chapterName, fullUrl);
+          var url = _parseValueOnNode(node, tocRule.chapterUrl, fullUrl);
+          if (url.isNotEmpty && !url.startsWith('http')) {
+            url = _absoluteUrl(fullUrl, url);
+          }
+          if (chapters.isEmpty) {
+            sample = <String, String>{'name': name, 'url': url};
+          }
+          if (name.isNotEmpty && url.isNotEmpty) {
+            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+          }
         }
-        if (chapters.isEmpty) {
-          sample = <String, String>{'name': name, 'url': url};
+        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+          final next = _parseValueOnNode(jsonRoot, tocRule.nextTocUrl, fullUrl);
+          if (next.trim().isNotEmpty) {
+            sample = <String, String>{...sample, 'nextTocUrl': next};
+          }
         }
-        if (name.isNotEmpty && url.isNotEmpty) {
-          chapters.add(TocItem(index: i, name: name, url: url));
+      } else {
+        final document = html_parser.parse(body);
+        final chapterElements =
+            _selectAllElementsByRule(document, normalized.selector);
+        listCount = chapterElements.length;
+
+        for (var i = 0; i < chapterElements.length; i++) {
+          final element = chapterElements[i];
+          final name = _parseRule(element, tocRule.chapterName, fullUrl);
+          var url = _parseRule(element, tocRule.chapterUrl, fullUrl);
+          if (url.isNotEmpty && !url.startsWith('http')) {
+            url = _absoluteUrl(fullUrl, url);
+          }
+          if (chapters.isEmpty) {
+            sample = <String, String>{'name': name, 'url': url};
+          }
+          if (name.isNotEmpty && url.isNotEmpty) {
+            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+          }
+        }
+
+        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+          final root = document.documentElement;
+          if (root != null) {
+            final next = _parseRule(root, tocRule.nextTocUrl, fullUrl);
+            if (next.trim().isNotEmpty) {
+              sample = <String, String>{...sample, 'nextTocUrl': next};
+            }
+          }
         }
       }
 
@@ -1728,7 +2304,7 @@ class RuleParserEngine {
         requestType: DebugRequestType.toc,
         requestUrlRule: tocUrl,
         listRule: normalized.selector,
-        listCount: chapterElements.length,
+        listCount: listCount,
         toc: normalized.reverse
             ? chapters.reversed.toList(growable: false)
             : chapters,
@@ -1796,32 +2372,79 @@ class RuleParserEngine {
     if (contentRule == null) return '';
 
     try {
-      final fullUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
-      final response = await _fetch(
-        fullUrl,
-        header: source.header,
-        timeoutMs: source.respondTime,
-        enabledCookieJar: source.enabledCookieJar,
-      );
-      if (response == null) return '';
+      final visited = <String>{};
+      var currentUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
+      var page = 0;
+      const maxPages = 8;
 
-      final document = html_parser.parse(response);
-      String content = _parseRule(
-        document.documentElement!,
-        contentRule.content,
-        source.bookSourceUrl,
-      );
+      final parts = <String>[];
 
-      // 应用替换规则
-      if (contentRule.replaceRegex != null &&
-          contentRule.replaceRegex!.isNotEmpty) {
-        content = _applyReplaceRegex(content, contentRule.replaceRegex!);
+      while (currentUrl.trim().isNotEmpty &&
+          !visited.contains(currentUrl) &&
+          page < maxPages) {
+        visited.add(currentUrl);
+
+        final response = await _fetch(
+          currentUrl,
+          header: source.header,
+          timeoutMs: source.respondTime,
+          enabledCookieJar: source.enabledCookieJar,
+        );
+        if (response == null) break;
+
+        final trimmed = response.trimLeft();
+        final jsonRoot =
+            (trimmed.startsWith('{') || trimmed.startsWith('['))
+                ? _tryDecodeJsonValue(response)
+                : null;
+
+        String extracted;
+        String? nextUrl;
+
+        if (jsonRoot != null && contentRule.content != null && _looksLikeJsonPath(contentRule.content!)) {
+          extracted = _parseValueOnNode(jsonRoot, contentRule.content, currentUrl);
+          if (contentRule.nextContentUrl != null &&
+              contentRule.nextContentUrl!.trim().isNotEmpty) {
+            nextUrl = _parseValueOnNode(
+              jsonRoot,
+              contentRule.nextContentUrl,
+              currentUrl,
+            );
+          }
+        } else {
+          final document = html_parser.parse(response);
+          final root = document.documentElement;
+          if (root == null) break;
+          if (contentRule.content == null || contentRule.content!.trim().isEmpty) {
+            extracted = root.text;
+          } else {
+            extracted = _parseRule(root, contentRule.content, currentUrl);
+          }
+          if (contentRule.nextContentUrl != null &&
+              contentRule.nextContentUrl!.trim().isNotEmpty) {
+            nextUrl = _parseRule(root, contentRule.nextContentUrl, currentUrl);
+          }
+        }
+
+        var processed = extracted;
+        if (contentRule.replaceRegex != null &&
+            contentRule.replaceRegex!.trim().isNotEmpty) {
+          processed = _applyReplaceRegex(processed, contentRule.replaceRegex!);
+        }
+        final cleaned = _cleanContent(processed);
+        if (cleaned.trim().isNotEmpty) parts.add(cleaned);
+
+        if (nextUrl == null || nextUrl.trim().isEmpty) break;
+        var resolved = nextUrl.trim();
+        if (!resolved.startsWith('http')) {
+          resolved = _absoluteUrl(currentUrl, resolved);
+        }
+        if (resolved == currentUrl) break;
+        currentUrl = resolved;
+        page++;
       }
 
-      // 清理内容
-      content = _cleanContent(content);
-
-      return content;
+      return parts.join('\n');
     } catch (e) {
       debugPrint('获取正文失败: $e');
       return '';
@@ -1865,26 +2488,93 @@ class RuleParserEngine {
     }
 
     try {
-      final document = html_parser.parse(fetch.body);
-      final extracted = _parseRule(
-        document.documentElement!,
-        contentRule.content,
-        source.bookSourceUrl,
-      );
-      var text = extracted;
-      if (contentRule.replaceRegex != null &&
-          contentRule.replaceRegex!.isNotEmpty) {
-        text = _applyReplaceRegex(text, contentRule.replaceRegex!);
+      final visited = <String>{};
+      var currentUrl = fullUrl;
+      var page = 0;
+      const maxPages = 8;
+
+      var totalExtracted = 0;
+      final parts = <String>[];
+
+      while (currentUrl.trim().isNotEmpty &&
+          !visited.contains(currentUrl) &&
+          page < maxPages) {
+        visited.add(currentUrl);
+
+        // 第一页用 fetch（含请求/响应调试信息），后续页用普通请求即可
+        final body = (currentUrl == fullUrl) ? fetch.body! : await _fetch(
+              currentUrl,
+              header: source.header,
+              timeoutMs: source.respondTime,
+              enabledCookieJar: source.enabledCookieJar,
+            );
+        if (body == null) break;
+
+        final trimmed = body.trimLeft();
+        final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+            ? _tryDecodeJsonValue(body)
+            : null;
+
+        String extracted;
+        String? nextUrl;
+
+        if (jsonRoot != null &&
+            contentRule.content != null &&
+            _looksLikeJsonPath(contentRule.content!)) {
+          extracted =
+              _parseValueOnNode(jsonRoot, contentRule.content, currentUrl);
+          if (contentRule.nextContentUrl != null &&
+              contentRule.nextContentUrl!.trim().isNotEmpty) {
+            nextUrl = _parseValueOnNode(
+              jsonRoot,
+              contentRule.nextContentUrl,
+              currentUrl,
+            );
+          }
+        } else {
+          final document = html_parser.parse(body);
+          final root = document.documentElement;
+          if (root == null) break;
+          if (contentRule.content == null || contentRule.content!.trim().isEmpty) {
+            extracted = root.text;
+          } else {
+            extracted = _parseRule(root, contentRule.content, currentUrl);
+          }
+          if (contentRule.nextContentUrl != null &&
+              contentRule.nextContentUrl!.trim().isNotEmpty) {
+            nextUrl = _parseRule(root, contentRule.nextContentUrl, currentUrl);
+          }
+        }
+
+        totalExtracted += extracted.length;
+
+        var text = extracted;
+        if (contentRule.replaceRegex != null &&
+            contentRule.replaceRegex!.isNotEmpty) {
+          text = _applyReplaceRegex(text, contentRule.replaceRegex!);
+        }
+        final cleaned = _cleanContent(text);
+        if (cleaned.trim().isNotEmpty) parts.add(cleaned);
+
+        if (nextUrl == null || nextUrl.trim().isEmpty) break;
+        var resolved = nextUrl.trim();
+        if (!resolved.startsWith('http')) {
+          resolved = _absoluteUrl(currentUrl, resolved);
+        }
+        if (resolved == currentUrl) break;
+        currentUrl = resolved;
+        page++;
       }
-      final cleaned = _cleanContent(text);
+
+      final cleanedAll = parts.join('\n');
 
       return ContentDebugResult(
         fetch: fetch,
         requestType: DebugRequestType.content,
         requestUrlRule: chapterUrl,
-        extractedLength: extracted.length,
-        cleanedLength: cleaned.length,
-        content: cleaned,
+        extractedLength: totalExtracted,
+        cleanedLength: cleanedAll.length,
+        content: cleanedAll,
         error: null,
       );
     } catch (e) {
@@ -2203,6 +2893,180 @@ class RuleParserEngine {
     }
   }
 
+  bool _looksLikeXPath(String rule) {
+    final t = rule.trimLeft();
+    return t.startsWith('@XPath:') || t.startsWith('//');
+  }
+
+  bool _looksLikeJsonPath(String rule) {
+    final t = rule.trimLeft();
+    return t.startsWith('@Json:') ||
+        t == r'$' ||
+        t.startsWith(r'$.') ||
+        t.startsWith(r'$[') ||
+        t.startsWith(r'$..');
+  }
+
+  bool _looksLikeRegexRule(String rule) {
+    final t = rule.trimLeft();
+    return t.startsWith(':');
+  }
+
+  ({String expr, List<_LegadoReplacePair> replacements}) _splitExprAndReplacements(
+    String raw,
+  ) {
+    final parts = raw.split('##');
+    final expr = parts.first.trim();
+    final reps = <_LegadoReplacePair>[];
+    if (parts.length > 1) {
+      final rep = parts.sublist(1);
+      for (var i = 0; i < rep.length; i += 2) {
+        final pattern = rep[i].trim();
+        final replacement = (i + 1) < rep.length ? rep[i + 1] : '';
+        if (pattern.isEmpty) continue;
+        reps.add(_LegadoReplacePair(pattern: pattern, replacement: replacement));
+      }
+    }
+    return (expr: expr, replacements: reps);
+  }
+
+  String _parseXPathRule(Element element, String raw, String baseUrl) {
+    final split = _splitExprAndReplacements(raw);
+    var expr = split.expr;
+    if (expr.startsWith('@XPath:')) {
+      expr = expr.substring('@XPath:'.length).trim();
+    }
+    if (expr.isEmpty) return '';
+
+    try {
+      final result = HtmlXPath.node(element).query(expr);
+      var text = result.attr ??
+          (result.node?.text ?? (result.node?.toString() ?? ''));
+      text = _applyInlineReplacements(text, split.replacements);
+      return text.trim();
+    } catch (e) {
+      debugPrint('XPath 解析失败: $expr - $e');
+      return '';
+    }
+  }
+
+  String _parseJsonPathRule(dynamic json, String raw) {
+    final split = _splitExprAndReplacements(raw);
+    var expr = split.expr;
+    if (expr.startsWith('@Json:')) {
+      expr = expr.substring('@Json:'.length).trim();
+    }
+    if (expr.isEmpty) return '';
+
+    dynamic value;
+    try {
+      final matches = JsonPath(expr).read(json).toList(growable: false);
+      if (matches.isEmpty) return '';
+      value = matches.first.value;
+    } catch (e) {
+      // 兼容少量源写法：直接给 key（不带 $.）
+      if (json is Map && json.containsKey(expr)) {
+        value = json[expr];
+      } else {
+        debugPrint('JsonPath 解析失败: $expr - $e');
+        return '';
+      }
+    }
+
+    String text;
+    if (value == null) {
+      text = '';
+    } else if (value is String) {
+      text = value;
+    } else if (value is num || value is bool) {
+      text = value.toString();
+    } else {
+      try {
+        text = jsonEncode(value);
+      } catch (_) {
+        text = value.toString();
+      }
+    }
+    text = _applyInlineReplacements(text, split.replacements);
+    return text.trim();
+  }
+
+  dynamic _tryDecodeJsonValue(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return null;
+    try {
+      return jsonDecode(t);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _parseValueOnNode(dynamic node, String? rule, String baseUrl) {
+    if (rule == null || rule.trim().isEmpty) return '';
+    if (node is Element) {
+      return _parseRule(node, rule, baseUrl);
+    }
+    // JSON 节点：支持 @Json / $. / 简单 key
+    final trimmed = rule.trim();
+    // 处理多个规则（用 || 分隔，表示备选）
+    for (final r in trimmed.split('||')) {
+      final one = r.trim();
+      if (one.isEmpty) continue;
+      if (_looksLikeJsonPath(one)) {
+        final v = _parseJsonPathRule(node, one);
+        if (v.isNotEmpty) return v;
+      } else if (node is Map && node.containsKey(one)) {
+        final v = node[one];
+        if (v == null) continue;
+        final s = v.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+    }
+    return '';
+  }
+
+  List<dynamic> _selectJsonList(dynamic json, String rawRule) {
+    final split = _splitExprAndReplacements(rawRule);
+    var expr = split.expr.trim();
+    if (expr.startsWith('@Json:')) {
+      expr = expr.substring('@Json:'.length).trim();
+    }
+    if (expr.isEmpty) return const <dynamic>[];
+
+    try {
+      final matches = JsonPath(expr).read(json).toList(growable: false);
+      if (matches.isEmpty) return const <dynamic>[];
+      // 如果命中的是数组节点，优先展开成 item 列表
+      final first = matches.first.value;
+      if (first is List) return first;
+      // 否则返回每个 match 的 value
+      return matches.map((m) => m.value).toList(growable: false);
+    } catch (e) {
+      debugPrint('JsonPath 列表解析失败: $expr - $e');
+      return const <dynamic>[];
+    }
+  }
+
+  String _parseRegexRuleOnText(String text, String raw) {
+    final split = _splitExprAndReplacements(raw);
+    var expr = split.expr.trimLeft();
+    if (!expr.startsWith(':')) return '';
+    expr = expr.substring(1).trim();
+    if (expr.isEmpty) return '';
+
+    try {
+      final re = RegExp(expr, dotAll: true, multiLine: true);
+      final m = re.firstMatch(text);
+      if (m == null) return '';
+      final v = (m.groupCount >= 1 ? m.group(1) : m.group(0)) ?? '';
+      final out = _applyInlineReplacements(v, split.replacements);
+      return out.trim();
+    } catch (e) {
+      debugPrint('Regex 解析失败: $expr - $e');
+      return '';
+    }
+  }
+
   /// 解析规则
   String _parseRule(Element element, String? rule, String baseUrl) {
     if (rule == null || rule.isEmpty) return '';
@@ -2212,7 +3076,15 @@ class RuleParserEngine {
     // 处理多个规则（用 || 分隔，表示备选）
     final rules = rule.split('||');
     for (final r in rules) {
-      result = _parseSingleRule(element, r.trim(), baseUrl);
+      final trimmed = r.trim();
+      if (trimmed.isEmpty) continue;
+      if (_looksLikeXPath(trimmed)) {
+        result = _parseXPathRule(element, trimmed, baseUrl);
+      } else if (_looksLikeRegexRule(trimmed)) {
+        result = _parseRegexRuleOnText(element.outerHtml, trimmed);
+      } else {
+        result = _parseSingleRule(element, trimmed, baseUrl);
+      }
       if (result.isNotEmpty) break;
     }
 
@@ -2338,9 +3210,76 @@ class RuleParserEngine {
     return contexts.whereType<Element>().toList(growable: false);
   }
 
-  List<Element> _selectAllElementsByRule(dynamic parent, String selectorRule) {
+  List<Element> _selectAllElementsByRule(
+    dynamic parent,
+    String selectorRule, {
+    String? rawHtml,
+  }) {
+    final raw = selectorRule.trim();
+    if (raw.isEmpty) return const <Element>[];
+
+    if (_looksLikeXPath(raw)) {
+      final split = _splitExprAndReplacements(raw);
+      var expr = split.expr;
+      if (expr.startsWith('@XPath:')) {
+        expr = expr.substring('@XPath:'.length).trim();
+      }
+      if (expr.isEmpty) return const <Element>[];
+      try {
+        final root = parent is Document
+            ? parent.documentElement
+            : parent is Element
+                ? parent
+                : null;
+        if (root == null) return const <Element>[];
+        final result = HtmlXPath.node(root).query(expr);
+        return result.nodes
+            .where((n) => n.isElement)
+            .map((n) => (n as HtmlNodeTree).element)
+            .toList(growable: false);
+      } catch (e) {
+        debugPrint('XPath 列表解析失败: $expr - $e');
+        return const <Element>[];
+      }
+    }
+
+    if (_looksLikeRegexRule(raw)) {
+      final split = _splitExprAndReplacements(raw);
+      var expr = split.expr.trimLeft();
+      expr = expr.startsWith(':') ? expr.substring(1).trim() : expr;
+      if (expr.isEmpty) return const <Element>[];
+
+      final htmlText = rawHtml ??
+          (parent is Document
+              ? parent.documentElement?.outerHtml
+              : parent is Element
+                  ? parent.outerHtml
+                  : null) ??
+          '';
+      if (htmlText.isEmpty) return const <Element>[];
+
+      try {
+        final re = RegExp(expr, dotAll: true, multiLine: true);
+        final out = <Element>[];
+        for (final m in re.allMatches(htmlText)) {
+          final snippet =
+              (m.groupCount >= 1 ? m.group(1) : m.group(0)) ?? '';
+          if (snippet.trim().isEmpty) continue;
+          final wrapper = html_parser
+              .parse('<div>$snippet</div>')
+              .documentElement
+              ?.querySelector('div');
+          if (wrapper != null) out.add(wrapper);
+        }
+        return out;
+      } catch (e) {
+        debugPrint('Regex 列表解析失败: $expr - $e');
+        return const <Element>[];
+      }
+    }
+
     final parsed = _LegadoTextRule.parse(
-      selectorRule,
+      raw,
       isExtractor: _isExtractorToken,
     );
     return _selectAllBySelectors(parent, parsed.selectors);

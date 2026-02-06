@@ -734,7 +734,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
             CupertinoListTile.notched(
               title: const Text('一键导出调试包（推荐）'),
-              subtitle: const Text('保存到文件：控制台 + 书源 JSON（不含网页源码）'),
+              subtitle: const Text('保存为 zip：控制台 + 书源 JSON（不含网页源码）'),
               trailing: const CupertinoListTileChevron(),
               onTap: _debugLinesAll.isEmpty
                   ? null
@@ -1326,14 +1326,35 @@ class _SourceEditViewState extends State<SourceEditView> {
     required bool includeRawSources,
   }) async {
     final bundle = _buildDebugBundle(includeRawSources: includeRawSources);
-    final json = _prettyJson(LegadoJson.encode(bundle));
     final ts = DateTime.now().millisecondsSinceEpoch;
     final fileName = includeRawSources
-        ? 'soupreader_debug_bundle_full_$ts.json'
-        : 'soupreader_debug_bundle_$ts.json';
+        ? 'soupreader_debug_bundle_full_$ts.zip'
+        : 'soupreader_debug_bundle_$ts.zip';
 
-    final ok = await _debugExportService.exportJsonToFile(
-      json: json,
+    final bundleJson = _prettyJson(LegadoJson.encode(bundle));
+    final files = <String, String>{
+      'bundle.json': bundleJson,
+      'console.txt': _debugLinesAll.map((e) => e.text).join('\n'),
+      // 兼容排查：单独导出书源 JSON（原样）
+      'source.json': _prettyJson(_jsonCtrl.text),
+    };
+
+    if (includeRawSources) {
+      void putIfNonEmpty(String path, String? content) {
+        final t = content?.trim();
+        if (t == null || t.isEmpty) return;
+        files[path] = content!;
+      }
+
+      putIfNonEmpty('raw/list.html', _debugListSrcHtml);
+      putIfNonEmpty('raw/book.html', _debugBookSrcHtml);
+      putIfNonEmpty('raw/toc.html', _debugTocSrcHtml);
+      putIfNonEmpty('raw/content.html', _debugContentSrcHtml);
+      putIfNonEmpty('raw/content_result.txt', _debugContentResult);
+    }
+
+    final ok = await _debugExportService.exportZipToFile(
+      files: files,
       fileName: fileName,
     );
     if (!mounted) return;
