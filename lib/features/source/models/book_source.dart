@@ -207,6 +207,24 @@ class BookSource {
       return null;
     }
 
+    String? parseHeader(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is String) return raw;
+      if (raw is Map) {
+        final m = <String, String>{};
+        raw.forEach((k, v) {
+          if (k == null || v == null) return;
+          final key = k.toString().trim();
+          if (key.isEmpty) return;
+          m[key] = v.toString();
+        });
+        if (m.isEmpty) return null;
+        return jsonEncode(m);
+      }
+      final t = raw.toString();
+      return t.trim().isEmpty ? null : t;
+    }
+
     return BookSource(
       bookSourceUrl: (json['bookSourceUrl'] ?? '').toString(),
       bookSourceName: (json['bookSourceName'] ?? '').toString(),
@@ -221,7 +239,8 @@ class BookSource {
           ? (parseNullableBool(json['enabledCookieJar']) ?? true)
           : true,
       concurrentRate: json['concurrentRate']?.toString(),
-      header: json['header']?.toString(),
+      // 对标 legado：header 允许为 JSON 字符串或 Map；统一归一为字符串，交由解析引擎兼容处理。
+      header: parseHeader(json['header']),
       loginUrl: json['loginUrl']?.toString(),
       loginUi: json['loginUi']?.toString(),
       loginCheckJs: json['loginCheckJs']?.toString(),

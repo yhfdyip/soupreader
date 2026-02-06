@@ -259,6 +259,42 @@ class _SearchViewState extends State<SearchView> {
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
+          if ([
+            if (result.kind.trim().isNotEmpty) result.kind.trim(),
+            if (result.wordCount.trim().isNotEmpty)
+              '字数:${result.wordCount.trim()}',
+            if (result.updateTime.trim().isNotEmpty)
+              '更新:${result.updateTime.trim()}',
+          ].isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              [
+                if (result.kind.trim().isNotEmpty) result.kind.trim(),
+                if (result.wordCount.trim().isNotEmpty)
+                  '字数:${result.wordCount.trim()}',
+                if (result.updateTime.trim().isNotEmpty)
+                  '更新:${result.updateTime.trim()}',
+              ].join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
+          if (result.lastChapter.trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              '最新: ${result.lastChapter.trim()}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
           const SizedBox(height: 2),
           Text(
             '来源: ${result.sourceName}',

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 
 import '../../../core/database/database_service.dart';
@@ -64,7 +65,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final DatabaseService _db;
   late final SourceRepository _repo;
   final RuleParserEngine _engine = RuleParserEngine();
-  final SourceDebugExportService _debugExportService = SourceDebugExportService();
+  final SourceDebugExportService _debugExportService =
+      SourceDebugExportService();
 
   int _tab = 0; // 0 基础 1 规则 2 JSON 3 调试
 
@@ -98,7 +100,10 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final TextEditingController _searchBookUrlCtrl;
   late final TextEditingController _searchCoverUrlCtrl;
   late final TextEditingController _searchIntroCtrl;
+  late final TextEditingController _searchKindCtrl;
   late final TextEditingController _searchLastChapterCtrl;
+  late final TextEditingController _searchUpdateTimeCtrl;
+  late final TextEditingController _searchWordCountCtrl;
 
   late final TextEditingController _exploreBookListCtrl;
   late final TextEditingController _exploreNameCtrl;
@@ -106,7 +111,10 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final TextEditingController _exploreBookUrlCtrl;
   late final TextEditingController _exploreCoverUrlCtrl;
   late final TextEditingController _exploreIntroCtrl;
+  late final TextEditingController _exploreKindCtrl;
   late final TextEditingController _exploreLastChapterCtrl;
+  late final TextEditingController _exploreUpdateTimeCtrl;
+  late final TextEditingController _exploreWordCountCtrl;
 
   late final TextEditingController _infoInitCtrl;
   late final TextEditingController _infoNameCtrl;
@@ -114,7 +122,10 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final TextEditingController _infoIntroCtrl;
   late final TextEditingController _infoCoverUrlCtrl;
   late final TextEditingController _infoTocUrlCtrl;
+  late final TextEditingController _infoKindCtrl;
   late final TextEditingController _infoLastChapterCtrl;
+  late final TextEditingController _infoUpdateTimeCtrl;
+  late final TextEditingController _infoWordCountCtrl;
 
   late final TextEditingController _tocChapterListCtrl;
   late final TextEditingController _tocChapterNameCtrl;
@@ -141,8 +152,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   final List<_DebugLine> _debugLines = <_DebugLine>[];
   final List<_DebugLine> _debugLinesAll = <_DebugLine>[];
   int _debugConsoleMode = 1; // 0 分段 1 文本 2 逐行
-  bool _debugShowAllLines = false; // 全量展示（可能卡顿）
-  bool _debugWrapLines = false; // 逐行模式自动换行
+  bool _debugShowAllLines = true; // 全量展示（可能卡顿）
+  bool _debugWrapLines = true; // 逐行模式自动换行
   String _debugFilter = ''; // 控制台过滤关键字（大小写不敏感）
   final Set<int> _expandedDebugBlocks = <int>{};
   String? _debugListSrcHtml; // state=10（搜索/发现列表页）
@@ -185,7 +196,8 @@ class _SourceEditViewState extends State<SourceEditView> {
     _loginUrlCtrl = TextEditingController(text: source?.loginUrl ?? '');
     _loginUiCtrl = TextEditingController(text: source?.loginUi ?? '');
     _loginCheckJsCtrl = TextEditingController(text: source?.loginCheckJs ?? '');
-    _coverDecodeJsCtrl = TextEditingController(text: source?.coverDecodeJs ?? '');
+    _coverDecodeJsCtrl =
+        TextEditingController(text: source?.coverDecodeJs ?? '');
     _bookSourceCommentCtrl =
         TextEditingController(text: source?.bookSourceComment ?? '');
     _variableCommentCtrl =
@@ -203,7 +215,8 @@ class _SourceEditViewState extends State<SourceEditView> {
         TextEditingController(text: source?.ruleSearch?.checkKeyWord ?? '');
     _searchBookListCtrl =
         TextEditingController(text: source?.ruleSearch?.bookList ?? '');
-    _searchNameCtrl = TextEditingController(text: source?.ruleSearch?.name ?? '');
+    _searchNameCtrl =
+        TextEditingController(text: source?.ruleSearch?.name ?? '');
     _searchAuthorCtrl =
         TextEditingController(text: source?.ruleSearch?.author ?? '');
     _searchBookUrlCtrl =
@@ -212,8 +225,14 @@ class _SourceEditViewState extends State<SourceEditView> {
         TextEditingController(text: source?.ruleSearch?.coverUrl ?? '');
     _searchIntroCtrl =
         TextEditingController(text: source?.ruleSearch?.intro ?? '');
+    _searchKindCtrl =
+        TextEditingController(text: source?.ruleSearch?.kind ?? '');
     _searchLastChapterCtrl =
         TextEditingController(text: source?.ruleSearch?.lastChapter ?? '');
+    _searchUpdateTimeCtrl =
+        TextEditingController(text: source?.ruleSearch?.updateTime ?? '');
+    _searchWordCountCtrl =
+        TextEditingController(text: source?.ruleSearch?.wordCount ?? '');
 
     _exploreBookListCtrl =
         TextEditingController(text: source?.ruleExplore?.bookList ?? '');
@@ -227,12 +246,19 @@ class _SourceEditViewState extends State<SourceEditView> {
         TextEditingController(text: source?.ruleExplore?.coverUrl ?? '');
     _exploreIntroCtrl =
         TextEditingController(text: source?.ruleExplore?.intro ?? '');
+    _exploreKindCtrl =
+        TextEditingController(text: source?.ruleExplore?.kind ?? '');
     _exploreLastChapterCtrl =
         TextEditingController(text: source?.ruleExplore?.lastChapter ?? '');
+    _exploreUpdateTimeCtrl =
+        TextEditingController(text: source?.ruleExplore?.updateTime ?? '');
+    _exploreWordCountCtrl =
+        TextEditingController(text: source?.ruleExplore?.wordCount ?? '');
 
     _infoInitCtrl =
         TextEditingController(text: source?.ruleBookInfo?.init ?? '');
-    _infoNameCtrl = TextEditingController(text: source?.ruleBookInfo?.name ?? '');
+    _infoNameCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.name ?? '');
     _infoAuthorCtrl =
         TextEditingController(text: source?.ruleBookInfo?.author ?? '');
     _infoIntroCtrl =
@@ -241,8 +267,14 @@ class _SourceEditViewState extends State<SourceEditView> {
         TextEditingController(text: source?.ruleBookInfo?.coverUrl ?? '');
     _infoTocUrlCtrl =
         TextEditingController(text: source?.ruleBookInfo?.tocUrl ?? '');
+    _infoKindCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.kind ?? '');
     _infoLastChapterCtrl =
         TextEditingController(text: source?.ruleBookInfo?.lastChapter ?? '');
+    _infoUpdateTimeCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.updateTime ?? '');
+    _infoWordCountCtrl =
+        TextEditingController(text: source?.ruleBookInfo?.wordCount ?? '');
 
     _tocChapterListCtrl =
         TextEditingController(text: source?.ruleToc?.chapterList ?? '');
@@ -298,21 +330,30 @@ class _SourceEditViewState extends State<SourceEditView> {
     _searchBookUrlCtrl.dispose();
     _searchCoverUrlCtrl.dispose();
     _searchIntroCtrl.dispose();
+    _searchKindCtrl.dispose();
     _searchLastChapterCtrl.dispose();
+    _searchUpdateTimeCtrl.dispose();
+    _searchWordCountCtrl.dispose();
     _exploreBookListCtrl.dispose();
     _exploreNameCtrl.dispose();
     _exploreAuthorCtrl.dispose();
     _exploreBookUrlCtrl.dispose();
     _exploreCoverUrlCtrl.dispose();
     _exploreIntroCtrl.dispose();
+    _exploreKindCtrl.dispose();
     _exploreLastChapterCtrl.dispose();
+    _exploreUpdateTimeCtrl.dispose();
+    _exploreWordCountCtrl.dispose();
     _infoInitCtrl.dispose();
     _infoNameCtrl.dispose();
     _infoAuthorCtrl.dispose();
     _infoIntroCtrl.dispose();
     _infoCoverUrlCtrl.dispose();
     _infoTocUrlCtrl.dispose();
+    _infoKindCtrl.dispose();
     _infoLastChapterCtrl.dispose();
+    _infoUpdateTimeCtrl.dispose();
+    _infoWordCountCtrl.dispose();
     _tocChapterListCtrl.dispose();
     _tocChapterNameCtrl.dispose();
     _tocChapterUrlCtrl.dispose();
@@ -333,10 +374,14 @@ class _SourceEditViewState extends State<SourceEditView> {
     final tabControl = CupertinoSlidingSegmentedControl<int>(
       groupValue: _tab,
       children: const {
-        0: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('基础')),
-        1: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('规则')),
-        2: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('JSON')),
-        3: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('调试')),
+        0: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('基础')),
+        1: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('规则')),
+        2: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('JSON')),
+        3: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('调试')),
       },
       onValueChanged: (v) {
         if (v == null) return;
@@ -404,12 +449,18 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleSearch.name'),
             _buildTextFieldTile('作者', _searchAuthorCtrl,
                 placeholder: 'ruleSearch.author'),
+            _buildTextFieldTile('分类/类型', _searchKindCtrl,
+                placeholder: 'ruleSearch.kind（可选）'),
             _buildTextFieldTile('封面', _searchCoverUrlCtrl,
                 placeholder: 'ruleSearch.coverUrl（@src）'),
             _buildTextFieldTile('简介', _searchIntroCtrl,
                 placeholder: 'ruleSearch.intro'),
             _buildTextFieldTile('最新章节', _searchLastChapterCtrl,
                 placeholder: 'ruleSearch.lastChapter'),
+            _buildTextFieldTile('更新时间', _searchUpdateTimeCtrl,
+                placeholder: 'ruleSearch.updateTime（可选）'),
+            _buildTextFieldTile('字数', _searchWordCountCtrl,
+                placeholder: 'ruleSearch.wordCount（可选）'),
             _buildTextFieldTile('详情链接', _searchBookUrlCtrl,
                 placeholder: 'ruleSearch.bookUrl（@href）'),
           ],
@@ -423,12 +474,18 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleExplore.name'),
             _buildTextFieldTile('作者', _exploreAuthorCtrl,
                 placeholder: 'ruleExplore.author'),
+            _buildTextFieldTile('分类/类型', _exploreKindCtrl,
+                placeholder: 'ruleExplore.kind（可选）'),
             _buildTextFieldTile('封面', _exploreCoverUrlCtrl,
                 placeholder: 'ruleExplore.coverUrl'),
             _buildTextFieldTile('简介', _exploreIntroCtrl,
                 placeholder: 'ruleExplore.intro'),
             _buildTextFieldTile('最新章节', _exploreLastChapterCtrl,
                 placeholder: 'ruleExplore.lastChapter'),
+            _buildTextFieldTile('更新时间', _exploreUpdateTimeCtrl,
+                placeholder: 'ruleExplore.updateTime（可选）'),
+            _buildTextFieldTile('字数', _exploreWordCountCtrl,
+                placeholder: 'ruleExplore.wordCount（可选）'),
             _buildTextFieldTile('详情链接', _exploreBookUrlCtrl,
                 placeholder: 'ruleExplore.bookUrl'),
           ],
@@ -446,8 +503,14 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleBookInfo.coverUrl'),
             _buildTextFieldTile('简介', _infoIntroCtrl,
                 placeholder: 'ruleBookInfo.intro', maxLines: 3),
+            _buildTextFieldTile('分类/类型', _infoKindCtrl,
+                placeholder: 'ruleBookInfo.kind（可选）'),
             _buildTextFieldTile('最新章节', _infoLastChapterCtrl,
                 placeholder: 'ruleBookInfo.lastChapter'),
+            _buildTextFieldTile('更新时间', _infoUpdateTimeCtrl,
+                placeholder: 'ruleBookInfo.updateTime（可选）'),
+            _buildTextFieldTile('字数', _infoWordCountCtrl,
+                placeholder: 'ruleBookInfo.wordCount（可选）'),
             _buildTextFieldTile('目录链接', _infoTocUrlCtrl,
                 placeholder: 'ruleBookInfo.tocUrl（@href）'),
           ],
@@ -511,8 +574,10 @@ class _SourceEditViewState extends State<SourceEditView> {
           children: [
             _buildTextFieldTile('名称', _nameCtrl, placeholder: 'bookSourceName'),
             _buildTextFieldTile('地址', _urlCtrl, placeholder: 'bookSourceUrl'),
-            _buildTextFieldTile('分组', _groupCtrl, placeholder: 'bookSourceGroup'),
-            _buildTextFieldTile('类型', _typeCtrl, placeholder: 'bookSourceType（数字）'),
+            _buildTextFieldTile('分组', _groupCtrl,
+                placeholder: 'bookSourceGroup'),
+            _buildTextFieldTile('类型', _typeCtrl,
+                placeholder: 'bookSourceType（数字）'),
             _buildTextFieldTile(
               '自定义排序',
               _customOrderCtrl,
@@ -602,7 +667,8 @@ class _SourceEditViewState extends State<SourceEditView> {
               _searchUrlCtrl,
               placeholder: 'searchUrl（含 {key} 或 {{key}}）',
             ),
-            _buildTextFieldTile('发现 URL', _exploreUrlCtrl, placeholder: 'exploreUrl'),
+            _buildTextFieldTile('发现 URL', _exploreUrlCtrl,
+                placeholder: 'exploreUrl'),
             _buildTextFieldTile(
               '发现屏蔽',
               _exploreScreenCtrl,
@@ -944,7 +1010,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildDebugSourcesSection() {
-    String? nonEmpty(String? s) => (s != null && s.trim().isNotEmpty) ? s : null;
+    String? nonEmpty(String? s) =>
+        (s != null && s.trim().isNotEmpty) ? s : null;
     final listHtml = nonEmpty(_debugListSrcHtml);
     final bookHtml = nonEmpty(_debugBookSrcHtml);
     final tocHtml = nonEmpty(_debugTocSrcHtml);
@@ -956,7 +1023,8 @@ class _SourceEditViewState extends State<SourceEditView> {
       children: [
         CupertinoListTile.notched(
           title: const Text('列表页源码'),
-          additionalInfo: Text(listHtml == null ? '—' : '${listHtml.length} 字符'),
+          additionalInfo:
+              Text(listHtml == null ? '—' : '${listHtml.length} 字符'),
           trailing: const CupertinoListTileChevron(),
           onTap: listHtml == null
               ? null
@@ -964,7 +1032,8 @@ class _SourceEditViewState extends State<SourceEditView> {
         ),
         CupertinoListTile.notched(
           title: const Text('详情页源码'),
-          additionalInfo: Text(bookHtml == null ? '—' : '${bookHtml.length} 字符'),
+          additionalInfo:
+              Text(bookHtml == null ? '—' : '${bookHtml.length} 字符'),
           trailing: const CupertinoListTileChevron(),
           onTap: bookHtml == null
               ? null
@@ -1004,7 +1073,11 @@ class _SourceEditViewState extends State<SourceEditView> {
   Widget _buildDebugConsoleSection() {
     final hasLines = _debugLinesAll.isNotEmpty;
     final mode = _debugConsoleMode;
-    final modeLabel = mode == 0 ? '分段' : mode == 1 ? '文本' : '逐行';
+    final modeLabel = mode == 0
+        ? '分段'
+        : mode == 1
+            ? '文本'
+            : '逐行';
     final allText =
         hasLines ? _debugLinesAll.map((e) => e.text).join('\n') : '';
     final totalLines = _debugLinesAll.length;
@@ -1026,9 +1099,15 @@ class _SourceEditViewState extends State<SourceEditView> {
         subtitle: CupertinoSlidingSegmentedControl<int>(
           groupValue: _debugConsoleMode,
           children: const {
-            0: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('分段')),
-            1: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('文本')),
-            2: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('逐行')),
+            0: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('分段')),
+            1: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('文本')),
+            2: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('逐行')),
           },
           onValueChanged: (v) {
             if (v == null) return;
@@ -1064,7 +1143,8 @@ class _SourceEditViewState extends State<SourceEditView> {
         title: const Text('打开全文控制台'),
         additionalInfo: Text('$totalLines 行'),
         trailing: const CupertinoListTileChevron(),
-        onTap: hasLines ? () => _openDebugText(title: '控制台', text: allText) : null,
+        onTap:
+            hasLines ? () => _openDebugText(title: '控制台', text: allText) : null,
       ),
     ];
 
@@ -1081,26 +1161,11 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
 
     if (effectiveMode == 1) {
-      const previewLines = 40;
-      final preview = _debugLinesAll.length <= previewLines
-          ? allText
-          : _debugLinesAll
-              .sublist(_debugLinesAll.length - previewLines)
-              .map((e) => e.text)
-              .join('\n');
+      final visibleText = visibleLines.map((e) => e.text).join('\n');
       children.add(
         CupertinoListTile.notched(
-          title: const Text('预览（最近 40 行）'),
-          subtitle: Text(
-            preview,
-            maxLines: 16,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12.5,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
+          title: const Text('文本控制台'),
+          subtitle: _buildConsoleTextPanel(visibleText),
           trailing: const CupertinoListTileChevron(),
           onTap: () => _openDebugText(title: '控制台', text: allText),
         ),
@@ -1143,7 +1208,9 @@ class _SourceEditViewState extends State<SourceEditView> {
             title: Text(
               line.text,
               maxLines: _debugWrapLines ? null : 3,
-              overflow: _debugWrapLines ? TextOverflow.visible : TextOverflow.ellipsis,
+              overflow: _debugWrapLines
+                  ? TextOverflow.visible
+                  : TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 12.5,
@@ -1226,8 +1293,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                 ),
               ),
               trailing: const CupertinoListTileChevron(),
-              onTap: () =>
-                  _openDebugText(title: '日志分段', text: block.fullText),
+              onTap: () => _openDebugText(title: '日志分段', text: block.fullText),
             ),
           );
         }
@@ -1248,6 +1314,32 @@ class _SourceEditViewState extends State<SourceEditView> {
         }(),
       ),
       children: children,
+    );
+  }
+
+  Widget _buildConsoleTextPanel(String text) {
+    final t = text.trimRight();
+    final show = t.isEmpty ? '—' : t;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      constraints: const BoxConstraints(minHeight: 120, maxHeight: 340),
+      child: CupertinoScrollbar(
+        child: SingleChildScrollView(
+          child: SelectableText(
+            show,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1467,7 +1559,8 @@ class _SourceEditViewState extends State<SourceEditView> {
     setIfNonEmpty('loginUi', _loginUiCtrl, trimValue: false);
     setIfNonEmpty('loginCheckJs', _loginCheckJsCtrl, trimValue: false);
     setIfNonEmpty('coverDecodeJs', _coverDecodeJsCtrl, trimValue: false);
-    setIfNonEmpty('bookSourceComment', _bookSourceCommentCtrl, trimValue: false);
+    setIfNonEmpty('bookSourceComment', _bookSourceCommentCtrl,
+        trimValue: false);
     setIfNonEmpty('variableComment', _variableCommentCtrl, trimValue: false);
     setIfNonEmpty('searchUrl', _searchUrlCtrl);
     setIfNonEmpty('exploreUrl', _exploreUrlCtrl);
@@ -1496,7 +1589,10 @@ class _SourceEditViewState extends State<SourceEditView> {
       'bookUrl': _searchBookUrlCtrl,
       'coverUrl': _searchCoverUrlCtrl,
       'intro': _searchIntroCtrl,
+      'kind': _searchKindCtrl,
       'lastChapter': _searchLastChapterCtrl,
+      'updateTime': _searchUpdateTimeCtrl,
+      'wordCount': _searchWordCountCtrl,
     });
 
     map['ruleExplore'] = patchRule('ruleExplore', {
@@ -1506,7 +1602,10 @@ class _SourceEditViewState extends State<SourceEditView> {
       'bookUrl': _exploreBookUrlCtrl,
       'coverUrl': _exploreCoverUrlCtrl,
       'intro': _exploreIntroCtrl,
+      'kind': _exploreKindCtrl,
       'lastChapter': _exploreLastChapterCtrl,
+      'updateTime': _exploreUpdateTimeCtrl,
+      'wordCount': _exploreWordCountCtrl,
     });
 
     map['ruleBookInfo'] = patchRule(
@@ -1517,7 +1616,10 @@ class _SourceEditViewState extends State<SourceEditView> {
         'author': _infoAuthorCtrl,
         'coverUrl': _infoCoverUrlCtrl,
         'tocUrl': _infoTocUrlCtrl,
+        'kind': _infoKindCtrl,
         'lastChapter': _infoLastChapterCtrl,
+        'updateTime': _infoUpdateTimeCtrl,
+        'wordCount': _infoWordCountCtrl,
         'intro': _infoIntroCtrl,
       },
       noTrimKeys: {'intro'},
@@ -1786,10 +1888,14 @@ class _SourceEditViewState extends State<SourceEditView> {
     setOrRemove('header', textOrNull(_headerCtrl, trimValue: false));
     setOrRemove('loginUrl', textOrNull(_loginUrlCtrl));
     setOrRemove('loginUi', textOrNull(_loginUiCtrl, trimValue: false));
-    setOrRemove('loginCheckJs', textOrNull(_loginCheckJsCtrl, trimValue: false));
-    setOrRemove('coverDecodeJs', textOrNull(_coverDecodeJsCtrl, trimValue: false));
-    setOrRemove('bookSourceComment', textOrNull(_bookSourceCommentCtrl, trimValue: false));
-    setOrRemove('variableComment', textOrNull(_variableCommentCtrl, trimValue: false));
+    setOrRemove(
+        'loginCheckJs', textOrNull(_loginCheckJsCtrl, trimValue: false));
+    setOrRemove(
+        'coverDecodeJs', textOrNull(_coverDecodeJsCtrl, trimValue: false));
+    setOrRemove('bookSourceComment',
+        textOrNull(_bookSourceCommentCtrl, trimValue: false));
+    setOrRemove(
+        'variableComment', textOrNull(_variableCommentCtrl, trimValue: false));
     setOrRemove('searchUrl', textOrNull(_searchUrlCtrl));
     setOrRemove('exploreUrl', textOrNull(_exploreUrlCtrl));
     setOrRemove('exploreScreen', textOrNull(_exploreScreenCtrl));
@@ -1802,7 +1908,8 @@ class _SourceEditViewState extends State<SourceEditView> {
       return <String, dynamic>{};
     }
 
-    Map<String, dynamic>? mergeRule(dynamic rawRule, Map<String, String?> updates) {
+    Map<String, dynamic>? mergeRule(
+        dynamic rawRule, Map<String, String?> updates) {
       final m = ensureMap(rawRule);
       updates.forEach((k, v) {
         if (v == null) {
@@ -1823,7 +1930,10 @@ class _SourceEditViewState extends State<SourceEditView> {
       'bookUrl': textOrNull(_searchBookUrlCtrl),
       'coverUrl': textOrNull(_searchCoverUrlCtrl),
       'intro': textOrNull(_searchIntroCtrl),
+      'kind': textOrNull(_searchKindCtrl),
       'lastChapter': textOrNull(_searchLastChapterCtrl),
+      'updateTime': textOrNull(_searchUpdateTimeCtrl),
+      'wordCount': textOrNull(_searchWordCountCtrl),
     });
     if (ruleSearch == null) {
       map.remove('ruleSearch');
@@ -1838,7 +1948,10 @@ class _SourceEditViewState extends State<SourceEditView> {
       'bookUrl': textOrNull(_exploreBookUrlCtrl),
       'coverUrl': textOrNull(_exploreCoverUrlCtrl),
       'intro': textOrNull(_exploreIntroCtrl),
+      'kind': textOrNull(_exploreKindCtrl),
       'lastChapter': textOrNull(_exploreLastChapterCtrl),
+      'updateTime': textOrNull(_exploreUpdateTimeCtrl),
+      'wordCount': textOrNull(_exploreWordCountCtrl),
     });
     if (ruleExplore == null) {
       map.remove('ruleExplore');
@@ -1851,9 +1964,12 @@ class _SourceEditViewState extends State<SourceEditView> {
       'name': textOrNull(_infoNameCtrl),
       'author': textOrNull(_infoAuthorCtrl),
       'intro': textOrNull(_infoIntroCtrl, trimValue: false),
+      'kind': textOrNull(_infoKindCtrl),
       'coverUrl': textOrNull(_infoCoverUrlCtrl),
       'tocUrl': textOrNull(_infoTocUrlCtrl),
       'lastChapter': textOrNull(_infoLastChapterCtrl),
+      'updateTime': textOrNull(_infoUpdateTimeCtrl),
+      'wordCount': textOrNull(_infoWordCountCtrl),
     });
     if (ruleBookInfo == null) {
       map.remove('ruleBookInfo');
@@ -1934,7 +2050,10 @@ class _SourceEditViewState extends State<SourceEditView> {
       _searchBookUrlCtrl.text = source.ruleSearch?.bookUrl ?? '';
       _searchCoverUrlCtrl.text = source.ruleSearch?.coverUrl ?? '';
       _searchIntroCtrl.text = source.ruleSearch?.intro ?? '';
+      _searchKindCtrl.text = source.ruleSearch?.kind ?? '';
       _searchLastChapterCtrl.text = source.ruleSearch?.lastChapter ?? '';
+      _searchUpdateTimeCtrl.text = source.ruleSearch?.updateTime ?? '';
+      _searchWordCountCtrl.text = source.ruleSearch?.wordCount ?? '';
 
       _exploreBookListCtrl.text = source.ruleExplore?.bookList ?? '';
       _exploreNameCtrl.text = source.ruleExplore?.name ?? '';
@@ -1942,15 +2061,21 @@ class _SourceEditViewState extends State<SourceEditView> {
       _exploreBookUrlCtrl.text = source.ruleExplore?.bookUrl ?? '';
       _exploreCoverUrlCtrl.text = source.ruleExplore?.coverUrl ?? '';
       _exploreIntroCtrl.text = source.ruleExplore?.intro ?? '';
+      _exploreKindCtrl.text = source.ruleExplore?.kind ?? '';
       _exploreLastChapterCtrl.text = source.ruleExplore?.lastChapter ?? '';
+      _exploreUpdateTimeCtrl.text = source.ruleExplore?.updateTime ?? '';
+      _exploreWordCountCtrl.text = source.ruleExplore?.wordCount ?? '';
 
       _infoInitCtrl.text = source.ruleBookInfo?.init ?? '';
       _infoNameCtrl.text = source.ruleBookInfo?.name ?? '';
       _infoAuthorCtrl.text = source.ruleBookInfo?.author ?? '';
       _infoIntroCtrl.text = source.ruleBookInfo?.intro ?? '';
+      _infoKindCtrl.text = source.ruleBookInfo?.kind ?? '';
       _infoCoverUrlCtrl.text = source.ruleBookInfo?.coverUrl ?? '';
       _infoTocUrlCtrl.text = source.ruleBookInfo?.tocUrl ?? '';
       _infoLastChapterCtrl.text = source.ruleBookInfo?.lastChapter ?? '';
+      _infoUpdateTimeCtrl.text = source.ruleBookInfo?.updateTime ?? '';
+      _infoWordCountCtrl.text = source.ruleBookInfo?.wordCount ?? '';
 
       _tocChapterListCtrl.text = source.ruleToc?.chapterList ?? '';
       _tocChapterNameCtrl.text = source.ruleToc?.chapterName ?? '';
@@ -1961,7 +2086,8 @@ class _SourceEditViewState extends State<SourceEditView> {
 
       _contentTitleCtrl.text = source.ruleContent?.title ?? '';
       _contentContentCtrl.text = source.ruleContent?.content ?? '';
-      _contentNextContentUrlCtrl.text = source.ruleContent?.nextContentUrl ?? '';
+      _contentNextContentUrlCtrl.text =
+          source.ruleContent?.nextContentUrl ?? '';
       _contentReplaceRegexCtrl.text = source.ruleContent?.replaceRegex ?? '';
     });
     _validateJson();

@@ -19,8 +19,7 @@ class RuleParserEngine {
   static const Map<String, String> _defaultHeaders = {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) '
         'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
-    'Accept':
-        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
     'Upgrade-Insecure-Requests': '1',
   };
@@ -360,6 +359,40 @@ class RuleParserEngine {
     return headers;
   }
 
+  void _applyPreferredOriginHeaders(
+    Map<String, String> headers,
+    String? originText,
+  ) {
+    final raw = (originText ?? '').trim();
+    if (raw.isEmpty) return;
+    Uri? uri;
+    try {
+      uri = Uri.parse(raw);
+    } catch (_) {
+      uri = null;
+    }
+    if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) return;
+
+    final isDefaultPort = (uri.scheme == 'http' && uri.port == 80) ||
+        (uri.scheme == 'https' && uri.port == 443);
+    final origin = isDefaultPort || !uri.hasPort
+        ? '${uri.scheme}://${uri.host}'
+        : '${uri.scheme}://${uri.host}:${uri.port}';
+
+    bool hasKey(String key) {
+      final lower = key.toLowerCase();
+      return headers.keys.any((k) => k.toLowerCase() == lower);
+    }
+
+    // 对标 legado：UrlOption.origin 主要用于补齐防盗链站点的 Origin/Referer
+    if (!hasKey('Origin')) {
+      headers['Origin'] = origin;
+    }
+    if (!hasKey('Referer')) {
+      headers['Referer'] = '$origin/';
+    }
+  }
+
   String _formatRequestHeadersForLog(Map<String, String> headers) {
     if (headers.isEmpty) return '—';
 
@@ -696,8 +729,8 @@ class RuleParserEngine {
   String? _tryParseCharsetFromContentType(String? contentType) {
     final ct = (contentType ?? '').trim();
     if (ct.isEmpty) return null;
-    final m = RegExp(r'charset\s*=\s*([^;\s]+)', caseSensitive: false)
-        .firstMatch(ct);
+    final m =
+        RegExp(r'charset\s*=\s*([^;\s]+)', caseSensitive: false).firstMatch(ct);
     if (m == null) return null;
     final v = m.group(1);
     if (v == null) return null;
@@ -708,8 +741,7 @@ class RuleParserEngine {
     // 用 latin1 作为“无损映射”，只为查 meta charset（不用于最终文本）
     final headLen = bytes.length < 4096 ? bytes.length : 4096;
     final head = latin1.decode(bytes.sublist(0, headLen), allowInvalid: true);
-    final m1 = RegExp(
-            r'''<meta[^>]+charset\s*=\s*['"]?\s*([^'"\s/>]+)''',
+    final m1 = RegExp(r'''<meta[^>]+charset\s*=\s*['"]?\s*([^'"\s/>]+)''',
             caseSensitive: false)
         .firstMatch(head);
     final c1 = m1?.group(1);
@@ -813,8 +845,13 @@ class RuleParserEngine {
           final name = _parseValueOnNode(node, searchRule.name, searchUrl);
           final author = _parseValueOnNode(node, searchRule.author, searchUrl);
           final intro = _parseValueOnNode(node, searchRule.intro, searchUrl);
+          final kind = _parseValueOnNode(node, searchRule.kind, searchUrl);
           final lastChapter =
               _parseValueOnNode(node, searchRule.lastChapter, searchUrl);
+          final updateTime =
+              _parseValueOnNode(node, searchRule.updateTime, searchUrl);
+          final wordCount =
+              _parseValueOnNode(node, searchRule.wordCount, searchUrl);
 
           var bookUrl = _parseValueOnNode(node, searchRule.bookUrl, searchUrl);
           if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
@@ -832,7 +869,10 @@ class RuleParserEngine {
             author: author,
             coverUrl: coverUrl,
             intro: intro,
+            kind: kind,
             lastChapter: lastChapter,
+            updateTime: updateTime,
+            wordCount: wordCount,
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -863,7 +903,10 @@ class RuleParserEngine {
             author: _parseRule(element, searchRule.author, searchUrl),
             coverUrl: coverUrl,
             intro: _parseRule(element, searchRule.intro, searchUrl),
+            kind: _parseRule(element, searchRule.kind, searchUrl),
             lastChapter: _parseRule(element, searchRule.lastChapter, searchUrl),
+            updateTime: _parseRule(element, searchRule.updateTime, searchUrl),
+            wordCount: _parseRule(element, searchRule.wordCount, searchUrl),
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -1115,7 +1158,8 @@ class RuleParserEngine {
     required BookSource source,
     required String keyOrUrl,
     required _DebugListMode mode,
-    required Future<FetchDebugResult> Function(String url, {required int rawState})
+    required Future<FetchDebugResult> Function(String url,
+            {required int rawState})
         fetchStage,
     required void Function(String msg, {int state, bool showTime}) log,
   }) async {
@@ -1170,8 +1214,7 @@ class RuleParserEngine {
       for (var i = 0; i < nodes.length; i++) {
         final node = nodes[i];
         final name = _parseValueOnNode(node, bookListRule.name, requestUrl);
-        final author =
-            _parseValueOnNode(node, bookListRule.author, requestUrl);
+        final author = _parseValueOnNode(node, bookListRule.author, requestUrl);
         var coverUrl =
             _parseValueOnNode(node, bookListRule.coverUrl, requestUrl);
         if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
@@ -1180,8 +1223,7 @@ class RuleParserEngine {
         final intro = _parseValueOnNode(node, bookListRule.intro, requestUrl);
         final lastChapter =
             _parseValueOnNode(node, bookListRule.lastChapter, requestUrl);
-        var bookUrl =
-            _parseValueOnNode(node, bookListRule.bookUrl, requestUrl);
+        var bookUrl = _parseValueOnNode(node, bookListRule.bookUrl, requestUrl);
         if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
           bookUrl = _absoluteUrl(requestUrl, bookUrl);
         }
@@ -1235,7 +1277,8 @@ class RuleParserEngine {
           coverUrl = _absoluteUrl(requestUrl, coverUrl);
         }
         final intro = _parseRule(el, bookListRule.intro, requestUrl);
-        final lastChapter = _parseRule(el, bookListRule.lastChapter, requestUrl);
+        final lastChapter =
+            _parseRule(el, bookListRule.lastChapter, requestUrl);
         var bookUrl = _parseRule(el, bookListRule.bookUrl, requestUrl);
         if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
           bookUrl = _absoluteUrl(requestUrl, bookUrl);
@@ -1281,7 +1324,8 @@ class RuleParserEngine {
   Future<bool> _debugInfoTocContent({
     required BookSource source,
     required String bookUrl,
-    required Future<FetchDebugResult> Function(String url, {required int rawState})
+    required Future<FetchDebugResult> Function(String url,
+            {required int rawState})
         fetchStage,
     required void Function(int state, String payload) emitRaw,
     required void Function(String msg, {int state, bool showTime}) log,
@@ -1308,7 +1352,8 @@ class RuleParserEngine {
   Future<String?> _debugBookInfo({
     required BookSource source,
     required String bookUrl,
-    required Future<FetchDebugResult> Function(String url, {required int rawState})
+    required Future<FetchDebugResult> Function(String url,
+            {required int rawState})
         fetchStage,
     required void Function(String msg, {int state, bool showTime}) log,
   }) async {
@@ -1357,7 +1402,10 @@ class RuleParserEngine {
         tocUrl = _absoluteUrl(fullUrl, tocUrl);
       }
 
-      if (name.isEmpty && author.isEmpty && lastChapter.isEmpty && tocUrl.isEmpty) {
+      if (name.isEmpty &&
+          author.isEmpty &&
+          lastChapter.isEmpty &&
+          tocUrl.isEmpty) {
         log('≡字段全为空，可能 ruleBookInfo 不匹配', state: -1);
       }
 
@@ -1407,7 +1455,10 @@ class RuleParserEngine {
       tocUrl = _absoluteUrl(fullUrl, tocUrl);
     }
 
-    if (name.isEmpty && author.isEmpty && lastChapter.isEmpty && tocUrl.isEmpty) {
+    if (name.isEmpty &&
+        author.isEmpty &&
+        lastChapter.isEmpty &&
+        tocUrl.isEmpty) {
       log('≡字段全为空，可能 ruleBookInfo 不匹配', state: -1);
     }
 
@@ -1420,7 +1471,8 @@ class RuleParserEngine {
   Future<bool> _debugTocThenContent({
     required BookSource source,
     required String tocUrl,
-    required Future<FetchDebugResult> Function(String url, {required int rawState})
+    required Future<FetchDebugResult> Function(String url,
+            {required int rawState})
         fetchStage,
     required void Function(int state, String payload) emitRaw,
     required void Function(String msg, {int state, bool showTime}) log,
@@ -1477,7 +1529,8 @@ class RuleParserEngine {
           if (name.isEmpty || url.isEmpty) continue;
           toc.add(TocItem(index: toc.length, name: name, url: url));
         }
-        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+        if (tocRule.nextTocUrl != null &&
+            tocRule.nextTocUrl!.trim().isNotEmpty) {
           nextCandidates = _parseStringListFromJson(
             json: jsonRoot,
             rule: tocRule.nextTocUrl!,
@@ -1491,7 +1544,8 @@ class RuleParserEngine {
         }
       } else {
         final document = html_parser.parse(body);
-        final elements = _selectAllElementsByRule(document, normalized.selector);
+        final elements =
+            _selectAllElementsByRule(document, normalized.selector);
         log('└列表大小:${elements.length}');
         for (var i = 0; i < elements.length; i++) {
           final el = elements[i];
@@ -1509,7 +1563,8 @@ class RuleParserEngine {
           if (name.isEmpty || url.isEmpty) continue;
           toc.add(TocItem(index: toc.length, name: name, url: url));
         }
-        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+        if (tocRule.nextTocUrl != null &&
+            tocRule.nextTocUrl!.trim().isNotEmpty) {
           final root = document.documentElement;
           if (root != null) {
             nextCandidates = _parseStringListFromHtml(
@@ -1574,7 +1629,8 @@ class RuleParserEngine {
   Future<bool> _debugContentOnly({
     required BookSource source,
     required String chapterUrl,
-    required Future<FetchDebugResult> Function(String url, {required int rawState})
+    required Future<FetchDebugResult> Function(String url,
+            {required int rawState})
         fetchStage,
     required void Function(int state, String payload) emitRaw,
     required void Function(String msg, {int state, bool showTime}) log,
@@ -1612,9 +1668,12 @@ class RuleParserEngine {
       String extracted;
       List<String> nextCandidates = const <String>[];
 
-      if (jsonRoot != null && rule.content != null && _looksLikeJsonPath(rule.content!)) {
+      if (jsonRoot != null &&
+          rule.content != null &&
+          _looksLikeJsonPath(rule.content!)) {
         extracted = _parseValueOnNode(jsonRoot, rule.content, currentUrl);
-        if (rule.nextContentUrl != null && rule.nextContentUrl!.trim().isNotEmpty) {
+        if (rule.nextContentUrl != null &&
+            rule.nextContentUrl!.trim().isNotEmpty) {
           nextCandidates = _parseStringListFromJson(
             json: jsonRoot,
             rule: rule.nextContentUrl!,
@@ -1641,7 +1700,8 @@ class RuleParserEngine {
           extracted = _parseRule(root, rule.content, currentUrl);
         }
 
-        if (rule.nextContentUrl != null && rule.nextContentUrl!.trim().isNotEmpty) {
+        if (rule.nextContentUrl != null &&
+            rule.nextContentUrl!.trim().isNotEmpty) {
           nextCandidates = _parseStringListFromHtml(
             root: root,
             rule: rule.nextContentUrl!,
@@ -1700,7 +1760,8 @@ class RuleParserEngine {
   }
 
   /// 搜索调试：返回「请求/解析」过程的关键诊断信息
-  Future<SearchDebugResult> searchDebug(BookSource source, String keyword) async {
+  Future<SearchDebugResult> searchDebug(
+      BookSource source, String keyword) async {
     final searchRule = source.ruleSearch;
     final searchUrlRule = source.searchUrl;
     if (searchRule == null || searchUrlRule == null || searchUrlRule.isEmpty) {
@@ -1760,6 +1821,7 @@ class RuleParserEngine {
         for (final node in nodes) {
           final name = _parseValueOnNode(node, searchRule.name, requestUrl);
           final author = _parseValueOnNode(node, searchRule.author, requestUrl);
+          final kind = _parseValueOnNode(node, searchRule.kind, requestUrl);
           var coverUrl =
               _parseValueOnNode(node, searchRule.coverUrl, requestUrl);
           if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
@@ -1768,6 +1830,10 @@ class RuleParserEngine {
           final intro = _parseValueOnNode(node, searchRule.intro, requestUrl);
           final lastChapter =
               _parseValueOnNode(node, searchRule.lastChapter, requestUrl);
+          final updateTime =
+              _parseValueOnNode(node, searchRule.updateTime, requestUrl);
+          final wordCount =
+              _parseValueOnNode(node, searchRule.wordCount, requestUrl);
           var bookUrl = _parseValueOnNode(node, searchRule.bookUrl, requestUrl);
           if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
             bookUrl = _absoluteUrl(requestUrl, bookUrl);
@@ -1778,7 +1844,10 @@ class RuleParserEngine {
             author: author,
             coverUrl: coverUrl,
             intro: intro,
+            kind: kind,
             lastChapter: lastChapter,
+            updateTime: updateTime,
+            wordCount: wordCount,
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -1790,7 +1859,10 @@ class RuleParserEngine {
               'author': author,
               'coverUrl': coverUrl,
               'intro': intro,
+              'kind': kind,
               'lastChapter': lastChapter,
+              'updateTime': updateTime,
+              'wordCount': wordCount,
               'bookUrl': bookUrl,
             };
           }
@@ -1807,6 +1879,7 @@ class RuleParserEngine {
         for (final element in bookElements) {
           final name = _parseRule(element, searchRule.name, requestUrl);
           final author = _parseRule(element, searchRule.author, requestUrl);
+          final kind = _parseRule(element, searchRule.kind, requestUrl);
           var coverUrl = _parseRule(element, searchRule.coverUrl, requestUrl);
           if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
             coverUrl = _absoluteUrl(requestUrl, coverUrl);
@@ -1814,6 +1887,10 @@ class RuleParserEngine {
           final intro = _parseRule(element, searchRule.intro, requestUrl);
           final lastChapter =
               _parseRule(element, searchRule.lastChapter, requestUrl);
+          final updateTime =
+              _parseRule(element, searchRule.updateTime, requestUrl);
+          final wordCount =
+              _parseRule(element, searchRule.wordCount, requestUrl);
           var bookUrl = _parseRule(element, searchRule.bookUrl, requestUrl);
           if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
             bookUrl = _absoluteUrl(requestUrl, bookUrl);
@@ -1824,7 +1901,10 @@ class RuleParserEngine {
             author: author,
             coverUrl: coverUrl,
             intro: intro,
+            kind: kind,
             lastChapter: lastChapter,
+            updateTime: updateTime,
+            wordCount: wordCount,
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -1836,7 +1916,10 @@ class RuleParserEngine {
               'author': author,
               'coverUrl': coverUrl,
               'intro': intro,
+              'kind': kind,
               'lastChapter': lastChapter,
+              'updateTime': updateTime,
+              'wordCount': wordCount,
               'bookUrl': bookUrl,
             };
           }
@@ -1917,10 +2000,16 @@ class RuleParserEngine {
           final author =
               _parseValueOnNode(node, exploreRule.author, exploreUrl);
           final intro = _parseValueOnNode(node, exploreRule.intro, exploreUrl);
+          final kind = _parseValueOnNode(node, exploreRule.kind, exploreUrl);
           final lastChapter =
               _parseValueOnNode(node, exploreRule.lastChapter, exploreUrl);
+          final updateTime =
+              _parseValueOnNode(node, exploreRule.updateTime, exploreUrl);
+          final wordCount =
+              _parseValueOnNode(node, exploreRule.wordCount, exploreUrl);
 
-          var bookUrl = _parseValueOnNode(node, exploreRule.bookUrl, exploreUrl);
+          var bookUrl =
+              _parseValueOnNode(node, exploreRule.bookUrl, exploreUrl);
           if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
             bookUrl = _absoluteUrl(exploreUrl, bookUrl);
           }
@@ -1936,7 +2025,10 @@ class RuleParserEngine {
             author: author,
             coverUrl: coverUrl,
             intro: intro,
+            kind: kind,
             lastChapter: lastChapter,
+            updateTime: updateTime,
+            wordCount: wordCount,
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -1964,7 +2056,11 @@ class RuleParserEngine {
             author: _parseRule(element, exploreRule.author, exploreUrl),
             coverUrl: coverUrl,
             intro: _parseRule(element, exploreRule.intro, exploreUrl),
-            lastChapter: _parseRule(element, exploreRule.lastChapter, exploreUrl),
+            kind: _parseRule(element, exploreRule.kind, exploreUrl),
+            lastChapter:
+                _parseRule(element, exploreRule.lastChapter, exploreUrl),
+            updateTime: _parseRule(element, exploreRule.updateTime, exploreUrl),
+            wordCount: _parseRule(element, exploreRule.wordCount, exploreUrl),
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -2046,7 +2142,9 @@ class RuleParserEngine {
         listCount = nodes.length;
         for (final node in nodes) {
           final name = _parseValueOnNode(node, exploreRule.name, requestUrl);
-          final author = _parseValueOnNode(node, exploreRule.author, requestUrl);
+          final author =
+              _parseValueOnNode(node, exploreRule.author, requestUrl);
+          final kind = _parseValueOnNode(node, exploreRule.kind, requestUrl);
           var coverUrl =
               _parseValueOnNode(node, exploreRule.coverUrl, requestUrl);
           if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
@@ -2055,6 +2153,10 @@ class RuleParserEngine {
           final intro = _parseValueOnNode(node, exploreRule.intro, requestUrl);
           final lastChapter =
               _parseValueOnNode(node, exploreRule.lastChapter, requestUrl);
+          final updateTime =
+              _parseValueOnNode(node, exploreRule.updateTime, requestUrl);
+          final wordCount =
+              _parseValueOnNode(node, exploreRule.wordCount, requestUrl);
           var bookUrl =
               _parseValueOnNode(node, exploreRule.bookUrl, requestUrl);
           if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
@@ -2066,7 +2168,10 @@ class RuleParserEngine {
             author: author,
             coverUrl: coverUrl,
             intro: intro,
+            kind: kind,
             lastChapter: lastChapter,
+            updateTime: updateTime,
+            wordCount: wordCount,
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -2078,7 +2183,10 @@ class RuleParserEngine {
               'author': author,
               'coverUrl': coverUrl,
               'intro': intro,
+              'kind': kind,
               'lastChapter': lastChapter,
+              'updateTime': updateTime,
+              'wordCount': wordCount,
               'bookUrl': bookUrl,
             };
           }
@@ -2095,6 +2203,7 @@ class RuleParserEngine {
         for (final element in bookElements) {
           final name = _parseRule(element, exploreRule.name, requestUrl);
           final author = _parseRule(element, exploreRule.author, requestUrl);
+          final kind = _parseRule(element, exploreRule.kind, requestUrl);
           var coverUrl = _parseRule(element, exploreRule.coverUrl, requestUrl);
           if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
             coverUrl = _absoluteUrl(requestUrl, coverUrl);
@@ -2102,6 +2211,10 @@ class RuleParserEngine {
           final intro = _parseRule(element, exploreRule.intro, requestUrl);
           final lastChapter =
               _parseRule(element, exploreRule.lastChapter, requestUrl);
+          final updateTime =
+              _parseRule(element, exploreRule.updateTime, requestUrl);
+          final wordCount =
+              _parseRule(element, exploreRule.wordCount, requestUrl);
           var bookUrl = _parseRule(element, exploreRule.bookUrl, requestUrl);
           if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
             bookUrl = _absoluteUrl(requestUrl, bookUrl);
@@ -2112,7 +2225,10 @@ class RuleParserEngine {
             author: author,
             coverUrl: coverUrl,
             intro: intro,
+            kind: kind,
             lastChapter: lastChapter,
+            updateTime: updateTime,
+            wordCount: wordCount,
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
@@ -2124,7 +2240,10 @@ class RuleParserEngine {
               'author': author,
               'coverUrl': coverUrl,
               'intro': intro,
+              'kind': kind,
               'lastChapter': lastChapter,
+              'updateTime': updateTime,
+              'wordCount': wordCount,
               'bookUrl': bookUrl,
             };
           }
@@ -2203,6 +2322,10 @@ class RuleParserEngine {
           kind: _parseValueOnNode(jsonRoot, bookInfoRule.kind, fullUrl),
           lastChapter:
               _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, fullUrl),
+          updateTime:
+              _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, fullUrl),
+          wordCount:
+              _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, fullUrl),
           tocUrl: tocUrl,
           bookUrl: fullUrl,
         );
@@ -2239,6 +2362,8 @@ class RuleParserEngine {
         intro: _parseRule(root, bookInfoRule.intro, fullUrl),
         kind: _parseRule(root, bookInfoRule.kind, fullUrl),
         lastChapter: _parseRule(root, bookInfoRule.lastChapter, fullUrl),
+        updateTime: _parseRule(root, bookInfoRule.updateTime, fullUrl),
+        wordCount: _parseRule(root, bookInfoRule.wordCount, fullUrl),
         tocUrl: tocUrl,
         bookUrl: fullUrl,
       );
@@ -2311,6 +2436,10 @@ class RuleParserEngine {
         final kind = _parseValueOnNode(jsonRoot, bookInfoRule.kind, fullUrl);
         final lastChapter =
             _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, fullUrl);
+        final updateTime =
+            _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, fullUrl);
+        final wordCount =
+            _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, fullUrl);
         var tocUrl = _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, fullUrl);
         if (tocUrl.trim().isEmpty && source.ruleToc != null) {
           tocUrl = fullUrl;
@@ -2325,6 +2454,8 @@ class RuleParserEngine {
           intro: intro,
           kind: kind,
           lastChapter: lastChapter,
+          updateTime: updateTime,
+          wordCount: wordCount,
           tocUrl: tocUrl,
           bookUrl: fullUrl,
         );
@@ -2343,6 +2474,8 @@ class RuleParserEngine {
             'intro': intro,
             'kind': kind,
             'lastChapter': lastChapter,
+            'updateTime': updateTime,
+            'wordCount': wordCount,
             'tocUrl': tocUrl,
           },
           error: initMatched ? null : '响应为 JSON：init 规则不适用',
@@ -2380,6 +2513,8 @@ class RuleParserEngine {
       final intro = _parseRule(root, bookInfoRule.intro, fullUrl);
       final kind = _parseRule(root, bookInfoRule.kind, fullUrl);
       final lastChapter = _parseRule(root, bookInfoRule.lastChapter, fullUrl);
+      final updateTime = _parseRule(root, bookInfoRule.updateTime, fullUrl);
+      final wordCount = _parseRule(root, bookInfoRule.wordCount, fullUrl);
       var tocUrl = _parseRule(root, bookInfoRule.tocUrl, fullUrl);
       if (tocUrl.trim().isEmpty && source.ruleToc != null) {
         tocUrl = fullUrl;
@@ -2394,6 +2529,8 @@ class RuleParserEngine {
         intro: intro,
         kind: kind,
         lastChapter: lastChapter,
+        updateTime: updateTime,
+        wordCount: wordCount,
         tocUrl: tocUrl,
         bookUrl: fullUrl,
       );
@@ -2412,6 +2549,8 @@ class RuleParserEngine {
           'intro': intro,
           'kind': kind,
           'lastChapter': lastChapter,
+          'updateTime': updateTime,
+          'wordCount': wordCount,
           'tocUrl': tocUrl,
         },
         error: null,
@@ -2459,10 +2598,9 @@ class RuleParserEngine {
         if (response == null) break;
 
         final trimmed = response.trimLeft();
-        final jsonRoot =
-            (trimmed.startsWith('{') || trimmed.startsWith('['))
-                ? _tryDecodeJsonValue(response)
-                : null;
+        final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+            ? _tryDecodeJsonValue(response)
+            : null;
 
         List<String> nextCandidates = const <String>[];
 
@@ -2479,7 +2617,8 @@ class RuleParserEngine {
             chapters.add(TocItem(index: chapters.length, name: name, url: url));
           }
 
-          if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+          if (tocRule.nextTocUrl != null &&
+              tocRule.nextTocUrl!.trim().isNotEmpty) {
             nextCandidates = _parseStringListFromJson(
               json: jsonRoot,
               rule: tocRule.nextTocUrl!,
@@ -2505,7 +2644,8 @@ class RuleParserEngine {
             chapters.add(TocItem(index: chapters.length, name: name, url: url));
           }
 
-          if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+          if (tocRule.nextTocUrl != null &&
+              tocRule.nextTocUrl!.trim().isNotEmpty) {
             nextCandidates = _parseStringListFromHtml(
               root: root,
               rule: tocRule.nextTocUrl!,
@@ -2601,8 +2741,7 @@ class RuleParserEngine {
         final nodes = _selectJsonList(jsonRoot, normalized.selector);
         listCount = nodes.length;
         for (final node in nodes) {
-          final name =
-              _parseValueOnNode(node, tocRule.chapterName, fullUrl);
+          final name = _parseValueOnNode(node, tocRule.chapterName, fullUrl);
           var url = _parseValueOnNode(node, tocRule.chapterUrl, fullUrl);
           if (url.isNotEmpty && !url.startsWith('http')) {
             url = _absoluteUrl(fullUrl, url);
@@ -2614,7 +2753,8 @@ class RuleParserEngine {
             chapters.add(TocItem(index: chapters.length, name: name, url: url));
           }
         }
-        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+        if (tocRule.nextTocUrl != null &&
+            tocRule.nextTocUrl!.trim().isNotEmpty) {
           final nextList = _parseStringListFromJson(
             json: jsonRoot,
             rule: tocRule.nextTocUrl!,
@@ -2622,7 +2762,10 @@ class RuleParserEngine {
             isUrl: true,
           );
           if (nextList.isNotEmpty) {
-            sample = <String, String>{...sample, 'nextTocUrl': nextList.join('\n')};
+            sample = <String, String>{
+              ...sample,
+              'nextTocUrl': nextList.join('\n')
+            };
           }
         }
       } else {
@@ -2646,7 +2789,8 @@ class RuleParserEngine {
           }
         }
 
-        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+        if (tocRule.nextTocUrl != null &&
+            tocRule.nextTocUrl!.trim().isNotEmpty) {
           final root = document.documentElement;
           if (root != null) {
             final nextList = _parseStringListFromHtml(
@@ -2656,7 +2800,10 @@ class RuleParserEngine {
               isUrl: true,
             );
             if (nextList.isNotEmpty) {
-              sample = <String, String>{...sample, 'nextTocUrl': nextList.join('\n')};
+              sample = <String, String>{
+                ...sample,
+                'nextTocUrl': nextList.join('\n')
+              };
             }
           }
         }
@@ -2774,16 +2921,18 @@ class RuleParserEngine {
         if (response == null) break;
 
         final trimmed = response.trimLeft();
-        final jsonRoot =
-            (trimmed.startsWith('{') || trimmed.startsWith('['))
-                ? _tryDecodeJsonValue(response)
-                : null;
+        final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+            ? _tryDecodeJsonValue(response)
+            : null;
 
         String extracted;
         List<String> nextCandidates = const <String>[];
 
-        if (jsonRoot != null && contentRule.content != null && _looksLikeJsonPath(contentRule.content!)) {
-          extracted = _parseValueOnNode(jsonRoot, contentRule.content, currentUrl);
+        if (jsonRoot != null &&
+            contentRule.content != null &&
+            _looksLikeJsonPath(contentRule.content!)) {
+          extracted =
+              _parseValueOnNode(jsonRoot, contentRule.content, currentUrl);
           if (contentRule.nextContentUrl != null &&
               contentRule.nextContentUrl!.trim().isNotEmpty) {
             nextCandidates = _parseStringListFromJson(
@@ -2797,7 +2946,8 @@ class RuleParserEngine {
           final document = html_parser.parse(response);
           final root = document.documentElement;
           if (root == null) break;
-          if (contentRule.content == null || contentRule.content!.trim().isEmpty) {
+          if (contentRule.content == null ||
+              contentRule.content!.trim().isEmpty) {
             extracted = root.text;
           } else {
             extracted = _parseRule(root, contentRule.content, currentUrl);
@@ -2895,13 +3045,15 @@ class RuleParserEngine {
         visited.add(currentUrl);
 
         // 第一页用 fetch（含请求/响应调试信息），后续页用普通请求即可
-        final body = (currentUrl == fullUrl) ? fetch.body! : await _fetch(
-              currentUrl,
-              header: source.header,
-              jsLib: source.jsLib,
-              timeoutMs: source.respondTime,
-              enabledCookieJar: source.enabledCookieJar,
-            );
+        final body = (currentUrl == fullUrl)
+            ? fetch.body!
+            : await _fetch(
+                currentUrl,
+                header: source.header,
+                jsLib: source.jsLib,
+                timeoutMs: source.respondTime,
+                enabledCookieJar: source.enabledCookieJar,
+              );
         if (body == null) break;
 
         final trimmed = body.trimLeft();
@@ -2930,7 +3082,8 @@ class RuleParserEngine {
           final document = html_parser.parse(body);
           final root = document.documentElement;
           if (root == null) break;
-          if (contentRule.content == null || contentRule.content!.trim().isEmpty) {
+          if (contentRule.content == null ||
+              contentRule.content!.trim().isEmpty) {
             extracted = root.text;
           } else {
             extracted = _parseRule(root, contentRule.content, currentUrl);
@@ -3014,7 +3167,8 @@ class RuleParserEngine {
 
       // URL option js 允许二次修改 url/header
       var finalUrl = parsedUrl.url;
-      if (parsedUrl.option?.js != null && parsedUrl.option!.js!.trim().isNotEmpty) {
+      if (parsedUrl.option?.js != null &&
+          parsedUrl.option!.js!.trim().isNotEmpty) {
         final patched = _applyLegadoUrlOptionJs(
           js: parsedUrl.option!.js!.trim(),
           url: finalUrl,
@@ -3027,6 +3181,10 @@ class RuleParserEngine {
             ..addAll(patched.headers);
         }
       }
+
+      // 对标 legado：UrlOption.origin 可补齐/覆盖 Origin/Referer（但若用户已显式写入，则不动）
+      _applyPreferredOriginHeaders(
+          mergedCustomHeaders, parsedUrl.option?.origin);
 
       final requestHeaders = _buildEffectiveRequestHeaders(
         finalUrl,
@@ -3098,7 +3256,8 @@ class RuleParserEngine {
 
     var finalUrl = parsedUrl.url;
     _UrlJsPatchResult? urlJsPatch;
-    if (parsedUrl.option?.js != null && parsedUrl.option!.js!.trim().isNotEmpty) {
+    if (parsedUrl.option?.js != null &&
+        parsedUrl.option!.js!.trim().isNotEmpty) {
       urlJsPatch = _applyLegadoUrlOptionJs(
         js: parsedUrl.option!.js!.trim(),
         url: finalUrl,
@@ -3111,6 +3270,8 @@ class RuleParserEngine {
           ..addAll(urlJsPatch.headers);
       }
     }
+
+    _applyPreferredOriginHeaders(mergedCustomHeaders, parsedUrl.option?.origin);
 
     final requestHeaders = _buildEffectiveRequestHeaders(
       finalUrl,
@@ -3214,8 +3375,10 @@ class RuleParserEngine {
         }
         final parts = <String>[
           'DioException(${e.type})',
-          if (parsedHeaders.warning != null) 'header警告=${parsedHeaders.warning}',
-          if (e.message != null && e.message!.trim().isNotEmpty) e.message!.trim(),
+          if (parsedHeaders.warning != null)
+            'header警告=${parsedHeaders.warning}',
+          if (e.message != null && e.message!.trim().isNotEmpty)
+            e.message!.trim(),
           if (e.error != null) 'error=${e.error}',
         ];
         return FetchDebugResult(
@@ -3294,7 +3457,9 @@ class RuleParserEngine {
           return '${uri.scheme}://${uri.host}$url';
         }
       }
-      final trimmedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+      final trimmedBase = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
       final trimmedUrl = url.startsWith('/') ? url.substring(1) : url;
       return '$trimmedBase/$trimmedUrl';
     }
@@ -3319,7 +3484,8 @@ class RuleParserEngine {
     return t.startsWith(':');
   }
 
-  ({String expr, List<_LegadoReplacePair> replacements}) _splitExprAndReplacements(
+  ({String expr, List<_LegadoReplacePair> replacements})
+      _splitExprAndReplacements(
     String raw,
   ) {
     final parts = raw.split('##');
@@ -3331,7 +3497,8 @@ class RuleParserEngine {
         final pattern = rep[i].trim();
         final replacement = (i + 1) < rep.length ? rep[i + 1] : '';
         if (pattern.isEmpty) continue;
-        reps.add(_LegadoReplacePair(pattern: pattern, replacement: replacement));
+        reps.add(
+            _LegadoReplacePair(pattern: pattern, replacement: replacement));
       }
     }
     return (expr: expr, replacements: reps);
@@ -3347,8 +3514,8 @@ class RuleParserEngine {
 
     try {
       final result = HtmlXPath.node(element).query(expr);
-      var text = result.attr ??
-          (result.node?.text ?? (result.node?.toString() ?? ''));
+      var text =
+          result.attr ?? (result.node?.text ?? (result.node?.toString() ?? ''));
       text = _applyInlineReplacements(text, split.replacements);
       return text.trim();
     } catch (e) {
@@ -3669,8 +3836,7 @@ class RuleParserEngine {
         final re = RegExp(expr, dotAll: true, multiLine: true);
         final out = <Element>[];
         for (final m in re.allMatches(htmlText)) {
-          final snippet =
-              (m.groupCount >= 1 ? m.group(1) : m.group(0)) ?? '';
+          final snippet = (m.groupCount >= 1 ? m.group(1) : m.group(0)) ?? '';
           if (snippet.trim().isEmpty) continue;
           final wrapper = html_parser
               .parse('<div>$snippet</div>')
@@ -3999,6 +4165,7 @@ class _LegadoUrlOption {
   final String? body;
   final String? charset;
   final Map<String, String> headers;
+  final String? origin;
   final String? js;
 
   const _LegadoUrlOption({
@@ -4006,6 +4173,7 @@ class _LegadoUrlOption {
     required this.body,
     required this.charset,
     required this.headers,
+    required this.origin,
     required this.js,
   });
 
@@ -4017,20 +4185,96 @@ class _LegadoUrlOption {
       return t.isEmpty ? null : t;
     }
 
-    final headers = <String, String>{};
-    final h = json['headers'];
-    if (h is Map) {
-      h.forEach((k, v) {
-        if (k == null || v == null) return;
-        headers[k.toString()] = v.toString();
-      });
+    Map<String, String> parseHeaders(dynamic raw) {
+      final out = <String, String>{};
+      if (raw == null) return out;
+      if (raw is Map) {
+        raw.forEach((k, v) {
+          if (k == null || v == null) return;
+          final key = k.toString().trim();
+          if (key.isEmpty) return;
+          out[key] = v.toString();
+        });
+        return out;
+      }
+      if (raw is String) {
+        final t = raw.trim();
+        if (t.isEmpty) return out;
+        // 对标 legado：UrlOption.headers 允许为 JSON 字符串
+        if (t.startsWith('{') && t.endsWith('}')) {
+          try {
+            final decoded = jsonDecode(t);
+            if (decoded is Map) {
+              decoded.forEach((k, v) {
+                if (k == null || v == null) return;
+                final key = k.toString().trim();
+                if (key.isEmpty) return;
+                out[key] = v.toString();
+              });
+              return out;
+            }
+          } catch (_) {
+            // fallthrough
+          }
+        }
+        // 兼容编辑器里每行 key:value 的形式
+        for (final line in t.split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) continue;
+          final idx = trimmed.indexOf(':');
+          if (idx <= 0) continue;
+          final key = trimmed.substring(0, idx).trim();
+          final value = trimmed.substring(idx + 1).trim();
+          if (key.isEmpty) continue;
+          out[key] = value;
+        }
+        return out;
+      }
+      // 兜底：toString 后尝试 JSON
+      final t = raw.toString().trim();
+      if (t.isEmpty) return out;
+      if (t.startsWith('{') && t.endsWith('}')) {
+        try {
+          final decoded = jsonDecode(t);
+          if (decoded is Map) {
+            decoded.forEach((k, v) {
+              if (k == null || v == null) return;
+              final key = k.toString().trim();
+              if (key.isEmpty) return;
+              out[key] = v.toString();
+            });
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+      return out;
     }
+
+    String? parseBody(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is String) {
+        final t = raw.trimRight();
+        return t.isEmpty ? null : raw;
+      }
+      try {
+        return jsonEncode(raw);
+      } catch (_) {
+        final t = raw.toString();
+        return t.trim().isEmpty ? null : t;
+      }
+    }
+
+    final headers = parseHeaders(
+      json.containsKey('headers') ? json['headers'] : json['header'],
+    );
 
     return _LegadoUrlOption(
       method: getString('method'),
-      body: getString('body'),
+      body: parseBody(json['body']),
       charset: getString('charset'),
       headers: headers,
+      origin: getString('origin'),
       js: getString('js'),
     );
   }
@@ -4202,7 +4446,10 @@ class SearchResult {
   final String author;
   final String coverUrl;
   final String intro;
+  final String kind;
   final String lastChapter;
+  final String updateTime;
+  final String wordCount;
   final String bookUrl;
   final String sourceUrl;
   final String sourceName;
@@ -4212,7 +4459,10 @@ class SearchResult {
     required this.author,
     required this.coverUrl,
     required this.intro,
+    this.kind = '',
     required this.lastChapter,
+    this.updateTime = '',
+    this.wordCount = '',
     required this.bookUrl,
     required this.sourceUrl,
     required this.sourceName,
@@ -4227,6 +4477,8 @@ class BookDetail {
   final String intro;
   final String kind;
   final String lastChapter;
+  final String updateTime;
+  final String wordCount;
   final String tocUrl;
   final String bookUrl;
 
@@ -4237,6 +4489,8 @@ class BookDetail {
     required this.intro,
     required this.kind,
     required this.lastChapter,
+    this.updateTime = '',
+    this.wordCount = '',
     required this.tocUrl,
     required this.bookUrl,
   });
