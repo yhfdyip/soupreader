@@ -904,14 +904,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Widget _buildPageContent() {
-    // 仿真翻页（含 shader / 贝塞尔）只支持水平手势与水平渲染。
-    // 如果沿用 `pageDirection=vertical` 会导致：
-    // - 手势走垂直分支，仿真逻辑无法正确工作
-    // - 渲染降级为垂直滑动，看起来“仿真不对”
-    final forceHorizontal = widget.pageTurnMode == PageTurnMode.simulation ||
-        widget.pageTurnMode == PageTurnMode.simulation2;
-    final isVertical =
-        widget.pageDirection == PageDirection.vertical && !forceHorizontal;
+    // 产品约束：除了“滚动”以外，所有翻页模式都只允许水平手势/水平渲染。
+    // 说明：
+    // - 滚动模式不使用 PagedReaderWidget（见 SimpleReaderView），因此这里直接兜底为水平。
+    // - 这样即使历史配置里残留 `pageDirection=vertical`，也不会把 slide/cover/none/simulation 变成垂直翻页。
+    final isVertical = false;
     // 只有启用手势时才允许滑动翻页
     final enableDrag = widget.enableGestures;
 
@@ -923,12 +920,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       onHorizontalDragUpdate:
           (!isVertical && enableDrag) ? _onDragUpdate : null,
       onHorizontalDragEnd: (!isVertical && enableDrag) ? _onDragEnd : null,
-      // 垂直方向手势（仅在启用手势且为垂直方向时）
-      onVerticalDragStart:
-          (isVertical && enableDrag) ? _onVerticalDragStart : null,
-      onVerticalDragUpdate:
-          (isVertical && enableDrag) ? _onVerticalDragUpdate : null,
-      onVerticalDragEnd: (isVertical && enableDrag) ? _onVerticalDragEnd : null,
+      // 垂直方向手势：按产品约束禁用（滚动模式不走这里）
+      onVerticalDragStart: null,
+      onVerticalDragUpdate: null,
+      onVerticalDragEnd: null,
       child: _buildAnimatedPages(),
     );
   }
@@ -937,10 +932,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
     final screenHeight = size.height;
-    final forceHorizontal = widget.pageTurnMode == PageTurnMode.simulation ||
-        widget.pageTurnMode == PageTurnMode.simulation2;
-    final isVertical =
-        widget.pageDirection == PageDirection.vertical && !forceHorizontal;
+    // 同 _buildPageContent：除了滚动以外一律按水平处理
+    final isVertical = false;
     final isRunning = _isMoved || _isRunning || _isStarted;
     if (!isRunning) {
       // 静止态提前预渲染相邻页，避免首次拖拽时同步生成导致的卡顿

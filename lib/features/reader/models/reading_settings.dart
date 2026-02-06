@@ -102,8 +102,8 @@ class ReadingSettings {
     this.autoReadSpeed = 50,
     // 翻页动画增强默认值
     this.pageAnimDuration = 300,
-    // 对标专业阅读器：翻页方向默认更符合“上下”阅读习惯（尤其在滚动/连贯阅读场景）
-    this.pageDirection = PageDirection.vertical,
+    // 产品约束：除“滚动”以外的翻页模式一律水平；滚动模式由渲染层决定纵向滚动
+    this.pageDirection = PageDirection.horizontal,
     this.pageTouchSlop = 25,
     this.volumeKeyPage = false,
     // 页眉/页脚配置默认值
@@ -137,6 +137,19 @@ class ReadingSettings {
             : PageTurnMode.simulation.index;
     final safePageTurnModeIndex =
         pageTurnModeIndex.clamp(0, PageTurnMode.values.length - 1);
+    final safePageTurnMode = PageTurnMode.values[safePageTurnModeIndex];
+
+    final defaultPageDirectionIndex = safePageTurnMode == PageTurnMode.scroll
+        ? PageDirection.vertical.index
+        : PageDirection.horizontal.index;
+    final rawPageDirection = json['pageDirection'];
+    final pageDirectionIndex = rawPageDirection is int
+        ? rawPageDirection
+        : rawPageDirection is num
+            ? rawPageDirection.toInt()
+            : defaultPageDirectionIndex;
+    final safePageDirectionIndex =
+        pageDirectionIndex.clamp(0, PageDirection.values.length - 1);
 
     return ReadingSettings(
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 18.0,
@@ -151,7 +164,7 @@ class ReadingSettings {
           16.0,
       themeIndex: json['themeIndex'] as int? ?? 2,
       fontFamilyIndex: json['fontFamilyIndex'] as int? ?? 0,
-      pageTurnMode: PageTurnMode.values[safePageTurnModeIndex],
+      pageTurnMode: safePageTurnMode,
       keepScreenOn: json['keepScreenOn'] as bool? ?? false,
       showStatusBar: json['showStatusBar'] as bool? ?? true,
       showBattery: json['showBattery'] as bool? ?? true,
@@ -180,8 +193,7 @@ class ReadingSettings {
       autoReadSpeed: json['autoReadSpeed'] as int? ?? 50,
       // 翻页动画增强
       pageAnimDuration: json['pageAnimDuration'] as int? ?? 300,
-      pageDirection: PageDirection.values[
-          json['pageDirection'] as int? ?? PageDirection.vertical.index],
+      pageDirection: PageDirection.values[safePageDirectionIndex],
       pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
       volumeKeyPage: json['volumeKeyPage'] as bool? ?? false,
       // 页眉/页脚配置

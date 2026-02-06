@@ -419,6 +419,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 更新设置
   void _updateSettings(ReadingSettings newSettings) {
+    // 产品约束：除“滚动”外一律水平翻页；滚动模式固定纵向滚动。
+    if (newSettings.pageTurnMode == PageTurnMode.scroll) {
+      if (newSettings.pageDirection != PageDirection.vertical) {
+        newSettings =
+            newSettings.copyWith(pageDirection: PageDirection.vertical);
+      }
+    } else {
+      if (newSettings.pageDirection != PageDirection.horizontal) {
+        newSettings =
+            newSettings.copyWith(pageDirection: PageDirection.horizontal);
+      }
+    }
+
     final oldSettings = _settings;
     final oldMode = oldSettings.pageTurnMode;
     final newMode = newSettings.pageTurnMode;
