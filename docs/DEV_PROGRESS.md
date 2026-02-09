@@ -54,3 +54,29 @@
 ### 兼容影响
 - 本次为无用代码与分析告警清理，不涉及书源规则语义变更，旧书源兼容性预期不受影响。
 - 本次新增“可选保留运行时变量”能力，默认行为不变（默认仍清理）；仅在加书链路中显式开启跨阶段保留，属于兼容增强。
+
+## 2026-02-09（P0：stage-js 时机补齐）
+
+### 已完成
+- 修复 `searchDebug` / `exploreDebug` 中误植入的目录阶段变量引用（移除错误的 `tocRule/fullUrl/stageBody` 片段，恢复使用 `body` 解析），消除编译风险。
+- 在目录/正文链路统一补齐阶段响应脚本执行：
+  - 目录阶段：`ruleToc.preUpdateJs`
+  - 正文阶段：`ruleContent.webJs`
+  - 覆盖生产链路与调试链路（`getToc`、`getTocDebug`、`getContent`、`getContentDebug` 及对应 debug flow）。
+- 新增阶段 JS 回退解析能力：当运行时 JS 引擎不可用或执行返回空时，支持对常见脚本模式（赋值、拼接、`JSON.stringify`、`result/content` 变量）做轻量回退，避免链路直接退回原始响应。
+- 新增回归测试：`test/rule_parser_engine_stage_js_compat_test.dart`，覆盖 `preUpdateJs` 与 `webJs` 在解析前生效。
+
+### 为什么
+- 现网与调试链路此前对 `preUpdateJs/webJs` 的执行时机不完整，导致一类 legado 书源在目录/正文阶段无法按预期预处理响应。
+- 在当前测试环境中，原生 JS 动态库可能不可用；若无回退策略，阶段 JS 会“静默失效”，影响兼容性与可调试性。
+
+### 验证方式
+- 命令：`flutter analyze`
+- 命令：`flutter test test/rule_parser_engine_stage_js_compat_test.dart`
+- 命令：`flutter test test/rule_parser_engine_next_url_compat_test.dart`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+
+### 兼容影响
+- 默认行为不变：当未配置 `preUpdateJs/webJs` 时，解析流程与旧行为一致。
+- 兼容增强：配置阶段 JS 的书源在目录/正文阶段可按预期预处理响应；JS 引擎不可用时新增轻量回退，优先保障旧书源“可解析而非直接失效”。
+- 回退策略仅在 JS 主执行返回空时启用，尽量不干扰已有可用脚本行为。

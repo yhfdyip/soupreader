@@ -190,6 +190,211 @@ class RuleParserEngine {
     return out;
   }
 
+  String _applyStageResponseJs({
+    required String responseText,
+    required String? jsRule,
+    required String currentUrl,
+    String? jsLib,
+    String stageLabel = 'webJs',
+    void Function(String message)? onLog,
+  }) {
+    final js = (jsRule ?? '').trim();
+    if (js.isEmpty) return responseText;
+
+    var transformed = _evalJsMaybeString(
+      js: js,
+      jsLib: jsLib,
+      bindings: <String, Object?>{
+        'result': responseText,
+        'content': responseText,
+        'baseUrl': currentUrl,
+        'url': currentUrl,
+        'vars': Map<String, String>.from(_runtimeVariables),
+      },
+    );
+
+    if (transformed.isEmpty) {
+      transformed = _evalStageJsFallback(
+        js: js,
+        responseText: responseText,
+        currentUrl: currentUrl,
+      );
+      if (transformed.isNotEmpty) {
+        onLog?.call('$stageLabel 使用回退解析应用脚本');
+      }
+    }
+
+    if (transformed.isEmpty) {
+      onLog?.call('$stageLabel 执行返回空，保留原始响应');
+      return responseText;
+    }
+
+    if (transformed != responseText) {
+      onLog?.call(
+        '$stageLabel 已应用（长度 ${responseText.length} -> ${transformed.length}）',
+      );
+    }
+    return transformed;
+  }
+
+  String _evalStageJsFallback({
+    required String js,
+    required String responseText,
+    required String currentUrl,
+  }) {
+    final split = _splitRuleByTopLevelOperator(js, const [';']);
+    final statements = split.parts.isEmpty ? <String>[js] : split.parts;
+
+    final env = <String, String>{
+      'result': responseText,
+      'content': responseText,
+      'baseUrl': currentUrl,
+      'url': currentUrl,
+    };
+
+    var lastValue = '';
+    for (final raw in statements) {
+      final statement = raw.trim();
+      if (statement.isEmpty) continue;
+
+      final assign = RegExp(r'^([A-Za-z_\$][A-Za-z0-9_\$]*)\s*=\s*([\s\S]+)$')
+          .firstMatch(statement);
+      if (assign != null) {
+        final key = assign.group(1)?.trim() ?? '';
+        final rhs = assign.group(2)?.trim() ?? '';
+        if (key.isEmpty || rhs.isEmpty) continue;
+        final value = _evalStageJsExpressionFallback(rhs, env);
+        if (value != null) {
+          env[key] = value;
+          lastValue = value;
+        }
+        continue;
+      }
+
+      final value = _evalStageJsExpressionFallback(statement, env);
+      if (value != null) {
+        lastValue = value;
+      }
+    }
+
+    if (lastValue.trim().isNotEmpty) return lastValue;
+
+    final resultValue = env['result'] ?? '';
+    if (resultValue.trim().isNotEmpty && resultValue != responseText) {
+      return resultValue;
+    }
+
+    final contentValue = env['content'] ?? '';
+    if (contentValue.trim().isNotEmpty && contentValue != responseText) {
+      return contentValue;
+    }
+
+    return '';
+  }
+
+  String? _evalStageJsExpressionFallback(
+    String expression,
+    Map<String, String> env,
+  ) {
+    final trimmed = expression.trim();
+    if (trimmed.isEmpty) return '';
+
+    final stringify = RegExp(
+      r'^JSON\.stringify\s*\(([\s\S]*)\)\s*;?$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+    if (stringify != null) {
+      final inner = stringify.group(1)?.trim() ?? '';
+      if (inner.isEmpty) return '';
+
+      final fromEnv = env[inner];
+      if (fromEnv != null) {
+        final decoded = _tryDecodeJsonValue(fromEnv);
+        return jsonEncode(decoded ?? fromEnv);
+      }
+
+      final strLiteral = _decodeSimpleJsStringLiteral(inner);
+      if (strLiteral != null) {
+        return jsonEncode(strLiteral);
+      }
+
+      final normalizedJson = _normalizeLooseJsonLiteral(inner);
+      if (normalizedJson != null) {
+        return normalizedJson;
+      }
+
+      return null;
+    }
+
+    final concat = _evalSimpleJsConcat(
+      trimmed,
+      resolveAtom: (atom) => _resolveStageJsAtomFallback(atom, env),
+    );
+    if (concat != null) return concat;
+
+    return _resolveStageJsAtomFallback(trimmed, env);
+  }
+
+  String? _resolveStageJsAtomFallback(String atom, Map<String, String> env) {
+    final trimmed = atom.trim();
+    if (trimmed.isEmpty) return '';
+
+    final strLiteral = _decodeSimpleJsStringLiteral(trimmed);
+    if (strLiteral != null) return strLiteral;
+
+    if (env.containsKey(trimmed)) return env[trimmed];
+
+    if (trimmed.startsWith('vars[') && trimmed.endsWith(']')) {
+      final inner = trimmed.substring(5, trimmed.length - 1).trim();
+      if (inner.isEmpty) return '';
+      final key = _decodeJsIndexKey(inner);
+      return _getRuntimeVariable(key);
+    }
+
+    final varsDot =
+        RegExp(r'^vars\.([A-Za-z_][A-Za-z0-9_]*)$').firstMatch(trimmed);
+    if (varsDot != null) {
+      final key = varsDot.group(1) ?? '';
+      return _getRuntimeVariable(key);
+    }
+
+    if (RegExp(r'^-?\d+(?:\.\d+)?$').hasMatch(trimmed)) {
+      return trimmed;
+    }
+
+    return null;
+  }
+
+  String? _normalizeLooseJsonLiteral(String source) {
+    var text = source.trim();
+    if (text.isEmpty) return null;
+    if (!(text.startsWith('{') || text.startsWith('['))) return null;
+
+    text = text.replaceAllMapped(
+      RegExp(r"'([^'\\]*(?:\\.[^'\\]*)*)'"),
+      (m) {
+        final inner = m.group(1) ?? '';
+        final decoded = _unescapeSingleQuotedJsString(inner);
+        return jsonEncode(decoded);
+      },
+    );
+
+    text = text.replaceAllMapped(
+      RegExp(r'([\{\[, ]\s*)([A-Za-z_\$][A-Za-z0-9_\$]*)\s*:'),
+      (m) => '${m.group(1)}"${m.group(2)}":',
+    );
+
+    text = text.replaceAll(RegExp(r'\bundefined\b'), 'null');
+
+    final decoded = _tryDecodeJsonValue(text);
+    if (decoded == null) return null;
+    try {
+      return jsonEncode(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
   List<String> _splitPossibleListValues(String text) {
     final t = text.trim();
     if (t.isEmpty) return const <String>[];
@@ -3575,10 +3780,19 @@ class RuleParserEngine {
       log('≡目录页请求:${page + 1}');
       final fetch = await fetchStage(currentUrl, rawState: 30);
       final body = fetch.body!;
+      final stageBody = _applyStageResponseJs(
+        responseText: body,
+        jsRule: tocRule.preUpdateJs,
+        currentUrl: currentUrl,
+        jsLib: source.jsLib,
+        stageLabel: 'preUpdateJs',
+        onLog: (msg) => log('└$msg', showTime: false),
+      );
+      emitRaw(30, stageBody);
 
-      final trimmed = body.trimLeft();
+      final trimmed = stageBody.trimLeft();
       final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(body)
+          ? _tryDecodeJsonValue(stageBody)
           : null;
 
       List<String> nextCandidates = const <String>[];
@@ -3755,10 +3969,19 @@ class RuleParserEngine {
       log('≡正文页请求:${page + 1}');
       final fetch = await fetchStage(currentUrl, rawState: 40);
       final body = fetch.body!;
+      final stageBody = _applyStageResponseJs(
+        responseText: body,
+        jsRule: rule.webJs,
+        currentUrl: currentUrl,
+        jsLib: source.jsLib,
+        stageLabel: 'webJs',
+        onLog: (msg) => log('└$msg', showTime: false),
+      );
+      emitRaw(40, stageBody);
 
-      final trimmed = body.trimLeft();
+      final trimmed = stageBody.trimLeft();
       final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(body)
+          ? _tryDecodeJsonValue(stageBody)
           : null;
 
       String extracted;
@@ -3782,7 +4005,7 @@ class RuleParserEngine {
           }
         }
       } else {
-        final document = html_parser.parse(body);
+        final document = html_parser.parse(stageBody);
         final root = document.documentElement;
         if (root == null) {
           log('⇒页面无 documentElement', state: -1);
@@ -4732,9 +4955,17 @@ class RuleParserEngine {
         );
         if (response == null) break;
 
-        final trimmed = response.trimLeft();
+        final stageBody = _applyStageResponseJs(
+          responseText: response,
+          jsRule: tocRule.preUpdateJs,
+          currentUrl: currentUrl,
+          jsLib: source.jsLib,
+          stageLabel: 'preUpdateJs',
+        );
+
+        final trimmed = stageBody.trimLeft();
         final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-            ? _tryDecodeJsonValue(response)
+            ? _tryDecodeJsonValue(stageBody)
             : null;
 
         List<String> nextCandidates = const <String>[];
@@ -4762,7 +4993,7 @@ class RuleParserEngine {
             );
           }
         } else {
-          final document = html_parser.parse(response);
+          final document = html_parser.parse(stageBody);
           final root = document.documentElement;
           if (root == null) break;
 
@@ -4872,9 +5103,16 @@ class RuleParserEngine {
       var listCount = 0;
 
       final body = fetch.body!;
-      final trimmed = body.trimLeft();
+      final stageBody = _applyStageResponseJs(
+        responseText: body,
+        jsRule: tocRule.preUpdateJs,
+        currentUrl: fullUrl,
+        jsLib: source.jsLib,
+        stageLabel: 'preUpdateJs',
+      );
+      final trimmed = stageBody.trimLeft();
       final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(body)
+          ? _tryDecodeJsonValue(stageBody)
           : null;
 
       if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
@@ -4909,7 +5147,7 @@ class RuleParserEngine {
           }
         }
       } else {
-        final document = html_parser.parse(body);
+        final document = html_parser.parse(stageBody);
         final chapterElements =
             _selectAllElementsByRule(document, normalized.selector);
         listCount = chapterElements.length;
@@ -5073,9 +5311,17 @@ class RuleParserEngine {
         );
         if (response == null) break;
 
-        final trimmed = response.trimLeft();
+        final stageBody = _applyStageResponseJs(
+          responseText: response,
+          jsRule: contentRule.webJs,
+          currentUrl: currentUrl,
+          jsLib: source.jsLib,
+          stageLabel: 'webJs',
+        );
+
+        final trimmed = stageBody.trimLeft();
         final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-            ? _tryDecodeJsonValue(response)
+            ? _tryDecodeJsonValue(stageBody)
             : null;
 
         String extracted;
@@ -5096,7 +5342,7 @@ class RuleParserEngine {
             );
           }
         } else {
-          final document = html_parser.parse(response);
+          final document = html_parser.parse(stageBody);
           final root = document.documentElement;
           if (root == null) break;
           if (contentRule.content == null ||
@@ -5221,9 +5467,17 @@ class RuleParserEngine {
               );
         if (body == null) break;
 
-        final trimmed = body.trimLeft();
+        final stageBody = _applyStageResponseJs(
+          responseText: body,
+          jsRule: contentRule.webJs,
+          currentUrl: currentUrl,
+          jsLib: source.jsLib,
+          stageLabel: 'webJs',
+        );
+
+        final trimmed = stageBody.trimLeft();
         final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-            ? _tryDecodeJsonValue(body)
+            ? _tryDecodeJsonValue(stageBody)
             : null;
 
         String extracted;
@@ -5244,7 +5498,7 @@ class RuleParserEngine {
             );
           }
         } else {
-          final document = html_parser.parse(body);
+          final document = html_parser.parse(stageBody);
           final root = document.documentElement;
           if (root == null) break;
           if (contentRule.content == null ||
