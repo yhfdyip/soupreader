@@ -5,6 +5,27 @@ import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 
 class SourceDebugExportService {
+  Future<bool> exportTextToFile({
+    required String text,
+    required String fileName,
+    String dialogTitle = '导出文本',
+  }) async {
+    try {
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: dialogTitle,
+        fileName: fileName,
+        allowedExtensions: ['txt', 'log'],
+        type: FileType.custom,
+      );
+
+      if (outputPath == null) return false;
+      await File(outputPath).writeAsString(text);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> exportJsonToFile({
     required String json,
     required String fileName,

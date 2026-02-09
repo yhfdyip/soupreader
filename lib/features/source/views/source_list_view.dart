@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/book_entity.dart';
@@ -9,6 +10,12 @@ import '../services/source_import_export_service.dart';
 import '../../../core/utils/legado_json.dart';
 import 'source_edit_view.dart';
 import 'source_availability_check_view.dart';
+
+enum _ImportConflictAction {
+  overwriteExisting,
+  skipExisting,
+  cancel,
+}
 
 /// 书源管理页面 - 纯 iOS 原生风格
 class SourceListView extends StatefulWidget {
@@ -222,6 +229,7 @@ class _SourceListViewState extends State<SourceListView> {
       context: context,
       builder: (context) => CupertinoActionSheet(
         title: const Text('导入书源'),
+        message: const Text('推荐优先：剪贴板导入（最快）\n若来源是链接，可用网络导入；Web 端可能受跨域限制。'),
         actions: [
           CupertinoActionSheetAction(
             child: const Text('新建书源'),
@@ -429,13 +437,7 @@ class _SourceListViewState extends State<SourceListView> {
 
   Future<void> _importFromFile() async {
     final result = await _importExportService.importFromFile();
-    if (!result.success) {
-      if (result.cancelled) return;
-      _showMessage(result.errorMessage ?? '导入失败');
-      return;
-    }
-    await _sourceRepo.addSources(result.sources);
-    _showMessage('成功导入 ${result.importCount} 条书源');
+    await _commitImportResult(result);
   }
 
   Future<void> _importFromClipboard() async {
@@ -446,12 +448,7 @@ class _SourceListViewState extends State<SourceListView> {
       return;
     }
     final result = _importExportService.importFromJson(text);
-    if (!result.success) {
-      _showMessage(result.errorMessage ?? '导入失败');
-      return;
-    }
-    await _sourceRepo.addSources(result.sources);
-    _showMessage('成功导入 ${result.importCount} 条书源');
+    await _commitImportResult(result);
   }
 
   Future<void> _importFromUrl() async {
@@ -464,7 +461,7 @@ class _SourceListViewState extends State<SourceListView> {
           padding: const EdgeInsets.only(top: 12),
           child: CupertinoTextField(
             controller: _urlController,
-            placeholder: '输入书源链接',
+            placeholder: '输入书源链接（http/https）',
           ),
         ),
         actions: [
@@ -481,14 +478,195 @@ class _SourceListViewState extends State<SourceListView> {
     ).then((value) async {
       final url = value?.trim();
       if (url == null || url.isEmpty) return;
-      final result = await _importExportService.importFromUrl(url);
-      if (!result.success) {
-        _showMessage(result.errorMessage ?? '导入失败');
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        _showMessage('链接格式无效，请输入 http:// 或 https:// 开头的地址');
         return;
       }
-      await _sourceRepo.addSources(result.sources);
-      _showMessage('成功导入 ${result.importCount} 条书源');
+      final result = await _importExportService.importFromUrl(url);
+      await _commitImportResult(result);
     });
+  }
+
+  Future<void> _commitImportResult(SourceImportResult result) async {
+    if (!result.success) {
+      if (result.cancelled) return;
+      _showImportError(result);
+      return;
+    }
+
+    final prepared = await _prepareImportSources(result.sources);
+    if (prepared == null) return;
+
+    final finalSources = prepared.finalSources;
+    if (finalSources.isEmpty) {
+      _showMessage('没有可导入的书源（可能都已存在）');
+      return;
+    }
+
+    await _sourceRepo.addSources(finalSources);
+    _showImportSummary(
+      result,
+      actualImportedCount: finalSources.length,
+      conflictCount: prepared.conflictCount,
+      skippedConflictCount: prepared.skippedConflictCount,
+    );
+  }
+
+  Future<
+      ({
+        List<BookSource> finalSources,
+        int conflictCount,
+        int skippedConflictCount,
+      })?> _prepareImportSources(List<BookSource> incoming) async {
+    if (incoming.isEmpty) {
+      return (
+        finalSources: const <BookSource>[],
+        conflictCount: 0,
+        skippedConflictCount: 0,
+      );
+    }
+
+    final conflictUrls = <String>{};
+    final conflictPreview = <BookSource>[];
+
+    for (final source in incoming) {
+      final url = source.bookSourceUrl.trim();
+      if (url.isEmpty) continue;
+      if (_sourceRepo.getSourceByUrl(url) == null) continue;
+      if (conflictUrls.add(url) && conflictPreview.length < 5) {
+        conflictPreview.add(source);
+      }
+    }
+
+    final conflictCount = conflictUrls.length;
+    if (conflictCount == 0) {
+      return (
+        finalSources: incoming,
+        conflictCount: 0,
+        skippedConflictCount: 0,
+      );
+    }
+
+    final action = await _showImportConflictDialog(
+      conflictCount: conflictCount,
+      preview: conflictPreview,
+    );
+    if (action == null || action == _ImportConflictAction.cancel) {
+      _showMessage('已取消导入');
+      return null;
+    }
+
+    if (action == _ImportConflictAction.skipExisting) {
+      final filtered = incoming
+          .where((s) => !conflictUrls.contains(s.bookSourceUrl.trim()))
+          .toList(growable: false);
+      return (
+        finalSources: filtered,
+        conflictCount: conflictCount,
+        skippedConflictCount: conflictCount,
+      );
+    }
+
+    return (
+      finalSources: incoming,
+      conflictCount: conflictCount,
+      skippedConflictCount: 0,
+    );
+  }
+
+  Future<_ImportConflictAction?> _showImportConflictDialog({
+    required int conflictCount,
+    required List<BookSource> preview,
+  }) {
+    final lines = <String>['检测到 $conflictCount 条书源 URL 与现有书源重复。'];
+    if (preview.isNotEmpty) {
+      lines.add('示例：');
+      lines.addAll(preview.map((s) {
+        final name = s.bookSourceName.trim();
+        final url = s.bookSourceUrl.trim();
+        return '• ${name.isEmpty ? '(未命名)' : name}（$url）';
+      }));
+      final more = conflictCount - preview.length;
+      if (more > 0) lines.add('…其余 $more 条省略');
+    }
+    lines.add('请选择处理方式：');
+
+    return showCupertinoDialog<_ImportConflictAction>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('导入冲突处理'),
+        content: Text('\n${lines.join('\n')}'),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () =>
+                Navigator.pop(context, _ImportConflictAction.overwriteExisting),
+            child: const Text('覆盖重复（推荐）'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () =>
+                Navigator.pop(context, _ImportConflictAction.skipExisting),
+            child: const Text('跳过重复（保留现有）'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () =>
+                Navigator.pop(context, _ImportConflictAction.cancel),
+            child: const Text('取消导入'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImportError(SourceImportResult result) {
+    final lines = <String>[];
+    lines.add(result.errorMessage ?? '导入失败');
+    if (result.totalInputCount > 0) {
+      lines.add('输入条数：${result.totalInputCount}');
+      if (result.invalidCount > 0) lines.add('无效条数：${result.invalidCount}');
+      if (result.duplicateCount > 0) {
+        lines.add('重复URL：${result.duplicateCount}（已按后出现项覆盖）');
+      }
+    }
+    if (kIsWeb && (result.errorMessage ?? '').contains('跨域限制')) {
+      lines.add('建议：改用“从剪贴板导入”或“从文件导入”');
+    }
+    if (result.warnings.isNotEmpty) {
+      lines.add('详情：');
+      lines.addAll(result.warnings.take(5));
+      final more = result.warnings.length - 5;
+      if (more > 0) lines.add('…其余 $more 条省略');
+    }
+    _showMessage(lines.join('\n'));
+  }
+
+  void _showImportSummary(
+    SourceImportResult result, {
+    required int actualImportedCount,
+    int conflictCount = 0,
+    int skippedConflictCount = 0,
+  }) {
+    final lines = <String>['成功导入 $actualImportedCount 条书源'];
+    if (result.totalInputCount > 0) {
+      lines.add('输入条数：${result.totalInputCount}');
+      if (result.invalidCount > 0) lines.add('跳过无效：${result.invalidCount}');
+      if (result.duplicateCount > 0) {
+        lines.add('覆盖重复URL：${result.duplicateCount}');
+      }
+    }
+    if (conflictCount > 0) {
+      lines.add('与现有书源重复：$conflictCount');
+      if (skippedConflictCount > 0) {
+        lines.add('按你的选择跳过：$skippedConflictCount');
+      }
+    }
+    if (result.warnings.isNotEmpty) {
+      lines.add('说明：');
+      lines.addAll(result.warnings.take(5));
+      final more = result.warnings.length - 5;
+      if (more > 0) lines.add('…其余 $more 条省略');
+    }
+    _showMessage(lines.join('\n'));
   }
 
   Future<void> _exportSources() async {

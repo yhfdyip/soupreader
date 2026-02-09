@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/models/app_settings.dart';
@@ -27,18 +29,27 @@ class _BookshelfViewState extends State<BookshelfView> {
   late final BookshelfBooklistImportService _booklistImporter;
   List<Book> _books = [];
   bool _isImporting = false;
+  String? _initError;
 
   @override
   void initState() {
     super.initState();
-    _bookRepo = BookRepository(DatabaseService());
-    _importService = ImportService();
-    _settingsService = SettingsService();
-    _bookshelfIo = BookshelfImportExportService();
-    _booklistImporter = BookshelfBooklistImportService();
-    _isGridView =
-        _settingsService.appSettings.bookshelfViewMode == BookshelfViewMode.grid;
-    _loadBooks();
+    try {
+      debugPrint('[bookshelf] init start');
+      _bookRepo = BookRepository(DatabaseService());
+      _importService = ImportService();
+      _settingsService = SettingsService();
+      _bookshelfIo = BookshelfImportExportService();
+      _booklistImporter = BookshelfBooklistImportService();
+      _isGridView = _settingsService.appSettings.bookshelfViewMode ==
+          BookshelfViewMode.grid;
+      _loadBooks();
+      debugPrint('[bookshelf] init done, books=\${_books.length}');
+    } catch (e, st) {
+      _initError = '书架初始化异常: $e';
+      debugPrint('[bookshelf] init failed: $e');
+      debugPrintStack(stackTrace: st);
+    }
   }
 
   void _loadBooks() {
@@ -371,7 +382,28 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
       ),
       child: SafeArea(
-        child: _books.isEmpty ? _buildEmptyState() : _buildBookList(),
+        child: _initError != null
+            ? _buildInitError()
+            : (_books.isEmpty ? _buildEmptyState() : _buildBookList()),
+      ),
+    );
+  }
+
+  Widget _buildInitError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(CupertinoIcons.exclamationmark_triangle, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              _initError ?? '初始化失败',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -446,10 +478,10 @@ class _BookshelfViewState extends State<BookshelfView> {
                 color: CupertinoColors.systemGrey5.resolveFrom(context),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: book.coverUrl != null
+              child: book.coverUrl != null && book.coverUrl!.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(book.coverUrl!, fit: BoxFit.cover),
+                      child: _buildCoverImage(book),
                     )
                   : Center(
                       child: Text(
@@ -488,6 +520,50 @@ class _BookshelfViewState extends State<BookshelfView> {
         ],
       ),
     );
+  }
+
+  Widget _buildCoverImage(Book book) {
+    final coverUrl = book.coverUrl ?? '';
+    if (coverUrl.isEmpty) {
+      return _buildCoverFallback(book);
+    }
+
+    if (_isRemoteCover(coverUrl)) {
+      return Image.network(
+        coverUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildCoverFallback(book),
+      );
+    }
+
+    if (kIsWeb) {
+      return _buildCoverFallback(book);
+    }
+
+    return Image.file(
+      File(coverUrl),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => _buildCoverFallback(book),
+    );
+  }
+
+  Widget _buildCoverFallback(Book book) {
+    return Center(
+      child: Text(
+        book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
+        style: TextStyle(
+          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          fontSize: 28,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  bool _isRemoteCover(String value) {
+    final uri = Uri.tryParse(value);
+    final scheme = uri?.scheme.toLowerCase();
+    return scheme == 'http' || scheme == 'https';
   }
 
   Widget _buildListView() {

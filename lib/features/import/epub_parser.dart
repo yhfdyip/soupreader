@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:epubx/epubx.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../bookshelf/models/book.dart';
 import '../../core/utils/html_text_formatter.dart';
-
 
 /// EPUB 文件解析器
 class EpubParser {
@@ -40,10 +40,7 @@ class EpubParser {
       final author = epubBook.Author ?? '未知作者';
 
       // 获取封面
-      String? coverUrl;
-      if (epubBook.CoverImage != null) {
-        // TODO: 保存封面图片到本地并返回路径
-      }
+      final coverUrl = await _saveCoverImage(epubBook, bookId);
 
       // 解析章节
       final chapters = _parseChapters(epubBook, bookId);
@@ -63,6 +60,157 @@ class EpubParser {
       return EpubImportResult(book: book, chapters: chapters);
     } catch (e) {
       throw Exception('EPUB解析失败: $e');
+    }
+  }
+
+  static Future<String?> _saveCoverImage(
+      EpubBook epubBook, String bookId) async {
+    final coverData = _extractCoverImageData(epubBook);
+    if (coverData == null) return null;
+
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final coverDir = Directory('${docsDir.path}/.book_covers');
+      if (!await coverDir.exists()) {
+        await coverDir.create(recursive: true);
+      }
+
+      final extension = _inferCoverExtension(coverData.bytes, coverData.href);
+      final coverFile = File('${coverDir.path}/$bookId.$extension');
+      await coverFile.writeAsBytes(coverData.bytes, flush: true);
+      return coverFile.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static _CoverImageData? _extractCoverImageData(EpubBook epubBook) {
+    final package = epubBook.Schema?.Package;
+    final metaItems = package?.Metadata?.MetaItems;
+    final manifestItems = package?.Manifest?.Items;
+    final images = epubBook.Content?.Images;
+
+    if (metaItems == null ||
+        metaItems.isEmpty ||
+        manifestItems == null ||
+        manifestItems.isEmpty ||
+        images == null ||
+        images.isEmpty) {
+      return null;
+    }
+
+    String? coverItemId;
+    for (final metaItem in metaItems) {
+      final name = metaItem.Name?.trim().toLowerCase();
+      final content = metaItem.Content?.trim();
+      if (name == 'cover' && content != null && content.isNotEmpty) {
+        coverItemId = content;
+        break;
+      }
+    }
+    if (coverItemId == null) return null;
+
+    String? coverHref;
+    for (final manifestItem in manifestItems) {
+      final manifestId = manifestItem.Id;
+      if (manifestId != null &&
+          manifestId.toLowerCase() == coverItemId.toLowerCase()) {
+        coverHref = manifestItem.Href;
+        break;
+      }
+    }
+    if (coverHref == null || coverHref.isEmpty) return null;
+
+    final coverImage = _findCoverImageFile(images, coverHref);
+    final coverBytes = coverImage?.Content;
+    if (coverBytes == null || coverBytes.isEmpty) return null;
+
+    return _CoverImageData(bytes: coverBytes, href: coverHref);
+  }
+
+  static EpubByteContentFile? _findCoverImageFile(
+    Map<String, EpubByteContentFile> images,
+    String href,
+  ) {
+    final exactMatch = images[href];
+    if (exactMatch != null) return exactMatch;
+
+    final normalizedHref = _normalizeResourcePath(href);
+    for (final entry in images.entries) {
+      final normalizedKey = _normalizeResourcePath(entry.key);
+      if (normalizedKey == normalizedHref ||
+          normalizedKey.endsWith('/$normalizedHref') ||
+          normalizedHref.endsWith('/$normalizedKey')) {
+        return entry.value;
+      }
+    }
+
+    return null;
+  }
+
+  static String _normalizeResourcePath(String value) {
+    final withoutQuery = value.split('?').first.split('#').first;
+    return withoutQuery.replaceAll('\\', '/').replaceFirst(RegExp(r'^\./'), '');
+  }
+
+  static String _inferCoverExtension(List<int> bytes, String href) {
+    final extensionFromHref = _extractImageExtension(href);
+    if (extensionFromHref != null) {
+      return extensionFromHref;
+    }
+
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return 'png';
+    }
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF) {
+      return 'jpg';
+    }
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x47 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x38) {
+      return 'gif';
+    }
+    if (bytes.length >= 12 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
+      return 'webp';
+    }
+
+    return 'jpg';
+  }
+
+  static String? _extractImageExtension(String href) {
+    final normalized = _normalizeResourcePath(href).toLowerCase();
+    final match = RegExp(r'\.([a-z0-9]+)$').firstMatch(normalized);
+    final extension = match?.group(1);
+    if (extension == null || extension.isEmpty) return null;
+
+    switch (extension) {
+      case 'jpeg':
+        return 'jpg';
+      case 'jpg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+      case 'bmp':
+        return extension;
+      default:
+        return null;
     }
   }
 
@@ -119,8 +267,7 @@ class EpubParser {
       if (tocItems != null) {
         for (final tocItem in tocItems) {
           if (tocItem.Content?.Source?.contains(href) == true) {
-            chapterTitle =
-                tocItem.NavigationLabels?.first.Text ?? chapterTitle;
+            chapterTitle = tocItem.NavigationLabels?.first.Text ?? chapterTitle;
             break;
           }
         }
@@ -174,4 +321,11 @@ class EpubImportResult {
   final List<Chapter> chapters;
 
   EpubImportResult({required this.book, required this.chapters});
+}
+
+class _CoverImageData {
+  final List<int> bytes;
+  final String href;
+
+  const _CoverImageData({required this.bytes, required this.href});
 }

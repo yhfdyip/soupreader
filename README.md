@@ -1,6 +1,11 @@
 # soupreader
 
-A new Flutter project.
+SoupReader - 一款阅读应用（Flutter）。
+
+## 开发文档
+
+- 开发计划：`docs/DEV_PLAN.md`
+- 进度日志：`docs/DEV_PROGRESS.md`
 
 ## Getting Started
 

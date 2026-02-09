@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'core/database/database_service.dart';
@@ -10,19 +13,57 @@ import 'features/search/views/search_view.dart';
 import 'features/source/views/source_list_view.dart';
 import 'features/settings/views/settings_view.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化数据库
-  await DatabaseService().init();
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('[flutter-error] \${details.exceptionAsString()}');
+    if (details.stack != null) {
+      debugPrintStack(stackTrace: details.stack);
+    }
+  };
 
-  // 初始化全局设置
-  await SettingsService().init();
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    debugPrint('[platform-error] \$error');
+    debugPrintStack(stackTrace: stack);
+    return true;
+  };
 
-  // 初始化 Cookie 存储（对标“读不舍手”：持久化 CookieJar，便于反爬站点维持会话）
-  await CookieStore.setup();
+  runZonedGuarded(() async {
+    await _safeBootStep('DatabaseService.init', () async {
+      await DatabaseService().init();
+    });
 
-  runApp(const SoupReaderApp());
+    await _safeBootStep('SettingsService.init', () async {
+      await SettingsService().init();
+    });
+
+    await _safeBootStep('CookieStore.setup', () async {
+      await CookieStore.setup();
+    });
+
+    debugPrint('[boot] runApp start');
+    runApp(const SoupReaderApp());
+    debugPrint('[boot] runApp done');
+  }, (Object error, StackTrace stack) {
+    debugPrint('[zone-error] \$error');
+    debugPrintStack(stackTrace: stack);
+  });
+}
+
+Future<void> _safeBootStep(
+  String name,
+  Future<void> Function() action,
+) async {
+  debugPrint('[boot] \$name start');
+  try {
+    await action();
+    debugPrint('[boot] \$name ok');
+  } catch (e, st) {
+    debugPrint('[boot] \$name failed: \$e');
+    debugPrintStack(stackTrace: st);
+  }
 }
 
 /// SoupReader 阅读应用
@@ -51,7 +92,8 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _settingsService.appSettingsListenable.removeListener(_onAppSettingsChanged);
+    _settingsService.appSettingsListenable
+        .removeListener(_onAppSettingsChanged);
     super.dispose();
   }
 

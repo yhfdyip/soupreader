@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../../../app/theme/colors.dart';
@@ -110,20 +113,41 @@ class BookCoverCard extends StatelessWidget {
   }
 
   Widget _buildCover() {
-    if (book.coverUrl != null && book.coverUrl!.isNotEmpty) {
-      return Image.network(
-        book.coverUrl!,
+    final coverUrl = book.coverUrl;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      if (_isRemoteCover(coverUrl)) {
+        return Image.network(
+          coverUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildPlaceholderCover();
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return _buildPlaceholderCover(isLoading: true);
+          },
+        );
+      }
+
+      if (kIsWeb) {
+        return _buildPlaceholderCover();
+      }
+
+      return Image.file(
+        File(coverUrl),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           return _buildPlaceholderCover();
         },
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return _buildPlaceholderCover(isLoading: true);
-        },
       );
     }
     return _buildPlaceholderCover();
+  }
+
+  bool _isRemoteCover(String value) {
+    final uri = Uri.tryParse(value);
+    final scheme = uri?.scheme.toLowerCase();
+    return scheme == 'http' || scheme == 'https';
   }
 
   Widget _buildPlaceholderCover({bool isLoading = false}) {
@@ -132,7 +156,10 @@ class BookCoverCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.primary.withValues(alpha: 0.8), AppColors.secondary],
+          colors: [
+            AppColors.primary.withValues(alpha: 0.8),
+            AppColors.secondary
+          ],
         ),
       ),
       child: Center(

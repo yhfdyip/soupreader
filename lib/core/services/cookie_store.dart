@@ -1,14 +1,15 @@
 import 'dart:io';
 
 import 'package:cookie_jar/cookie_jar.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 class CookieStore {
-  static PersistCookieJar? _jar;
+  static CookieJar? _jar;
 
   static bool get isInitialized => _jar != null;
 
-  static PersistCookieJar get jar {
+  static CookieJar get jar {
     final v = _jar;
     if (v == null) {
       throw StateError('CookieStore 未初始化，请在 main() 启动阶段调用 CookieStore.setup()');
@@ -18,6 +19,13 @@ class CookieStore {
 
   static Future<void> setup() async {
     if (_jar != null) return;
+
+    if (kIsWeb) {
+      // Web 环境下不走本地文件系统，退化为内存 CookieJar（会随页面刷新丢失）。
+      _jar = CookieJar(ignoreExpires: false);
+      return;
+    }
+
     final docs = await getApplicationDocumentsDirectory();
     final dir = Directory('${docs.path}/.cookies');
     if (!await dir.exists()) {
@@ -43,4 +51,3 @@ class CookieStore {
     await jar.deleteAll();
   }
 }
-

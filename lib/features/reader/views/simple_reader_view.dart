@@ -307,17 +307,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _syncPageFactoryChapters({bool keepPosition = false}) {
-    final chapterDataList = _chapters
-        .map((chapter) {
-          final cached = _replaceStageCache[chapter.id];
-          final title = cached?.title ?? chapter.title;
-          final content = cached?.content ?? (chapter.content ?? '');
-          return ChapterData(
-            title: title,
-            content: _postProcessContent(content, title),
-          );
-        })
-        .toList();
+    final chapterDataList = _chapters.map((chapter) {
+      final cached = _replaceStageCache[chapter.id];
+      final title = cached?.title ?? chapter.title;
+      final content = cached?.content ?? (chapter.content ?? '');
+      return ChapterData(
+        title: title,
+        content: _postProcessContent(content, title),
+      );
+    }).toList();
     if (keepPosition) {
       _pageFactory.replaceChaptersKeepingPosition(chapterDataList);
     } else {
@@ -343,7 +341,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     String content = chapter.content ?? '';
     try {
-      content = await _ruleEngine.getContent(source, chapter.url ?? '');
+      final nextChapterUrl = (index + 1 < _chapters.length)
+          ? (_chapters[index + 1].url ?? '')
+          : null;
+      content = await _ruleEngine.getContent(
+        source,
+        chapter.url ?? '',
+        nextChapterUrl: nextChapterUrl,
+      );
       if (content.isNotEmpty) {
         await _chapterRepo.cacheChapterContent(chapter.id, content);
         _chapters[index] =
@@ -386,7 +391,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         bottomOffset -
         _settings.paddingTop -
         _settings.paddingBottom;
-    final contentWidth = screenWidth - _settings.paddingLeft - _settings.paddingRight;
+    final contentWidth =
+        screenWidth - _settings.paddingLeft - _settings.paddingRight;
 
     // 防止宽度过小导致死循环或异常
     if (contentWidth < 50 || contentHeight < 100) return;
@@ -472,27 +478,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       needRepaginate = true;
     } else if (newSettings.pageTurnMode != PageTurnMode.scroll) {
       if (oldSettings.fontSize != newSettings.fontSize ||
-              oldSettings.lineHeight != newSettings.lineHeight ||
-              oldSettings.letterSpacing != newSettings.letterSpacing ||
-              oldSettings.paragraphSpacing !=
-                  newSettings.paragraphSpacing || // 监听段间距变化
-              oldSettings.paddingLeft != newSettings.paddingLeft ||
-              oldSettings.paddingRight != newSettings.paddingRight ||
-              oldSettings.paddingTop != newSettings.paddingTop ||
-              oldSettings.paddingBottom != newSettings.paddingBottom ||
-              oldSettings.paragraphIndent != newSettings.paragraphIndent ||
-              oldSettings.textFullJustify != newSettings.textFullJustify ||
-              oldSettings.titleMode != newSettings.titleMode ||
-              oldSettings.titleSize != newSettings.titleSize ||
-              oldSettings.titleTopSpacing != newSettings.titleTopSpacing ||
-              oldSettings.titleBottomSpacing != newSettings.titleBottomSpacing ||
-              oldSettings.textBold != newSettings.textBold ||
-              oldSettings.underline != newSettings.underline ||
-              oldSettings.fontFamilyIndex != newSettings.fontFamilyIndex ||
-              // fontFamily 变化通常意味着需要全量刷新，但也需要重排
-              oldSettings.themeIndex != newSettings.themeIndex || // 主题变化可能影响字体? 暂时不用
-              contentTransformChanged
-          ) {
+          oldSettings.lineHeight != newSettings.lineHeight ||
+          oldSettings.letterSpacing != newSettings.letterSpacing ||
+          oldSettings.paragraphSpacing !=
+              newSettings.paragraphSpacing || // 监听段间距变化
+          oldSettings.paddingLeft != newSettings.paddingLeft ||
+          oldSettings.paddingRight != newSettings.paddingRight ||
+          oldSettings.paddingTop != newSettings.paddingTop ||
+          oldSettings.paddingBottom != newSettings.paddingBottom ||
+          oldSettings.paragraphIndent != newSettings.paragraphIndent ||
+          oldSettings.textFullJustify != newSettings.textFullJustify ||
+          oldSettings.titleMode != newSettings.titleMode ||
+          oldSettings.titleSize != newSettings.titleSize ||
+          oldSettings.titleTopSpacing != newSettings.titleTopSpacing ||
+          oldSettings.titleBottomSpacing != newSettings.titleBottomSpacing ||
+          oldSettings.textBold != newSettings.textBold ||
+          oldSettings.underline != newSettings.underline ||
+          oldSettings.fontFamilyIndex != newSettings.fontFamilyIndex ||
+          // fontFamily 变化通常意味着需要全量刷新，但也需要重排
+          oldSettings.themeIndex !=
+              newSettings.themeIndex || // 主题变化可能影响字体? 暂时不用
+          contentTransformChanged) {
         needRepaginate = true;
       }
     }
@@ -641,8 +647,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _scrollPage(up: !next);
       return;
     }
-    final moved =
-        next ? _pageFactory.moveToNext() : _pageFactory.moveToPrev();
+    final moved = next ? _pageFactory.moveToNext() : _pageFactory.moveToPrev();
     if (moved && mounted) {
       setState(() {});
     }
@@ -935,119 +940,120 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 height: screenSize.height,
                 child: Stack(
                   children: [
-                // 阅读内容 - 固定全屏
-                Positioned.fill(
-                  child: _buildReadingContent(),
-                ),
-
-                // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
-                if (_settings.showStatusBar &&
-                    !_showMenu &&
-                    !_showAutoReadPanel &&
-                    isScrollMode)
-                  ReaderStatusBar(
-                    settings: _settings,
-                    currentTheme: _currentTheme,
-                    currentTime: _getCurrentTime(),
-                    title: _currentTitle,
-                    bookTitle: widget.bookTitle,
-                    bookProgress: _getBookProgress(),
-                    chapterProgress: _getChapterProgress(),
-                    currentPage: 1,
-                    totalPages: 1,
-                  ),
-
-                // 顶部状态栏（滚动模式）
-                if (_settings.showStatusBar &&
-                    !_showMenu &&
-                    !_showAutoReadPanel &&
-                    isScrollMode)
-                  ReaderHeaderBar(
-                    settings: _settings,
-                    currentTheme: _currentTheme,
-                    currentTime: _getCurrentTime(),
-                    title: _currentTitle,
-                    bookTitle: widget.bookTitle,
-                    bookProgress: _getBookProgress(),
-                    chapterProgress: _getChapterProgress(),
-                    currentPage: 1,
-                    totalPages: 1,
-                  ),
-
-                // 顶部菜单
-                if (_showMenu)
-                  ReaderTopMenu(
-                    bookTitle: widget.bookTitle,
-                    chapterTitle: _currentTitle,
-                    onShowChapterList: _showChapterList,
-                  ),
-
-                // 底部菜单 (新版 Tab 导航)
-                if (_showMenu)
-                  ReaderBottomMenuNew(
-                    currentChapterIndex: _currentChapterIndex,
-                    totalChapters: _chapters.length,
-                    currentPageIndex: _pageFactory.currentPageIndex,
-                    totalPages: _pageFactory.totalPages.clamp(1, 9999),
-                    settings: _settings,
-                    currentTheme: _currentTheme,
-                    onChapterChanged: (index) => _loadChapter(index),
-                    onPageChanged: (pageIndex) {
-                      // 跳转到指定页码
-                      setState(() {
-                        // PageFactory 内部管理页码
-                        while (_pageFactory.currentPageIndex < pageIndex) {
-                          if (!_pageFactory.moveToNext()) break;
-                        }
-                        while (_pageFactory.currentPageIndex > pageIndex) {
-                          if (!_pageFactory.moveToPrev()) break;
-                        }
-                      });
-                    },
-                    onSettingsChanged: (settings) => _updateSettings(settings),
-                    onShowChapterList: _showChapterList,
-                    onShowTypography: () => _showQuickSettingsSheet(
-                      initialTab: ReaderQuickSettingsTab.typography,
+                    // 阅读内容 - 固定全屏
+                    Positioned.fill(
+                      child: _buildReadingContent(),
                     ),
-                    onShowTheme: () => _showQuickSettingsSheet(
-                      initialTab: ReaderQuickSettingsTab.theme,
-                    ),
-                    onShowPage: () => _showQuickSettingsSheet(
-                      initialTab: ReaderQuickSettingsTab.page,
-                    ),
-                    onShowMore: _showMoreMenu,
-                  ),
 
-                if (_isLoadingChapter)
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 12,
-                    right: 16,
-                    child: const CupertinoActivityIndicator(),
-                  ),
+                    // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
+                    if (_settings.showStatusBar &&
+                        !_showMenu &&
+                        !_showAutoReadPanel &&
+                        isScrollMode)
+                      ReaderStatusBar(
+                        settings: _settings,
+                        currentTheme: _currentTheme,
+                        currentTime: _getCurrentTime(),
+                        title: _currentTitle,
+                        bookTitle: widget.bookTitle,
+                        bookProgress: _getBookProgress(),
+                        chapterProgress: _getChapterProgress(),
+                        currentPage: 1,
+                        totalPages: 1,
+                      ),
 
-                // 自动阅读控制面板
-                if (_showAutoReadPanel)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: AutoReadPanel(
-                      autoPager: _autoPager,
-                      onSpeedChanged: (speed) {
-                        _updateSettings(
-                          _settings.copyWith(autoReadSpeed: speed),
-                        );
-                      },
-                      onClose: () {
-                        setState(() {
-                          _showAutoReadPanel = false;
-                        });
-                      },
+                    // 顶部状态栏（滚动模式）
+                    if (_settings.showStatusBar &&
+                        !_showMenu &&
+                        !_showAutoReadPanel &&
+                        isScrollMode)
+                      ReaderHeaderBar(
+                        settings: _settings,
+                        currentTheme: _currentTheme,
+                        currentTime: _getCurrentTime(),
+                        title: _currentTitle,
+                        bookTitle: widget.bookTitle,
+                        bookProgress: _getBookProgress(),
+                        chapterProgress: _getChapterProgress(),
+                        currentPage: 1,
+                        totalPages: 1,
+                      ),
+
+                    // 顶部菜单
+                    if (_showMenu)
+                      ReaderTopMenu(
+                        bookTitle: widget.bookTitle,
+                        chapterTitle: _currentTitle,
+                        onShowChapterList: _showChapterList,
+                      ),
+
+                    // 底部菜单 (新版 Tab 导航)
+                    if (_showMenu)
+                      ReaderBottomMenuNew(
+                        currentChapterIndex: _currentChapterIndex,
+                        totalChapters: _chapters.length,
+                        currentPageIndex: _pageFactory.currentPageIndex,
+                        totalPages: _pageFactory.totalPages.clamp(1, 9999),
+                        settings: _settings,
+                        currentTheme: _currentTheme,
+                        onChapterChanged: (index) => _loadChapter(index),
+                        onPageChanged: (pageIndex) {
+                          // 跳转到指定页码
+                          setState(() {
+                            // PageFactory 内部管理页码
+                            while (_pageFactory.currentPageIndex < pageIndex) {
+                              if (!_pageFactory.moveToNext()) break;
+                            }
+                            while (_pageFactory.currentPageIndex > pageIndex) {
+                              if (!_pageFactory.moveToPrev()) break;
+                            }
+                          });
+                        },
+                        onSettingsChanged: (settings) =>
+                            _updateSettings(settings),
+                        onShowChapterList: _showChapterList,
+                        onShowTypography: () => _showQuickSettingsSheet(
+                          initialTab: ReaderQuickSettingsTab.typography,
+                        ),
+                        onShowTheme: () => _showQuickSettingsSheet(
+                          initialTab: ReaderQuickSettingsTab.theme,
+                        ),
+                        onShowPage: () => _showQuickSettingsSheet(
+                          initialTab: ReaderQuickSettingsTab.page,
+                        ),
+                        onShowMore: _showMoreMenu,
+                      ),
+
+                    if (_isLoadingChapter)
+                      Positioned(
+                        top: MediaQuery.of(context).padding.top + 12,
+                        right: 16,
+                        child: const CupertinoActivityIndicator(),
+                      ),
+
+                    // 自动阅读控制面板
+                    if (_showAutoReadPanel)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: AutoReadPanel(
+                          autoPager: _autoPager,
+                          onSpeedChanged: (speed) {
+                            _updateSettings(
+                              _settings.copyWith(autoReadSpeed: speed),
+                            );
+                          },
+                          onClose: () {
+                            setState(() {
+                              _showAutoReadPanel = false;
+                            });
+                          },
+                        ),
+                      ),
+                    Positioned.fill(
+                      child: _buildBrightnessOverlay(),
                     ),
-                  ),
-                Positioned.fill(
-                  child: _buildBrightnessOverlay(),
-                ),
                   ],
                 ),
               ),
@@ -1515,7 +1521,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-
   Widget _buildSettingsTabs(int selectedTab, ValueChanged<int> onChanged) {
     Widget buildTab(String label, bool isSelected) {
       return Padding(
@@ -1640,7 +1645,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         label: '段首缩进',
                         isActive: _settings.paragraphIndent.isNotEmpty,
                         onTap: () {
-                          final hasIndent = _settings.paragraphIndent.isNotEmpty;
+                          final hasIndent =
+                              _settings.paragraphIndent.isNotEmpty;
                           _updateSettingsFromSheet(
                             setPopupState,
                             _settings.copyWith(
@@ -1667,8 +1673,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     );
                   },
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(8),
@@ -1691,7 +1697,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   thumbColor: CupertinoColors.activeBlue,
                   children: const {
                     2: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: Text('细体',
                           style: TextStyle(
                               color: Colors.white70,
@@ -1699,7 +1706,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                               fontWeight: FontWeight.w600)),
                     ),
                     0: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: Text('正常',
                           style: TextStyle(
                               color: Colors.white70,
@@ -1707,7 +1715,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                               fontWeight: FontWeight.w600)),
                     ),
                     1: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: Text('粗体',
                           style: TextStyle(
                               color: Colors.white70,
@@ -1805,8 +1814,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     );
                   },
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(8),
@@ -1814,8 +1823,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('高级排版与边距',
-                            style: TextStyle(color: Colors.white)),
+                        Text('高级排版与边距', style: TextStyle(color: Colors.white)),
                         Icon(CupertinoIcons.chevron_right,
                             color: Colors.white54, size: 16),
                       ],
@@ -1966,7 +1974,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         label: '段首缩进',
                         isActive: _settings.paragraphIndent.isNotEmpty,
                         onTap: () {
-                          final hasIndent = _settings.paragraphIndent.isNotEmpty;
+                          final hasIndent =
+                              _settings.paragraphIndent.isNotEmpty;
                           _updateSettingsFromSheet(
                             setPopupState,
                             _settings.copyWith(
@@ -2593,11 +2602,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
+              children: PageTurnModeUi.values(current: _settings.pageTurnMode)
+                  .map((mode) {
                 final isSelected = _settings.pageTurnMode == mode;
                 return ChoiceChip(
                   label: Text(
-                    PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name,
+                    PageTurnModeUi.isHidden(mode)
+                        ? '${mode.name}（隐藏）'
+                        : mode.name,
                   ),
                   selected: isSelected,
                   selectedColor: CupertinoColors.activeBlue,
@@ -2609,13 +2621,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   onSelected: PageTurnModeUi.isHidden(mode)
                       ? null
                       : (selected) {
-                    if (selected) {
-                      _updateSettingsFromSheet(
-                        setPopupState,
-                        _settings.copyWith(pageTurnMode: mode),
-                      );
-                    }
-                  },
+                          if (selected) {
+                            _updateSettingsFromSheet(
+                              setPopupState,
+                              _settings.copyWith(pageTurnMode: mode),
+                            );
+                          }
+                        },
                 );
               }).toList(),
             ),
@@ -2690,8 +2702,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(showStatusBar: value),
                   );
                 }),
-                _buildSwitchRow(
-                    '显示章节进度', _settings.showChapterProgress, (value) {
+                _buildSwitchRow('显示章节进度', _settings.showChapterProgress,
+                    (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
                     _settings.copyWith(showChapterProgress: value),

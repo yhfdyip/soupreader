@@ -11,6 +11,7 @@ import '../../../core/utils/legado_json.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
 import '../services/source_debug_export_service.dart';
+import '../services/source_rule_lint_service.dart';
 import 'source_debug_text_view.dart';
 import 'source_web_verify_view.dart';
 
@@ -67,6 +68,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   final RuleParserEngine _engine = RuleParserEngine();
   final SourceDebugExportService _debugExportService =
       SourceDebugExportService();
+  final SourceRuleLintService _ruleLintService = const SourceRuleLintService();
 
   int _tab = 0; // 0 基础 1 规则 2 JSON 3 调试
 
@@ -161,6 +163,17 @@ class _SourceEditViewState extends State<SourceEditView> {
   String? _debugTocSrcHtml; // state=30（目录页）
   String? _debugContentSrcHtml; // state=40（正文页）
   String? _debugContentResult; // 清理后的正文结果（便于直接看）
+  String? _debugMethodDecision;
+  String? _debugRetryDecision;
+  String? _debugRequestCharsetDecision;
+  String? _debugBodyDecision;
+  String? _debugResponseCharset;
+  String? _debugResponseCharsetDecision;
+  Map<String, String> _debugRuntimeVarsSnapshot = <String, String>{};
+  String? _previewChapterName;
+  String? _previewChapterUrl;
+  bool _awaitingChapterNameValue = false;
+  bool _awaitingChapterUrlValue = false;
 
   @override
   void initState() {
@@ -547,7 +560,77 @@ class _SourceEditViewState extends State<SourceEditView> {
           ],
         ),
         CupertinoListSection.insetGrouped(
+          header: const Text('字段即时预览（基于最近一次调试）'),
           children: [
+            CupertinoListTile.notched(
+              title: const Text('chapterName 预览'),
+              additionalInfo: Text(
+                (_previewChapterName == null || _previewChapterName!.isEmpty)
+                    ? '—'
+                    : '已提取',
+              ),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _previewChapterName == null || _previewChapterName!.isEmpty
+                  ? null
+                  : () => _openDebugText(
+                        title: 'chapterName 预览',
+                        text: [
+                          'ruleToc.chapterName: ${_tocChapterNameCtrl.text.trim()}',
+                          '',
+                          _previewChapterName!,
+                        ].join('\n'),
+                      ),
+            ),
+            CupertinoListTile.notched(
+              title: const Text('chapterUrl 预览'),
+              additionalInfo: Text(
+                (_previewChapterUrl == null || _previewChapterUrl!.isEmpty)
+                    ? '—'
+                    : '已提取',
+              ),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _previewChapterUrl == null || _previewChapterUrl!.isEmpty
+                  ? null
+                  : () => _openDebugText(
+                        title: 'chapterUrl 预览',
+                        text: [
+                          'ruleToc.chapterUrl: ${_tocChapterUrlCtrl.text.trim()}',
+                          '',
+                          _previewChapterUrl!,
+                        ].join('\n'),
+                      ),
+            ),
+            CupertinoListTile.notched(
+              title: const Text('content 预览'),
+              additionalInfo: Text(
+                (_debugContentResult == null ||
+                        _debugContentResult!.trim().isEmpty)
+                    ? '—'
+                    : '${_debugContentResult!.length} 字符',
+              ),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _debugContentResult == null ||
+                      _debugContentResult!.trim().isEmpty
+                  ? null
+                  : () => _openDebugText(
+                        title: 'content 预览',
+                        text: [
+                          'ruleContent.content: ${_contentContentCtrl.text.trim()}',
+                          '',
+                          _debugContentResult!,
+                        ].join('\n'),
+                      ),
+            ),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          children: [
+            CupertinoListTile.notched(
+              title: const Text('规则体检（Lint）'),
+              subtitle: const Text('检查关键字段缺失、规则格式风险与链路可用性风险'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _runRuleLint,
+            ),
             CupertinoListTile.notched(
               title: const Text('同步到 JSON'),
               subtitle: const Text('把基础与规则字段写入 JSON（保留未知字段）'),
@@ -848,6 +931,12 @@ class _SourceEditViewState extends State<SourceEditView> {
               trailing: const CupertinoListTileChevron(),
               onTap: _copyDebugConsole,
             ),
+            CupertinoListTile.notched(
+              title: const Text('复制最小复现信息'),
+              subtitle: const Text('包含书源关键字段、请求决策摘要、最近日志'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _copyMinimalReproInfo,
+            ),
           ],
         ),
         _buildDebugQuickActionsSection(),
@@ -1066,6 +1155,37 @@ class _SourceEditViewState extends State<SourceEditView> {
               ? null
               : () => _openDebugText(title: '正文结果', text: contentResult),
         ),
+        CupertinoListTile.notched(
+          title: const Text('运行时变量快照（脱敏）'),
+          subtitle: const Text('含 @put/@get 运行期变量，用于调试链路排查'),
+          additionalInfo: Text('${_debugRuntimeVarsSnapshot.length} 项'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: _debugRuntimeVarsSnapshot.isEmpty
+              ? null
+              : () => _openDebugText(
+                    title: '运行时变量快照（脱敏）',
+                    text: _prettyJson(
+                      LegadoJson.encode(_debugRuntimeVarsSnapshot),
+                    ),
+                  ),
+        ),
+        CupertinoListTile.notched(
+          title: const Text('复制变量快照（脱敏）'),
+          additionalInfo: Text('${_debugRuntimeVarsSnapshot.length} 项'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: _debugRuntimeVarsSnapshot.isEmpty
+              ? null
+              : () {
+                  Clipboard.setData(
+                    ClipboardData(
+                      text: _prettyJson(
+                        LegadoJson.encode(_debugRuntimeVarsSnapshot),
+                      ),
+                    ),
+                  );
+                  _showMessage('已复制变量快照（脱敏）');
+                },
+        ),
       ],
     );
   }
@@ -1093,7 +1213,27 @@ class _SourceEditViewState extends State<SourceEditView> {
     final uiLines = visibleLines.length;
     final effectiveMode = filterActive ? 2 : mode;
 
+    final decisionSummary = _buildDebugDecisionSummaryLines();
+
     final children = <Widget>[
+      if (decisionSummary.isNotEmpty)
+        CupertinoListTile.notched(
+          title: const Text('请求决策摘要（最近一次）'),
+          subtitle: _buildDecisionSummaryPanel(decisionSummary.join('\n')),
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () {
+              Clipboard.setData(
+                ClipboardData(text: decisionSummary.join('\n')),
+              );
+              _showMessage('已复制请求决策摘要');
+            },
+            child: const Icon(
+              CupertinoIcons.doc_on_doc,
+              size: 18,
+            ),
+          ),
+        ),
       CupertinoListTile.notched(
         title: const Text('显示模式'),
         subtitle: CupertinoSlidingSegmentedControl<int>(
@@ -1343,6 +1483,127 @@ class _SourceEditViewState extends State<SourceEditView> {
     );
   }
 
+  Widget _buildDecisionSummaryPanel(String text) {
+    final show = text.trim().isEmpty ? '—' : text.trimRight();
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      constraints: const BoxConstraints(minHeight: 88, maxHeight: 220),
+      child: CupertinoScrollbar(
+        child: SingleChildScrollView(
+          child: SelectableText(
+            show,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _stripDebugTimePrefix(String text) {
+    final t = text.trimLeft();
+    if (!t.startsWith('[')) return t;
+    final idx = t.indexOf('] ');
+    if (idx < 0) return t;
+    return t.substring(idx + 2);
+  }
+
+  void _updateRequestDecisionSummary(String message) {
+    final plain = _stripDebugTimePrefix(message).trimLeft();
+    String valueOf(String prefix) {
+      return plain.substring(prefix.length).trim();
+    }
+
+    if (plain.startsWith('└请求决策：')) {
+      _debugMethodDecision = valueOf('└请求决策：');
+      return;
+    }
+    if (plain.startsWith('└重试决策：')) {
+      _debugRetryDecision = valueOf('└重试决策：');
+      return;
+    }
+    if (plain.startsWith('└请求编码：')) {
+      _debugRequestCharsetDecision = valueOf('└请求编码：');
+      return;
+    }
+    if (plain.startsWith('└请求体决策：')) {
+      _debugBodyDecision = valueOf('└请求体决策：');
+      return;
+    }
+    if (plain.startsWith('└响应编码：')) {
+      _debugResponseCharset = valueOf('└响应编码：');
+      return;
+    }
+    if (plain.startsWith('└响应解码决策：')) {
+      _debugResponseCharsetDecision = valueOf('└响应解码决策：');
+    }
+  }
+
+  void _updateRuleFieldPreviewFromLine(String message) {
+    final plain = _stripDebugTimePrefix(message).trimLeft();
+    if (plain.startsWith('┌获取章节名')) {
+      _awaitingChapterNameValue = true;
+      return;
+    }
+    if (plain.startsWith('┌获取章节链接')) {
+      _awaitingChapterUrlValue = true;
+      return;
+    }
+    if (plain.startsWith('┌')) {
+      _awaitingChapterNameValue = false;
+      _awaitingChapterUrlValue = false;
+      return;
+    }
+    if (!plain.startsWith('└')) return;
+
+    final value = plain.substring(1).trim();
+    if (_awaitingChapterNameValue) {
+      if (value.isNotEmpty) {
+        _previewChapterName = value;
+      }
+      _awaitingChapterNameValue = false;
+    }
+    if (_awaitingChapterUrlValue) {
+      if (value.isNotEmpty) {
+        _previewChapterUrl = value;
+      }
+      _awaitingChapterUrlValue = false;
+    }
+  }
+
+  List<String> _buildDebugDecisionSummaryLines() {
+    final lines = <String>[];
+    if (_debugMethodDecision != null && _debugMethodDecision!.isNotEmpty) {
+      lines.add('method: $_debugMethodDecision');
+    }
+    if (_debugRetryDecision != null && _debugRetryDecision!.isNotEmpty) {
+      lines.add('retry: $_debugRetryDecision');
+    }
+    if (_debugRequestCharsetDecision != null &&
+        _debugRequestCharsetDecision!.isNotEmpty) {
+      lines.add('requestCharset: $_debugRequestCharsetDecision');
+    }
+    if (_debugBodyDecision != null && _debugBodyDecision!.isNotEmpty) {
+      lines.add('body: $_debugBodyDecision');
+    }
+    if (_debugResponseCharset != null && _debugResponseCharset!.isNotEmpty) {
+      lines.add('responseCharset: $_debugResponseCharset');
+    }
+    if (_debugResponseCharsetDecision != null &&
+        _debugResponseCharsetDecision!.isNotEmpty) {
+      lines.add('responseDecode: $_debugResponseCharsetDecision');
+    }
+    return lines;
+  }
+
   void _clearDebugConsole() {
     setState(() {
       _debugLines.clear();
@@ -1354,6 +1615,17 @@ class _SourceEditViewState extends State<SourceEditView> {
       _debugTocSrcHtml = null;
       _debugContentSrcHtml = null;
       _debugContentResult = null;
+      _debugMethodDecision = null;
+      _debugRetryDecision = null;
+      _debugRequestCharsetDecision = null;
+      _debugBodyDecision = null;
+      _debugResponseCharset = null;
+      _debugResponseCharsetDecision = null;
+      _debugRuntimeVarsSnapshot = <String, String>{};
+      _previewChapterName = null;
+      _previewChapterUrl = null;
+      _awaitingChapterNameValue = false;
+      _awaitingChapterUrlValue = false;
     });
   }
 
@@ -1365,6 +1637,56 @@ class _SourceEditViewState extends State<SourceEditView> {
     final text = _debugLinesAll.map((e) => e.text).join('\n');
     Clipboard.setData(ClipboardData(text: text));
     _showMessage('已复制全部日志');
+  }
+
+  void _copyMinimalReproInfo() {
+    final text = _buildMinimalReproText();
+    Clipboard.setData(ClipboardData(text: text));
+    _showMessage('已复制最小复现信息');
+  }
+
+  String _buildMinimalReproText() {
+    final now = DateTime.now().toIso8601String();
+    final patched = _buildPatchedJsonForDebug();
+    final source = patched == null ? null : BookSource.fromJson(patched);
+    final debugKey = _debugKeyCtrl.text.trim();
+
+    final lines = <String>[
+      'SoupReader 最小复现信息',
+      '生成时间：$now',
+      'Debug Key：${debugKey.isEmpty ? '-' : debugKey}',
+      if (source != null) '书源名称：${source.bookSourceName}',
+      if (source != null) '书源地址：${source.bookSourceUrl}',
+      if (source != null)
+        '搜索地址：${(source.searchUrl ?? '').trim().isEmpty ? '-' : source.searchUrl}',
+      if (source != null)
+        '发现地址：${(source.exploreUrl ?? '').trim().isEmpty ? '-' : source.exploreUrl}',
+      if (_debugError != null && _debugError!.trim().isNotEmpty)
+        '最近错误：${_debugError!.trim()}',
+    ];
+
+    final decisions = _buildDebugDecisionSummaryLines();
+    if (decisions.isNotEmpty) {
+      lines
+        ..add('')
+        ..add('请求决策摘要：')
+        ..addAll(decisions.map((e) => '- $e'));
+    }
+
+    final tailLogs = _debugLinesAll
+        .map((e) => e.text)
+        .where((e) => e.trim().isNotEmpty)
+        .toList(growable: false);
+    final start = tailLogs.length > 80 ? tailLogs.length - 80 : 0;
+    final slice = tailLogs.sublist(start);
+    if (slice.isNotEmpty) {
+      lines
+        ..add('')
+        ..add('关键日志（最近 ${slice.length} 行）：')
+        ..addAll(slice);
+    }
+
+    return lines.join('\n');
   }
 
   Map<String, dynamic> _buildDebugBundle({required bool includeRawSources}) {
@@ -1383,6 +1705,15 @@ class _SourceEditViewState extends State<SourceEditView> {
       'sourceJson': _jsonCtrl.text,
       'consoleText': consoleText,
       'consoleLines': lines,
+      'requestDecisionSummary': <String, dynamic>{
+        'method': _debugMethodDecision,
+        'retry': _debugRetryDecision,
+        'requestCharset': _debugRequestCharsetDecision,
+        'body': _debugBodyDecision,
+        'responseCharset': _debugResponseCharset,
+        'responseDecode': _debugResponseCharsetDecision,
+      },
+      'runtimeVariables': _debugRuntimeVarsSnapshot,
     };
 
     if (includeRawSources) {
@@ -1679,6 +2010,17 @@ class _SourceEditViewState extends State<SourceEditView> {
       _debugTocSrcHtml = null;
       _debugContentSrcHtml = null;
       _debugContentResult = null;
+      _debugMethodDecision = null;
+      _debugRetryDecision = null;
+      _debugRequestCharsetDecision = null;
+      _debugBodyDecision = null;
+      _debugResponseCharset = null;
+      _debugResponseCharsetDecision = null;
+      _debugRuntimeVarsSnapshot = <String, String>{};
+      _previewChapterName = null;
+      _previewChapterUrl = null;
+      _awaitingChapterNameValue = false;
+      _awaitingChapterUrlValue = false;
     });
 
     try {
@@ -1687,6 +2029,10 @@ class _SourceEditViewState extends State<SourceEditView> {
         key,
         onEvent: _onDebugEvent,
       );
+      if (!mounted) return;
+      setState(() {
+        _debugRuntimeVarsSnapshot = _engine.debugRuntimeVariablesSnapshot();
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _debugError = '调试失败：$e');
@@ -1724,6 +2070,8 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     setState(() {
       final line = _DebugLine(state: event.state, text: event.message);
+      _updateRequestDecisionSummary(event.message);
+      _updateRuleFieldPreviewFromLine(event.message);
       _debugLinesAll.add(line);
       _debugLines.add(line);
       // UI 列表模式保持轻量：仅保留最近一部分；“全文控制台/导出调试包”使用全量日志。
@@ -2115,6 +2463,44 @@ class _SourceEditViewState extends State<SourceEditView> {
       if (!mounted) return;
       _showMessage('保存失败：$e');
     }
+  }
+
+  Future<void> _runRuleLint() async {
+    final map = _buildPatchedJsonForDebug();
+    if (map == null) {
+      _showMessage('JSON 格式错误，无法执行规则体检');
+      return;
+    }
+
+    final report = _ruleLintService.lintFromJson(map);
+    final lines = <String>[
+      'SoupReader 规则体检报告',
+      '错误：${report.errorCount}',
+      '警告：${report.warningCount}',
+      '建议：${report.infoCount}',
+      '',
+    ];
+
+    if (!report.hasIssues) {
+      lines.add('✅ 未发现明显规则风险。');
+    } else {
+      for (var i = 0; i < report.issues.length; i++) {
+        final item = report.issues[i];
+        final level = item.level == RuleLintLevel.error
+            ? '错误'
+            : item.level == RuleLintLevel.warning
+                ? '警告'
+                : '建议';
+        lines.add('${i + 1}. [$level] ${item.field}');
+        lines.add('   ${item.message}');
+        if (item.suggestion != null && item.suggestion!.trim().isNotEmpty) {
+          lines.add('   建议：${item.suggestion!.trim()}');
+        }
+      }
+    }
+
+    final reportText = lines.join('\n');
+    await _openDebugText(title: '规则体检报告', text: reportText);
   }
 
   String _prettyJson(String raw) {

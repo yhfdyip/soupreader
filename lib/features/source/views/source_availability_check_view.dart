@@ -5,6 +5,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
+import '../services/source_debug_export_service.dart';
 import 'source_debug_text_view.dart';
 import 'source_edit_view.dart';
 
@@ -18,7 +19,7 @@ enum _CheckStatus {
 }
 
 class _CheckItem {
-  final BookSource source;
+  BookSource source;
   _CheckStatus status = _CheckStatus.pending;
   String? message;
   String? requestUrl;
@@ -27,6 +28,15 @@ class _CheckItem {
   String? debugKey;
 
   _CheckItem({required this.source});
+}
+
+enum _ResultFilter {
+  all,
+  available,
+  failed,
+  empty,
+  timeout,
+  skipped,
 }
 
 class SourceAvailabilityCheckView extends StatefulWidget {
@@ -42,14 +52,17 @@ class SourceAvailabilityCheckView extends StatefulWidget {
       _SourceAvailabilityCheckViewState();
 }
 
-class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckView> {
+class _SourceAvailabilityCheckViewState
+    extends State<SourceAvailabilityCheckView> {
   final RuleParserEngine _engine = RuleParserEngine();
+  final SourceDebugExportService _exportService = SourceDebugExportService();
   late final DatabaseService _db;
   late final SourceRepository _repo;
 
   bool _running = false;
   bool _cancelRequested = false;
   final List<_CheckItem> _items = <_CheckItem>[];
+  _ResultFilter _resultFilter = _ResultFilter.all;
 
   @override
   void initState() {
@@ -109,14 +122,15 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
         final hasSearch =
             (source.searchUrl != null && source.searchUrl!.trim().isNotEmpty) &&
                 source.ruleSearch != null;
-        final hasExplore =
-            (source.exploreUrl != null && source.exploreUrl!.trim().isNotEmpty) &&
-                source.ruleExplore != null;
+        final hasExplore = (source.exploreUrl != null &&
+                source.exploreUrl!.trim().isNotEmpty) &&
+            source.ruleExplore != null;
 
         if (hasSearch) {
-          final keyword = source.ruleSearch?.checkKeyWord?.trim().isNotEmpty == true
-              ? source.ruleSearch!.checkKeyWord!.trim()
-              : '我的';
+          final keyword =
+              source.ruleSearch?.checkKeyWord?.trim().isNotEmpty == true
+                  ? source.ruleSearch!.checkKeyWord!.trim()
+                  : '我的';
           item.debugKey = keyword;
           final debug = await _engine.searchDebug(source, keyword);
           final ok = debug.fetch.body != null;
@@ -131,7 +145,8 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
               item.message = debug.error ?? debug.fetch.error ?? '请求失败';
             } else if (cnt <= 0) {
               item.status = _CheckStatus.empty;
-              item.message = '请求成功，但列表为空（${keyword.isEmpty ? '无关键字' : '关键字: $keyword'}）';
+              item.message =
+                  '请求成功，但列表为空（${keyword.isEmpty ? '无关键字' : '关键字: $keyword'}）';
             } else {
               item.status = _CheckStatus.ok;
               item.message = '可用（列表 $cnt）';
@@ -168,7 +183,8 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
         if (!mounted) return;
         setState(() {
           item.status = _CheckStatus.fail;
-          item.message = '缺少 searchUrl/ruleSearch 或 exploreUrl/ruleExplore，无法检测';
+          item.message =
+              '缺少 searchUrl/ruleSearch 或 exploreUrl/ruleExplore，无法检测';
         });
       } catch (e) {
         if (!mounted) return;
@@ -224,9 +240,76 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
     }
   }
 
-  Future<void> _copyReport() async {
-    final lines = <String>[];
-    for (final item in _items) {
+  bool _isTimeoutMessage(String? message) {
+    final text = (message ?? '').trim().toLowerCase();
+    if (text.isEmpty) return false;
+    return text.contains('timeout') ||
+        text.contains('time out') ||
+        text.contains('timed out') ||
+        text.contains('连接超时') ||
+        text.contains('请求超时') ||
+        text.contains('超时');
+  }
+
+  bool _matchesFilter(_CheckItem item, _ResultFilter filter) {
+    switch (filter) {
+      case _ResultFilter.all:
+        return true;
+      case _ResultFilter.available:
+        return item.status == _CheckStatus.ok;
+      case _ResultFilter.failed:
+        return item.status == _CheckStatus.fail;
+      case _ResultFilter.empty:
+        return item.status == _CheckStatus.empty;
+      case _ResultFilter.timeout:
+        return item.status == _CheckStatus.fail &&
+            _isTimeoutMessage(item.message);
+      case _ResultFilter.skipped:
+        return item.status == _CheckStatus.skipped;
+    }
+  }
+
+  String _filterLabel(_ResultFilter filter) {
+    switch (filter) {
+      case _ResultFilter.all:
+        return '全部';
+      case _ResultFilter.available:
+        return '可用';
+      case _ResultFilter.failed:
+        return '失败';
+      case _ResultFilter.empty:
+        return '空列表';
+      case _ResultFilter.timeout:
+        return '超时';
+      case _ResultFilter.skipped:
+        return '跳过';
+    }
+  }
+
+  int _countByFilter(_ResultFilter filter) {
+    return _items.where((e) => _matchesFilter(e, filter)).length;
+  }
+
+  String _buildReportText({required bool onlyVisible}) {
+    final now = DateTime.now().toIso8601String();
+    final pool = onlyVisible
+        ? _items.where((e) => _matchesFilter(e, _resultFilter)).toList()
+        : _items;
+
+    final lines = <String>[
+      'SoupReader 书源可用性检测报告',
+      '生成时间：$now',
+      '范围：${widget.includeDisabled ? '全部书源' : '仅启用书源'}',
+      '筛选：${_filterLabel(_resultFilter)}',
+      '总计：${pool.length}',
+      '可用：${pool.where((e) => e.status == _CheckStatus.ok).length}',
+      '失败：${pool.where((e) => e.status == _CheckStatus.fail).length}',
+      '空列表：${pool.where((e) => e.status == _CheckStatus.empty).length}',
+      '跳过：${pool.where((e) => e.status == _CheckStatus.skipped).length}',
+      '',
+    ];
+
+    for (final item in pool) {
       final s = item.source;
       lines.add([
         _statusText(item.status),
@@ -238,13 +321,130 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
           item.message!.trim(),
       ].join(' | '));
     }
-    await Clipboard.setData(ClipboardData(text: lines.join('\n')));
+
+    return lines.join('\n');
+  }
+
+  Future<void> _copyReport() async {
+    final text = _buildReportText(onlyVisible: true);
+    await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     await showCupertinoDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
         content: const Text('\n已复制检测报告'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('好'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportReportToFile() async {
+    final text = _buildReportText(onlyVisible: true);
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final fileName = 'source_availability_report_$ts.txt';
+    final ok = await _exportService.exportTextToFile(
+      text: text,
+      fileName: fileName,
+      dialogTitle: '导出检测报告',
+    );
+    if (!mounted) return;
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text(ok ? '\n已导出：$fileName' : '\n导出取消或失败'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('好'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _disableUnavailableSources() async {
+    if (_running) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('提示'),
+          content: const Text('\n检测进行中，请先停止检测再执行此操作。'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('好'),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final targets = _items
+        .where((item) =>
+            item.source.enabled &&
+            (item.status == _CheckStatus.fail ||
+                item.status == _CheckStatus.empty))
+        .toList(growable: false);
+    if (targets.isEmpty) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('提示'),
+          content: const Text('\n没有可禁用的失效书源（仅处理失败/空列表且当前启用）。'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('好'),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: const Text('一键禁用失效源'),
+            content: Text('\n将禁用 ${targets.length} 条书源（失败/空列表）。此操作可在书源列表手动恢复。'),
+            actions: [
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('确认禁用'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    for (final item in targets) {
+      final updated = item.source.copyWith(enabled: false);
+      await _repo.updateSource(updated);
+      item.source = updated;
+      item.message = '${item.message ?? '已检测'}；已自动禁用';
+    }
+
+    if (!mounted) return;
+    setState(() {});
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('完成'),
+        content: Text('\n已禁用 ${targets.length} 条失效书源。'),
         actions: [
           CupertinoDialogAction(
             child: const Text('好'),
@@ -308,19 +508,40 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
     final total = _items.length;
     final done = _items
         .where((e) =>
-            e.status != _CheckStatus.pending && e.status != _CheckStatus.running)
+            e.status != _CheckStatus.pending &&
+            e.status != _CheckStatus.running)
         .length;
     final ok = _items.where((e) => e.status == _CheckStatus.ok).length;
     final fail = _items.where((e) => e.status == _CheckStatus.fail).length;
     final empty = _items.where((e) => e.status == _CheckStatus.empty).length;
+    final timedOut = _items
+        .where((e) =>
+            e.status == _CheckStatus.fail && _isTimeoutMessage(e.message))
+        .length;
+    final skipped =
+        _items.where((e) => e.status == _CheckStatus.skipped).length;
+
+    final visibleItems = _items
+        .where((e) => _matchesFilter(e, _resultFilter))
+        .toList(growable: false);
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('书源可用性检测'),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _copyReport,
-          child: const Text('复制'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: _copyReport,
+              child: const Text('复制'),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: _exportReportToFile,
+              child: const Text('导出'),
+            ),
+          ],
         ),
       ),
       child: SafeArea(
@@ -335,7 +556,32 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
                 ),
                 CupertinoListTile.notched(
                   title: const Text('结果'),
-                  additionalInfo: Text('可用 $ok / 失败 $fail / 空 $empty'),
+                  additionalInfo: Text(
+                      '可用 $ok / 失败 $fail / 空 $empty / 超时 $timedOut / 跳过 $skipped'),
+                ),
+                CupertinoListTile.notched(
+                  title: const Text('结果筛选'),
+                  subtitle: CupertinoSlidingSegmentedControl<_ResultFilter>(
+                    groupValue: _resultFilter,
+                    children: {
+                      for (final f in _ResultFilter.values)
+                        f: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child:
+                              Text('${_filterLabel(f)}(${_countByFilter(f)})'),
+                        ),
+                    },
+                    onValueChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _resultFilter = v);
+                    },
+                  ),
+                ),
+                CupertinoListTile.notched(
+                  title: const Text('一键禁用失效源'),
+                  subtitle: const Text('禁用状态为“失败/空列表”的已启用书源'),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _disableUnavailableSources,
                 ),
                 CupertinoListTile.notched(
                   title: Text(_running ? '停止检测' : '重新检测'),
@@ -345,8 +591,8 @@ class _SourceAvailabilityCheckViewState extends State<SourceAvailabilityCheckVie
               ],
             ),
             CupertinoListSection.insetGrouped(
-              header: const Text('列表'),
-              children: _items.map((item) {
+              header: Text('列表（显示 ${visibleItems.length} / 总计 $total）'),
+              children: visibleItems.map((item) {
                 final statusText = _statusText(item.status);
                 final color = _statusColor(item.status);
                 return GestureDetector(
