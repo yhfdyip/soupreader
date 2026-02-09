@@ -4,6 +4,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../models/book.dart';
+import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 
 class BookAddResult {
@@ -69,7 +70,78 @@ class BookAddService {
         _bookRepo = BookRepository(db),
         _chapterRepo = ChapterRepository(db);
 
+  String _compactMessage(String text, {int maxLength = 96}) {
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return '${normalized.substring(0, maxLength)}…';
+  }
+
+  bool _isSameUrl(String a, String b) {
+    return a.trim() == b.trim();
+  }
+
+  List<Chapter> _buildChapters(String bookId, List<TocItem> tocItems) {
+    final chapters = <Chapter>[];
+    final seenUrls = <String>{};
+
+    for (final item in tocItems) {
+      final title = item.name.trim();
+      final url = item.url.trim();
+      if (title.isEmpty || url.isEmpty) continue;
+      if (!seenUrls.add(url)) continue;
+
+      final index = chapters.length;
+      chapters.add(
+        Chapter(
+          id: _uuid.v5(
+            Namespace.url.value,
+            '$bookId|$index|$url',
+          ),
+          bookId: bookId,
+          title: title,
+          url: url,
+          index: index,
+          isDownloaded: false,
+          content: null,
+        ),
+      );
+    }
+
+    return chapters;
+  }
+
+  Future<String> _buildTocFailureHint({
+    required BookSource source,
+    required String tocUrl,
+  }) async {
+    try {
+      final debug = await _engine.getTocDebug(source, tocUrl);
+
+      final explicitError = (debug.error ?? '').trim();
+      if (explicitError.isNotEmpty) {
+        return _compactMessage(explicitError);
+      }
+
+      final statusCode = debug.fetch.statusCode;
+      if (statusCode != null && statusCode >= 400) {
+        return '请求失败（HTTP $statusCode）';
+      }
+
+      if (debug.fetch.body != null && debug.listCount > 0 && debug.toc.isEmpty) {
+        return '解析到目录列表 ${debug.listCount} 项，但章节名或章节链接为空';
+      }
+    } catch (_) {
+      // ignore debug hint failure
+    }
+
+    return '';
+  }
+
   Future<BookAddResult> addFromSearchResult(SearchResult result) async {
+    String? persistedBookId;
+
     try {
       final source = _sourceRepo.getSourceByUrl(result.sourceUrl);
       if (source == null) {
@@ -90,15 +162,49 @@ class BookAddService {
         result.bookUrl,
         clearRuntimeVariables: true,
       );
-      final tocUrl =
+
+      final primaryTocUrl =
           detail?.tocUrl.isNotEmpty == true ? detail!.tocUrl : result.bookUrl;
-      final tocItems = await _engine.getToc(
+      var requestedTocUrl = primaryTocUrl;
+      var tocItems = await _engine.getToc(
         source,
-        tocUrl,
+        requestedTocUrl,
         clearRuntimeVariables: false,
       );
+
+      final fallbackTocUrl = result.bookUrl.trim();
+      final canFallback = fallbackTocUrl.isNotEmpty &&
+          !_isSameUrl(requestedTocUrl, fallbackTocUrl);
+
+      var hasTriedBookUrlFallback = false;
+      if (tocItems.isEmpty && canFallback) {
+        hasTriedBookUrlFallback = true;
+        requestedTocUrl = fallbackTocUrl;
+        tocItems = await _engine.getToc(
+          source,
+          requestedTocUrl,
+          clearRuntimeVariables: false,
+        );
+      }
+
       if (tocItems.isEmpty) {
-        return BookAddResult.error('目录解析失败');
+        final hint = await _buildTocFailureHint(
+          source: source,
+          tocUrl: requestedTocUrl,
+        );
+        final baseMessage = hasTriedBookUrlFallback
+            ? '目录解析失败：已尝试详情目录地址与书籍地址，仍未获取到有效章节'
+            : '目录解析失败：未获取到有效章节';
+
+        if (hint.isNotEmpty) {
+          return BookAddResult.error('$baseMessage（$hint）');
+        }
+        return BookAddResult.error('$baseMessage（可能是 ruleToc 不匹配）');
+      }
+
+      final chapters = _buildChapters(bookId, tocItems);
+      if (chapters.isEmpty) {
+        return BookAddResult.error('目录解析失败：章节名或章节链接为空（可能是 ruleToc 不匹配）');
       }
 
       final book = Book(
@@ -112,7 +218,7 @@ class BookAddService {
         sourceId: source.bookSourceUrl,
         sourceUrl: source.bookSourceUrl,
         latestChapter: detail?.lastChapter ?? result.lastChapter,
-        totalChapters: tocItems.length,
+        totalChapters: chapters.length,
         currentChapter: 0,
         readProgress: 0,
         lastReadTime: null,
@@ -121,27 +227,35 @@ class BookAddService {
         localPath: null,
       );
 
-      final chapters = tocItems.map((item) {
-        return Chapter(
-          id: _uuid.v5(
-            Namespace.url.value,
-            '$bookId|${item.index}|${item.url}',
-          ),
-          bookId: bookId,
-          title: item.name,
-          url: item.url,
-          index: item.index,
-          isDownloaded: false,
-          content: null,
-        );
-      }).toList();
-
       await _bookRepo.addBook(book);
+      persistedBookId = bookId;
       await _chapterRepo.addChapters(chapters);
+
+      final storedChapterCount = _chapterRepo.getChaptersForBook(bookId).length;
+      if (storedChapterCount <= 0) {
+        await _bookRepo.deleteBook(bookId);
+        persistedBookId = null;
+        return BookAddResult.error(
+          '加入失败：章节写入失败（0/${chapters.length}），请检查目录规则',
+        );
+      }
+
+      if (storedChapterCount != book.totalChapters) {
+        await _bookRepo.updateBook(
+          book.copyWith(totalChapters: storedChapterCount),
+        );
+      }
 
       return BookAddResult.success(bookId);
     } catch (e) {
-      return BookAddResult.error('导入失败: $e');
+      if (persistedBookId != null) {
+        try {
+          await _bookRepo.deleteBook(persistedBookId);
+        } catch (_) {
+          // ignore rollback failure
+        }
+      }
+      return BookAddResult.error('导入失败: ${_compactMessage(e.toString())}');
     }
   }
 }

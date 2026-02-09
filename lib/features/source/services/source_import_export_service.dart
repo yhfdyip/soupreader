@@ -6,8 +6,114 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../../../core/utils/legado_json.dart';
 
+typedef SourceImportHttpFetcher = Future<Response<String>> Function(Uri uri);
+
 /// 书源导入导出服务
 class SourceImportExportService {
+  final SourceImportHttpFetcher? _httpFetcher;
+  final bool _isWeb;
+
+  SourceImportExportService({
+    SourceImportHttpFetcher? httpFetcher,
+    bool? isWeb,
+  })  : _httpFetcher = httpFetcher,
+        _isWeb = isWeb ?? kIsWeb;
+
+  Future<Response<String>> _defaultFetch(Uri uri) {
+    return Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+        followRedirects: true,
+        maxRedirects: 5,
+        responseType: ResponseType.plain,
+        validateStatus: (_) => true,
+      ),
+    ).get<String>(uri.toString());
+  }
+
+  Future<Response<String>> _fetchFromUrl(Uri uri) {
+    final fetcher = _httpFetcher;
+    if (fetcher != null) {
+      return fetcher(uri);
+    }
+    return _defaultFetch(uri);
+  }
+
+  SourceImportResult _copyWithWarnings(
+    SourceImportResult source,
+    List<String> extraWarnings,
+  ) {
+    if (extraWarnings.isEmpty) return source;
+    final merged = <String>[
+      ...source.warnings,
+      ...extraWarnings.where((w) => w.trim().isNotEmpty),
+    ];
+    return SourceImportResult(
+      success: source.success,
+      cancelled: source.cancelled,
+      errorMessage: source.errorMessage,
+      sources: source.sources,
+      importCount: source.importCount,
+      totalInputCount: source.totalInputCount,
+      invalidCount: source.invalidCount,
+      duplicateCount: source.duplicateCount,
+      warnings: merged,
+    );
+  }
+
+  String? _buildRedirectHint({
+    required Uri requested,
+    required Uri? resolved,
+  }) {
+    if (resolved == null) return null;
+    final from = requested.toString().trim();
+    final to = resolved.toString().trim();
+    if (from.isEmpty || to.isEmpty || from == to) {
+      return null;
+    }
+    return '已跟随重定向：$from -> $to';
+  }
+
+  bool _isLikelyCorsError(String text) {
+    final lower = text.toLowerCase();
+    return lower.contains('xmlhttprequest') ||
+        lower.contains('cors') ||
+        lower.contains('cross-origin') ||
+        lower.contains('access-control-allow-origin');
+  }
+
+  String _networkErrorMessage(Object error) {
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+          return '网络请求失败：连接超时';
+        case DioExceptionType.sendTimeout:
+          return '网络请求失败：发送超时';
+        case DioExceptionType.receiveTimeout:
+          return '网络请求失败：接收超时';
+        case DioExceptionType.badCertificate:
+          return '网络请求失败：证书异常';
+        case DioExceptionType.cancel:
+          return '网络请求已取消';
+        case DioExceptionType.badResponse:
+          final status = error.response?.statusCode;
+          if (status != null) {
+            return '网络请求失败（HTTP $status）';
+          }
+          break;
+        case DioExceptionType.connectionError:
+        case DioExceptionType.unknown:
+          break;
+      }
+      final message = error.message?.trim();
+      if (message != null && message.isNotEmpty) {
+        return '网络请求失败: $message';
+      }
+    }
+    return '网络请求失败: $error';
+  }
+
   /// 从JSON文件导入书源
   Future<SourceImportResult> importFromFile() async {
     try {
@@ -192,22 +298,22 @@ class SourceImportExportService {
         );
       }
 
-      final response = await Dio(
-        BaseOptions(
-          connectTimeout: const Duration(seconds: 20),
-          receiveTimeout: const Duration(seconds: 20),
-          followRedirects: true,
-          maxRedirects: 5,
-          responseType: ResponseType.plain,
-          validateStatus: (_) => true,
-        ),
-      ).get<String>(uri.toString());
+      final response = await _fetchFromUrl(uri);
+      final redirectHint = _buildRedirectHint(
+        requested: uri,
+        resolved: response.realUri,
+      );
+      final warnings = <String>[];
+      if (redirectHint != null) {
+        warnings.add(redirectHint);
+      }
 
       final status = response.statusCode ?? 0;
       if (status < 200 || status >= 300) {
         return SourceImportResult(
           success: false,
           errorMessage: 'HTTP请求失败: $status',
+          warnings: warnings,
         );
       }
 
@@ -216,23 +322,24 @@ class SourceImportExportService {
         return SourceImportResult(
           success: false,
           errorMessage: '返回内容为空',
+          warnings: warnings,
         );
       }
 
-      return importFromJson(content);
+      final parsed = importFromJson(content);
+      return _copyWithWarnings(parsed, warnings);
     } catch (e) {
       final err = e.toString();
-      if (kIsWeb &&
-          (err.contains('XMLHttpRequest') ||
-              err.toLowerCase().contains('cors'))) {
+      if (_isWeb && _isLikelyCorsError(err)) {
         return SourceImportResult(
           success: false,
-          errorMessage: '网络导入失败：浏览器跨域限制（CORS）',
+          errorMessage:
+              '网络导入失败：浏览器跨域限制（CORS），请改用“从剪贴板导入”或“从文件导入”',
         );
       }
       return SourceImportResult(
         success: false,
-        errorMessage: '网络请求失败: $err',
+        errorMessage: _networkErrorMessage(e),
       );
     }
   }

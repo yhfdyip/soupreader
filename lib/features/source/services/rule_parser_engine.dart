@@ -7031,17 +7031,27 @@ class RuleParserEngine {
 
   /// 应用替换正则
   String _applyReplaceRegex(String content, String replaceRegex) {
-    try {
-      // 源阅格式: regex##replacement##regex2##replacement2...
-      final parts = replaceRegex.split('##');
-      for (int i = 0; i < parts.length - 1; i += 2) {
-        final regex = RegExp(parts[i]);
-        final replacement = parts.length > i + 1 ? parts[i + 1] : '';
-        content = content.replaceAll(regex, replacement);
+    // 源阅格式: regex##replacement##regex2##replacement2...
+    final parts = replaceRegex.split('##');
+    if (parts.isEmpty) return content;
+
+    for (int i = 0; i < parts.length - 1; i += 2) {
+      final pattern = parts[i];
+      if (pattern.isEmpty) continue;
+      final replacement = parts.length > i + 1 ? parts[i + 1] : '';
+
+      try {
+        content = content.replaceAll(RegExp(pattern), replacement);
+      } catch (e) {
+        // 兼容兜底：单条正则异常时按字面量替换，且不中断后续 replaceRegex 链。
+        try {
+          content = content.replaceAll(pattern, replacement);
+        } catch (_) {
+          debugPrint('替换正则失败(第${(i ~/ 2) + 1}条): $e');
+        }
       }
-    } catch (e) {
-      debugPrint('替换正则失败: $e');
     }
+
     return content;
   }
 

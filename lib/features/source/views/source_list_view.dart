@@ -6,6 +6,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../models/book_source.dart';
+import '../services/source_filter_helper.dart';
 import '../services/source_import_export_service.dart';
 import '../../../core/utils/legado_json.dart';
 import 'source_edit_view.dart';
@@ -27,13 +28,12 @@ class SourceListView extends StatefulWidget {
 
 class _SourceListViewState extends State<SourceListView> {
   String _selectedGroup = '全部';
+  SourceEnabledFilter _enabledFilter = SourceEnabledFilter.all;
   late final SourceRepository _sourceRepo;
   late final DatabaseService _db;
   final SourceImportExportService _importExportService =
       SourceImportExportService();
   final TextEditingController _urlController = TextEditingController();
-
-  static final RegExp _splitGroupRegex = RegExp(r'[,;，；]');
 
   @override
   void initState() {
@@ -84,11 +84,16 @@ class _SourceListViewState extends State<SourceListView> {
             final groups = _buildGroups(sources);
             final activeGroup =
                 groups.contains(_selectedGroup) ? _selectedGroup : '全部';
-            final filteredSources = _filterSources(sources, activeGroup);
+            final filteredByGroup = _filterSources(sources, activeGroup);
+            final filteredSources = SourceFilterHelper.filterByEnabled(
+              filteredByGroup,
+              _enabledFilter,
+            );
 
             return Column(
               children: [
                 _buildGroupFilter(groups, activeGroup),
+                _buildEnabledFilter(),
                 Expanded(
                   child: filteredSources.isEmpty
                       ? _buildEmptyState()
@@ -103,35 +108,41 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   List<String> _buildGroups(List<BookSource> sources) {
-    final groups = <String>{};
-    for (final source in sources) {
-      final raw = source.bookSourceGroup?.trim();
-      if (raw == null || raw.isEmpty) continue;
-      for (final g in raw.split(_splitGroupRegex)) {
-        final group = g.trim();
-        if (group.isNotEmpty) groups.add(group);
-      }
-    }
-    return ['全部', ...groups.toList()..sort(), '失效'];
+    return SourceFilterHelper.buildGroups(sources);
   }
 
   List<BookSource> _filterSources(
     List<BookSource> sources,
     String activeGroup,
   ) {
-    if (activeGroup == '全部') return sources;
-    if (activeGroup == '失效') {
-      return sources.where((s) => !s.enabled).toList();
-    }
-    return sources.where((s) {
-      final raw = s.bookSourceGroup;
-      if (raw == null || raw.trim().isEmpty) return false;
-      return raw
-          .split(_splitGroupRegex)
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .contains(activeGroup);
-    }).toList();
+    return SourceFilterHelper.filterByGroup(sources, activeGroup);
+  }
+
+  Widget _buildEnabledFilter() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: CupertinoSlidingSegmentedControl<SourceEnabledFilter>(
+        groupValue: _enabledFilter,
+        children: const {
+          SourceEnabledFilter.all: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('全部状态'),
+          ),
+          SourceEnabledFilter.enabled: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('仅启用'),
+          ),
+          SourceEnabledFilter.disabled: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('仅失效'),
+          ),
+        },
+        onValueChanged: (value) {
+          if (value == null) return;
+          setState(() => _enabledFilter = value);
+        },
+      ),
+    );
   }
 
   Widget _buildGroupFilter(List<String> groups, String activeGroup) {
@@ -288,11 +299,25 @@ class _SourceListViewState extends State<SourceListView> {
             },
           ),
           CupertinoActionSheetAction(
+            child: const Text('批量启用当前筛选'),
+            onPressed: () {
+              Navigator.pop(context);
+              _bulkUpdateEnabledForFiltered(true);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('批量禁用当前筛选'),
+            onPressed: () {
+              Navigator.pop(context);
+              _bulkUpdateEnabledForFiltered(false);
+            },
+          ),
+          CupertinoActionSheetAction(
             isDestructiveAction: true,
             child: const Text('删除失效书源'),
             onPressed: () {
               Navigator.pop(context);
-              _sourceRepo.deleteDisabledSources();
+              _confirmDeleteDisabledSources();
             },
           ),
         ],
@@ -302,6 +327,63 @@ class _SourceListViewState extends State<SourceListView> {
         ),
       ),
     );
+  }
+
+  Future<void> _bulkUpdateEnabledForFiltered(bool enabled) async {
+    final all = _sourceRepo.getAllSources();
+    final groups = _buildGroups(all);
+    final activeGroup = groups.contains(_selectedGroup) ? _selectedGroup : '全部';
+    final groupFiltered = _filterSources(all, activeGroup);
+    final filtered = SourceFilterHelper.filterByEnabled(groupFiltered, _enabledFilter);
+
+    if (filtered.isEmpty) {
+      _showMessage('当前筛选结果为空，无可批量处理项');
+      return;
+    }
+
+    final targets = filtered.where((s) => s.enabled != enabled).toList(growable: false);
+    if (targets.isEmpty) {
+      _showMessage(enabled ? '当前筛选内已全部启用' : '当前筛选内已全部禁用');
+      return;
+    }
+
+    for (final source in targets) {
+      await _sourceRepo.updateSource(source.copyWith(enabled: enabled));
+    }
+
+    _showMessage('${enabled ? '已启用' : '已禁用'} ${targets.length} 条书源');
+  }
+
+  Future<void> _confirmDeleteDisabledSources() async {
+    final count = _sourceRepo.getAllSources().where((s) => !s.enabled).length;
+    if (count <= 0) {
+      _showMessage('当前没有失效书源可删除');
+      return;
+    }
+
+    final confirmed = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: const Text('删除失效书源'),
+            content: Text('\n将删除 $count 条已禁用书源，此操作不可撤销。'),
+            actions: [
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('确认删除'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    await _sourceRepo.deleteDisabledSources();
+    _showMessage('已删除 $count 条失效书源');
   }
 
   Future<void> _openAvailabilityCheck() async {

@@ -78,12 +78,63 @@ class SettingsService {
     await _prefs.setString(_keyAppSettings, json.encode(settings.toJson()));
   }
 
-  /// 保存特定书籍的滚动偏移量 (临时方案，可考虑存入 Hive)
-  Future<void> saveScrollOffset(String bookId, double offset) async {
-    await _prefs.setDouble('scroll_offset_$bookId', offset);
+  String _scrollOffsetKey(String bookId, {int? chapterIndex}) {
+    if (chapterIndex == null) {
+      return 'scroll_offset_$bookId';
+    }
+    return 'scroll_offset_${bookId}_c$chapterIndex';
   }
 
-  double getScrollOffset(String bookId) {
-    return _prefs.getDouble('scroll_offset_$bookId') ?? 0.0;
+  String _chapterPageProgressKey(String bookId, int chapterIndex) {
+    return 'page_progress_${bookId}_c$chapterIndex';
+  }
+
+  /// 保存特定书籍的滚动偏移量 (临时方案，可考虑存入 Hive)
+  Future<void> saveScrollOffset(
+    String bookId,
+    double offset, {
+    int? chapterIndex,
+  }) async {
+    await _prefs.setDouble(
+      _scrollOffsetKey(bookId, chapterIndex: chapterIndex),
+      offset,
+    );
+
+    // 兼容旧键：保留“书籍级最后偏移”，便于平滑升级。
+    if (chapterIndex != null) {
+      await _prefs.setDouble(_scrollOffsetKey(bookId), offset);
+    }
+  }
+
+  double getScrollOffset(String bookId, {int? chapterIndex}) {
+    if (chapterIndex != null) {
+      final chapterValue =
+          _prefs.getDouble(_scrollOffsetKey(bookId, chapterIndex: chapterIndex));
+      if (chapterValue != null) {
+        return chapterValue;
+      }
+    }
+    return _prefs.getDouble(_scrollOffsetKey(bookId)) ?? 0.0;
+  }
+
+  Future<void> saveChapterPageProgress(
+    String bookId, {
+    required int chapterIndex,
+    required double progress,
+  }) async {
+    final normalized = progress.clamp(0.0, 1.0).toDouble();
+    await _prefs.setDouble(
+      _chapterPageProgressKey(bookId, chapterIndex),
+      normalized,
+    );
+  }
+
+  double getChapterPageProgress(
+    String bookId, {
+    required int chapterIndex,
+  }) {
+    final value = _prefs.getDouble(_chapterPageProgressKey(bookId, chapterIndex));
+    if (value == null) return 0.0;
+    return value.clamp(0.0, 1.0).toDouble();
   }
 }

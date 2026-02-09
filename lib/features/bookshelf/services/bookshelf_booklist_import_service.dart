@@ -61,6 +61,14 @@ class BookshelfBooklistImportService {
   )   : _sourceRepo = SourceRepository(db),
         _addService = addService ?? BookAddService(database: db, engine: _engine);
 
+  String _compactReason(String text, {int maxLength = 96}) {
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return '${normalized.substring(0, maxLength)}…';
+  }
+
   Future<BooklistImportSummary> importBySearching(
     List<BooklistItem> items, {
     void Function(BooklistImportProgress progress)? onProgress,
@@ -88,6 +96,7 @@ class BookshelfBooklistImportService {
 
       SearchResult? best;
       String currentSource = '';
+      final sourceRunErrors = <String>[];
 
       for (final source in enabledSources) {
         currentSource = source.bookSourceName;
@@ -100,19 +109,33 @@ class BookshelfBooklistImportService {
           ),
         );
 
-        final results = await _engine.search(source, keyword);
-        if (results.isEmpty) continue;
+        try {
+          final results = await _engine.search(source, keyword);
+          if (results.isEmpty) continue;
 
-        final candidate = _pickBestResult(results, item);
-        if (candidate != null) {
-          best = candidate;
-          break;
+          final candidate = _pickBestResult(results, item);
+          if (candidate != null) {
+            best = candidate;
+            break;
+          }
+        } catch (e) {
+          sourceRunErrors.add(
+            '${source.bookSourceName}: ${_compactReason(e.toString())}',
+          );
         }
       }
 
       if (best == null) {
         failed++;
-        errors.add('未找到：${item.name}${item.author.isNotEmpty ? ' - ${item.author}' : ''}');
+        final base = '未找到：${item.name}${item.author.isNotEmpty ? ' - ${item.author}' : ''}';
+        if (sourceRunErrors.isEmpty) {
+          errors.add(base);
+        } else {
+          final preview = sourceRunErrors.take(2).join('；');
+          final remain = sourceRunErrors.length - 2;
+          final suffix = remain > 0 ? '；其余 $remain 个书源失败' : '';
+          errors.add('$base（部分书源异常：$preview$suffix）');
+        }
         continue;
       }
 

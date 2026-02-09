@@ -11,6 +11,8 @@ import '../../../core/utils/legado_json.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
 import '../services/source_debug_export_service.dart';
+import '../services/source_debug_summary_parser.dart';
+import '../services/source_quick_test_helper.dart';
 import '../services/source_rule_lint_service.dart';
 import 'source_debug_text_view.dart';
 import 'source_web_verify_view.dart';
@@ -446,6 +448,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildRulesTab() {
+    final hasPreviewChapterUrl =
+        _previewChapterUrl != null && _previewChapterUrl!.trim().isNotEmpty;
+
     return ListView(
       children: [
         CupertinoListSection.insetGrouped(
@@ -620,6 +625,28 @@ class _SourceEditViewState extends State<SourceEditView> {
                           _debugContentResult!,
                         ].join('\n'),
                       ),
+            ),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          header: const Text('规则页快速测试'),
+          footer: const Text('会自动切到调试页并执行，便于边改规则边验证。'),
+          children: [
+            CupertinoListTile.notched(
+              title: const Text('测试搜索规则'),
+              subtitle: const Text('使用 checkKeyWord；为空时回退“我的”'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _runQuickSearchRuleTest,
+            ),
+            CupertinoListTile.notched(
+              title: const Text('测试正文规则'),
+              subtitle: Text(
+                hasPreviewChapterUrl
+                    ? '使用最近章节链接（--contentUrl）'
+                    : '需先在调试中拿到 chapterUrl 后再测正文',
+              ),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _runQuickContentRuleTest,
             ),
           ],
         ),
@@ -951,6 +978,7 @@ class _SourceEditViewState extends State<SourceEditView> {
               ),
             ),
           ),
+        _buildDiagnosisSection(),
         _buildDebugSourcesSection(),
         _buildDebugConsoleSection(),
       ],
@@ -1087,6 +1115,37 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
   }
 
+  void _runQuickSearchRuleTest() {
+    if (!_ensureQuickTestIdle()) return;
+    final key = SourceQuickTestHelper.buildSearchKey(
+      checkKeyword: _searchCheckKeyWordCtrl.text,
+    );
+    _switchToDebugTabAndRun(key);
+  }
+
+  void _runQuickContentRuleTest() {
+    if (!_ensureQuickTestIdle()) return;
+    final key = SourceQuickTestHelper.buildContentKey(
+      previewChapterUrl: _previewChapterUrl,
+    );
+    if (key == null) {
+      _showMessage('请先调试搜索/目录拿到 chapterUrl，再测试正文规则');
+      return;
+    }
+    _switchToDebugTabAndRun(key);
+  }
+
+  bool _ensureQuickTestIdle() {
+    if (!_debugLoading) return true;
+    _showMessage('调试运行中，请稍后再试');
+    return false;
+  }
+
+  void _switchToDebugTabAndRun(String key) {
+    setState(() => _tab = 3);
+    _setDebugKeyAndMaybeRun(key, run: true);
+  }
+
   void _prefixKey(String prefix) {
     final text = _debugKeyCtrl.text.trim();
     if (text.isEmpty || text.length <= 2) {
@@ -1106,10 +1165,38 @@ class _SourceEditViewState extends State<SourceEditView> {
     final tocHtml = nonEmpty(_debugTocSrcHtml);
     final contentHtml = nonEmpty(_debugContentSrcHtml);
     final contentResult = nonEmpty(_debugContentResult);
+    final hasDebugLines = _debugLinesAll.isNotEmpty;
+    final structuredSummaryText = hasDebugLines
+        ? _prettyJson(LegadoJson.encode(_buildStructuredDebugSummary()))
+        : null;
 
     return CupertinoListSection.insetGrouped(
       header: const Text('源码 & 结果'),
       children: [
+        CupertinoListTile.notched(
+          title: const Text('结构化调试摘要（脱敏）'),
+          subtitle: const Text('请求/解析/错误摘要，便于快速定位失败阶段'),
+          additionalInfo: Text(hasDebugLines ? '可查看' : '—'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: structuredSummaryText == null
+              ? null
+              : () => _openDebugText(
+                    title: '结构化调试摘要',
+                    text: structuredSummaryText,
+                  ),
+        ),
+        CupertinoListTile.notched(
+          title: const Text('复制调试摘要（脱敏）'),
+          subtitle: const Text('用于 issue/群反馈，避免贴整段日志'),
+          additionalInfo: Text(hasDebugLines ? '可复制' : '—'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: structuredSummaryText == null
+              ? null
+              : () {
+                  Clipboard.setData(ClipboardData(text: structuredSummaryText));
+                  _showMessage('已复制调试摘要（脱敏）');
+                },
+        ),
         CupertinoListTile.notched(
           title: const Text('列表页源码'),
           additionalInfo:
@@ -1689,12 +1776,149 @@ class _SourceEditViewState extends State<SourceEditView> {
     return lines.join('\n');
   }
 
+  Map<String, dynamic> _buildStructuredDebugSummary() {
+    final logs = _debugLinesAll.map((e) => e.text).toList(growable: false);
+    final stageErrors = _debugLinesAll
+        .where((e) => e.state == -1)
+        .map((e) => e.text)
+        .toList(growable: false);
+    return SourceDebugSummaryParser.build(
+      logLines: logs,
+      debugError: _debugError,
+      errorLines: stageErrors,
+    );
+  }
+
+  List<String> _debugDiagnosisLabels(Map<String, dynamic> summary) {
+    final diagnosis = summary['diagnosis'];
+    if (diagnosis is! Map) return const <String>[];
+    final labelsRaw = diagnosis['labels'];
+    if (labelsRaw is! List) return const <String>[];
+    return labelsRaw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  List<String> _debugDiagnosisHints(Map<String, dynamic> summary) {
+    final diagnosis = summary['diagnosis'];
+    if (diagnosis is! Map) return const <String>[];
+    final hintsRaw = diagnosis['hints'];
+    if (hintsRaw is! List) return const <String>[];
+    return hintsRaw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  String _labelText(String code) {
+    switch (code) {
+      case 'request_failure':
+        return '请求失败';
+      case 'parse_failure':
+        return '解析失败';
+      case 'paging_interrupted':
+        return '分页中断';
+      case 'ok':
+        return '基本正常';
+      case 'no_data':
+        return '无数据';
+      default:
+        return code;
+    }
+  }
+
+  Color _labelColor(String code) {
+    switch (code) {
+      case 'request_failure':
+      case 'parse_failure':
+      case 'paging_interrupted':
+        return CupertinoColors.systemRed.resolveFrom(context);
+      case 'ok':
+        return CupertinoColors.systemGreen.resolveFrom(context);
+      default:
+        return CupertinoColors.secondaryLabel.resolveFrom(context);
+    }
+  }
+
+  Widget _buildDiagnosisSection() {
+    final hasLogs = _debugLinesAll.isNotEmpty;
+    final summary = _buildStructuredDebugSummary();
+    final labels = _debugDiagnosisLabels(summary);
+    final hints = _debugDiagnosisHints(summary);
+
+    return CupertinoListSection.insetGrouped(
+      header: const Text('诊断标签'),
+      children: [
+        CupertinoListTile.notched(
+          title: const Text('失败分类'),
+          subtitle: hasLogs
+              ? Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final label in labels)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _labelColor(label).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _labelColor(label).withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          _labelText(label),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _labelColor(label),
+                          ),
+                        ),
+                      ),
+                  ],
+                )
+              : const Text('暂无调试数据，请先执行“开始调试”'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: hasLogs
+              ? () => _openDebugText(
+                    title: '诊断标签（结构化）',
+                    text: _prettyJson(LegadoJson.encode(summary['diagnosis'])),
+                  )
+              : null,
+        ),
+        CupertinoListTile.notched(
+          title: const Text('定位建议'),
+          subtitle: hasLogs
+              ? Text(
+                  hints.isEmpty ? '—' : hints.join('\n'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                )
+              : const Text('—'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: hasLogs
+              ? () => _openDebugText(
+                    title: '定位建议',
+                    text: hints.isEmpty ? '—' : hints.join('\n'),
+                  )
+              : null,
+        ),
+      ],
+    );
+  }
+
   Map<String, dynamic> _buildDebugBundle({required bool includeRawSources}) {
     final now = DateTime.now().toIso8601String();
     final consoleText = _debugLinesAll.map((e) => e.text).join('\n');
     final lines = _debugLinesAll
         .map((e) => <String, dynamic>{'state': e.state, 'text': e.text})
         .toList(growable: false);
+    final structuredSummary = _buildStructuredDebugSummary();
 
     final bundle = <String, dynamic>{
       'type': 'soupreader_debug_bundle',
@@ -1713,6 +1937,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         'responseCharset': _debugResponseCharset,
         'responseDecode': _debugResponseCharsetDecision,
       },
+      'structuredSummary': structuredSummary,
       'runtimeVariables': _debugRuntimeVarsSnapshot,
     };
 
@@ -1773,6 +1998,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     required bool includeRawSources,
   }) async {
     final bundle = _buildDebugBundle(includeRawSources: includeRawSources);
+    final summary = _buildStructuredDebugSummary();
     final ts = DateTime.now().millisecondsSinceEpoch;
     final fileName = includeRawSources
         ? 'soupreader_debug_bundle_full_$ts.zip'
@@ -1782,6 +2008,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     final files = <String, String>{
       'bundle.json': bundleJson,
       'console.txt': _debugLinesAll.map((e) => e.text).join('\n'),
+      'summary.json': _prettyJson(LegadoJson.encode(summary)),
       // 兼容排查：单独导出书源 JSON（原样）
       'source.json': _prettyJson(_jsonCtrl.text),
     };

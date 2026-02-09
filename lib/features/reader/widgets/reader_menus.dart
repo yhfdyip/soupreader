@@ -6,17 +6,29 @@ import '../models/reading_settings.dart';
 class ReaderTopMenu extends StatelessWidget {
   final String bookTitle;
   final String chapterTitle;
+  final String? sourceName;
   final VoidCallback onShowChapterList;
+  final VoidCallback onSwitchSource;
+  final VoidCallback onToggleCleanChapterTitle;
+  final VoidCallback onRefreshChapter;
+  final bool cleanChapterTitleEnabled;
 
   const ReaderTopMenu({
     super.key,
     required this.bookTitle,
     required this.chapterTitle,
+    this.sourceName,
     required this.onShowChapterList,
+    required this.onSwitchSource,
+    required this.onToggleCleanChapterTitle,
+    required this.onRefreshChapter,
+    required this.cleanChapterTitleEnabled,
   });
 
   @override
   Widget build(BuildContext context) {
+    final source = sourceName?.trim() ?? '';
+    final chapterLine = source.isNotEmpty ? '$source · $chapterTitle' : chapterTitle;
     return Positioned(
       top: 0,
       left: 0,
@@ -54,12 +66,34 @@ class ReaderTopMenu extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  // 目录按钮
-                  CupertinoButton(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    onPressed: onShowChapterList,
-                    child: const Icon(CupertinoIcons.list_bullet,
-                        color: CupertinoColors.white),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildActionText(
+                        label: '换源',
+                        onTap: onSwitchSource,
+                      ),
+                      const SizedBox(width: 10),
+                      _buildActionText(
+                        label: cleanChapterTitleEnabled ? '净化中' : '净化',
+                        onTap: onToggleCleanChapterTitle,
+                        highlighted: cleanChapterTitleEnabled,
+                      ),
+                      const SizedBox(width: 10),
+                      _buildActionText(
+                        label: '刷新',
+                        onTap: onRefreshChapter,
+                      ),
+                      const SizedBox(width: 4),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: onShowChapterList,
+                        child: const Icon(
+                          CupertinoIcons.list_bullet,
+                          color: CupertinoColors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -75,7 +109,7 @@ class ReaderTopMenu extends StatelessWidget {
                 ),
               ),
               child: Text(
-                chapterTitle,
+                chapterLine,
                 style: TextStyle(
                   color: CupertinoColors.white.withValues(alpha: 0.7),
                   fontSize: 13,
@@ -85,6 +119,26 @@ class ReaderTopMenu extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionText({
+    required String label,
+    required VoidCallback onTap,
+    bool highlighted = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: highlighted
+              ? CupertinoColors.activeGreen
+              : CupertinoColors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

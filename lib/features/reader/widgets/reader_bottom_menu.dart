@@ -19,7 +19,6 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final VoidCallback onShowTypography;
   final VoidCallback onShowTheme;
   final VoidCallback onShowPage;
-  final VoidCallback onShowMore;
 
   const ReaderBottomMenuNew({
     super.key,
@@ -36,7 +35,6 @@ class ReaderBottomMenuNew extends StatefulWidget {
     required this.onShowTypography,
     required this.onShowTheme,
     required this.onShowPage,
-    required this.onShowMore,
   });
 
   @override
@@ -93,7 +91,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               child: _buildChapterSlider(),
             ),
 
-            // 底部 Tab 导航栏 (精简为4个：目录/日夜/界面/设置)
+            // 底部 Tab 导航栏（对齐截图：目录 / 字体 / 界面 / 设置）
             Container(
               padding: EdgeInsets.only(
                 left: 8,
@@ -109,26 +107,20 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                   _buildTabItem(
                     1,
                     CupertinoIcons.textformat_size,
-                    'Aa',
+                    '字体',
                     widget.onShowTypography,
                   ),
                   _buildTabItem(
                     2,
-                    CupertinoIcons.paintbrush,
-                    '主题',
+                    CupertinoIcons.rectangle_grid_1x2,
+                    '界面',
                     widget.onShowTheme,
                   ),
                   _buildTabItem(
                     3,
-                    CupertinoIcons.arrow_right_arrow_left_circle,
-                    '翻页',
+                    CupertinoIcons.gear,
+                    '设置',
                     widget.onShowPage,
-                  ),
-                  _buildTabItem(
-                    4,
-                    CupertinoIcons.ellipsis,
-                    '更多',
-                    widget.onShowMore,
                   ),
                 ],
               ),

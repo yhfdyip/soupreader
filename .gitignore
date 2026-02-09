@@ -46,3 +46,8 @@ app.*.map.json
 soupreader.code-workspace
 images/
 tool/
+
+# Local planning docs (do not commit)
+docs/DEV_PLAN.md
+docs/DEV_PROGRESS.md
+docs/HAPPY_PARITY_MATRIX.md

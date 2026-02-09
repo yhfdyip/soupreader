@@ -5,6 +5,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
+import '../services/source_availability_diagnosis_service.dart';
 import '../services/source_debug_export_service.dart';
 import 'source_debug_text_view.dart';
 import 'source_edit_view.dart';
@@ -26,6 +27,7 @@ class _CheckItem {
   int elapsedMs = 0;
   int listCount = 0;
   String? debugKey;
+  DiagnosisSummary diagnosis = DiagnosisSummary.noData;
 
   _CheckItem({required this.source});
 }
@@ -55,6 +57,8 @@ class SourceAvailabilityCheckView extends StatefulWidget {
 class _SourceAvailabilityCheckViewState
     extends State<SourceAvailabilityCheckView> {
   final RuleParserEngine _engine = RuleParserEngine();
+  final SourceAvailabilityDiagnosisService _diagnosisService =
+      const SourceAvailabilityDiagnosisService();
   final SourceDebugExportService _exportService = SourceDebugExportService();
   late final DatabaseService _db;
   late final SourceRepository _repo;
@@ -96,6 +100,7 @@ class _SourceAvailabilityCheckViewState
         item.elapsedMs = 0;
         item.listCount = 0;
         item.debugKey = null;
+        item.diagnosis = DiagnosisSummary.noData;
       }
     });
 
@@ -140,6 +145,10 @@ class _SourceAvailabilityCheckViewState
             item.elapsedMs = debug.fetch.elapsedMs;
             item.requestUrl = debug.fetch.finalUrl ?? debug.fetch.requestUrl;
             item.listCount = cnt;
+            item.diagnosis = _diagnosisService.diagnoseSearch(
+              debug: debug,
+              keyword: keyword,
+            );
             if (!ok) {
               item.status = _CheckStatus.fail;
               item.message = debug.error ?? debug.fetch.error ?? '请求失败';
@@ -166,6 +175,7 @@ class _SourceAvailabilityCheckViewState
             item.elapsedMs = debug.fetch.elapsedMs;
             item.requestUrl = debug.fetch.finalUrl ?? debug.fetch.requestUrl;
             item.listCount = cnt;
+            item.diagnosis = _diagnosisService.diagnoseExplore(debug: debug);
             if (!ok) {
               item.status = _CheckStatus.fail;
               item.message = debug.error ?? debug.fetch.error ?? '请求失败';
@@ -185,12 +195,14 @@ class _SourceAvailabilityCheckViewState
           item.status = _CheckStatus.fail;
           item.message =
               '缺少 searchUrl/ruleSearch 或 exploreUrl/ruleExplore，无法检测';
+          item.diagnosis = _diagnosisService.diagnoseMissingRule();
         });
       } catch (e) {
         if (!mounted) return;
         setState(() {
           item.status = _CheckStatus.fail;
           item.message = '异常：$e';
+          item.diagnosis = _diagnosisService.diagnoseException(e);
         });
       }
     }
@@ -290,6 +302,36 @@ class _SourceAvailabilityCheckViewState
     return _items.where((e) => _matchesFilter(e, filter)).length;
   }
 
+  String _diagnosisLabelText(String code) {
+    switch (code) {
+      case 'request_failure':
+        return '请求失败';
+      case 'parse_failure':
+        return '解析失败';
+      case 'paging_interrupted':
+        return '分页中断';
+      case 'ok':
+        return '基本正常';
+      case 'no_data':
+        return '无数据';
+      default:
+        return code;
+    }
+  }
+
+  Color _diagnosisLabelColor(String code) {
+    switch (code) {
+      case 'request_failure':
+      case 'parse_failure':
+      case 'paging_interrupted':
+        return CupertinoColors.systemRed.resolveFrom(context);
+      case 'ok':
+        return CupertinoColors.systemGreen.resolveFrom(context);
+      default:
+        return CupertinoColors.systemGrey.resolveFrom(context);
+    }
+  }
+
   String _buildReportText({required bool onlyVisible}) {
     final now = DateTime.now().toIso8601String();
     final pool = onlyVisible
@@ -317,6 +359,8 @@ class _SourceAvailabilityCheckViewState
         s.bookSourceUrl,
         if (item.elapsedMs > 0) '${item.elapsedMs}ms',
         if (item.listCount > 0) 'list=${item.listCount}',
+        if (item.diagnosis.labels.isNotEmpty)
+          'diag=${item.diagnosis.labels.map(_diagnosisLabelText).join(',')}',
         if (item.message != null && item.message!.trim().isNotEmpty)
           item.message!.trim(),
       ].join(' | '));
@@ -465,6 +509,9 @@ class _SourceAvailabilityCheckViewState
       if (item.requestUrl != null) '请求：${item.requestUrl}',
       '耗时：${item.elapsedMs}ms',
       '列表：${item.listCount}',
+      if (item.diagnosis.labels.isNotEmpty)
+        '诊断：${item.diagnosis.labels.map(_diagnosisLabelText).join(' / ')}',
+      if (item.diagnosis.hints.isNotEmpty) '建议：${item.diagnosis.hints.join('；')}',
       if (item.message != null) '信息：${item.message}',
     ].join('\n');
     await Navigator.of(context).push(
@@ -600,9 +647,41 @@ class _SourceAvailabilityCheckViewState
                   child: CupertinoListTile.notched(
                     title: Text(item.source.bookSourceName),
                     subtitle: Text(item.source.bookSourceUrl),
-                    additionalInfo: Text(
-                      statusText,
-                      style: TextStyle(color: color),
+                    additionalInfo: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          statusText,
+                          style: TextStyle(color: color),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _diagnosisLabelColor(item.diagnosis.primary)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color:
+                                  _diagnosisLabelColor(item.diagnosis.primary)
+                                      .withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Text(
+                            _diagnosisLabelText(item.diagnosis.primary),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _diagnosisLabelColor(
+                                item.diagnosis.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     trailing: const CupertinoListTileChevron(),
                     onTap: () => _openItemDetails(item),

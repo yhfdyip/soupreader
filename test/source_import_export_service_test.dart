@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soupreader/features/source/services/source_import_export_service.dart';
 
@@ -72,6 +73,61 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.errorMessage, contains('JSON格式不支持'));
+    });
+
+    test('importFromUrl adds redirect warning when realUri changed', () async {
+      final service = SourceImportExportService(
+        isWeb: false,
+        httpFetcher: (uri) async {
+          return Response<String>(
+            requestOptions: RequestOptions(path: uri.toString()),
+            statusCode: 200,
+            data:
+                '[{"bookSourceUrl":"https://redirected.example","bookSourceName":"R"}]',
+            isRedirect: true,
+            redirects: <RedirectRecord>[
+              RedirectRecord(
+                302,
+                'GET',
+                Uri.parse('https://redirected.example/source.json'),
+              ),
+            ],
+          );
+        },
+      );
+
+      final result = await service.importFromUrl('https://origin.example/s.json');
+
+      expect(result.success, isTrue);
+      expect(result.importCount, 1);
+      expect(result.warnings, isNotEmpty);
+      expect(result.warnings.join('\n'), contains('已跟随重定向'));
+      expect(result.warnings.join('\n'), contains('https://origin.example/s.json'));
+      expect(
+        result.warnings.join('\n'),
+        contains('https://redirected.example/source.json'),
+      );
+    });
+
+    test('importFromUrl returns actionable CORS hint on web', () async {
+      final service = SourceImportExportService(
+        isWeb: true,
+        httpFetcher: (_) async {
+          throw DioException(
+            requestOptions: RequestOptions(path: 'https://blocked.example'),
+            type: DioExceptionType.connectionError,
+            message:
+                'XMLHttpRequest error: No Access-Control-Allow-Origin header',
+          );
+        },
+      );
+
+      final result = await service.importFromUrl('https://blocked.example/s.json');
+
+      expect(result.success, isFalse);
+      expect(result.errorMessage, contains('跨域限制（CORS）'));
+      expect(result.errorMessage, contains('从剪贴板导入'));
+      expect(result.errorMessage, contains('从文件导入'));
     });
   });
 }

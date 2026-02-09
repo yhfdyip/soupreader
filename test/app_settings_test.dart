@@ -41,5 +41,46 @@ void main() {
     expect(service.appSettings.appearanceMode, AppAppearanceMode.light);
     expect(service.appSettings.wifiOnlyDownload, false);
   });
-}
 
+  test('SettingsService stores scroll offsets by chapter with fallback',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = SettingsService();
+    await service.init();
+
+    expect(service.getScrollOffset('book-1', chapterIndex: 0), 0.0);
+
+    await service.saveScrollOffset('book-1', 123.0, chapterIndex: 0);
+    await service.saveScrollOffset('book-1', 456.0, chapterIndex: 1);
+
+    expect(service.getScrollOffset('book-1', chapterIndex: 0), 123.0);
+    expect(service.getScrollOffset('book-1', chapterIndex: 1), 456.0);
+
+    // 未写入章节时回退到书籍级偏移（兼容旧键）
+    expect(service.getScrollOffset('book-1', chapterIndex: 2), 456.0);
+    expect(service.getScrollOffset('book-1'), 456.0);
+  });
+
+  test('SettingsService stores chapter page progress and clamps values',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = SettingsService();
+    await service.init();
+
+    expect(service.getChapterPageProgress('book-2', chapterIndex: 0), 0.0);
+
+    await service.saveChapterPageProgress(
+      'book-2',
+      chapterIndex: 0,
+      progress: 1.8,
+    );
+    await service.saveChapterPageProgress(
+      'book-2',
+      chapterIndex: 1,
+      progress: -0.3,
+    );
+
+    expect(service.getChapterPageProgress('book-2', chapterIndex: 0), 1.0);
+    expect(service.getChapterPageProgress('book-2', chapterIndex: 1), 0.0);
+  });
+}

@@ -6,8 +6,9 @@ import '../models/reading_settings.dart';
 
 enum ReaderQuickSettingsTab {
   typography,
-  theme,
+  interface,
   page,
+  more,
 }
 
 class ReaderQuickSettingsSheet extends StatefulWidget {
@@ -153,15 +154,19 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
       children: const <ReaderQuickSettingsTab, Widget>{
         ReaderQuickSettingsTab.typography: Padding(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text('排版'),
+          child: Text('字体'),
         ),
-        ReaderQuickSettingsTab.theme: Padding(
+        ReaderQuickSettingsTab.interface: Padding(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text('主题'),
+          child: Text('界面'),
         ),
         ReaderQuickSettingsTab.page: Padding(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text('翻页'),
+          child: Text('设置'),
+        ),
+        ReaderQuickSettingsTab.more: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Text('更多'),
         ),
       },
     );
@@ -175,9 +180,9 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
           settings: _draft,
           onSettingsChanged: _apply,
         );
-      case ReaderQuickSettingsTab.theme:
-        return _ThemeTab(
-          key: const ValueKey('theme'),
+      case ReaderQuickSettingsTab.interface:
+        return _InterfaceTab(
+          key: const ValueKey('interface'),
           settings: _draft,
           themes: widget.themes,
           onSettingsChanged: _apply,
@@ -187,6 +192,13 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
           key: const ValueKey('page'),
           settings: _draft,
           onSettingsChanged: _apply,
+        );
+      case ReaderQuickSettingsTab.more:
+        return _MoreTab(
+          key: const ValueKey('more'),
+          settings: _draft,
+          onSettingsChanged: _apply,
+          onOpenFullSettings: widget.onOpenFullSettings,
         );
     }
   }
@@ -486,12 +498,12 @@ class _MarginPresetRow extends StatelessWidget {
   }
 }
 
-class _ThemeTab extends StatelessWidget {
+class _InterfaceTab extends StatelessWidget {
   final ReadingSettings settings;
   final List<ReadingThemeColors> themes;
   final ValueChanged<ReadingSettings> onSettingsChanged;
 
-  const _ThemeTab({
+  const _InterfaceTab({
     super.key,
     required this.settings,
     required this.themes,
@@ -507,21 +519,11 @@ class _ThemeTab extends StatelessWidget {
           title: '亮度',
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '跟随系统',
-                    style: TextStyle(color: CupertinoColors.white, fontSize: 14),
-                  ),
-                  CupertinoSwitch(
-                    value: settings.useSystemBrightness,
-                    onChanged: (v) => onSettingsChanged(
-                      settings.copyWith(useSystemBrightness: v),
-                    ),
-                    activeTrackColor: CupertinoColors.activeBlue,
-                  ),
-                ],
+              _SwitchRow(
+                label: '跟随系统',
+                value: settings.useSystemBrightness,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(useSystemBrightness: v)),
               ),
               const SizedBox(height: 10),
               IgnorePointer(
@@ -534,9 +536,8 @@ class _ThemeTab extends StatelessWidget {
                     min: 0.05,
                     max: 1.0,
                     format: (v) => '${(v * 100).round()}%',
-                    onChanged: (v) => onSettingsChanged(
-                      settings.copyWith(brightness: v),
-                    ),
+                    onChanged: (v) =>
+                        onSettingsChanged(settings.copyWith(brightness: v)),
                   ),
                 ),
               ),
@@ -548,9 +549,186 @@ class _ThemeTab extends StatelessWidget {
           child: _ThemeGrid(
             themes: themes,
             selectedIndex: settings.themeIndex,
-            onSelected: (index) => onSettingsChanged(
-              settings.copyWith(themeIndex: index),
-            ),
+            onSelected: (index) =>
+                onSettingsChanged(settings.copyWith(themeIndex: index)),
+          ),
+        ),
+        _Section(
+          title: '内容边距',
+          child: Column(
+            children: [
+              _SliderRow(
+                label: '上边',
+                value: settings.paddingTop,
+                min: 0,
+                max: 80,
+                format: (v) => v.round().toString(),
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(
+                    paddingTop: v,
+                    marginVertical: v,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _SliderRow(
+                label: '下边',
+                value: settings.paddingBottom,
+                min: 0,
+                max: 80,
+                format: (v) => v.round().toString(),
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(
+                    paddingBottom: v,
+                    marginVertical: v,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _SliderRow(
+                label: '左边',
+                value: settings.paddingLeft,
+                min: 0,
+                max: 80,
+                format: (v) => v.round().toString(),
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(
+                    paddingLeft: v,
+                    marginHorizontal: v,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _SliderRow(
+                label: '右边',
+                value: settings.paddingRight,
+                min: 0,
+                max: 80,
+                format: (v) => v.round().toString(),
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(
+                    paddingRight: v,
+                    marginHorizontal: v,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _Section(
+          title: '页眉页脚',
+          child: Column(
+            children: [
+              _SwitchRow(
+                label: '隐藏页眉',
+                value: settings.hideHeader,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(hideHeader: v)),
+              ),
+              const SizedBox(height: 8),
+              _SwitchRow(
+                label: '隐藏页脚',
+                value: settings.hideFooter,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(hideFooter: v)),
+              ),
+              const SizedBox(height: 8),
+              _SwitchRow(
+                label: '页眉分割线',
+                value: settings.showHeaderLine,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(showHeaderLine: v)),
+              ),
+              const SizedBox(height: 8),
+              _SwitchRow(
+                label: '页脚分割线',
+                value: settings.showFooterLine,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(showFooterLine: v)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SwitchRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: CupertinoColors.white, fontSize: 14),
+        ),
+        CupertinoSwitch(
+          value: value,
+          onChanged: onChanged,
+          activeTrackColor: CupertinoColors.activeBlue,
+        ),
+      ],
+    );
+  }
+}
+
+class _MoreTab extends StatelessWidget {
+  final ReadingSettings settings;
+  final ValueChanged<ReadingSettings> onSettingsChanged;
+  final VoidCallback onOpenFullSettings;
+
+  const _MoreTab({
+    super.key,
+    required this.settings,
+    required this.onSettingsChanged,
+    required this.onOpenFullSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      children: [
+        _Section(
+          title: '其他',
+          child: Column(
+            children: [
+              _SwitchRow(
+                label: '净化章节标题',
+                value: settings.cleanChapterTitle,
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(cleanChapterTitle: v),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _SwitchRow(
+                label: '音量键翻页',
+                value: settings.volumeKeyPage,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
+              ),
+            ],
+          ),
+        ),
+        _Section(
+          title: '高级',
+          child: CupertinoButton(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            onPressed: onOpenFullSettings,
+            child: const Text('打开完整阅读设置'),
           ),
         ),
         const SizedBox(height: 14),
