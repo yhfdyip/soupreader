@@ -85,10 +85,18 @@ class BookAddService {
         return BookAddResult.alreadyExists(bookId);
       }
 
-      final detail = await _engine.getBookInfo(source, result.bookUrl);
+      final detail = await _engine.getBookInfo(
+        source,
+        result.bookUrl,
+        clearRuntimeVariables: true,
+      );
       final tocUrl =
           detail?.tocUrl.isNotEmpty == true ? detail!.tocUrl : result.bookUrl;
-      final tocItems = await _engine.getToc(source, tocUrl);
+      final tocItems = await _engine.getToc(
+        source,
+        tocUrl,
+        clearRuntimeVariables: false,
+      );
       if (tocItems.isEmpty) {
         return BookAddResult.error('目录解析失败');
       }

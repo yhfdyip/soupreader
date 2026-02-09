@@ -2289,7 +2289,14 @@ class RuleParserEngine {
   }
 
   /// 获取书籍详情
-  Future<BookDetail?> getBookInfo(BookSource source, String bookUrl) async {
+  Future<BookDetail?> getBookInfo(
+    BookSource source,
+    String bookUrl, {
+    bool clearRuntimeVariables = true,
+  }) async {
+    if (clearRuntimeVariables) {
+      _clearRuntimeVariables();
+    }
     final bookInfoRule = source.ruleBookInfo;
     if (bookInfoRule == null) return null;
 
@@ -2580,7 +2587,14 @@ class RuleParserEngine {
   }
 
   /// 获取目录
-  Future<List<TocItem>> getToc(BookSource source, String tocUrl) async {
+  Future<List<TocItem>> getToc(
+    BookSource source,
+    String tocUrl, {
+    bool clearRuntimeVariables = true,
+  }) async {
+    if (clearRuntimeVariables) {
+      _clearRuntimeVariables();
+    }
     final tocRule = source.ruleToc;
     if (tocRule == null) return [];
 
