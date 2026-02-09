@@ -80,3 +80,27 @@
 - 默认行为不变：当未配置 `preUpdateJs/webJs` 时，解析流程与旧行为一致。
 - 兼容增强：配置阶段 JS 的书源在目录/正文阶段可按预期预处理响应；JS 引擎不可用时新增轻量回退，优先保障旧书源“可解析而非直接失效”。
 - 回退策略仅在 JS 主执行返回空时启用，尽量不干扰已有可用脚本行为。
+
+## 2026-02-09（P0-1：导入解析增强）
+
+### 已完成
+- 增强 `SourceImportExportService.importFromJson` 的输入容错：
+  - 支持自动剥离 UTF-8 BOM（`\uFEFF`）前缀。
+  - 支持多层字符串 JSON 递归解包（剪贴板/中转平台常见双重、三重转义场景）。
+  - 条目级字符串对象同样走多层解包后再解析为书源对象。
+- 保持原有重复 URL 覆盖策略与告警输出不变，仅增强“可读入能力”。
+- 新增回归用例：
+  - `importFromJson supports multi-level nested json string payload`
+  - `importFromJson supports utf8 bom prefix payload`
+
+### 为什么
+- P0-1 要求“剪贴板导入支持对象/数组/字符串嵌套 JSON”。
+- 实际分享场景下，书源文本常被多次 `jsonEncode` 或带 BOM；旧逻辑只解一层，容易导入失败。
+
+### 验证方式
+- 命令：`flutter analyze`
+- 命令：`flutter test test/source_import_export_service_test.dart test/source_import_export_conflict_logic_test.dart`
+
+### 兼容影响
+- 默认行为不变：标准对象/数组导入逻辑不受影响。
+- 兼容增强：此前因多层转义或 BOM 失败的输入现在可被正确导入。

@@ -46,10 +46,52 @@ class SourceImportExportService {
     }
   }
 
+  String _sanitizeJsonInput(String input) {
+    var value = input;
+    if (value.startsWith('﻿')) {
+      value = value.replaceFirst(RegExp(r'^﻿+'), '');
+    }
+    return value.trim();
+  }
+
+  dynamic _decodeNestedJsonValue(dynamic data, {int maxDepth = 5}) {
+    var current = data;
+    var depth = 0;
+
+    while (depth < maxDepth && current is String) {
+      final text = _sanitizeJsonInput(current);
+      if (text.isEmpty) return '';
+
+      final maybeJson =
+          text.startsWith('{') ||
+          text.startsWith('[') ||
+          (text.startsWith('"') && text.endsWith('"'));
+      if (!maybeJson) return current;
+
+      try {
+        current = json.decode(text);
+        depth++;
+      } catch (_) {
+        return current;
+      }
+    }
+
+    return current;
+  }
+
+  Map<String, dynamic>? _toSourceMap(dynamic item) {
+    final decoded = _decodeNestedJsonValue(item);
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) {
+      return decoded.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return null;
+  }
+
   /// 从JSON字符串导入书源
   SourceImportResult importFromJson(String jsonString) {
     try {
-      final raw = jsonString.trim();
+      final raw = _sanitizeJsonInput(jsonString);
       if (raw.isEmpty) {
         return const SourceImportResult(
           success: false,
@@ -58,14 +100,7 @@ class SourceImportExportService {
       }
 
       dynamic data = json.decode(raw);
-      if (data is String) {
-        final nested = data.trim();
-        if (nested.startsWith('{') || nested.startsWith('[')) {
-          try {
-            data = json.decode(nested);
-          } catch (_) {}
-        }
-      }
+      data = _decodeNestedJsonValue(data);
 
       final items = <dynamic>[];
       if (data is List) {
@@ -84,29 +119,8 @@ class SourceImportExportService {
       var duplicateCount = 0;
       final sourceByUrl = <String, BookSource>{};
 
-      Map<String, dynamic>? asMap(dynamic item) {
-        if (item is Map<String, dynamic>) return item;
-        if (item is Map) {
-          return item.map((k, v) => MapEntry(k.toString(), v));
-        }
-        if (item is String) {
-          final text = item.trim();
-          if (text.isEmpty) return null;
-          try {
-            final decoded = json.decode(text);
-            if (decoded is Map<String, dynamic>) return decoded;
-            if (decoded is Map) {
-              return decoded.map((k, v) => MapEntry(k.toString(), v));
-            }
-          } catch (_) {
-            return null;
-          }
-        }
-        return null;
-      }
-
       for (var i = 0; i < items.length; i++) {
-        final map = asMap(items[i]);
+        final map = _toSourceMap(items[i]);
         if (map == null) {
           invalidCount++;
           warnings.add('第${i + 1}条不是有效书源对象，已跳过');

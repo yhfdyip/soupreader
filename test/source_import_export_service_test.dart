@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soupreader/features/source/services/source_import_export_service.dart';
 
@@ -38,6 +40,31 @@ void main() {
       expect(result.success, isTrue);
       expect(result.importCount, 1);
       expect(result.sources.first.bookSourceUrl, 'https://c.com');
+    });
+
+    test('importFromJson supports multi-level nested json string payload', () {
+      final inner =
+          '[{"bookSourceUrl":"https://d.com","bookSourceName":"D"}]';
+      final payload = jsonEncode(jsonEncode(inner));
+
+      final result = service.importFromJson(payload);
+
+      expect(result.success, isTrue);
+      expect(result.importCount, 1);
+      expect(result.sources.first.bookSourceUrl, 'https://d.com');
+      expect(result.sources.first.bookSourceName, 'D');
+    });
+
+    test('importFromJson supports utf8 bom prefix payload', () {
+      final payload =
+          '\uFEFF{"bookSourceUrl":"https://e.com","bookSourceName":"E"}';
+
+      final result = service.importFromJson(payload);
+
+      expect(result.success, isTrue);
+      expect(result.importCount, 1);
+      expect(result.sources.first.bookSourceUrl, 'https://e.com');
+      expect(result.sources.first.bookSourceName, 'E');
     });
 
     test('importFromJson fails on unsupported json shape', () {
