@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/models/app_settings.dart';
@@ -355,9 +357,16 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CupertinoTheme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor =
+        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('书架'),
+        backgroundColor: theme.barBackgroundColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _isImporting ? null : _importLocalBook,
@@ -381,10 +390,24 @@ class _BookshelfViewState extends State<BookshelfView> {
           ],
         ),
       ),
-      child: SafeArea(
-        child: _initError != null
-            ? _buildInitError()
-            : (_books.isEmpty ? _buildEmptyState() : _buildBookList()),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              isDark
+                  ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
+                  : AppDesignTokens.surfaceLight.withValues(alpha: 0.96),
+              theme.scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: _initError != null
+              ? _buildInitError()
+              : (_books.isEmpty ? _buildEmptyState() : _buildBookList()),
+        ),
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -50,9 +52,16 @@ class _SourceListViewState extends State<SourceListView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CupertinoTheme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor =
+        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('书源管理'),
+        backgroundColor: theme.barBackgroundColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -69,39 +78,53 @@ class _SourceListViewState extends State<SourceListView> {
           ],
         ),
       ),
-      child: SafeArea(
-        child: ValueListenableBuilder<Box<BookSourceEntity>>(
-          valueListenable: _db.sourcesBox.listenable(),
-          builder: (context, box, _) {
-            final sources = _sourceRepo.fromEntities(box.values).toList()
-              ..sort((a, b) {
-                if (a.weight != b.weight) {
-                  return b.weight.compareTo(a.weight);
-                }
-                return a.bookSourceName.compareTo(b.bookSourceName);
-              });
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              isDark
+                  ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
+                  : AppDesignTokens.surfaceLight.withValues(alpha: 0.96),
+              theme.scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: ValueListenableBuilder<Box<BookSourceEntity>>(
+            valueListenable: _db.sourcesBox.listenable(),
+            builder: (context, box, _) {
+              final sources = _sourceRepo.fromEntities(box.values).toList()
+                ..sort((a, b) {
+                  if (a.weight != b.weight) {
+                    return b.weight.compareTo(a.weight);
+                  }
+                  return a.bookSourceName.compareTo(b.bookSourceName);
+                });
 
-            final groups = _buildGroups(sources);
-            final activeGroup =
-                groups.contains(_selectedGroup) ? _selectedGroup : '全部';
-            final filteredByGroup = _filterSources(sources, activeGroup);
-            final filteredSources = SourceFilterHelper.filterByEnabled(
-              filteredByGroup,
-              _enabledFilter,
-            );
+              final groups = _buildGroups(sources);
+              final activeGroup =
+                  groups.contains(_selectedGroup) ? _selectedGroup : '全部';
+              final filteredByGroup = _filterSources(sources, activeGroup);
+              final filteredSources = SourceFilterHelper.filterByEnabled(
+                filteredByGroup,
+                _enabledFilter,
+              );
 
-            return Column(
-              children: [
-                _buildGroupFilter(groups, activeGroup),
-                _buildEnabledFilter(),
-                Expanded(
-                  child: filteredSources.isEmpty
-                      ? _buildEmptyState()
-                      : _buildSourceList(filteredSources),
-                ),
-              ],
-            );
-          },
+              return Column(
+                children: [
+                  _buildGroupFilter(groups, activeGroup),
+                  _buildEnabledFilter(),
+                  Expanded(
+                    child: filteredSources.isEmpty
+                        ? _buildEmptyState()
+                        : _buildSourceList(filteredSources),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

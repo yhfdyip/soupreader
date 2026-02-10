@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/models/app_settings.dart';
@@ -65,12 +66,11 @@ class _SettingsViewState extends State<SettingsView> {
     final sourceCount = db.sourcesBox.length;
     final readingHistoryCount = db.booksBox.values
         .where((b) =>
-            b.lastReadTime != null && (b.readProgress > 0 || b.currentChapter > 0))
+            b.lastReadTime != null &&
+            (b.readProgress > 0 || b.currentChapter > 0))
         .length;
-    final localBookIds = db.booksBox.values
-        .where((b) => b.isLocal)
-        .map((b) => b.id)
-        .toSet();
+    final localBookIds =
+        db.booksBox.values.where((b) => b.isLocal).map((b) => b.id).toSet();
     final cacheInfo =
         chapterRepo.getDownloadedCacheInfo(protectBookIds: localBookIds);
 
@@ -97,22 +97,24 @@ class _SettingsViewState extends State<SettingsView> {
 
   String get _themeSummary {
     final themeIndex = _readingSettings.themeIndex;
-    final themeName = (themeIndex >= 0 &&
-            themeIndex < AppColors.readingThemes.length)
-        ? AppColors.readingThemes[themeIndex].name
-        : AppColors.readingThemes.first.name;
+    final themeName =
+        (themeIndex >= 0 && themeIndex < AppColors.readingThemes.length)
+            ? AppColors.readingThemes[themeIndex].name
+            : AppColors.readingThemes.first.name;
     return '$_appearanceSummary · $themeName';
   }
 
   String get _sourceSummary {
     final count = _sourceCount;
-    final auto = _settingsService.appSettings.autoUpdateSources ? '自动更新开' : '自动更新关';
+    final auto =
+        _settingsService.appSettings.autoUpdateSources ? '自动更新开' : '自动更新关';
     if (count == null) return auto;
     return '$count 个 · $auto';
   }
 
   String get _otherSettingsSummary {
-    final wifi = _settingsService.appSettings.wifiOnlyDownload ? '仅 Wi‑Fi' : '不限网络';
+    final wifi =
+        _settingsService.appSettings.wifiOnlyDownload ? '仅 Wi‑Fi' : '不限网络';
     final cache = FormatUtils.formatBytes(_cacheInfo.bytes);
     return '$wifi · 缓存 $cache';
   }
@@ -125,195 +127,216 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CupertinoTheme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor =
+        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('设置'),
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('设置'),
+        backgroundColor: theme.barBackgroundColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
       ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('源管理'),
-              children: [
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.cloud_fill,
-                    CupertinoColors.systemCyan,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              isDark
+                  ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
+                  : AppDesignTokens.surfaceLight.withValues(alpha: 0.96),
+              theme.scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: ListView(
+            children: [
+              CupertinoListSection.insetGrouped(
+                header: const Text('源管理'),
+                children: [
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.cloud_fill,
+                      CupertinoColors.systemCyan,
+                    ),
+                    title: const Text('书源管理'),
+                    additionalInfo: Text(_sourceSummary),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openSourceList,
                   ),
-                  title: const Text('书源管理'),
-                  additionalInfo: Text(_sourceSummary),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openSourceList,
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.collections_solid,
-                    CupertinoColors.systemCyan,
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.collections_solid,
+                      CupertinoColors.systemCyan,
+                    ),
+                    title: const Text('订阅管理'),
+                    additionalInfo: const Text('暂未实现'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SettingsPlaceholders.showNotImplemented(
+                      context,
+                      title: '订阅管理暂未实现',
+                    ),
                   ),
-                  title: const Text('订阅管理'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '订阅管理暂未实现',
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.speaker_2_fill,
+                      CupertinoColors.systemCyan,
+                    ),
+                    title: const Text('语音管理'),
+                    additionalInfo: const Text('暂未实现'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SettingsPlaceholders.showNotImplemented(
+                      context,
+                      title: '语音管理（TTS）暂未实现',
+                    ),
                   ),
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.speaker_2_fill,
-                    CupertinoColors.systemCyan,
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.wand_stars_inverse,
+                      CupertinoColors.systemCyan,
+                    ),
+                    title: const Text('替换净化'),
+                    additionalInfo: const Text('净化/繁简'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openTextRules,
                   ),
-                  title: const Text('语音管理'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '语音管理（TTS）暂未实现',
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.list_bullet,
+                      CupertinoColors.systemCyan,
+                    ),
+                    title: const Text('目录规则'),
+                    additionalInfo: const Text('暂未实现'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SettingsPlaceholders.showNotImplemented(
+                      context,
+                      title: '目录规则管理暂未实现（后续会合并到书源编辑器/规则调试）',
+                    ),
                   ),
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.wand_stars_inverse,
-                    CupertinoColors.systemCyan,
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.nosign,
+                      CupertinoColors.systemCyan,
+                    ),
+                    title: const Text('广告屏蔽'),
+                    additionalInfo: const Text('暂未实现'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SettingsPlaceholders.showNotImplemented(
+                      context,
+                      title: '广告屏蔽规则暂未实现',
+                    ),
                   ),
-                  title: const Text('替换净化'),
-                  additionalInfo: const Text('净化/繁简'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openTextRules,
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.list_bullet,
-                    CupertinoColors.systemCyan,
+                ],
+              ),
+              CupertinoListSection.insetGrouped(
+                header: const Text('主题'),
+                children: [
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.paintbrush_fill,
+                      CupertinoColors.systemIndigo,
+                    ),
+                    title: const Text('颜色主题'),
+                    additionalInfo: Text(_themeSummary),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openTheme,
                   ),
-                  title: const Text('目录规则'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '目录规则管理暂未实现（后续会合并到书源编辑器/规则调试）',
+                ],
+              ),
+              CupertinoListSection.insetGrouped(
+                header: const Text('功能 & 设置'),
+                children: [
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.arrow_up_arrow_down_circle_fill,
+                      CupertinoColors.systemGreen,
+                    ),
+                    title: const Text('备份/同步'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openBackup,
                   ),
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.nosign,
-                    CupertinoColors.systemCyan,
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.clock_fill,
+                      CupertinoColors.systemBlue,
+                    ),
+                    title: const Text('阅读记录'),
+                    additionalInfo: Text(_readingHistorySummary),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openReadingHistory,
                   ),
-                  title: const Text('广告屏蔽'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '广告屏蔽规则暂未实现',
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.airplane,
+                      CupertinoColors.systemBlue,
+                    ),
+                    title: const Text('隔空阅读'),
+                    additionalInfo: const Text('暂未实现'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SettingsPlaceholders.showNotImplemented(
+                      context,
+                      title: '隔空阅读（接力/Handoff）暂未实现',
+                    ),
                   ),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('主题'),
-              children: [
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.paintbrush_fill,
-                    CupertinoColors.systemIndigo,
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.gear_solid,
+                      CupertinoColors.systemOrange,
+                    ),
+                    title: const Text('其它设置'),
+                    additionalInfo: Text(_otherSettingsSummary),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openOtherSettings,
                   ),
-                  title: const Text('颜色主题'),
-                  additionalInfo: Text(_themeSummary),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openTheme,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('功能 & 设置'),
-              children: [
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.arrow_up_arrow_down_circle_fill,
-                    CupertinoColors.systemGreen,
+                ],
+              ),
+              CupertinoListSection.insetGrouped(
+                header: const Text('其它'),
+                children: [
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.share,
+                      CupertinoColors.systemGrey,
+                    ),
+                    title: const Text('分享'),
+                    additionalInfo: const Text('暂未实现'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SettingsPlaceholders.showNotImplemented(
+                      context,
+                      title: '分享暂未实现（可考虑接入 share_plus）',
+                    ),
                   ),
-                  title: const Text('备份/同步'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openBackup,
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.clock_fill,
-                    CupertinoColors.systemBlue,
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.hand_thumbsup_fill,
+                      CupertinoColors.systemGrey,
+                    ),
+                    title: const Text('好评支持'),
+                    additionalInfo: const Text('暂未实现'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SettingsPlaceholders.showNotImplemented(
+                      context,
+                      title: '好评支持暂未实现',
+                    ),
                   ),
-                  title: const Text('阅读记录'),
-                  additionalInfo: Text(_readingHistorySummary),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openReadingHistory,
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.airplane,
-                    CupertinoColors.systemBlue,
+                  CupertinoListTile.notched(
+                    leading: _buildIconBox(
+                      CupertinoIcons.info_circle_fill,
+                      CupertinoColors.systemGrey,
+                    ),
+                    title: const Text('关于我们'),
+                    additionalInfo: Text(_version.isEmpty ? '—' : _version),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openAbout,
                   ),
-                  title: const Text('隔空阅读'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '隔空阅读（接力/Handoff）暂未实现',
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.gear_solid,
-                    CupertinoColors.systemOrange,
-                  ),
-                  title: const Text('其它设置'),
-                  additionalInfo: Text(_otherSettingsSummary),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openOtherSettings,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('其它'),
-              children: [
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.share,
-                    CupertinoColors.systemGrey,
-                  ),
-                  title: const Text('分享'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '分享暂未实现（可考虑接入 share_plus）',
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.hand_thumbsup_fill,
-                    CupertinoColors.systemGrey,
-                  ),
-                  title: const Text('好评支持'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '好评支持暂未实现',
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.info_circle_fill,
-                    CupertinoColors.systemGrey,
-                  ),
-                  title: const Text('关于我们'),
-                  additionalInfo: Text(_version.isEmpty ? '—' : _version),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openAbout,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

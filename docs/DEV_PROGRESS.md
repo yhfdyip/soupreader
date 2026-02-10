@@ -787,3 +787,38 @@
 ### 兼容影响
 - 规则协议无变更：本次仅涉及阅读器 UI 主题层，不触及书源解析语义。
 - 行为兼容：保留原 9 主题名称与顺序，旧配置可无缝迁移；仅提升配色一致性和可读性。
+
+## 2026-02-10（P2：全页面 UI/UX 统一改造 - 第一批）
+
+### 已完成
+- 新增全局 Cupertino 主题文件 `lib/app/theme/cupertino_theme.dart`：
+  - 统一应用级 `CupertinoThemeData`（字体、主色、导航栏、Tab 文本）；
+  - 补齐底部 Tab 的背景/激活色/未激活色/分隔线统一规则；
+  - 明确亮暗模式下同一套语义色映射，避免页面各自定义。
+- `lib/main.dart` 接入全局主题：
+  - `CupertinoApp.theme` 改为 `AppCupertinoTheme.build(brightness)`；
+  - `CupertinoTabBar` 统一使用主题 token（背景、边框、激活态）；
+  - 保持原有 5 主 Tab 信息架构不变，仅统一视觉基线。
+- 核心高频页首批统一（先覆盖用户每天都用的入口）：
+  - `SearchView`：重构为“统一导航 + 顶部搜索面板 + 状态卡片 + 统一结果卡片”样式；
+  - `DiscoveryView`：接入统一导航边框、状态卡片与结果卡片视觉语义；
+  - `BookshelfView`：接入统一导航边框与页面背景渐变；
+  - `SourceListView`：接入统一导航边框与页面背景渐变；
+  - `SettingsView`：接入统一导航边框与页面背景渐变。
+- 代码稳定性修正：
+  - 清理 `SearchView` 中已损坏的重复代码片段并重建页面实现，恢复可维护状态。
+
+### 为什么
+- 你明确要求“所有页面都重新设计 UI/UX”，而不是局部修补。
+- 若不先建立全局主题与视觉 token，逐页改造会反复返工、难以保证整体协调。
+- 因此先做“主题中台 + 高频页首批落地”，再进入第二批全量页面收口，是风险最低、产出最高的路线。
+
+### 验证方式
+- 命令：`dart format lib/main.dart lib/app/theme/cupertino_theme.dart lib/features/search/views/search_view.dart lib/features/discovery/views/discovery_view.dart lib/features/bookshelf/views/bookshelf_view.dart lib/features/source/views/source_list_view.dart lib/features/settings/views/settings_view.dart`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+- 手工：在五个主 Tab（书架/发现/搜索/书源/设置）切换，确认导航栏、背景层次、卡片边框与状态提示样式一致。
+
+### 兼容影响
+- 规则协议无变更：本次仅涉及 UI/UX 展示层，不触及 legado 书源语义解析逻辑。
+- 交互兼容：保留原有核心业务入口与功能流程，主要调整视觉组织与信息层级。

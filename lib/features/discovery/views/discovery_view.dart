@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../bookshelf/services/book_add_service.dart';
@@ -50,7 +51,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   List<BookSource> _eligibleSources() {
     final all = _sourceRepo.getAllSources();
     final eligible = all.where((s) {
-      final hasExplore = (s.exploreUrl ?? '').trim().isNotEmpty && s.ruleExplore != null;
+      final hasExplore =
+          (s.exploreUrl ?? '').trim().isNotEmpty && s.ruleExplore != null;
       return s.enabled && s.enabledExplore && hasExplore;
     }).toList(growable: false);
     eligible.sort((a, b) {
@@ -156,7 +158,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     final statusCode = debugResult.fetch.statusCode;
     if (statusCode != null && statusCode >= 400) {
-      final detail = _compactReason(debugResult.fetch.error ?? 'HTTP $statusCode');
+      final detail =
+          _compactReason(debugResult.fetch.error ?? 'HTTP $statusCode');
       return _SourceRunIssue(
         sourceName: source.bookSourceName,
         reason: '请求失败（HTTP $statusCode）：$detail',
@@ -237,105 +240,153 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   @override
   Widget build(BuildContext context) {
     final eligibleCount = _eligibleSources().length;
+    final theme = CupertinoTheme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor =
+        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+    final panelColor = isDark
+        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.82)
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.94);
+
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('发现'),
+        backgroundColor: theme.barBackgroundColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _loading ? null : _refresh,
           child: const Icon(CupertinoIcons.refresh),
         ),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            if (_loading)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: Row(
-                  children: [
-                    const CupertinoActivityIndicator(),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _currentSourceName.isEmpty
-                            ? '正在加载…'
-                            : '正在发现: $_currentSourceName ($_completedSources/$_totalSources)',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              panelColor,
+              theme.scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              if (_loading)
+                _buildStatusPanel(
+                  borderColor: borderColor,
+                  panelColor: panelColor,
+                  child: Row(
+                    children: [
+                      const CupertinoActivityIndicator(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _currentSourceName.isEmpty
+                              ? '正在加载…'
+                              : '正在发现: $_currentSourceName ($_completedSources/$_totalSources)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark
+                                ? AppDesignTokens.textMuted
+                                : AppDesignTokens.textNormal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: _stop,
-                      child: const Text('停止'),
-                    ),
-                  ],
-                ),
-              )
-            else if (_sourceIssues.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.exclamationmark_triangle,
-                      size: 16,
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: _stop,
+                        child: const Text('停止'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_sourceIssues.isNotEmpty)
+                _buildStatusPanel(
+                  borderColor: CupertinoColors.systemRed.resolveFrom(context),
+                  panelColor: panelColor,
+                  child: Row(
+                    children: [
+                      Icon(
+                        CupertinoIcons.exclamationmark_triangle,
+                        size: 16,
+                        color: CupertinoColors.systemRed.resolveFrom(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                CupertinoColors.systemRed.resolveFrom(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: _showIssueDetails,
+                        child: const Text('查看'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_lastError != null && _results.isEmpty)
+                _buildStatusPanel(
+                  borderColor: CupertinoColors.systemRed.resolveFrom(context),
+                  panelColor: panelColor,
+                  child: Text(
+                    _lastError!,
+                    style: TextStyle(
+                      fontSize: 13,
                       color: CupertinoColors.systemRed.resolveFrom(context),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: CupertinoColors.systemRed.resolveFrom(context),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: _showIssueDetails,
-                      child: const Text('查看'),
-                    ),
-                  ],
-                ),
-              )
-            else if (_lastError != null && _results.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: Text(
-                  _lastError!,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: CupertinoColors.systemRed.resolveFrom(context),
                   ),
-                ),
-              )
-            else
-              const SizedBox(height: 6),
-            Expanded(
-              child: _results.isEmpty
-                  ? _buildEmptyState(context, eligibleCount)
-                  : ListView.builder(
-                      itemCount: _results.length,
-                      itemBuilder: (context, index) =>
-                          _buildResultItem(_results[index]),
-                    ),
-            ),
-            if (_isImporting)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: CupertinoActivityIndicator(),
+                )
+              else
+                const SizedBox(height: 6),
+              Expanded(
+                child: _results.isEmpty
+                    ? _buildEmptyState(context, eligibleCount)
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+                        itemCount: _results.length,
+                        itemBuilder: (context, index) =>
+                            _buildResultItem(_results[index]),
+                      ),
               ),
-          ],
+              if (_isImporting)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: CupertinoActivityIndicator(),
+                ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatusPanel({
+    required Color borderColor,
+    required Color panelColor,
+    required Widget child,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: panelColor,
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+          border: Border.all(color: borderColor),
+        ),
+        child: child,
       ),
     );
   }
@@ -378,72 +429,92 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Widget _buildResultItem(SearchResult result) {
-    return CupertinoListTile.notched(
-      leading: Container(
-        width: 40,
-        height: 56,
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final tileColor = isDark
+        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
+        : AppDesignTokens.surfaceLight;
+    final borderColor =
+        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey5.resolveFrom(context),
-          borderRadius: BorderRadius.circular(6),
-          image: result.coverUrl.isNotEmpty
-              ? DecorationImage(
-                  image: NetworkImage(result.coverUrl),
-                  fit: BoxFit.cover,
-                )
-              : null,
+          color: tileColor,
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+          border: Border.all(color: borderColor),
         ),
-        child: result.coverUrl.isEmpty
-            ? Center(
-                child: Text(
-                  result.name.isNotEmpty ? result.name.substring(0, 1) : '?',
+        child: CupertinoListTile.notched(
+          leading: Container(
+            width: 40,
+            height: 56,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemGrey5.resolveFrom(context),
+              borderRadius: BorderRadius.circular(6),
+              image: result.coverUrl.isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(result.coverUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: result.coverUrl.isEmpty
+                ? Center(
+                    child: Text(
+                      result.name.isNotEmpty
+                          ? result.name.substring(0, 1)
+                          : '?',
+                      style: TextStyle(
+                        color:
+                            CupertinoColors.secondaryLabel.resolveFrom(context),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+          title: Text(
+            result.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                result.author.isNotEmpty ? result.author : '未知作者',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '来源: ${result.sourceName}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                ),
+              ),
+              if (result.lastChapter.trim().isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  '最新: ${result.lastChapter.trim()}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    color: CupertinoColors.tertiaryLabel.resolveFrom(context),
                   ),
                 ),
-              )
-            : null,
-      ),
-      title: Text(
-        result.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            result.author.isNotEmpty ? result.author : '未知作者',
-            style: TextStyle(
-              fontSize: 13,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
+              ],
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            '来源: ${result.sourceName}',
-            style: TextStyle(
-              fontSize: 12,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-            ),
-          ),
-          if (result.lastChapter.trim().isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              '最新: ${result.lastChapter.trim()}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-              ),
-            ),
-          ],
-        ],
+          trailing: const CupertinoListTileChevron(),
+          onTap: () => _importBook(result),
+        ),
       ),
-      trailing: const CupertinoListTileChevron(),
-      onTap: () => _importBook(result),
     );
   }
 }

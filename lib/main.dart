@@ -3,6 +3,7 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'app/theme/cupertino_theme.dart';
 import 'core/database/database_service.dart';
 import 'core/models/app_settings.dart';
 import 'core/services/cookie_store.dart';
@@ -134,30 +135,32 @@ class _SoupReaderAppState extends State<SoupReaderApp>
 
   @override
   Widget build(BuildContext context) {
-    // 使用纯 CupertinoApp，不指定自定义字体让系统自动使用 SF Pro
+    final brightness = _effectiveBrightness;
+
+    // 使用统一 Cupertino 主题，确保全页面风格一致。
     return CupertinoApp(
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
-      // 使用系统默认深色主题，不过度自定义
-      theme: CupertinoThemeData(
-        brightness: _effectiveBrightness,
-        // 使用系统蓝色作为主色调（iOS 标准）
-        primaryColor: CupertinoColors.systemBlue,
-      ),
-      home: MainScreen(),
+      theme: AppCupertinoTheme.build(brightness),
+      home: MainScreen(brightness: brightness),
     );
   }
 }
 
 /// 主屏幕（带底部导航）
 class MainScreen extends StatelessWidget {
-  const MainScreen({super.key});
+  final Brightness brightness;
+
+  const MainScreen({super.key, required this.brightness});
 
   @override
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
-        // 使用系统默认样式，不自定义背景色
+        backgroundColor: AppCupertinoTheme.tabBarBackground(brightness),
+        activeColor: AppCupertinoTheme.tabBarActive(brightness),
+        inactiveColor: AppCupertinoTheme.tabBarInactive(brightness),
+        border: AppCupertinoTheme.tabBarBorder(brightness),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.book),
@@ -187,6 +190,7 @@ class MainScreen extends StatelessWidget {
       ),
       tabBuilder: (context, index) {
         return CupertinoTabView(
+          defaultTitle: 'SoupReader',
           builder: (context) {
             switch (index) {
               case 0:
