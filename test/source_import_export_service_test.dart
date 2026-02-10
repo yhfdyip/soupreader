@@ -32,6 +32,25 @@ void main() {
       expect(result.warnings, isNotEmpty);
     });
 
+    test('importFromJson keeps raw json mapping by source url', () {
+      final json = '''
+[
+  {"bookSourceUrl":"https://raw.com","bookSourceName":"Raw1","x-extra":"1"},
+  {"bookSourceUrl":"https://raw.com","bookSourceName":"Raw2","x-extra":"2"}
+]
+''';
+
+      final result = service.importFromJson(json);
+
+      expect(result.success, isTrue);
+      final rawJson = result.rawJsonForSourceUrl('https://raw.com');
+      expect(rawJson, isNotNull);
+
+      final rawMap = jsonDecode(rawJson!) as Map<String, dynamic>;
+      expect(rawMap['bookSourceName'], 'Raw2');
+      expect(rawMap['x-extra'], '2');
+    });
+
     test('importFromJson supports nested json string payload', () {
       final payload =
           '"[{\\"bookSourceUrl\\":\\"https://c.com\\",\\"bookSourceName\\":\\"C\\"}]"';
@@ -44,8 +63,7 @@ void main() {
     });
 
     test('importFromJson supports multi-level nested json string payload', () {
-      final inner =
-          '[{"bookSourceUrl":"https://d.com","bookSourceName":"D"}]';
+      final inner = '[{"bookSourceUrl":"https://d.com","bookSourceName":"D"}]';
       final payload = jsonEncode(jsonEncode(inner));
 
       final result = service.importFromJson(payload);
@@ -96,13 +114,15 @@ void main() {
         },
       );
 
-      final result = await service.importFromUrl('https://origin.example/s.json');
+      final result =
+          await service.importFromUrl('https://origin.example/s.json');
 
       expect(result.success, isTrue);
       expect(result.importCount, 1);
       expect(result.warnings, isNotEmpty);
       expect(result.warnings.join('\n'), contains('已跟随重定向'));
-      expect(result.warnings.join('\n'), contains('https://origin.example/s.json'));
+      expect(result.warnings.join('\n'),
+          contains('https://origin.example/s.json'));
       expect(
         result.warnings.join('\n'),
         contains('https://redirected.example/source.json'),
@@ -122,7 +142,8 @@ void main() {
         },
       );
 
-      final result = await service.importFromUrl('https://blocked.example/s.json');
+      final result =
+          await service.importFromUrl('https://blocked.example/s.json');
 
       expect(result.success, isFalse);
       expect(result.errorMessage, contains('跨域限制（CORS）'));

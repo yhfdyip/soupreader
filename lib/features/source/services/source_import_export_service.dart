@@ -59,6 +59,7 @@ class SourceImportExportService {
       invalidCount: source.invalidCount,
       duplicateCount: source.duplicateCount,
       warnings: merged,
+      sourceRawJsonByUrl: source.sourceRawJsonByUrl,
     );
   }
 
@@ -168,8 +169,7 @@ class SourceImportExportService {
       final text = _sanitizeJsonInput(current);
       if (text.isEmpty) return '';
 
-      final maybeJson =
-          text.startsWith('{') ||
+      final maybeJson = text.startsWith('{') ||
           text.startsWith('[') ||
           (text.startsWith('"') && text.endsWith('"'));
       if (!maybeJson) return current;
@@ -224,6 +224,7 @@ class SourceImportExportService {
       var invalidCount = 0;
       var duplicateCount = 0;
       final sourceByUrl = <String, BookSource>{};
+      final sourceRawJsonByUrl = <String, String>{};
 
       for (var i = 0; i < items.length; i++) {
         final map = _toSourceMap(items[i]);
@@ -250,6 +251,7 @@ class SourceImportExportService {
             warnings.add('发现重复书源URL：$url（已使用后出现项覆盖）');
           }
           sourceByUrl[url] = source;
+          sourceRawJsonByUrl[url] = LegadoJson.encode(map);
         } catch (e) {
           invalidCount++;
           warnings.add('第${i + 1}条解析失败：$e');
@@ -267,6 +269,7 @@ class SourceImportExportService {
           invalidCount: invalidCount,
           duplicateCount: duplicateCount,
           warnings: warnings,
+          sourceRawJsonByUrl: sourceRawJsonByUrl,
         );
       }
 
@@ -278,6 +281,7 @@ class SourceImportExportService {
         invalidCount: invalidCount,
         duplicateCount: duplicateCount,
         warnings: warnings,
+        sourceRawJsonByUrl: sourceRawJsonByUrl,
       );
     } catch (e) {
       return SourceImportResult(
@@ -333,8 +337,7 @@ class SourceImportExportService {
       if (_isWeb && _isLikelyCorsError(err)) {
         return SourceImportResult(
           success: false,
-          errorMessage:
-              '网络导入失败：浏览器跨域限制（CORS），请改用“从剪贴板导入”或“从文件导入”',
+          errorMessage: '网络导入失败：浏览器跨域限制（CORS），请改用“从剪贴板导入”或“从文件导入”',
         );
       }
       return SourceImportResult(
@@ -389,6 +392,10 @@ class SourceImportResult {
   final int duplicateCount;
   final List<String> warnings;
 
+  /// 导入阶段保留每个书源的原始 JSON（已按 LegadoJson 归一）。
+  /// key = bookSourceUrl
+  final Map<String, String> sourceRawJsonByUrl;
+
   bool get hasWarnings => warnings.isNotEmpty;
 
   const SourceImportResult({
@@ -401,5 +408,12 @@ class SourceImportResult {
     this.invalidCount = 0,
     this.duplicateCount = 0,
     this.warnings = const [],
+    this.sourceRawJsonByUrl = const <String, String>{},
   });
+
+  String? rawJsonForSourceUrl(String url) {
+    final key = url.trim();
+    if (key.isEmpty) return null;
+    return sourceRawJsonByUrl[key];
+  }
 }

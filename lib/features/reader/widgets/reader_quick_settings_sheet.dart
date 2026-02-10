@@ -111,12 +111,10 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              '完成',
-              style: TextStyle(
-                color: CupertinoColors.activeBlue,
-                fontSize: 16,
-              ),
+            child: const Icon(
+              CupertinoIcons.xmark,
+              color: CupertinoColors.white,
+              size: 20,
             ),
           ),
           const Expanded(
@@ -126,7 +124,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
               style: TextStyle(
                 color: CupertinoColors.white,
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -522,8 +520,8 @@ class _InterfaceTab extends StatelessWidget {
               _SwitchRow(
                 label: '跟随系统',
                 value: settings.useSystemBrightness,
-                onChanged: (v) =>
-                    onSettingsChanged(settings.copyWith(useSystemBrightness: v)),
+                onChanged: (v) => onSettingsChanged(
+                    settings.copyWith(useSystemBrightness: v)),
               ),
               const SizedBox(height: 10),
               IgnorePointer(
@@ -707,6 +705,14 @@ class _MoreTab extends StatelessWidget {
           child: Column(
             children: [
               _SwitchRow(
+                label: '屏幕常亮',
+                value: settings.keepScreenOn,
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(keepScreenOn: v),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _SwitchRow(
                 label: '净化章节标题',
                 value: settings.cleanChapterTitle,
                 onChanged: (v) => onSettingsChanged(
@@ -719,6 +725,14 @@ class _MoreTab extends StatelessWidget {
                 value: settings.volumeKeyPage,
                 onChanged: (v) =>
                     onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
+              ),
+              const SizedBox(height: 8),
+              _SwitchRow(
+                label: '繁体显示',
+                value: settings.chineseTraditional,
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(chineseTraditional: v),
+                ),
               ),
             ],
           ),
@@ -757,8 +771,7 @@ class _ThemeGrid extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final crossAxisCount = width >= 360 ? 4 : 3;
-        final itemWidth =
-            (width - (crossAxisCount - 1) * 10) / crossAxisCount;
+        final itemWidth = (width - (crossAxisCount - 1) * 10) / crossAxisCount;
         final itemHeight = 54.0;
 
         return Wrap(
@@ -881,7 +894,8 @@ class _PageTab extends StatelessWidget {
                 children: [
                   const Text(
                     '音量键翻页',
-                    style: TextStyle(color: CupertinoColors.white, fontSize: 14),
+                    style:
+                        TextStyle(color: CupertinoColors.white, fontSize: 14),
                   ),
                   CupertinoSwitch(
                     value: settings.volumeKeyPage,

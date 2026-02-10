@@ -591,3 +591,199 @@
 ### 兼容影响
 - 规则协议无变更：未修改 legado 书源规则语义与解析链路。
 - 行为调整仅限阅读设置 UI 分组与入口顺序，原设置字段保持兼容。
+
+## 2026-02-09（P2 续：阅读页整体 UI/UX 重构，对标同类阅读器）
+
+### 已完成
+- 阅读页顶部菜单重构（`ReaderTopMenu`）：
+  - 改为“渐变沉浸 + 圆角操作按钮”视觉层级；
+  - 保留并强化高频动作：`换源 / 净化 / 刷新 / 目录`；
+  - 书名与“源名·章节名”合并为主次信息，提升信息密度与可读性。
+- 阅读页底部菜单重构（`ReaderBottomMenuNew`）：
+  - 从“单一底部导航”升级为“章节进度 + 高频设置 + 底部导航”复合结构；
+  - 新增高频行内操作：亮度（含常亮切换）、字号 `A-/A+`、翻页模式 chips、音量键翻页、净化标题、自动阅读；
+  - 保留 `目录 / 字体 / 界面 / 设置` 导航入口，交互对齐截图中的阅读器布局。
+- 新增右侧悬浮快捷栏（`SimpleReaderView`）：
+  - 提供 `书签 / 目录 / 字体 / 界面 / 自动阅读` 五个快捷操作；
+  - 支持书签状态高亮、自动阅读运行态高亮；
+  - 快捷栏操作统一与底栏能力联动，减少深层菜单跳转。
+- 阅读交互细节联调：
+  - 新增菜单收起统一方法，打开快捷设置/目录时自动关闭阅读菜单并恢复沉浸模式；
+  - 自动阅读入口重新打通（菜单与悬浮栏均可控制开始/停止）；
+  - 章节切换后自动刷新当前章节书签状态，避免状态滞后。
+- 快捷设置面板微调：
+  - 头部左侧由“完成”改为关闭图标，贴近参考界面；
+  - Tab 文案 `设置` 调整为 `翻页`，语义更明确。
+
+### 为什么
+- 用户提供的同类阅读器截图核心特征是“阅读态高频能力外露”：不依赖多层弹窗即可完成换源、净化、目录、字体与翻页调整。
+- 现有阅读页虽然功能完整，但入口分散、视觉层级偏弱；本次重构优先解决“操作路径长、状态反馈弱、视觉一致性不足”的体验问题。
+
+### 验证方式
+- 命令：`flutter analyze lib/features/reader/views/simple_reader_view.dart lib/features/reader/widgets/reader_bottom_menu.dart lib/features/reader/widgets/reader_menus.dart lib/features/reader/widgets/reader_quick_settings_sheet.dart`
+- 命令：`flutter test test/reader_source_switch_helper_test.dart test/chapter_progress_utils_test.dart`
+- 手工：阅读页唤出菜单后验证：
+  - 顶栏展示重构后的操作布局与信息层级；
+  - 右侧浮动栏可执行书签/目录/字体/界面/自动阅读；
+  - 底栏可直接调亮度、字号、翻页模式、音量键翻页和净化标题。
+
+### 兼容影响
+- 规则协议无变更：不涉及 legado 规则语义修改。
+- 行为调整集中在阅读 UI/UX 与入口组织，底层阅读链路（目录/正文/翻页/进度）保持兼容。
+
+## 2026-02-09（P0：书源能力 legado 全量对标梳理）
+
+### 已完成
+- 新增 `docs/LEGADO_SOURCE_PARITY_MATRIX.md`：
+  - 以 `legado` 的 `BookSource/BaseSource/AnalyzeRule/AnalyzeUrl` 为基线，完成书源能力分模块对照；
+  - 逐项标注 `✅/🟡/⬜`，覆盖字段层、规则语义层、URL 请求链、五段链路、调试与编辑器能力；
+  - 输出“完全对标阻塞项”与 `P0/P1/P2` 可执行 Todo。
+- 更新 `docs/next_development_checklist.md`：
+  - 将“建立 legado 规则对齐矩阵”从待办改为已完成；
+  - 在未完成项中补充矩阵文档链接，统一后续整改入口。
+- 更新 `docs/DEV_PLAN.md`：
+  - 在 Done 增补“书源能力 legado 对标矩阵与分级 Todo”；
+  - 在 Todo 增补三项 P0 任务：登录语义链、段评/正文扩展语义、导入导出保真。
+
+### 为什么
+- 当前项目已具备主流程能力，但“声明级完全对标 legado”还缺少统一可追溯的差距矩阵。
+- 在继续功能开发前先把协议差距明确化，可避免后续出现“功能能跑但语义不兼容”的返工。
+
+### 验证方式
+- 文档检查：
+  - 打开 `docs/LEGADO_SOURCE_PARITY_MATRIX.md`，核对每个模块均有“基线 + 映射 + 状态 + 结论”；
+  - 打开 `docs/next_development_checklist.md`，确认 2.1 第一项已标记完成并带矩阵链接；
+  - 打开 `docs/DEV_PLAN.md`，确认 Done/Todo 已同步本次梳理结果。
+- 一致性检查：
+  - 矩阵中的未对齐项（如登录链、`ruleReview`、`imageDecode/payAction`）在代码中应能找到“仅字段存在、执行链缺失”的对应事实。
+
+### 兼容影响
+- 本次仅更新文档与计划，不修改运行时代码；
+- 对现有书源解析行为无直接变更。
+
+## 2026-02-09（P0 续：书源导入流程向 legado 保真语义对齐）
+
+### 已完成
+- 导入服务增强：`SourceImportResult` 新增 `sourceRawJsonByUrl`，在 `importFromJson` 阶段保留每个书源的原始 JSON（按 `LegadoJson` 归一）。
+- 导入入库链路调整：`SourceListView` 在导入提交时优先使用 `SourceRepository.upsertSourceRawJson` 写入（按 URL 取对应 rawJson），避免导入阶段丢失未知字段。
+- 导入相关回归测试补充：新增 `importFromJson keeps raw json mapping by source url` 用例，验证重复 URL 场景下会保留“后出现项”的原始字段。
+- 文档/计划同步：
+  - `docs/LEGADO_SOURCE_PARITY_MATRIX.md` 增补“书源界面使用逻辑（导入/调试/编辑）”对齐表；
+  - `docs/DEV_PLAN.md` 与 `docs/next_development_checklist.md` 增补“书源界面流程对齐 legado”任务。
+
+### 为什么
+- 你要求“书源界面使用逻辑、导入书源、调试书源都应与 legado 一样”。
+- 其中导入链路是兼容性的基础环节；若导入即丢字段，后续调试/编辑再完善也会受限。
+
+### 验证方式
+- 命令：`flutter test test/source_import_export_service_test.dart`
+- 命令：`flutter analyze lib/features/source/services/source_import_export_service.dart lib/features/source/views/source_list_view.dart`
+- 手工：
+  - 导入包含自定义未知字段的书源 JSON；
+  - 在书源编辑页切换 JSON 视图确认字段仍保留；
+  - 重复 URL 导入时确认采用“后出现项覆盖”。
+
+### 兼容影响
+- 行为增强：导入阶段更偏向 legado 保真语义（未知字段不轻易丢失）。
+- 无破坏性变更：原有导入入口、冲突处理和错误提示保持兼容。
+
+## 2026-02-09（P0 续：登录态缓存与请求链对齐 legado）
+
+### 已完成
+- 新增 `lib/core/services/source_login_store.dart`：
+  - 支持按书源 key 持久化 `loginHeader`（JSON Map）与 `loginInfo`（文本）；
+  - 提供读取/保存/清理接口，语义对齐 legado `BaseSource` 登录缓存能力。
+- 请求链路接入登录头：
+  - `RuleParserEngine` 的 `_fetch/_fetchDebug` 增加 `sourceKey`，会在请求头构建时自动合并 `SourceLoginStore` 中的登录头；
+  - 合并顺序对齐 legado：`书源 header -> 登录 header -> URL option headers`（URL option 最高优先级）。
+- 书源编辑页补登录态缓存入口（`SourceEditView`）：
+  - 新增“登录头缓存(JSON)”与“登录信息缓存”输入项；
+  - 新增“加载登录态缓存 / 保存登录态缓存 / 清除登录态缓存”操作；
+  - 保存书源时会静默保存登录态缓存。
+- 测试补充：
+  - 新增 `test/source_login_store_test.dart`；
+  - `test/rule_parser_engine_url_option_compat_test.dart` 增加“登录头并入与 URL option 覆盖优先级”用例。
+
+### 为什么
+- legado 的登录能力不仅是字段存在，还包括“登录态缓存 + 请求自动携带”。
+- 先补齐这一基础语义后，再推进 `loginUrl/loginCheckJs` 脚本执行闭环，能显著降低兼容风险。
+
+### 验证方式
+- 命令：`flutter test test/source_login_store_test.dart test/rule_parser_engine_url_option_compat_test.dart test/source_import_export_service_test.dart`
+- 命令：`flutter analyze lib/features/source/views/source_edit_view.dart lib/features/source/services/rule_parser_engine.dart lib/core/services/source_login_store.dart`
+- 手工：
+  - 在书源编辑页“网络/登录”填写“登录头缓存(JSON)”并保存；
+  - 再次进入该书源编辑页点击“加载登录态缓存”，确认回显；
+  - 执行书源调试，检查请求头摘要中可看到登录头生效（若未被 URL option 覆盖）。
+
+### 兼容影响
+- 行为增强：请求会自动并入该书源的登录头缓存（与 legado 登录头语义一致）。
+- 未完成项：`loginUrl/loginCheckJs` 执行链仍在后续 P0 Todo。
+
+## 2026-02-10（阅读器 UI/UX 对标截图：菜单/目录/缓存/常亮）
+
+### 已完成
+- 阅读页底部菜单语义对齐：
+  - 修复亮度区“跟随系统/常亮”错绑问题，新增“常亮”开关直连 `ReadingSettings.keepScreenOn`；
+  - “更多”入口改为打开完整阅读设置（避免把“更多”误导到翻页页签）。
+- 快捷阅读设置面板对齐：
+  - Tab 文案对齐为 `字体 / 界面 / 设置 / 更多`（将原“翻页”更名为“设置”）；
+  - “更多”页签补齐 `屏幕常亮 / 繁体显示` 等常用开关。
+- 目录/书签/笔记面板重构并补齐动作：
+  - 抽离为独立组件 `lib/features/reader/widgets/reader_catalog_sheet.dart`，对齐暖色目录抽屉样式；
+  - 支持目录搜索/倒序、显示“已缓存”章节标记；
+  - 支持书签列表与右滑删除；
+  - 接入“清理本书缓存”和“刷新目录（检查更新）”两个工具按钮：
+    - 清缓存：清除本书章节缓存内容但保留目录；
+    - 刷新目录：基于“当前书源搜索 -> 目录抓取 -> 仅追加（append）新章节”的安全策略更新目录，避免重排导致书签错位。
+- 平台能力补齐：新增 `KeepScreenOnService` + iOS/Android MethodChannel（阅读时可真正常亮）。
+
+### 为什么
+- 你提供的截图核心是“阅读态高频动作前置 + 目录抽屉可操作 + 设置分层清晰”，现有实现存在：
+  - 亮度区开关文案与实际行为不一致；
+  - 目录抽屉有 UI 但关键动作为空；
+  - “常亮”只是配置项，缺少平台落地。
+- 本次以“最小可用闭环”为目标：保证用户从阅读页能完成目录/书签/清缓存/检查更新/常亮等高频操作。
+
+### 验证方式
+- 命令：`flutter analyze`
+- 命令：`flutter test`
+- 手工：
+  - 阅读页唤出菜单 → 底部亮度区切换“跟随系统/常亮”，确认亮度与常亮行为符合预期；
+  - 打开目录抽屉 → 搜索章节/倒序 → 点击跳转章节；
+  - 在书签页右滑删除书签；
+  - 点击“清理缓存”，确认缓存标记消失且阅读不中断；
+  - 点击“刷新目录”，当目录存在追加章节时提示“新增 X 章”。
+
+### 兼容影响
+- 规则协议无变更：未修改 legado 书源字段与解析语义。
+- 行为增强：新增“常亮”平台落地、目录抽屉动作补齐与目录安全追加更新策略；对旧书源兼容性预期为正向增强。
+
+## 2026-02-10（阅读器视觉统一：Design Tokens + 三主轴主题）
+
+### 已完成
+- 新增统一视觉令牌文件 `lib/app/theme/design_tokens.dart`：
+  - 全局品牌/语义色（主品牌蓝、CTA 绿、成功/警告/错误/信息）；
+  - 中性色（文本、边框、分割线、浅/深表面）；
+  - 统一圆角（控件/卡片/弹层）与动效时长（150/220/300ms）；
+  - 阅读主题令牌（`ReaderThemeTokens`）及“日间/护眼/夜间”三主轴。
+- `lib/app/theme/colors.dart` 接入统一令牌，阅读主题改由 `ReaderThemeTokens` 映射，保持现有 9 个主题顺序不变（避免 `themeIndex` 历史数据错位）。
+- `lib/app/theme/app_theme.dart` 对齐视觉一致性：
+  - 统一卡片/按钮/输入框圆角为 token；
+  - 修正按钮 `onPrimary` 对比度（深色主题改白字）；
+  - 统一按钮前景色语义，提升可读性与一致性。
+- `lib/features/reader/views/reader_view.dart` 增加主题索引边界保护，避免历史异常配置导致索引越界。
+
+### 为什么
+- 当前阅读器已有多主题能力，但视觉语义分散在各文件中，长期会造成“同一产品多套视觉语言并存”的漂移风险。
+- 本次目标是先建立“可复用且可约束”的令牌层，再把现有主题映射到统一主轴，实现“整体协调”且不破坏现有用户习惯。
+
+### 验证方式
+- 命令：`dart format lib/app/theme/design_tokens.dart lib/app/theme/colors.dart lib/app/theme/app_theme.dart lib/features/reader/views/reader_view.dart`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+- 手工：阅读页切换各主题，确认主题可用且 `themeIndex` 历史配置不出现错位或崩溃。
+
+### 兼容影响
+- 规则协议无变更：本次仅涉及阅读器 UI 主题层，不触及书源解析语义。
+- 行为兼容：保留原 9 主题名称与顺序，旧配置可无缝迁移；仅提升配色一致性和可读性。

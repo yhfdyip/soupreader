@@ -2,10 +2,13 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/services/rule_parser_engine.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
   group('RuleParserEngine stage js compat', () {
     test('ruleToc.preUpdateJs rewrites response before list extraction',
         () async {

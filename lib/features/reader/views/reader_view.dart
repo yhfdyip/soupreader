@@ -26,8 +26,13 @@ class _ReaderViewState extends State<ReaderView> {
   ReadingSettings _settings = const ReadingSettings();
 
   // 当前阅读主题
-  ReadingThemeColors get _currentTheme =>
-      AppColors.readingThemes[_settings.themeIndex];
+  ReadingThemeColors get _currentTheme {
+    final index = _settings.themeIndex;
+    if (index >= 0 && index < AppColors.readingThemes.length) {
+      return AppColors.readingThemes[index];
+    }
+    return AppColors.readingThemes[0];
+  }
 
   // 是否显示菜单
   bool _showMenu = false;
@@ -84,9 +89,8 @@ class _ReaderViewState extends State<ReaderView> {
     final List<String> pages = [];
 
     for (int i = 0; i < lines.length; i += linesPerPage) {
-      final end = (i + linesPerPage > lines.length)
-          ? lines.length
-          : i + linesPerPage;
+      final end =
+          (i + linesPerPage > lines.length) ? lines.length : i + linesPerPage;
       pages.add(lines.sublist(i, end).join('\n'));
     }
 
@@ -609,22 +613,26 @@ class _ReaderViewState extends State<ReaderView> {
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
-                children: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
+                children: PageTurnModeUi.values(current: _settings.pageTurnMode)
+                    .map((mode) {
                   final isSelected = _settings.pageTurnMode == mode;
                   return ChoiceChip(
-                    label: Text(PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name),
+                    label: Text(PageTurnModeUi.isHidden(mode)
+                        ? '${mode.name}（隐藏）'
+                        : mode.name),
                     selected: isSelected,
                     onSelected: PageTurnModeUi.isHidden(mode)
                         ? null
                         : (selected) {
-                      if (selected) {
-                        setSheetState(() {
-                          setState(() {
-                            _settings = _settings.copyWith(pageTurnMode: mode);
-                          });
-                        });
-                      }
-                    },
+                            if (selected) {
+                              setSheetState(() {
+                                setState(() {
+                                  _settings =
+                                      _settings.copyWith(pageTurnMode: mode);
+                                });
+                              });
+                            }
+                          },
                   );
                 }).toList(),
               ),

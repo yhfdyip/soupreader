@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/services/rule_parser_engine.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
   group('RuleParserEngine next url compat', () {
     test('nextTocUrl supports || fallback on html rules', () {
       final doc = html_parser.parse('''

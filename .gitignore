@@ -51,3 +51,6 @@ tool/
 docs/DEV_PLAN.md
 docs/DEV_PROGRESS.md
 docs/HAPPY_PARITY_MATRIX.md
+
+# Local Codex workspace artifacts
+.codex/

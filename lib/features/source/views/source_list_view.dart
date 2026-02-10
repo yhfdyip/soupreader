@@ -334,14 +334,16 @@ class _SourceListViewState extends State<SourceListView> {
     final groups = _buildGroups(all);
     final activeGroup = groups.contains(_selectedGroup) ? _selectedGroup : '全部';
     final groupFiltered = _filterSources(all, activeGroup);
-    final filtered = SourceFilterHelper.filterByEnabled(groupFiltered, _enabledFilter);
+    final filtered =
+        SourceFilterHelper.filterByEnabled(groupFiltered, _enabledFilter);
 
     if (filtered.isEmpty) {
       _showMessage('当前筛选结果为空，无可批量处理项');
       return;
     }
 
-    final targets = filtered.where((s) => s.enabled != enabled).toList(growable: false);
+    final targets =
+        filtered.where((s) => s.enabled != enabled).toList(growable: false);
     if (targets.isEmpty) {
       _showMessage(enabled ? '当前筛选内已全部启用' : '当前筛选内已全部禁用');
       return;
@@ -585,13 +587,30 @@ class _SourceListViewState extends State<SourceListView> {
       return;
     }
 
-    await _sourceRepo.addSources(finalSources);
+    await _persistImportedSources(result, finalSources);
     _showImportSummary(
       result,
       actualImportedCount: finalSources.length,
       conflictCount: prepared.conflictCount,
       skippedConflictCount: prepared.skippedConflictCount,
     );
+  }
+
+  Future<void> _persistImportedSources(
+    SourceImportResult result,
+    List<BookSource> finalSources,
+  ) async {
+    for (final source in finalSources) {
+      final url = source.bookSourceUrl.trim();
+      if (url.isEmpty) continue;
+
+      final rawJson = result.rawJsonForSourceUrl(url);
+      if (rawJson != null && rawJson.trim().isNotEmpty) {
+        await _sourceRepo.upsertSourceRawJson(rawJson: rawJson);
+      } else {
+        await _sourceRepo.addSource(source);
+      }
+    }
   }
 
   Future<

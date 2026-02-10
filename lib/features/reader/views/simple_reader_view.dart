@@ -5,10 +5,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart'
     hide Slider; // 隐藏 Slider 以避免与 Cupertino 冲突
 import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../app/theme/colors.dart';
@@ -26,6 +28,7 @@ import '../widgets/page_factory.dart';
 import '../widgets/reader_menus.dart';
 import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
+import '../widgets/reader_catalog_sheet.dart';
 import '../widgets/typography_settings_dialog.dart';
 import '../widgets/reader_quick_settings_sheet.dart';
 
@@ -54,6 +57,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   late final SettingsService _settingsService;
   final ScreenBrightnessService _brightnessService =
       ScreenBrightnessService.instance;
+  final KeepScreenOnService _keepScreenOnService = KeepScreenOnService.instance;
   final RuleParserEngine _ruleEngine = RuleParserEngine();
 
   List<Chapter> _chapters = [];
@@ -79,7 +83,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _showAutoReadPanel = false;
 
   // 当前书籍信息
-  final String _bookAuthor = '';
+  String _bookAuthor = '';
+  String? _bookCoverUrl;
   String? _currentSourceUrl;
   String? _currentSourceName;
 
@@ -135,7 +140,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         : AutoPagerMode.page);
 
     _currentChapterIndex = widget.initialChapter;
-    _initReader();
+    unawaited(() async {
+      try {
+        await _bookmarkRepo.init();
+      } catch (_) {
+        // ignore bookmark init failure; reader should still be usable
+      }
+      await _initReader();
+    }());
 
     // 应用亮度设置（首帧后，避免部分机型窗口未就绪）
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -144,6 +156,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _settings,
         force: true,
       );
+      unawaited(_syncNativeKeepScreenOn(_settings));
     });
 
     // 初始化自动翻页器
@@ -160,6 +173,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<void> _initReader() async {
     final book = _bookRepo.getBookById(widget.bookId);
+    _bookAuthor = book?.author ?? '';
+    _bookCoverUrl = book?.coverUrl;
     _currentSourceUrl = book?.sourceUrl ?? book?.sourceId;
     _refreshCurrentSourceName();
 
@@ -209,6 +224,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _autoPager.dispose();
     // 离开阅读器时恢复系统亮度（iOS 还原原始亮度；Android 还原窗口亮度为跟随系统）
     unawaited(_brightnessService.resetToSystem());
+    unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -233,6 +249,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     // 手动亮度：仅在关闭“跟随系统”时生效
     unawaited(_brightnessService.setBrightness(newSettings.brightness));
+  }
+
+  Future<void> _syncNativeKeepScreenOn(ReadingSettings settings) async {
+    await _keepScreenOnService.setEnabled(settings.keepScreenOn);
   }
 
   /// 保存进度：章节 + 滚动偏移
@@ -291,6 +311,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _currentTitle = stage.title;
       _currentContent = processedContent;
     });
+    _updateBookmarkStatus();
 
     _syncPageFactoryChapters();
 
@@ -577,6 +598,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           : AutoPagerMode.page);
     }
     _syncNativeBrightnessForSettings(oldSettings, newSettings);
+    if (oldSettings.keepScreenOn != newSettings.keepScreenOn) {
+      unawaited(_syncNativeKeepScreenOn(newSettings));
+    }
     unawaited(_settingsService.saveReadingSettings(newSettings));
 
     if (modeChanged) {
@@ -1051,7 +1075,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         cleanChapterTitleEnabled: _settings.cleanChapterTitle,
                       ),
 
-                    // 底部菜单 (新版 Tab 导航)
+                    // 右侧悬浮快捷栏（对标同类阅读器）
+                    if (_showMenu) _buildFloatingActionRail(),
+
+                    // 底部菜单（章节进度 + 高频设置 + 导航）
                     if (_showMenu)
                       ReaderBottomMenuNew(
                         currentChapterIndex: _currentChapterIndex,
@@ -1062,9 +1089,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         currentTheme: _currentTheme,
                         onChapterChanged: (index) => _loadChapter(index),
                         onPageChanged: (pageIndex) {
-                          // 跳转到指定页码
                           setState(() {
-                            // PageFactory 内部管理页码
                             while (_pageFactory.currentPageIndex < pageIndex) {
                               if (!_pageFactory.moveToNext()) break;
                             }
@@ -1075,16 +1100,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         },
                         onSettingsChanged: (settings) =>
                             _updateSettings(settings),
-                        onShowChapterList: _showChapterList,
-                        onShowTypography: () => _showQuickSettingsSheet(
-                          initialTab: ReaderQuickSettingsTab.typography,
-                        ),
-                        onShowTheme: () => _showQuickSettingsSheet(
-                          initialTab: ReaderQuickSettingsTab.interface,
-                        ),
-                        onShowPage: () => _showQuickSettingsSheet(
-                          initialTab: ReaderQuickSettingsTab.more,
-                        ),
+                        onShowChapterList: _openChapterListFromMenu,
+                        onShowTypography: () => _openQuickSettingsFromMenu(
+                            ReaderQuickSettingsTab.typography),
+                        onShowTheme: () => _openQuickSettingsFromMenu(
+                            ReaderQuickSettingsTab.interface),
+                        onShowPage: () => _openQuickSettingsFromMenu(
+                            ReaderQuickSettingsTab.page),
+                        onOpenFullSettings: _openFullSettingsFromMenu,
+                        onToggleAutoRead: _toggleAutoReadPanelFromMenu,
+                        autoReadRunning: _autoPager.isRunning,
                       ),
 
                     if (_isLoadingChapter)
@@ -1379,10 +1404,126 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  void _closeReaderMenuOverlay() {
+    if (!_showMenu) return;
+    setState(() => _showMenu = false);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  void _openChapterListFromMenu() {
+    _closeReaderMenuOverlay();
+    _showChapterList();
+  }
+
+  void _openQuickSettingsFromMenu(ReaderQuickSettingsTab tab) {
+    _closeReaderMenuOverlay();
+    _showQuickSettingsSheet(initialTab: tab);
+  }
+
+  void _openFullSettingsFromMenu() {
+    _closeReaderMenuOverlay();
+    _showReadingSettingsSheet(initialTab: 0);
+  }
+
+  void _toggleAutoReadPanelFromMenu() {
+    final nextVisible = !_showAutoReadPanel;
+    if (_showMenu) {
+      setState(() {
+        _showMenu = false;
+        _showAutoReadPanel = nextVisible;
+      });
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      setState(() {
+        _showAutoReadPanel = nextVisible;
+      });
+    }
+
+    if (nextVisible) {
+      _autoPager.start();
+    } else {
+      _autoPager.stop();
+    }
+  }
+
+  Widget _buildFloatingActionRail() {
+    final topOffset = MediaQuery.of(context).padding.top + 86;
+    return Positioned(
+      right: 10,
+      top: topOffset,
+      child: Column(
+        children: [
+          _buildFloatingActionButton(
+            icon: _hasBookmarkAtCurrent
+                ? CupertinoIcons.bookmark_solid
+                : CupertinoIcons.bookmark,
+            active: _hasBookmarkAtCurrent,
+            onTap: () => unawaited(_toggleBookmark()),
+          ),
+          const SizedBox(height: 10),
+          _buildFloatingActionButton(
+            icon: CupertinoIcons.list_bullet,
+            onTap: _openChapterListFromMenu,
+          ),
+          const SizedBox(height: 10),
+          _buildFloatingActionButton(
+            icon: CupertinoIcons.textformat_size,
+            onTap: () => _openQuickSettingsFromMenu(
+              ReaderQuickSettingsTab.typography,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildFloatingActionButton(
+            icon: CupertinoIcons.circle_grid_3x3,
+            onTap: () => _openQuickSettingsFromMenu(
+              ReaderQuickSettingsTab.interface,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildFloatingActionButton(
+            icon: _autoPager.isRunning
+                ? CupertinoIcons.pause_circle_fill
+                : CupertinoIcons.play_circle_fill,
+            active: _autoPager.isRunning,
+            onTap: _toggleAutoReadPanelFromMenu,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool active = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: active
+              ? CupertinoColors.activeGreen.withValues(alpha: 0.22)
+              : Colors.black.withValues(alpha: 0.32),
+          borderRadius: BorderRadius.circular(21),
+          border: Border.all(
+            color: active ? CupertinoColors.activeGreen : Colors.white24,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: active ? CupertinoColors.activeGreen : CupertinoColors.white,
+        ),
+      ),
+    );
+  }
+
   /// 刷新当前章节
   void _refreshChapter() {
+    _closeReaderMenuOverlay();
     _loadChapter(_currentChapterIndex);
-    setState(() => _showMenu = false);
   }
 
   void _showToast(String message) {
@@ -2875,401 +3016,261 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 切换当前位置的书签
   Future<void> _toggleBookmark() async {
-    if (_hasBookmarkAtCurrent) {
-      // 删除书签
-      final bookmark =
-          _bookmarkRepo.getBookmarkAt(widget.bookId, _currentChapterIndex, 0);
-      if (bookmark != null) {
-        await _bookmarkRepo.removeBookmark(bookmark.id);
+    try {
+      if (_hasBookmarkAtCurrent) {
+        // 删除书签
+        final bookmark =
+            _bookmarkRepo.getBookmarkAt(widget.bookId, _currentChapterIndex, 0);
+        if (bookmark != null) {
+          await _bookmarkRepo.removeBookmark(bookmark.id);
+        }
+      } else {
+        // 添加书签
+        await _bookmarkRepo.addBookmark(
+          bookId: widget.bookId,
+          bookName: widget.bookTitle,
+          bookAuthor: _bookAuthor,
+          chapterIndex: _currentChapterIndex,
+          chapterTitle: _currentTitle,
+          chapterPos: 0,
+          content:
+              _currentContent.substring(0, _currentContent.length.clamp(0, 50)),
+        );
       }
-    } else {
-      // 添加书签
-      await _bookmarkRepo.addBookmark(
-        bookId: widget.bookId,
-        bookName: widget.bookTitle,
-        bookAuthor: _bookAuthor,
-        chapterIndex: _currentChapterIndex,
-        chapterTitle: _currentTitle,
-        chapterPos: 0,
-        content:
-            _currentContent.substring(0, _currentContent.length.clamp(0, 50)),
-      );
+      _updateBookmarkStatus();
+    } catch (e) {
+      if (!mounted) return;
+      _showToast('书签操作失败：$e');
     }
-    _updateBookmarkStatus();
   }
 
   /// 更新书签状态
   void _updateBookmarkStatus() {
+    if (!mounted) return;
+    bool hasBookmark = false;
+    try {
+      hasBookmark = _bookmarkRepo.hasBookmark(widget.bookId, _currentChapterIndex);
+    } catch (_) {
+      hasBookmark = false;
+    }
+    if (_hasBookmarkAtCurrent == hasBookmark) return;
     setState(() {
-      _hasBookmarkAtCurrent =
-          _bookmarkRepo.hasBookmark(widget.bookId, _currentChapterIndex);
+      _hasBookmarkAtCurrent = hasBookmark;
     });
+  }
+
+  Future<ChapterCacheInfo> _clearBookCache() async {
+    final info = await _chapterRepo.clearDownloadedCacheForBook(widget.bookId);
+
+    if (!mounted) return info;
+
+    setState(() {
+      // 保持当前阅读不中断：不强行清空当前章节的内存内容，但把“已下载标记”与缓存阶段清空。
+      _replaceStageCache.clear();
+
+      final currentId =
+          _chapters.isNotEmpty ? _chapters[_currentChapterIndex].id : null;
+      _chapters = _chapters
+          .map((chapter) {
+            if (!chapter.isDownloaded) return chapter;
+            final keepContent = chapter.id == currentId ? chapter.content : null;
+            return chapter.copyWith(isDownloaded: false, content: keepContent);
+          })
+          .toList(growable: false);
+    });
+
+    _syncPageFactoryChapters(
+      keepPosition: _settings.pageTurnMode != PageTurnMode.scroll,
+    );
+    return info;
+  }
+
+  SearchResult? _pickBestUpdateTarget({
+    required Book book,
+    required List<SearchResult> results,
+  }) {
+    final titleKey = ReaderSourceSwitchHelper.normalizeForCompare(book.title);
+    final authorKey = ReaderSourceSwitchHelper.normalizeForCompare(book.author);
+
+    SearchResult? authorMatched;
+    SearchResult? fallback;
+
+    for (final item in results) {
+      final itemTitleKey = ReaderSourceSwitchHelper.normalizeForCompare(item.name);
+      if (itemTitleKey != titleKey) continue;
+
+      fallback ??= item;
+      final itemAuthorKey = ReaderSourceSwitchHelper.normalizeForCompare(item.author);
+      if (authorKey.isNotEmpty &&
+          itemAuthorKey.isNotEmpty &&
+          itemAuthorKey == authorKey) {
+        authorMatched = item;
+        break;
+      }
+    }
+
+    return authorMatched ?? fallback;
+  }
+
+  bool _isUrlPrefix(List<String> prefix, List<String> full) {
+    if (prefix.length > full.length) return false;
+    for (var i = 0; i < prefix.length; i++) {
+      if (prefix[i] != full[i]) return false;
+    }
+    return true;
+  }
+
+  Future<List<Chapter>> _refreshCatalogFromSource() async {
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null) {
+      throw StateError('书籍信息不存在');
+    }
+    if (book.isLocal) {
+      throw StateError('本地书籍不支持检查更新');
+    }
+
+    final sourceUrl = (book.sourceUrl ?? book.sourceId ?? '').trim();
+    if (sourceUrl.isEmpty) {
+      throw StateError('缺少书源信息，无法检查更新');
+    }
+    final source = _sourceRepo.getSourceByUrl(sourceUrl);
+    if (source == null) {
+      throw StateError('书源不存在或已被删除');
+    }
+
+    final keyword = book.title.trim();
+    if (keyword.isEmpty) {
+      throw StateError('书名为空，无法检查更新');
+    }
+
+    // 通过“当前书源搜索”拿回 bookUrl（BookEntity 未持久化 bookUrl，因此只能走该策略）
+    final results = await _ruleEngine.search(source, keyword);
+    final target = _pickBestUpdateTarget(book: book, results: results);
+    if (target == null) {
+      throw StateError('未在当前书源搜索到匹配书籍');
+    }
+
+    final detail = await _ruleEngine.getBookInfo(
+      source,
+      target.bookUrl,
+      clearRuntimeVariables: true,
+    );
+    final tocUrl =
+        detail?.tocUrl.trim().isNotEmpty == true ? detail!.tocUrl.trim() : target.bookUrl.trim();
+    if (tocUrl.isEmpty) {
+      throw StateError('目录地址为空（可能详情解析失败）');
+    }
+
+    final toc = await _ruleEngine.getToc(
+      source,
+      tocUrl,
+      clearRuntimeVariables: false,
+    );
+    if (toc.isEmpty) {
+      throw StateError('目录为空（可能是 ruleToc 不匹配）');
+    }
+
+    final existing = _chapters;
+    final existingUrls = <String>[];
+    for (final chapter in existing) {
+      final url = (chapter.url ?? '').trim();
+      if (url.isEmpty) {
+        throw StateError('当前目录存在空章节链接，暂不支持自动检查更新');
+      }
+      existingUrls.add(url);
+    }
+
+    final newUrls = <String>[];
+    final newTitleByUrl = <String, String>{};
+    final seen = <String>{};
+    for (final item in toc) {
+      final url = item.url.trim();
+      if (url.isEmpty) continue;
+      if (!seen.add(url)) continue;
+      newUrls.add(url);
+      newTitleByUrl[url] = item.name.trim();
+    }
+    if (newUrls.isEmpty) {
+      throw StateError('目录解析失败：章节链接为空');
+    }
+
+    if (!_isUrlPrefix(existingUrls, newUrls)) {
+      throw StateError('目录结构变化较大，暂不自动合并（可尝试换源或重新加入书架）');
+    }
+
+    if (newUrls.length <= existingUrls.length) {
+      return _chapters;
+    }
+
+    final uuid = const Uuid();
+    final toAdd = <Chapter>[];
+    for (var i = existingUrls.length; i < newUrls.length; i++) {
+      final url = newUrls[i];
+      final title = (newTitleByUrl[url] ?? '').trim();
+      final safeTitle = title.isNotEmpty ? title : '第${i + 1}章';
+      final id = uuid.v5(Namespace.url.value, '${widget.bookId}|$i|$url');
+      toAdd.add(
+        Chapter(
+          id: id,
+          bookId: widget.bookId,
+          title: safeTitle,
+          url: url,
+          index: i,
+          isDownloaded: false,
+          content: null,
+        ),
+      );
+    }
+
+    if (toAdd.isEmpty) return _chapters;
+
+    await _chapterRepo.addChapters(toAdd);
+    final updated = _chapterRepo.getChaptersForBook(widget.bookId);
+
+    await _bookRepo.updateBook(
+      book.copyWith(
+        totalChapters: updated.length,
+        latestChapter: updated.isNotEmpty ? updated.last.title : book.latestChapter,
+      ),
+    );
+
+    if (!mounted) return updated;
+
+    setState(() {
+      _chapters = updated;
+    });
+    _syncPageFactoryChapters(
+      keepPosition: _settings.pageTurnMode != PageTurnMode.scroll,
+    );
+
+    return updated;
   }
 
   void _showChapterList() {
     showCupertinoModalPopup(
       context: context,
-      builder: (context) => _ChapterListSheet(
+      builder: (popupContext) => ReaderCatalogSheet(
+        bookId: widget.bookId,
         bookTitle: widget.bookTitle,
         bookAuthor: _bookAuthor,
+        coverUrl: _bookCoverUrl,
         chapters: _chapters,
         currentChapterIndex: _currentChapterIndex,
-        onChapterTap: (index) {
-          Navigator.pop(context);
+        bookmarks: _bookmarkRepo.getBookmarksForBook(widget.bookId),
+        onClearBookCache: _clearBookCache,
+        onRefreshCatalog: _refreshCatalogFromSource,
+        onChapterSelected: (index) {
+          Navigator.pop(popupContext);
           _loadChapter(index);
         },
-      ),
-    );
-  }
-}
-
-/// 目录面板 - 参考 Legado 设计
-class _ChapterListSheet extends StatefulWidget {
-  final String bookTitle;
-  final String bookAuthor;
-  final List<Chapter> chapters;
-  final int currentChapterIndex;
-  final ValueChanged<int> onChapterTap;
-
-  const _ChapterListSheet({
-    required this.bookTitle,
-    required this.bookAuthor,
-    required this.chapters,
-    required this.currentChapterIndex,
-    required this.onChapterTap,
-  });
-
-  @override
-  State<_ChapterListSheet> createState() => _ChapterListSheetState();
-}
-
-class _ChapterListSheetState extends State<_ChapterListSheet> {
-  int _selectedTab = 0; // 0=目录, 1=书签, 2=笔记
-  bool _isReversed = false; // 倒序排列
-  String _searchQuery = '';
-  final TextEditingController _searchController = TextEditingController();
-  late ScrollController _scrollController;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController();
-    // 初始滚动到当前章节位置
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToCurrentChapter();
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollToCurrentChapter() {
-    final index = _isReversed
-        ? widget.chapters.length - 1 - widget.currentChapterIndex
-        : widget.currentChapterIndex;
-    if (index > 0 && index < widget.chapters.length) {
-      _scrollController.animateTo(
-        index * 56.0, // 估算每个 item 高度
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  List<Chapter> get _filteredChapters {
-    var chapters = widget.chapters;
-    if (_searchQuery.isNotEmpty) {
-      chapters = chapters
-          .where(
-              (c) => c.title.toLowerCase().contains(_searchQuery.toLowerCase()))
-          .toList();
-    }
-    if (_isReversed) {
-      chapters = chapters.reversed.toList();
-    }
-    return chapters;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFAF8F5), // Legado 风格的暖色背景
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        children: [
-          // 拖动指示器
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.black12,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-
-          // 顶部书籍信息
-          _buildHeader(),
-
-          // Tab 栏
-          _buildTabBar(),
-
-          // 搜索和排序
-          _buildSearchAndSort(),
-
-          // 内容区
-          Expanded(
-            child: _selectedTab == 0
-                ? _buildChapterList()
-                : _buildEmptyTab(_selectedTab == 1 ? '暂无书签' : '暂无笔记'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          // 书封（占位）
-          Container(
-            width: 50,
-            height: 70,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8E4DF),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.black12),
-            ),
-            child: const Center(
-              child: Icon(CupertinoIcons.book, color: Colors.black38, size: 24),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // 书名和作者
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.bookTitle,
-                  style: const TextStyle(
-                    color: Color(0xFF333333),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.bookAuthor.isNotEmpty ? widget.bookAuthor : '未知作者',
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '共${widget.chapters.length}章',
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE0E0E0)),
-        ),
-      ),
-      child: Row(
-        children: [
-          _buildTab(0, '目录'),
-          _buildTab(1, '书签'),
-          _buildTab(2, '笔记'),
-          const Spacer(),
-          // 删除缓存、检查更新按钮
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            onPressed: () {},
-            child: const Icon(CupertinoIcons.trash,
-                size: 20, color: Color(0xFF666666)),
-          ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            onPressed: () {},
-            child: const Icon(CupertinoIcons.arrow_clockwise,
-                size: 20, color: Color(0xFF666666)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTab(int index, String label) {
-    final isSelected = _selectedTab == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? const Color(0xFF4CAF50) : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color:
-                isSelected ? const Color(0xFF4CAF50) : const Color(0xFF666666),
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchAndSort() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          // 搜索框
-          Expanded(
-            child: Container(
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0EDE8),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: CupertinoTextField(
-                controller: _searchController,
-                placeholder: '输入关键字搜索目录',
-                placeholderStyle:
-                    const TextStyle(color: Color(0xFF999999), fontSize: 13),
-                style: const TextStyle(color: Color(0xFF333333), fontSize: 13),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: null,
-                prefix: const Padding(
-                  padding: EdgeInsets.only(left: 8),
-                  child: Icon(CupertinoIcons.search,
-                      size: 16, color: Color(0xFF999999)),
-                ),
-                onChanged: (value) => setState(() => _searchQuery = value),
-              ),
-            ),
-          ),
-          // 排序按钮
-          CupertinoButton(
-            padding: const EdgeInsets.only(left: 12),
-            onPressed: () {
-              setState(() => _isReversed = !_isReversed);
-            },
-            child: Icon(
-              _isReversed ? CupertinoIcons.sort_up : CupertinoIcons.sort_down,
-              size: 22,
-              color: const Color(0xFF666666),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChapterList() {
-    final chapters = _filteredChapters;
-    if (chapters.isEmpty) {
-      return _buildEmptyTab('无匹配章节');
-    }
-
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: chapters.length,
-      itemBuilder: (context, index) {
-        final chapter = chapters[index];
-        final originalIndex = _isReversed
-            ? widget.chapters.length - 1 - widget.chapters.indexOf(chapter)
-            : widget.chapters.indexOf(chapter);
-        final isCurrent = originalIndex == widget.currentChapterIndex;
-
-        return GestureDetector(
-          onTap: () => widget.onChapterTap(widget.chapters.indexOf(chapter)),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Color(0xFFEEEEEE)),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    chapter.title,
-                    style: TextStyle(
-                      color: isCurrent
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFF333333),
-                      fontSize: 14,
-                      fontWeight:
-                          isCurrent ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (isCurrent)
-                  const Icon(
-                    CupertinoIcons.checkmark_circle_fill,
-                    color: Color(0xFF4CAF50),
-                    size: 18,
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyTab(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(CupertinoIcons.doc_text,
-              size: 48, color: Color(0xFFCCCCCC)),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: const TextStyle(color: Color(0xFF999999), fontSize: 14),
-          ),
-        ],
+        onBookmarkSelected: (bookmark) {
+          Navigator.pop(popupContext);
+          _loadChapter(bookmark.chapterIndex, restoreOffset: true);
+        },
+        onDeleteBookmark: (bookmark) async {
+          await _bookmarkRepo.removeBookmark(bookmark.id);
+          _updateBookmarkStatus();
+        },
       ),
     );
   }

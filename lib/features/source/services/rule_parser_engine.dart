@@ -12,6 +12,7 @@ import 'package:json_path/json_path.dart';
 import 'package:xpath_selector_html_parser/xpath_selector_html_parser.dart';
 import '../../../core/utils/html_text_formatter.dart';
 import '../../../core/services/cookie_store.dart';
+import '../../../core/services/source_login_store.dart';
 
 /// 书源规则解析引擎
 /// 支持 CSS 选择器、XPath（简化版）和正则表达式
@@ -3073,6 +3074,7 @@ class RuleParserEngine {
         jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
+        sourceKey: source.bookSourceUrl,
       );
       if (response == null) return [];
 
@@ -3230,6 +3232,7 @@ class RuleParserEngine {
         jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
+        sourceKey: source.bookSourceUrl,
       );
       if (res.headersWarning != null && res.headersWarning!.trim().isNotEmpty) {
         log('└请求头解析提示：${res.headersWarning}', state: 1, showTime: false);
@@ -4129,6 +4132,7 @@ class RuleParserEngine {
       jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
+      sourceKey: source.bookSourceUrl,
     );
     if (fetch.body == null) {
       return SearchDebugResult(
@@ -4324,6 +4328,7 @@ class RuleParserEngine {
         jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
+        sourceKey: source.bookSourceUrl,
       );
       if (response == null) return [];
 
@@ -4454,6 +4459,7 @@ class RuleParserEngine {
       jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
+      sourceKey: source.bookSourceUrl,
     );
     if (fetch.body == null) {
       return ExploreDebugResult(
@@ -4641,6 +4647,7 @@ class RuleParserEngine {
         jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
+        sourceKey: source.bookSourceUrl,
       );
       if (response == null) return null;
 
@@ -4748,6 +4755,7 @@ class RuleParserEngine {
       jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
+      sourceKey: source.bookSourceUrl,
     );
     if (fetch.body == null) {
       return BookInfoDebugResult(
@@ -4952,6 +4960,7 @@ class RuleParserEngine {
           jsLib: source.jsLib,
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
+          sourceKey: source.bookSourceUrl,
         );
         if (response == null) break;
 
@@ -5082,6 +5091,7 @@ class RuleParserEngine {
       jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
+      sourceKey: source.bookSourceUrl,
     );
     if (fetch.body == null) {
       return TocDebugResult(
@@ -5308,6 +5318,7 @@ class RuleParserEngine {
           jsLib: source.jsLib,
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
+          sourceKey: source.bookSourceUrl,
         );
         if (response == null) break;
 
@@ -5423,6 +5434,7 @@ class RuleParserEngine {
       jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
+      sourceKey: source.bookSourceUrl,
     );
     if (fetch.body == null) {
       return ContentDebugResult(
@@ -5464,6 +5476,7 @@ class RuleParserEngine {
                 jsLib: source.jsLib,
                 timeoutMs: source.respondTime,
                 enabledCookieJar: source.enabledCookieJar,
+                sourceKey: source.bookSourceUrl,
               );
         if (body == null) break;
 
@@ -5573,6 +5586,19 @@ class RuleParserEngine {
     }
   }
 
+  Future<void> _mergeSourceLoginHeaders(
+    Map<String, String> headers,
+    String? sourceKey,
+  ) async {
+    final key = (sourceKey ?? '').trim();
+    if (key.isEmpty) return;
+
+    final loginHeaders = await SourceLoginStore.getLoginHeaderMap(key);
+    if (loginHeaders == null || loginHeaders.isEmpty) return;
+
+    headers.addAll(loginHeaders);
+  }
+
   /// 发送HTTP请求
   Future<String?> _fetch(
     String url, {
@@ -5580,15 +5606,19 @@ class RuleParserEngine {
     String? jsLib,
     int? timeoutMs,
     bool? enabledCookieJar,
+    String? sourceKey,
   }) async {
     try {
       final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
       final parsedUrl = _parseLegadoStyleUrl(url);
 
-      // URL option headers 覆盖书源 headers
+      // Header 合并顺序对齐 legado 语义：
+      // 书源 header -> 登录 header -> URL option headers（最高优先级）
       final mergedCustomHeaders = <String, String>{}
-        ..addAll(parsedHeaders.headers)
-        ..addAll(parsedUrl.option?.headers ?? const <String, String>{});
+        ..addAll(parsedHeaders.headers);
+      await _mergeSourceLoginHeaders(mergedCustomHeaders, sourceKey);
+      mergedCustomHeaders
+          .addAll(parsedUrl.option?.headers ?? const <String, String>{});
 
       // URL option js 允许二次修改 url/header
       var finalUrl = parsedUrl.url;
@@ -5671,14 +5701,17 @@ class RuleParserEngine {
     String? jsLib,
     int? timeoutMs,
     bool? enabledCookieJar,
+    String? sourceKey,
   }) async {
     final sw = Stopwatch()..start();
     final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
     final parsedUrl = _parseLegadoStyleUrl(url);
 
     final mergedCustomHeaders = <String, String>{}
-      ..addAll(parsedHeaders.headers)
-      ..addAll(parsedUrl.option?.headers ?? const <String, String>{});
+      ..addAll(parsedHeaders.headers);
+    await _mergeSourceLoginHeaders(mergedCustomHeaders, sourceKey);
+    mergedCustomHeaders
+        .addAll(parsedUrl.option?.headers ?? const <String, String>{});
 
     var finalUrl = parsedUrl.url;
     _UrlJsPatchResult? urlJsPatch;
@@ -5964,6 +5997,7 @@ class RuleParserEngine {
     Map<String, String> params, {
     String? header,
     String? jsLib,
+    Map<String, String>? sourceLoginHeaders,
   }) {
     final builtUrl = _buildUrl(baseUrl, urlRule, params, jsLib: jsLib);
     final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
@@ -5971,6 +6005,7 @@ class RuleParserEngine {
 
     final mergedCustomHeaders = <String, String>{}
       ..addAll(parsedHeaders.headers)
+      ..addAll(sourceLoginHeaders ?? const <String, String>{})
       ..addAll(parsedUrl.option?.headers ?? const <String, String>{});
 
     var finalUrl = parsedUrl.url;

@@ -28,95 +28,87 @@ class ReaderTopMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final source = sourceName?.trim() ?? '';
-    final chapterLine = source.isNotEmpty ? '$source · $chapterTitle' : chapterTitle;
+    final chapterLine =
+        source.isNotEmpty ? '$source · $chapterTitle' : chapterTitle;
+
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
       child: Container(
-        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E).withValues(alpha: 0.95),
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + 6,
+          left: 10,
+          right: 10,
+          bottom: 10,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.82),
+              Colors.black.withValues(alpha: 0.58),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Row(
           children: [
-            // 顶部导航栏
-            SizedBox(
-              height: 44,
-              child: Row(
+            _buildRoundIcon(
+              icon: CupertinoIcons.back,
+              onTap: () => Navigator.pop(context),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 返回按钮
-                  CupertinoButton(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    onPressed: () => Navigator.pop(context),
-                    child: const Icon(CupertinoIcons.back,
-                        color: CupertinoColors.white),
-                  ),
-                  // 书名
-                  Expanded(
-                    child: Text(
-                      bookTitle,
-                      style: const TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
+                  Text(
+                    bookTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: CupertinoColors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildActionText(
-                        label: '换源',
-                        onTap: onSwitchSource,
-                      ),
-                      const SizedBox(width: 10),
-                      _buildActionText(
-                        label: cleanChapterTitleEnabled ? '净化中' : '净化',
-                        onTap: onToggleCleanChapterTitle,
-                        highlighted: cleanChapterTitleEnabled,
-                      ),
-                      const SizedBox(width: 10),
-                      _buildActionText(
-                        label: '刷新',
-                        onTap: onRefreshChapter,
-                      ),
-                      const SizedBox(width: 4),
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        onPressed: onShowChapterList,
-                        child: const Icon(
-                          CupertinoIcons.list_bullet,
-                          color: CupertinoColors.white,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    chapterLine,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: CupertinoColors.white.withValues(alpha: 0.72),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
-            // 章节名
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                      color: CupertinoColors.white.withValues(alpha: 0.1)),
-                ),
-              ),
-              child: Text(
-                chapterLine,
-                style: TextStyle(
-                  color: CupertinoColors.white.withValues(alpha: 0.7),
-                  fontSize: 13,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
+            const SizedBox(width: 8),
+            _buildActionChip(
+              label: '换源',
+              onTap: onSwitchSource,
+              active: false,
+            ),
+            const SizedBox(width: 6),
+            _buildActionChip(
+              label: cleanChapterTitleEnabled ? '净化中' : '净化',
+              onTap: onToggleCleanChapterTitle,
+              active: cleanChapterTitleEnabled,
+            ),
+            const SizedBox(width: 6),
+            _buildRoundIcon(
+              icon: CupertinoIcons.refresh,
+              onTap: onRefreshChapter,
+            ),
+            const SizedBox(width: 6),
+            _buildRoundIcon(
+              icon: CupertinoIcons.list_bullet,
+              onTap: onShowChapterList,
             ),
           ],
         ),
@@ -124,21 +116,54 @@ class ReaderTopMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildActionText({
-    required String label,
+  Widget _buildRoundIcon({
+    required IconData icon,
     required VoidCallback onTap,
-    bool highlighted = false,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: highlighted
-              ? CupertinoColors.activeGreen
-              : CupertinoColors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.24),
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Icon(
+          icon,
+          color: CupertinoColors.white,
+          size: 18,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionChip({
+    required String label,
+    required VoidCallback onTap,
+    required bool active,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: active
+              ? CupertinoColors.activeGreen.withValues(alpha: 0.2)
+              : Colors.black.withValues(alpha: 0.24),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: active ? CupertinoColors.activeGreen : Colors.white24,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? CupertinoColors.activeGreen : CupertinoColors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -385,7 +410,8 @@ class ReaderBottomMenu extends StatelessWidget {
       context: rootContext,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('选择翻页模式'),
-        actions: PageTurnModeUi.values(current: settings.pageTurnMode).map((mode) {
+        actions:
+            PageTurnModeUi.values(current: settings.pageTurnMode).map((mode) {
           final isSelected = mode == settings.pageTurnMode;
           return CupertinoActionSheetAction(
             onPressed: () {
@@ -410,7 +436,9 @@ class ReaderBottomMenu extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name,
+                  PageTurnModeUi.isHidden(mode)
+                      ? '${mode.name}（隐藏）'
+                      : mode.name,
                   style: TextStyle(
                     color: isSelected
                         ? CupertinoColors.activeBlue

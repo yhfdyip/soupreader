@@ -54,6 +54,30 @@ import WebKit
     }
 
     if let controller = window?.rootViewController as? FlutterViewController {
+      let keepScreenOnChannel = FlutterMethodChannel(
+        name: "soupreader/keep_screen_on",
+        binaryMessenger: controller.binaryMessenger
+      )
+
+      keepScreenOnChannel.setMethodCallHandler { call, result in
+        switch call.method {
+        case "setEnabled":
+          guard let args = call.arguments as? [String: Any],
+                let enabled = args["enabled"] as? Bool
+          else {
+            result(FlutterError(code: "ARGUMENT_ERROR", message: "Missing enabled", details: nil))
+            return
+          }
+          UIApplication.shared.isIdleTimerDisabled = enabled
+          result(nil)
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
+    if let controller = window?.rootViewController as? FlutterViewController {
       let cookiesChannel = FlutterMethodChannel(
         name: "soupreader/webview_cookies",
         binaryMessenger: controller.binaryMessenger

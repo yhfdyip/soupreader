@@ -8,6 +8,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/utils/legado_json.dart';
+import '../../../core/services/source_login_store.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
 import '../services/source_debug_export_service.dart';
@@ -90,6 +91,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final TextEditingController _loginUiCtrl;
   late final TextEditingController _loginCheckJsCtrl;
   late final TextEditingController _coverDecodeJsCtrl;
+  late final TextEditingController _loginHeaderCacheCtrl;
+  late final TextEditingController _loginInfoCtrl;
+  bool _loginStateLoading = false;
   late final TextEditingController _bookSourceCommentCtrl;
   late final TextEditingController _variableCommentCtrl;
   late final TextEditingController _searchUrlCtrl;
@@ -213,6 +217,8 @@ class _SourceEditViewState extends State<SourceEditView> {
     _loginCheckJsCtrl = TextEditingController(text: source?.loginCheckJs ?? '');
     _coverDecodeJsCtrl =
         TextEditingController(text: source?.coverDecodeJs ?? '');
+    _loginHeaderCacheCtrl = TextEditingController();
+    _loginInfoCtrl = TextEditingController();
     _bookSourceCommentCtrl =
         TextEditingController(text: source?.bookSourceComment ?? '');
     _variableCommentCtrl =
@@ -314,6 +320,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         TextEditingController(text: source?.ruleContent?.nextContentUrl ?? '');
 
     _validateJson(silent: true);
+    _loadLoginStateForSource(source?.bookSourceUrl ?? widget.originalUrl);
   }
 
   @override
@@ -333,6 +340,8 @@ class _SourceEditViewState extends State<SourceEditView> {
     _loginUiCtrl.dispose();
     _loginCheckJsCtrl.dispose();
     _coverDecodeJsCtrl.dispose();
+    _loginHeaderCacheCtrl.dispose();
+    _loginInfoCtrl.dispose();
     _bookSourceCommentCtrl.dispose();
     _variableCommentCtrl.dispose();
     _searchUrlCtrl.dispose();
@@ -761,6 +770,38 @@ class _SourceEditViewState extends State<SourceEditView> {
               _coverDecodeJsCtrl,
               placeholder: 'coverDecodeJs（可空）',
               maxLines: 3,
+            ),
+            _buildTextFieldTile(
+              '登录头缓存(JSON)',
+              _loginHeaderCacheCtrl,
+              placeholder: '{"Cookie":"sid=...","Authorization":"Bearer ..."}',
+              maxLines: 4,
+            ),
+            _buildTextFieldTile(
+              '登录信息缓存',
+              _loginInfoCtrl,
+              placeholder: 'userInfo（JSON 或文本，可空）',
+              maxLines: 3,
+            ),
+            CupertinoListTile.notched(
+              title: const Text('加载登录态缓存'),
+              additionalInfo: _loginStateLoading ? const Text('加载中…') : null,
+              trailing: const CupertinoListTileChevron(),
+              onTap: _loginStateLoading
+                  ? null
+                  : () => _loadLoginStateForSource(_effectiveSourceKey()),
+            ),
+            CupertinoListTile.notched(
+              title: const Text('保存登录态缓存'),
+              subtitle: const Text('保存 loginHeader/loginInfo 到本地缓存'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _loginStateLoading ? null : () => _saveLoginState(),
+            ),
+            CupertinoListTile.notched(
+              title: const Text('清除登录态缓存'),
+              subtitle: const Text('清除当前书源的登录头与登录信息'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _loginStateLoading ? null : () => _clearLoginState(),
             ),
           ],
         ),
@@ -2586,6 +2627,91 @@ class _SourceEditViewState extends State<SourceEditView> {
     _validateJson();
   }
 
+  String _effectiveSourceKey() {
+    final fromUrl = _urlCtrl.text.trim();
+    if (fromUrl.isNotEmpty) return fromUrl;
+    final fromOriginal = (widget.originalUrl ?? '').trim();
+    return fromOriginal;
+  }
+
+  Future<void> _loadLoginStateForSource(String? sourceKey) async {
+    final key = (sourceKey ?? '').trim();
+    if (key.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _loginHeaderCacheCtrl.text = '';
+        _loginInfoCtrl.text = '';
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _loginStateLoading = true);
+    }
+
+    final headerMap = await SourceLoginStore.getLoginHeaderMap(key);
+    final loginInfo = await SourceLoginStore.getLoginInfo(key);
+
+    if (!mounted) return;
+    setState(() {
+      _loginStateLoading = false;
+      _loginHeaderCacheCtrl.text = headerMap == null || headerMap.isEmpty
+          ? ''
+          : _prettyJson(jsonEncode(headerMap));
+      _loginInfoCtrl.text = loginInfo ?? '';
+    });
+  }
+
+  Future<void> _saveLoginState({bool showMessage = true}) async {
+    final key = _effectiveSourceKey();
+    if (key.isEmpty) {
+      if (showMessage) {
+        _showMessage('请先填写 bookSourceUrl，再保存登录态');
+      }
+      return;
+    }
+
+    final headerRaw = _loginHeaderCacheCtrl.text.trim();
+    final loginInfo = _loginInfoCtrl.text.trim();
+
+    try {
+      if (headerRaw.isEmpty) {
+        await SourceLoginStore.removeLoginHeader(key);
+      } else {
+        await SourceLoginStore.putLoginHeaderJson(key, headerRaw);
+      }
+
+      if (loginInfo.isEmpty) {
+        await SourceLoginStore.removeLoginInfo(key);
+      } else {
+        await SourceLoginStore.putLoginInfo(key, loginInfo);
+      }
+
+      if (showMessage) {
+        _showMessage('登录态缓存已保存');
+      }
+    } catch (e) {
+      if (showMessage) {
+        _showMessage('登录态保存失败：$e');
+      }
+    }
+  }
+
+  Future<void> _clearLoginState() async {
+    final key = _effectiveSourceKey();
+    if (key.isNotEmpty) {
+      await SourceLoginStore.removeLoginHeader(key);
+      await SourceLoginStore.removeLoginInfo(key);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _loginHeaderCacheCtrl.text = '';
+      _loginInfoCtrl.text = '';
+    });
+    _showMessage('登录态缓存已清除');
+  }
+
   void _syncJsonToFields() {
     final map = _tryDecodeJsonMap(_jsonCtrl.text);
     if (map == null) {
@@ -2666,6 +2792,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       _contentReplaceRegexCtrl.text = source.ruleContent?.replaceRegex ?? '';
     });
     _validateJson();
+    _loadLoginStateForSource(source.bookSourceUrl);
     _showMessage('已从 JSON 同步到表单');
   }
 
@@ -2684,6 +2811,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         originalUrl: widget.originalUrl,
         rawJson: _jsonCtrl.text,
       );
+      await _saveLoginState(showMessage: false);
       if (!mounted) return;
       _showMessage('保存成功');
     } catch (e) {

@@ -213,6 +213,28 @@ void main() {
       expect(built, 'https://example.com/search?kw=%E7%8E%84%E5%B9%BB&p=3');
     });
 
+    test('source login headers are merged and can be overridden by url option',
+        () {
+      final engine = RuleParserEngine();
+      engine.debugClearRuntimeVariables();
+
+      final resolved = engine.debugResolveRequestForTest(
+        'https://example.com',
+        '/search, {"headers":{"Cookie":"opt=1"}}',
+        const {},
+        header: '{"Cookie":"base=1","X-Base":"1"}',
+        sourceLoginHeaders: const {
+          'Cookie': 'login=1',
+          'Authorization': 'Bearer L',
+        },
+      );
+
+      // 合并顺序：base -> login -> urlOption
+      expect(resolved.headers['Cookie'], 'opt=1');
+      expect(resolved.headers['Authorization'], 'Bearer L');
+      expect(resolved.headers['X-Base'], '1');
+    });
+
     test('supports jsLib in URL option body template js', () {
       final engine = RuleParserEngine();
       engine.debugClearRuntimeVariables();

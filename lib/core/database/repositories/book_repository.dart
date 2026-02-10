@@ -171,6 +171,19 @@ class ChapterRepository {
     return ChapterCacheInfo(bytes: bytes, chapters: chapters);
   }
 
+  ChapterCacheInfo getDownloadedCacheInfoForBook(String bookId) {
+    var bytes = 0;
+    var chapters = 0;
+    for (final entity in _db.chaptersBox.values) {
+      if (entity.bookId != bookId) continue;
+      final content = entity.content;
+      if (!entity.isDownloaded || content == null || content.isEmpty) continue;
+      chapters++;
+      bytes += utf8.encode(content).length;
+    }
+    return ChapterCacheInfo(bytes: bytes, chapters: chapters);
+  }
+
   /// 清除已下载章节的缓存内容（不删除章节条目，以保留目录/进度）
   ///
   /// - `protectBookIds`：需要保护的书籍（例如本地导入书籍），不清理其章节内容
@@ -182,6 +195,34 @@ class ChapterRepository {
 
     for (final entity in _db.chaptersBox.values) {
       if (protectBookIds.contains(entity.bookId)) continue;
+      final content = entity.content;
+      if (!entity.isDownloaded || content == null || content.isEmpty) continue;
+
+      chapters++;
+      bytes += utf8.encode(content).length;
+
+      final updated = ChapterEntity(
+        id: entity.id,
+        bookId: entity.bookId,
+        title: entity.title,
+        url: entity.url,
+        index: entity.index,
+        isDownloaded: false,
+        content: null,
+      );
+      await _db.chaptersBox.put(entity.id, updated);
+    }
+
+    return ChapterCacheInfo(bytes: bytes, chapters: chapters);
+  }
+
+  /// 清除指定书籍的章节缓存内容（不删除章节条目，以保留目录/进度）
+  Future<ChapterCacheInfo> clearDownloadedCacheForBook(String bookId) async {
+    var bytes = 0;
+    var chapters = 0;
+
+    for (final entity in _db.chaptersBox.values) {
+      if (entity.bookId != bookId) continue;
       final content = entity.content;
       if (!entity.isDownloaded || content == null || content.isEmpty) continue;
 
