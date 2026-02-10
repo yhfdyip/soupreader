@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Colors;
 import 'package:battery_plus/battery_plus.dart';
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
 
 /// 阅读器状态栏 - 支持电量显示和可配置内容
@@ -58,7 +59,8 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
       _batteryLevel = await _battery.batteryLevel;
       _batteryState = await _battery.batteryState;
 
-      _batteryStateSubscription = _battery.onBatteryStateChanged.listen((state) {
+      _batteryStateSubscription =
+          _battery.onBatteryStateChanged.listen((state) {
         setState(() {
           _batteryState = state;
         });
@@ -99,7 +101,7 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
           border: widget.settings.showFooterLine
               ? Border(
                   top: BorderSide(
-                    color: widget.currentTheme.text.withValues(alpha: 0.1),
+                    color: _lineColor,
                     width: 0.5,
                   ),
                 )
@@ -127,7 +129,8 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
   Widget _buildFooterContent(int contentType) {
     switch (contentType) {
       case 0: // 进度
-        return _buildProgressText(widget.bookProgress, widget.settings.showProgress);
+        return _buildProgressText(
+            widget.bookProgress, widget.settings.showProgress);
       case 1: // 页码
         return _buildPageNumber();
       case 2: // 时间
@@ -180,10 +183,8 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
       return const SizedBox.shrink();
     }
     final time = widget.settings.showTime ? widget.currentTime : '';
-    final battery =
-        widget.settings.showBattery ? '$_batteryLevel%' : '';
-    final text =
-        [time, battery].where((part) => part.isNotEmpty).join(' ');
+    final battery = widget.settings.showBattery ? '$_batteryLevel%' : '';
+    final text = [time, battery].where((part) => part.isNotEmpty).join(' ');
     if (text.isEmpty) return const SizedBox.shrink();
     return Text(text, style: _textStyle);
   }
@@ -225,11 +226,11 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
 
   Color _getBatteryColor() {
     if (_batteryLevel <= 20) {
-      return Colors.red;
+      return AppDesignTokens.error;
     } else if (_batteryLevel <= 50) {
-      return Colors.orange;
+      return AppDesignTokens.warning;
     } else {
-      return widget.currentTheme.text.withValues(alpha: 0.4);
+      return _textColor;
     }
   }
 
@@ -249,8 +250,16 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
     );
   }
 
+  bool get _isDarkTheme => widget.currentTheme.isDark;
+
+  Color get _textColor =>
+      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.5 : 0.62);
+
+  Color get _lineColor =>
+      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.14 : 0.18);
+
   TextStyle get _textStyle => TextStyle(
-        color: widget.currentTheme.text.withValues(alpha: 0.4),
+        color: _textColor,
         fontSize: 11,
       );
 }
@@ -306,7 +315,8 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
     try {
       _batteryLevel = await _battery.batteryLevel;
       _batteryState = await _battery.batteryState;
-      _batteryStateSubscription = _battery.onBatteryStateChanged.listen((state) {
+      _batteryStateSubscription =
+          _battery.onBatteryStateChanged.listen((state) {
         setState(() {
           _batteryState = state;
         });
@@ -343,7 +353,7 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
           border: widget.settings.showHeaderLine
               ? Border(
                   bottom: BorderSide(
-                    color: widget.currentTheme.text.withValues(alpha: 0.1),
+                    color: _lineColor,
                     width: 0.5,
                   ),
                 )
@@ -355,8 +365,7 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
             _buildHeaderContent(widget.settings.headerLeftContent),
             Expanded(
               child: Center(
-                child:
-                    _buildHeaderContent(widget.settings.headerCenterContent),
+                child: _buildHeaderContent(widget.settings.headerCenterContent),
               ),
             ),
             _buildHeaderContent(widget.settings.headerRightContent),
@@ -423,10 +432,8 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
       return const SizedBox.shrink();
     }
     final time = widget.settings.showTime ? widget.currentTime : '';
-    final battery =
-        widget.settings.showBattery ? '$_batteryLevel%' : '';
-    final text =
-        [time, battery].where((part) => part.isNotEmpty).join(' ');
+    final battery = widget.settings.showBattery ? '$_batteryLevel%' : '';
+    final text = [time, battery].where((part) => part.isNotEmpty).join(' ');
     if (text.isEmpty) return const SizedBox.shrink();
     return Text(text, style: _textStyle);
   }
@@ -463,11 +470,11 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
 
   Color _getBatteryColor() {
     if (_batteryLevel <= 20) {
-      return Colors.red;
+      return AppDesignTokens.error;
     } else if (_batteryLevel <= 50) {
-      return Colors.orange;
+      return AppDesignTokens.warning;
     } else {
-      return widget.currentTheme.text.withValues(alpha: 0.4);
+      return _textColor;
     }
   }
 
@@ -487,8 +494,16 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
     );
   }
 
+  bool get _isDarkTheme => widget.currentTheme.isDark;
+
+  Color get _textColor =>
+      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.5 : 0.62);
+
+  Color get _lineColor =>
+      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.14 : 0.18);
+
   TextStyle get _textStyle => TextStyle(
-        color: widget.currentTheme.text.withValues(alpha: 0.4),
+        color: _textColor,
         fontSize: 11,
       );
 }

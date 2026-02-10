@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
 
 class ReaderTopMenu extends StatelessWidget {
@@ -30,6 +31,9 @@ class ReaderTopMenu extends StatelessWidget {
     final horizontalPadding =
         MediaQuery.of(context).size.width < 390 ? 8.0 : 10.0;
     final compactMode = MediaQuery.of(context).size.width < 375;
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final accent =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     final source = sourceName?.trim() ?? '';
     final chapterLine =
         source.isNotEmpty ? '$source · $chapterTitle' : chapterTitle;
@@ -97,6 +101,7 @@ class ReaderTopMenu extends StatelessWidget {
                 label: '换源',
                 onTap: onSwitchSource,
                 active: false,
+                accent: accent,
               ),
               const SizedBox(width: 6),
             ],
@@ -104,6 +109,7 @@ class ReaderTopMenu extends StatelessWidget {
               label: cleanChapterTitleEnabled ? '净化中' : '净化',
               onTap: onToggleCleanChapterTitle,
               active: cleanChapterTitleEnabled,
+              accent: accent,
             ),
             const SizedBox(width: 6),
             _buildRoundIcon(
@@ -149,6 +155,7 @@ class ReaderTopMenu extends StatelessWidget {
     required String label,
     required VoidCallback onTap,
     required bool active,
+    required Color accent,
   }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -157,17 +164,17 @@ class ReaderTopMenu extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
           color: active
-              ? CupertinoColors.activeGreen.withValues(alpha: 0.2)
+              ? accent.withValues(alpha: 0.2)
               : Colors.black.withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: active ? CupertinoColors.activeGreen : Colors.white30,
+            color: active ? accent : Colors.white30,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: active ? CupertinoColors.activeGreen : CupertinoColors.white,
+            color: active ? accent : CupertinoColors.white,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
