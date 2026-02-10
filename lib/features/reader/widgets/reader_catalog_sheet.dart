@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Colors;
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../bookshelf/models/book.dart';
@@ -60,6 +61,29 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
 
   late List<Chapter> _chapters;
   late List<BookmarkEntity> _bookmarks;
+
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent =>
+      _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+
+  Color get _panelBg =>
+      _isDark ? AppDesignTokens.surfaceDark : const Color(0xFFFAF8F5);
+
+  Color get _textStrong =>
+      _isDark ? AppDesignTokens.textInverse : const Color(0xFF333333);
+
+  Color get _textNormal =>
+      _isDark ? AppDesignTokens.textMuted : const Color(0xFF666666);
+
+  Color get _textSubtle =>
+      _isDark ? AppDesignTokens.textMuted : const Color(0xFF888888);
+
+  Color get _lineColor =>
+      _isDark ? AppDesignTokens.borderDark : const Color(0xFFEEEEEE);
+
+  Color get _cardMutedBg =>
+      _isDark ? AppDesignTokens.pageBgDark : const Color(0xFFF0EDE8);
 
   @override
   void initState() {
@@ -127,8 +151,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFAF8F5), // 暖色背景（对标 Legado）
+      decoration: BoxDecoration(
+        color: _panelBg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(
@@ -147,13 +171,16 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   Widget _buildGrabber() {
+    final color = _isDark
+        ? AppDesignTokens.textMuted.withValues(alpha: 0.45)
+        : Colors.black12;
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 8),
         width: 36,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.black12,
+          color: color,
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -168,6 +195,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           _BookCover(
             title: widget.bookTitle,
             coverUrl: widget.coverUrl,
+            isDark: _isDark,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -176,8 +204,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
               children: [
                 Text(
                   widget.bookTitle,
-                  style: const TextStyle(
-                    color: Color(0xFF333333),
+                  style: TextStyle(
+                    color: _textStrong,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -189,16 +217,16 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                   widget.bookAuthor.trim().isNotEmpty
                       ? widget.bookAuthor.trim()
                       : '未知作者',
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
+                  style: TextStyle(
+                    color: _textSubtle,
                     fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '共${_chapters.length}章',
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
+                  style: TextStyle(
+                    color: _textSubtle,
                     fontSize: 12,
                   ),
                 ),
@@ -215,9 +243,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     final bookmarkCount = _bookmarks.length;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Color(0xFFE0E0E0)),
+          bottom: BorderSide(color: _lineColor),
         ),
       ),
       child: Row(
@@ -232,7 +260,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             child: Icon(
               CupertinoIcons.trash,
               size: 20,
-              color: _busy ? const Color(0xFFBBBBBB) : const Color(0xFF666666),
+              color: _busy
+                  ? AppDesignTokens.textMuted.withValues(alpha: 0.55)
+                  : _textNormal,
             ),
           ),
           CupertinoButton(
@@ -241,7 +271,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             child: Icon(
               CupertinoIcons.arrow_clockwise,
               size: 20,
-              color: _busy ? const Color(0xFFBBBBBB) : const Color(0xFF666666),
+              color: _busy
+                  ? AppDesignTokens.textMuted.withValues(alpha: 0.55)
+                  : _textNormal,
             ),
           ),
         ],
@@ -269,7 +301,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: isSelected ? const Color(0xFF4CAF50) : Colors.transparent,
+              color: isSelected ? _accent : Colors.transparent,
               width: 2,
             ),
           ),
@@ -277,8 +309,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         child: Text(
           title,
           style: TextStyle(
-            color:
-                isSelected ? const Color(0xFF4CAF50) : const Color(0xFF666666),
+            color: isSelected ? _accent : _textNormal,
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -308,23 +339,22 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             child: Container(
               height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFFF0EDE8),
+                color: _cardMutedBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: CupertinoTextField(
                 controller: _searchController,
                 placeholder: placeholder,
-                placeholderStyle:
-                    const TextStyle(color: Color(0xFF999999), fontSize: 13),
-                style: const TextStyle(color: Color(0xFF333333), fontSize: 13),
+                placeholderStyle: TextStyle(color: _textSubtle, fontSize: 13),
+                style: TextStyle(color: _textStrong, fontSize: 13),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: null,
-                prefix: const Padding(
+                prefix: Padding(
                   padding: EdgeInsets.only(left: 8),
                   child: Icon(
                     CupertinoIcons.search,
                     size: 16,
-                    color: Color(0xFF999999),
+                    color: _textSubtle,
                   ),
                 ),
                 onChanged: (value) => setState(() => _searchQuery = value),
@@ -343,7 +373,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
               child: Icon(
                 _isReversed ? CupertinoIcons.sort_up : CupertinoIcons.sort_down,
                 size: 22,
-                color: const Color(0xFF666666),
+                color: _textNormal,
               ),
             ),
           ],
@@ -374,15 +404,16 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         final chapter = chapters[index];
         final originalIndex = chapter.index;
         final isCurrent = originalIndex == widget.currentChapterIndex;
-        final hasCache = chapter.isDownloaded && (chapter.content?.isNotEmpty ?? false);
+        final hasCache =
+            chapter.isDownloaded && (chapter.content?.isNotEmpty ?? false);
 
         return GestureDetector(
           onTap: () => widget.onChapterSelected(originalIndex),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Color(0xFFEEEEEE)),
+                bottom: BorderSide(color: _lineColor),
               ),
             ),
             child: Row(
@@ -391,9 +422,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                   child: Text(
                     chapter.title,
                     style: TextStyle(
-                      color: isCurrent
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFF333333),
+                      color: isCurrent ? _accent : _textStrong,
                       fontSize: 14,
                       fontWeight:
                           isCurrent ? FontWeight.w600 : FontWeight.normal,
@@ -403,18 +432,18 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                   ),
                 ),
                 if (hasCache)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(right: 8),
                     child: Icon(
                       CupertinoIcons.cloud_download_fill,
-                      color: Color(0xFFAAAAAA),
+                      color: _textSubtle,
                       size: 16,
                     ),
                   ),
                 if (isCurrent)
-                  const Icon(
+                  Icon(
                     CupertinoIcons.checkmark_circle_fill,
-                    color: Color(0xFF4CAF50),
+                    color: _accent,
                     size: 18,
                   ),
               ],
@@ -437,7 +466,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       itemCount: bookmarks.length,
       separatorBuilder: (_, __) => Container(
         height: 1,
-        color: const Color(0xFFEEEEEE),
+        color: _lineColor,
       ),
       itemBuilder: (context, index) {
         final bookmark = bookmarks[index];
@@ -447,7 +476,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           background: Container(
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 18),
-            color: const Color(0xFFFFEAEA),
+            color: _isDark
+                ? CupertinoColors.destructiveRed.withValues(alpha: 0.18)
+                : const Color(0xFFFFEAEA),
             child: const Icon(
               CupertinoIcons.delete,
               color: CupertinoColors.destructiveRed,
@@ -475,7 +506,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                     width: 6,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50),
+                      color: _accent,
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -488,8 +519,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                           bookmark.chapterTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF333333),
+                          style: TextStyle(
+                            color: _textStrong,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -501,8 +532,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                               : '（无预览内容）',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF888888),
+                          style: TextStyle(
+                            color: _textSubtle,
                             fontSize: 12,
                           ),
                         ),
@@ -510,9 +541,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(
+                  Icon(
                     CupertinoIcons.chevron_forward,
-                    color: Color(0xFFBBBBBB),
+                    color: _textSubtle,
                     size: 18,
                   ),
                 ],
@@ -529,15 +560,15 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             CupertinoIcons.doc_text,
             size: 48,
-            color: Color(0xFFCCCCCC),
+            color: _textSubtle.withValues(alpha: 0.65),
           ),
           const SizedBox(height: 12),
           Text(
             message,
-            style: const TextStyle(color: Color(0xFF999999), fontSize: 14),
+            style: TextStyle(color: _textSubtle, fontSize: 14),
           ),
         ],
       ),
@@ -679,10 +710,12 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
 class _BookCover extends StatelessWidget {
   final String title;
   final String? coverUrl;
+  final bool isDark;
 
   const _BookCover({
     required this.title,
     required this.coverUrl,
+    required this.isDark,
   });
 
   bool _isRemote(String value) {
@@ -715,15 +748,17 @@ class _BookCover extends StatelessWidget {
       width: 50,
       height: 70,
       decoration: BoxDecoration(
-        color: const Color(0xFFE8E4DF),
+        color: isDark ? AppDesignTokens.pageBgDark : const Color(0xFFE8E4DF),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.black12),
+        border: Border.all(
+          color: isDark ? AppDesignTokens.borderDark : Colors.black12,
+        ),
       ),
       alignment: Alignment.center,
       child: Text(
         first,
-        style: const TextStyle(
-          color: Colors.black38,
+        style: TextStyle(
+          color: isDark ? AppDesignTokens.textMuted : Colors.black38,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),

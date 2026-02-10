@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Colors;
 
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
 
 enum ReaderQuickSettingsTab {
@@ -58,11 +59,15 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark
+        ? const Color(0xFF1C1C1E)
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.98);
     final height = MediaQuery.of(context).size.height * 0.62;
     return Container(
       height: height,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1C1C1E),
+      decoration: BoxDecoration(
+        color: sheetBg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       child: SafeArea(
@@ -90,13 +95,17 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   }
 
   Widget _buildGrabber() {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final grabberColor = isDark
+        ? Colors.white24
+        : AppDesignTokens.textMuted.withValues(alpha: 0.35);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 10, bottom: 8),
         width: 40,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.white24,
+          color: grabberColor,
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -104,6 +113,9 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   }
 
   Widget _buildHeader() {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final textColor =
+        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
@@ -111,18 +123,18 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: () => Navigator.pop(context),
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.xmark,
-              color: CupertinoColors.white,
+              color: textColor,
               size: 20,
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
               '阅读设置',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: CupertinoColors.white,
+                color: textColor,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -131,9 +143,9 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _showMoreActions,
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.ellipsis,
-              color: CupertinoColors.white,
+              color: textColor,
               size: 22,
             ),
           ),
@@ -264,13 +276,21 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark
+        ? Colors.white10
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.9);
+    final borderColor = isDark ? Colors.white12 : AppDesignTokens.borderLight;
+    final titleColor = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : AppDesignTokens.textMuted;
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,7 +298,7 @@ class _Section extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: titleColor,
               fontSize: 13,
             ),
           ),
@@ -309,13 +329,20 @@ class _SliderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final labelColor =
+        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+    final valueColor =
+        isDark ? CupertinoColors.white : AppDesignTokens.textNormal;
+    final activeColor =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     return Row(
       children: [
         SizedBox(
           width: 44,
           child: Text(
             label,
-            style: const TextStyle(color: CupertinoColors.white, fontSize: 13),
+            style: TextStyle(color: labelColor, fontSize: 13),
           ),
         ),
         Expanded(
@@ -323,7 +350,7 @@ class _SliderRow extends StatelessWidget {
             value: value.clamp(min, max),
             min: min,
             max: max,
-            activeColor: CupertinoColors.activeBlue,
+            activeColor: activeColor,
             onChanged: onChanged,
           ),
         ),
@@ -332,7 +359,7 @@ class _SliderRow extends StatelessWidget {
           child: Text(
             format(value),
             textAlign: TextAlign.end,
-            style: const TextStyle(color: CupertinoColors.white, fontSize: 12),
+            style: TextStyle(color: valueColor, fontSize: 12),
           ),
         ),
       ],
@@ -458,6 +485,14 @@ class _MarginPresetRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final preset = _inferPreset() ?? _MarginPreset.normal;
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final accent =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final chipBg = isDark
+        ? Colors.white10
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
+    final chipBorder = isDark ? Colors.white12 : AppDesignTokens.borderLight;
+    final textNormal = isDark ? Colors.white70 : AppDesignTokens.textNormal;
     Widget chip(String label, _MarginPreset v) {
       final selected = preset == v;
       return GestureDetector(
@@ -466,17 +501,17 @@ class _MarginPresetRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: selected
-                ? CupertinoColors.activeBlue.withValues(alpha: 0.18)
-                : Colors.white10,
+                ? accent.withValues(alpha: isDark ? 0.18 : 0.12)
+                : chipBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? CupertinoColors.activeBlue : Colors.white12,
+              color: selected ? accent : chipBorder,
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? CupertinoColors.activeBlue : Colors.white70,
+              color: selected ? accent : textNormal,
               fontSize: 13,
               fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             ),
@@ -666,17 +701,22 @@ class _SwitchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final labelColor =
+        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+    final activeTrackColor =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: const TextStyle(color: CupertinoColors.white, fontSize: 14),
+          style: TextStyle(color: labelColor, fontSize: 14),
         ),
         CupertinoSwitch(
           value: value,
           onChanged: onChanged,
-          activeTrackColor: CupertinoColors.activeBlue,
+          activeTrackColor: activeTrackColor,
         ),
       ],
     );
@@ -811,7 +851,10 @@ class _ThemeCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? CupertinoColors.activeBlue : Colors.white12;
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final accent =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final borderColor = selected ? accent : AppDesignTokens.borderLight;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -851,6 +894,11 @@ class _PageTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final labelColor =
+        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+    final activeTrackColor =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     final modes = PageTurnModeUi.values(current: settings.pageTurnMode);
     return ListView(
       physics: const BouncingScrollPhysics(),
@@ -892,16 +940,15 @@ class _PageTab extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     '音量键翻页',
-                    style:
-                        TextStyle(color: CupertinoColors.white, fontSize: 14),
+                    style: TextStyle(color: labelColor, fontSize: 14),
                   ),
                   CupertinoSwitch(
                     value: settings.volumeKeyPage,
                     onChanged: (v) =>
                         onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
-                    activeTrackColor: CupertinoColors.activeBlue,
+                    activeTrackColor: activeTrackColor,
                   ),
                 ],
               ),
@@ -929,12 +976,19 @@ class _ModeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baseColor = selected
-        ? CupertinoColors.activeBlue.withValues(alpha: 0.18)
-        : Colors.white10;
-    final borderColor = selected ? CupertinoColors.activeBlue : Colors.white12;
-    final textColor =
-        selected ? CupertinoColors.activeBlue : CupertinoColors.white;
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final accent =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final bgNormal = isDark
+        ? Colors.white10
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
+    final borderNormal = isDark ? Colors.white12 : AppDesignTokens.borderLight;
+    final textNormal =
+        isDark ? CupertinoColors.white : AppDesignTokens.textNormal;
+    final baseColor =
+        selected ? accent.withValues(alpha: isDark ? 0.18 : 0.12) : bgNormal;
+    final borderColor = selected ? accent : borderNormal;
+    final textColor = selected ? accent : textNormal;
     final opacity = disabled ? 0.45 : 1.0;
     return Opacity(
       opacity: opacity,

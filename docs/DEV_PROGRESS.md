@@ -873,3 +873,28 @@
 ### 兼容影响
 - 规则协议无变更：不涉及书源字段与 legado 规则语义。
 - 行为兼容：阅读功能入口与交互路径保持一致，仅优化视觉层级、状态反馈与多主题协调性。
+
+## 2026-02-10（P2：阅读器面板统一 - 快捷设置/目录抽屉）
+
+### 已完成
+- `reader_quick_settings_sheet.dart`：
+  - 接入 `AppDesignTokens`，将快捷设置面板从“固定深色”升级为“按当前亮暗模式自适应”的配色语义；
+  - 统一 section 卡片、滑杆、开关、模式/边距 chips 的强调色与文本层级；
+  - 保持原有功能结构不变（字体/界面/设置/更多四分区）。
+- `reader_catalog_sheet.dart`：
+  - 目录抽屉接入统一语义色（背景、文字、分割线、强调色、搜索框、空状态）；
+  - 目录项/书签项/Tab/工具按钮在亮暗模式下统一反馈，减少与主阅读页的视觉割裂；
+  - 封面占位卡 `_BookCover` 新增亮暗模式适配。
+
+### 为什么
+- 上一批已完成阅读主视图与上下菜单重构，但快捷设置与目录抽屉仍使用旧色值，存在明显风格断层。
+- 本次在不改变操作路径的前提下，补齐阅读器“二级面板”与主界面的视觉一致性。
+
+### 验证方式
+- 命令：`dart format lib/features/reader/widgets/reader_quick_settings_sheet.dart lib/features/reader/widgets/reader_catalog_sheet.dart`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+
+### 兼容影响
+- 规则协议无变更：未触及书源字段与解析语义。
+- 行为兼容：目录/书签/设置入口与逻辑保持一致，仅统一视觉层级与主题适配表现。
