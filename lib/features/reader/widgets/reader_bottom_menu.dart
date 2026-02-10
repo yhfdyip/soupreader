@@ -9,6 +9,7 @@ import 'package:flutter/material.dart'
         SliderThemeData;
 
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
 
 /// 阅读器底部菜单（对标同类阅读器：章节进度 + 高频设置 + 底部导航）
@@ -59,6 +60,36 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   bool _isDragging = false;
   double _dragValue = 0;
 
+  bool get _isDarkMode => widget.currentTheme.isDark;
+
+  Color get _accentColor => _isDarkMode
+      ? AppDesignTokens.brandSecondary
+      : AppDesignTokens.brandPrimary;
+
+  Color get _panelColor => _isDarkMode
+      ? const Color(0xFF1C1C1E).withValues(alpha: 0.98)
+      : Colors.white.withValues(alpha: 0.94);
+
+  Color get _textStrong =>
+      _isDarkMode ? CupertinoColors.white : const Color(0xFF1E293B);
+
+  Color get _textMuted =>
+      _isDarkMode ? CupertinoColors.systemGrey : const Color(0xFF64748B);
+
+  Color get _cardColor => _isDarkMode
+      ? Colors.white.withValues(alpha: 0.06)
+      : const Color(0xFFF8FAFC);
+
+  Color get _cardBorderColor =>
+      _isDarkMode ? Colors.white12 : const Color(0xFFE2E8F0);
+
+  Color get _chipBgColor => _isDarkMode
+      ? Colors.white.withValues(alpha: 0.08)
+      : const Color(0xFFF1F5F9);
+
+  Color get _chipBorderColor =>
+      _isDarkMode ? Colors.white24 : const Color(0xFFE2E8F0);
+
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
@@ -69,13 +100,15 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       right: 0,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E).withValues(alpha: 0.98),
+          color: _panelColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 22,
-              offset: const Offset(0, -6),
+              color: _isDarkMode
+                  ? Colors.black.withValues(alpha: 0.35)
+                  : Colors.black.withValues(alpha: 0.12),
+              blurRadius: _isDarkMode ? 22 : 16,
+              offset: const Offset(0, -4),
             ),
           ],
         ),
@@ -113,7 +146,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       width: 36,
       height: 4,
       decoration: BoxDecoration(
-        color: Colors.white24,
+        color: _textMuted.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(2),
       ),
     );
@@ -124,9 +157,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: _cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: _cardBorderColor),
       ),
       child: child,
     );
@@ -145,8 +178,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           children: [
             Text(
               chapterLabel,
-              style: const TextStyle(
-                color: CupertinoColors.white,
+              style: TextStyle(
+                color: _textStrong,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -154,8 +187,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             const Spacer(),
             Text(
               pageLabel,
-              style: const TextStyle(
-                color: CupertinoColors.systemGrey,
+              style: TextStyle(
+                color: _textMuted,
                 fontSize: 12,
               ),
             ),
@@ -175,8 +208,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 style: TextStyle(
                   fontSize: 12,
                   color: widget.currentChapterIndex > 0
-                      ? CupertinoColors.activeBlue
-                      : CupertinoColors.systemGrey,
+                      ? _accentColor
+                      : _textMuted,
                 ),
               ),
             ),
@@ -188,10 +221,10 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                       const RoundSliderThumbShape(enabledThumbRadius: 8),
                   overlayShape:
                       const RoundSliderOverlayShape(overlayRadius: 15),
-                  activeTrackColor: CupertinoColors.activeBlue,
-                  inactiveTrackColor:
-                      CupertinoColors.systemGrey.withValues(alpha: 0.28),
-                  thumbColor: CupertinoColors.white,
+                  activeTrackColor: _accentColor,
+                  inactiveTrackColor: _textMuted.withValues(alpha: 0.28),
+                  thumbColor:
+                      _isDarkMode ? CupertinoColors.white : _accentColor,
                 ),
                 child: Slider(
                   value: _isDragging
@@ -225,8 +258,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 style: TextStyle(
                   fontSize: 12,
                   color: widget.currentChapterIndex < widget.totalChapters - 1
-                      ? CupertinoColors.activeBlue
-                      : CupertinoColors.systemGrey,
+                      ? _accentColor
+                      : _textMuted,
                 ),
               ),
             ),
@@ -245,12 +278,11 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       children: [
         Row(
           children: [
-            const SizedBox(
+            SizedBox(
               width: 34,
               child: Text(
                 '亮度',
-                style:
-                    TextStyle(color: CupertinoColors.systemGrey, fontSize: 12),
+                style: TextStyle(color: _textMuted, fontSize: 12),
               ),
             ),
             Expanded(
@@ -263,10 +295,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                       trackHeight: 3,
                       thumbShape:
                           const RoundSliderThumbShape(enabledThumbRadius: 7),
-                      activeTrackColor: CupertinoColors.activeGreen,
-                      inactiveTrackColor:
-                          CupertinoColors.systemGrey.withValues(alpha: 0.25),
-                      thumbColor: CupertinoColors.activeGreen,
+                      activeTrackColor: _accentColor,
+                      inactiveTrackColor: _textMuted.withValues(alpha: 0.25),
+                      thumbColor: _accentColor,
                     ),
                     child: Slider(
                       value: widget.settings.brightness.clamp(0.0, 1.0),
@@ -286,6 +317,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             _buildStateChip(
               label: '跟随系统',
               active: widget.settings.useSystemBrightness,
+              accent: _accentColor,
               onTap: () {
                 widget.onSettingsChanged(
                   widget.settings.copyWith(
@@ -298,6 +330,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             _buildStateChip(
               label: '常亮',
               active: widget.settings.keepScreenOn,
+              accent: _accentColor,
               onTap: () {
                 widget.onSettingsChanged(
                   widget.settings.copyWith(
@@ -311,17 +344,17 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         const SizedBox(height: 10),
         Row(
           children: [
-            const SizedBox(
+            SizedBox(
               width: 34,
               child: Text(
                 '字体',
-                style:
-                    TextStyle(color: CupertinoColors.systemGrey, fontSize: 12),
+                style: TextStyle(color: _textMuted, fontSize: 12),
               ),
             ),
             _buildRoundAction(
               label: 'A-',
               enabled: canDecrease,
+              accent: _accentColor,
               onTap: () {
                 if (!canDecrease) return;
                 widget.onSettingsChanged(
@@ -332,8 +365,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             const SizedBox(width: 8),
             Text(
               fontSize.toInt().toString(),
-              style: const TextStyle(
-                color: CupertinoColors.white,
+              style: TextStyle(
+                color: _textStrong,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -342,6 +375,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             _buildRoundAction(
               label: 'A+',
               enabled: canIncrease,
+              accent: _accentColor,
               onTap: () {
                 if (!canIncrease) return;
                 widget.onSettingsChanged(
@@ -353,6 +387,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             _buildStateChip(
               label: '排版',
               active: false,
+              accent: _accentColor,
               onTap: widget.onShowTypography,
             ),
           ],
@@ -373,9 +408,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '翻页',
-          style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 12),
+          style: TextStyle(color: _textMuted, fontSize: 12),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -386,6 +421,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               _buildStateChip(
                 label: _pageModeLabel(mode),
                 active: widget.settings.pageTurnMode == mode,
+                accent: _accentColor,
                 onTap: () => widget.onSettingsChanged(
                   widget.settings.copyWith(pageTurnMode: mode),
                 ),
@@ -393,9 +429,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           ],
         ),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           '其他',
-          style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 12),
+          style: TextStyle(color: _textMuted, fontSize: 12),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -405,6 +441,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             _buildStateChip(
               label: '音量键翻页',
               active: widget.settings.volumeKeyPage,
+              accent: _accentColor,
               onTap: () {
                 widget.onSettingsChanged(
                   widget.settings.copyWith(
@@ -416,6 +453,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             _buildStateChip(
               label: '净化标题',
               active: widget.settings.cleanChapterTitle,
+              accent: _accentColor,
               onTap: () {
                 widget.onSettingsChanged(
                   widget.settings.copyWith(
@@ -427,11 +465,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             _buildStateChip(
               label: '自动阅读',
               active: widget.autoReadRunning,
+              accent: _accentColor,
               onTap: widget.onToggleAutoRead,
             ),
             _buildStateChip(
               label: '更多',
               active: false,
+              accent: _accentColor,
               onTap: widget.onOpenFullSettings,
             ),
           ],
@@ -445,24 +485,32 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _buildTabItem(
-            0, CupertinoIcons.list_bullet, '目录', widget.onShowChapterList),
+          0,
+          CupertinoIcons.list_bullet,
+          '目录',
+          widget.onShowChapterList,
+          accent: _accentColor,
+        ),
         _buildTabItem(
           1,
           CupertinoIcons.textformat_size,
           '字体',
           widget.onShowTypography,
+          accent: _accentColor,
         ),
         _buildTabItem(
           2,
           CupertinoIcons.circle_grid_3x3,
           '界面',
           widget.onShowTheme,
+          accent: _accentColor,
         ),
         _buildTabItem(
           3,
           CupertinoIcons.gear,
           '设置',
           widget.onShowPage,
+          accent: _accentColor,
         ),
       ],
     );
@@ -472,8 +520,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     int index,
     IconData icon,
     String label,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    required Color accent,
+  }) {
     final isSelected = _selectedTab == index;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -489,18 +538,14 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             Icon(
               icon,
               size: 22,
-              color: isSelected
-                  ? CupertinoColors.activeGreen
-                  : CupertinoColors.white,
+              color: isSelected ? accent : _textStrong,
             ),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: isSelected
-                    ? CupertinoColors.activeGreen
-                    : CupertinoColors.white,
+                color: isSelected ? accent : _textMuted,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
@@ -513,6 +558,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   Widget _buildRoundAction({
     required String label,
     required bool enabled,
+    required Color accent,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
@@ -522,18 +568,26 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         height: 28,
         decoration: BoxDecoration(
           color: enabled
-              ? Colors.white.withValues(alpha: 0.14)
-              : Colors.white.withValues(alpha: 0.06),
+              ? (_isDarkMode
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : const Color(0xFFE2E8F0))
+              : (_isDarkMode
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : const Color(0xFFF1F5F9)),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: enabled ? Colors.white24 : Colors.white10,
+            color: enabled
+                ? (_isDarkMode ? Colors.white24 : const Color(0xFFCBD5E1))
+                : (_isDarkMode ? Colors.white10 : const Color(0xFFE2E8F0)),
           ),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: TextStyle(
-            color: enabled ? CupertinoColors.white : CupertinoColors.systemGrey,
+            color: enabled
+                ? (_isDarkMode ? CupertinoColors.white : accent)
+                : CupertinoColors.systemGrey,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -545,6 +599,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   Widget _buildStateChip({
     required String label,
     required bool active,
+    required Color accent,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
@@ -553,17 +608,21 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: active
-              ? CupertinoColors.activeGreen.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.08),
+              ? accent.withValues(alpha: _isDarkMode ? 0.2 : 0.14)
+              : _chipBgColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: active ? CupertinoColors.activeGreen : Colors.white24,
+            color: active ? accent : _chipBorderColor,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: active ? CupertinoColors.activeGreen : CupertinoColors.white,
+            color: active
+                ? accent
+                : (_isDarkMode
+                    ? CupertinoColors.white
+                    : const Color(0xFF334155)),
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),

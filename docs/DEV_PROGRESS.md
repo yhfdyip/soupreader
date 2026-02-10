@@ -846,3 +846,30 @@
 ### 兼容影响
 - 规则协议无变更：不涉及书源字段、规则语义和解析链路。
 - 行为兼容：业务流程、入口与数据结构保持不变，仅统一视觉外壳与页面层级。
+
+## 2026-02-10（P2：阅读页沉浸式 UI/UX 协调改造）
+
+### 已完成
+- 阅读主视图 `simple_reader_view`：
+  - 菜单态增加轻遮罩层（点击空白可关闭菜单），提升“内容层/控制层”层级感与聚焦性；
+  - 右侧悬浮快捷栏改为“统一容器 + 一致间距 + 统一激活色反馈”，减少散点控件噪声。
+- 顶部菜单 `reader_menus.dart`：
+  - 小屏宽度下自动进入紧凑模式（隐藏“换源”芯片，保留高频动作）；
+  - 顶栏图标/芯片边框与底色对比度微调，提升可读性与触控识别。
+- 底部菜单 `reader_bottom_menu.dart`：
+  - 接入 `AppDesignTokens`，按阅读主题明暗自动映射强调色（亮色主品牌、暗色品牌副色）；
+  - 统一底部面板、卡片、标签、按钮、滑杆的明暗模式色彩语义；
+  - 保持原有功能结构不变（章节进度、亮度字体、翻页与其他、底部四入口），仅做视觉重构。
+
+### 为什么
+- 你要求“所有页面重新设计且保持整体协调”，阅读页是高频核心场景，若仍保留旧视觉权重分配会造成全局风格断层。
+- 本次采用“只改展示层，不动阅读业务链路”的策略，保证体验升级同时降低功能回归风险。
+
+### 验证方式
+- 命令：`dart format lib/features/reader/views/simple_reader_view.dart lib/features/reader/widgets/reader_bottom_menu.dart lib/features/reader/widgets/reader_menus.dart`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+
+### 兼容影响
+- 规则协议无变更：不涉及书源字段与 legado 规则语义。
+- 行为兼容：阅读功能入口与交互路径保持一致，仅优化视觉层级、状态反馈与多主题协调性。

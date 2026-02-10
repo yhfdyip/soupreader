@@ -1027,6 +1027,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       child: _buildReadingContent(),
                     ),
 
+                    // 菜单打开时添加轻遮罩，提升层级感并支持点击空白关闭。
+                    if (_showMenu)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _closeReaderMenuOverlay,
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.14),
+                          ),
+                        ),
+                      ),
+
                     // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
                     if (_settings.showStatusBar &&
                         !_showMenu &&
@@ -1451,43 +1463,58 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return Positioned(
       right: 10,
       top: topOffset,
-      child: Column(
-        children: [
-          _buildFloatingActionButton(
-            icon: _hasBookmarkAtCurrent
-                ? CupertinoIcons.bookmark_solid
-                : CupertinoIcons.bookmark,
-            active: _hasBookmarkAtCurrent,
-            onTap: () => unawaited(_toggleBookmark()),
-          ),
-          const SizedBox(height: 10),
-          _buildFloatingActionButton(
-            icon: CupertinoIcons.list_bullet,
-            onTap: _openChapterListFromMenu,
-          ),
-          const SizedBox(height: 10),
-          _buildFloatingActionButton(
-            icon: CupertinoIcons.textformat_size,
-            onTap: () => _openQuickSettingsFromMenu(
-              ReaderQuickSettingsTab.typography,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.42),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-          const SizedBox(height: 10),
-          _buildFloatingActionButton(
-            icon: CupertinoIcons.circle_grid_3x3,
-            onTap: () => _openQuickSettingsFromMenu(
-              ReaderQuickSettingsTab.interface,
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildFloatingActionButton(
+              icon: _hasBookmarkAtCurrent
+                  ? CupertinoIcons.bookmark_solid
+                  : CupertinoIcons.bookmark,
+              active: _hasBookmarkAtCurrent,
+              onTap: () => unawaited(_toggleBookmark()),
             ),
-          ),
-          const SizedBox(height: 10),
-          _buildFloatingActionButton(
-            icon: _autoPager.isRunning
-                ? CupertinoIcons.pause_circle_fill
-                : CupertinoIcons.play_circle_fill,
-            active: _autoPager.isRunning,
-            onTap: _toggleAutoReadPanelFromMenu,
-          ),
-        ],
+            const SizedBox(height: 8),
+            _buildFloatingActionButton(
+              icon: CupertinoIcons.list_bullet,
+              onTap: _openChapterListFromMenu,
+            ),
+            const SizedBox(height: 8),
+            _buildFloatingActionButton(
+              icon: CupertinoIcons.textformat_size,
+              onTap: () => _openQuickSettingsFromMenu(
+                ReaderQuickSettingsTab.typography,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildFloatingActionButton(
+              icon: CupertinoIcons.circle_grid_3x3,
+              onTap: () => _openQuickSettingsFromMenu(
+                ReaderQuickSettingsTab.interface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildFloatingActionButton(
+              icon: _autoPager.isRunning
+                  ? CupertinoIcons.pause_circle_fill
+                  : CupertinoIcons.play_circle_fill,
+              active: _autoPager.isRunning,
+              onTap: _toggleAutoReadPanelFromMenu,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1498,23 +1525,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     bool active = false,
   }) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           color: active
-              ? CupertinoColors.activeGreen.withValues(alpha: 0.22)
-              : Colors.black.withValues(alpha: 0.32),
-          borderRadius: BorderRadius.circular(21),
+              ? CupertinoColors.activeBlue.withValues(alpha: 0.22)
+              : Colors.black.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? CupertinoColors.activeGreen : Colors.white24,
+            color: active ? CupertinoColors.activeBlue : Colors.white24,
           ),
         ),
         child: Icon(
           icon,
           size: 20,
-          color: active ? CupertinoColors.activeGreen : CupertinoColors.white,
+          color: active ? CupertinoColors.activeBlue : CupertinoColors.white,
         ),
       ),
     );
@@ -3049,7 +3079,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (!mounted) return;
     bool hasBookmark = false;
     try {
-      hasBookmark = _bookmarkRepo.hasBookmark(widget.bookId, _currentChapterIndex);
+      hasBookmark =
+          _bookmarkRepo.hasBookmark(widget.bookId, _currentChapterIndex);
     } catch (_) {
       hasBookmark = false;
     }
@@ -3070,13 +3101,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
       final currentId =
           _chapters.isNotEmpty ? _chapters[_currentChapterIndex].id : null;
-      _chapters = _chapters
-          .map((chapter) {
-            if (!chapter.isDownloaded) return chapter;
-            final keepContent = chapter.id == currentId ? chapter.content : null;
-            return chapter.copyWith(isDownloaded: false, content: keepContent);
-          })
-          .toList(growable: false);
+      _chapters = _chapters.map((chapter) {
+        if (!chapter.isDownloaded) return chapter;
+        final keepContent = chapter.id == currentId ? chapter.content : null;
+        return chapter.copyWith(isDownloaded: false, content: keepContent);
+      }).toList(growable: false);
     });
 
     _syncPageFactoryChapters(
@@ -3096,11 +3125,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     SearchResult? fallback;
 
     for (final item in results) {
-      final itemTitleKey = ReaderSourceSwitchHelper.normalizeForCompare(item.name);
+      final itemTitleKey =
+          ReaderSourceSwitchHelper.normalizeForCompare(item.name);
       if (itemTitleKey != titleKey) continue;
 
       fallback ??= item;
-      final itemAuthorKey = ReaderSourceSwitchHelper.normalizeForCompare(item.author);
+      final itemAuthorKey =
+          ReaderSourceSwitchHelper.normalizeForCompare(item.author);
       if (authorKey.isNotEmpty &&
           itemAuthorKey.isNotEmpty &&
           itemAuthorKey == authorKey) {
@@ -3155,8 +3186,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       target.bookUrl,
       clearRuntimeVariables: true,
     );
-    final tocUrl =
-        detail?.tocUrl.trim().isNotEmpty == true ? detail!.tocUrl.trim() : target.bookUrl.trim();
+    final tocUrl = detail?.tocUrl.trim().isNotEmpty == true
+        ? detail!.tocUrl.trim()
+        : target.bookUrl.trim();
     if (tocUrl.isEmpty) {
       throw StateError('目录地址为空（可能详情解析失败）');
     }
@@ -3230,7 +3262,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await _bookRepo.updateBook(
       book.copyWith(
         totalChapters: updated.length,
-        latestChapter: updated.isNotEmpty ? updated.last.title : book.latestChapter,
+        latestChapter:
+            updated.isNotEmpty ? updated.last.title : book.latestChapter,
       ),
     );
 

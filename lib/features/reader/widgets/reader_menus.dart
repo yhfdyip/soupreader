@@ -27,6 +27,9 @@ class ReaderTopMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding =
+        MediaQuery.of(context).size.width < 390 ? 8.0 : 10.0;
+    final compactMode = MediaQuery.of(context).size.width < 375;
     final source = sourceName?.trim() ?? '';
     final chapterLine =
         source.isNotEmpty ? '$source · $chapterTitle' : chapterTitle;
@@ -38,8 +41,8 @@ class ReaderTopMenu extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.only(
           top: MediaQuery.of(context).padding.top + 6,
-          left: 10,
-          right: 10,
+          left: horizontalPadding,
+          right: horizontalPadding,
           bottom: 10,
         ),
         decoration: BoxDecoration(
@@ -88,13 +91,15 @@ class ReaderTopMenu extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            _buildActionChip(
-              label: '换源',
-              onTap: onSwitchSource,
-              active: false,
-            ),
             const SizedBox(width: 6),
+            if (!compactMode) ...[
+              _buildActionChip(
+                label: '换源',
+                onTap: onSwitchSource,
+                active: false,
+              ),
+              const SizedBox(width: 6),
+            ],
             _buildActionChip(
               label: cleanChapterTitleEnabled ? '净化中' : '净化',
               onTap: onToggleCleanChapterTitle,
@@ -121,14 +126,15 @@ class ReaderTopMenu extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.24),
+          color: Colors.black.withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: Colors.white24),
+          border: Border.all(color: Colors.white30),
         ),
         child: Icon(
           icon,
@@ -145,16 +151,17 @@ class ReaderTopMenu extends StatelessWidget {
     required bool active,
   }) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
           color: active
               ? CupertinoColors.activeGreen.withValues(alpha: 0.2)
-              : Colors.black.withValues(alpha: 0.24),
+              : Colors.black.withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: active ? CupertinoColors.activeGreen : Colors.white24,
+            color: active ? CupertinoColors.activeGreen : Colors.white30,
           ),
         ),
         child: Text(
