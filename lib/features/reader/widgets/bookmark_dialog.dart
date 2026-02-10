@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 
@@ -29,8 +31,37 @@ class BookmarkDialog extends StatefulWidget {
 }
 
 class _BookmarkDialogState extends State<BookmarkDialog> {
-  late List<BookmarkEntity> _bookmarks;
+  List<BookmarkEntity> _bookmarks = <BookmarkEntity>[];
   bool _isLoading = true;
+
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent =>
+      _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+
+  Color get _panelBg =>
+      _isDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+
+  Color get _textStrong =>
+      _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+
+  Color get _textNormal =>
+      _isDark ? CupertinoColors.systemGrey : AppDesignTokens.textNormal;
+
+  Color get _textSubtle => _isDark
+      ? CupertinoColors.systemGrey.withValues(alpha: 0.75)
+      : AppDesignTokens.textMuted;
+
+  Color get _lineColor =>
+      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+
+  Color get _cardBg => _isDark
+      ? CupertinoColors.systemGrey.withValues(alpha: 0.1)
+      : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
+
+  Color get _dangerBg => _isDark
+      ? AppDesignTokens.error.withValues(alpha: 0.24)
+      : AppDesignTokens.error.withValues(alpha: 0.18);
 
   @override
   void initState() {
@@ -61,9 +92,14 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('书签已添加'),
-          duration: Duration(seconds: 1),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _isDark ? const Color(0xFF2C2C2E) : _panelBg,
+          content: Text(
+            '书签已添加',
+            style: TextStyle(color: _textStrong),
+          ),
+          duration: const Duration(seconds: 1),
         ),
       );
     }
@@ -105,61 +141,103 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.6,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: _panelBg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      child: Column(
-        children: [
-          // 标题栏
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Color(0xFF333333)),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '书签',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildGrabber(),
+
+            // 标题栏
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: _lineColor),
                 ),
-                Row(
-                  children: [
-                    // 添加书签按钮
-                    TextButton.icon(
-                      onPressed: _addBookmark,
-                      icon: const Icon(Icons.add, color: Colors.amber),
-                      label: const Text(
-                        '添加',
-                        style: TextStyle(color: Colors.amber),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '书签（${_bookmarks.length}）',
+                      style: TextStyle(
+                        color: _textStrong,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white70),
-                      onPressed: () => Navigator.pop(context),
+                  ),
+                  CupertinoButton(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: const Size(30, 30),
+                    onPressed: _addBookmark,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.add, color: _accent, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          '添加',
+                          style: TextStyle(
+                            color: _accent,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: const Size(30, 30),
+                    onPressed: () => Navigator.pop(context),
+                    child: Icon(
+                      CupertinoIcons.xmark,
+                      color: _textSubtle,
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // 书签列表
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _bookmarks.isEmpty
-                    ? _buildEmptyState()
-                    : _buildBookmarkList(),
-          ),
-        ],
+            // 书签列表
+            Expanded(
+              child: _isLoading
+                  ? Center(
+                      child: CupertinoActivityIndicator(
+                        radius: 12,
+                        color: _accent,
+                      ),
+                    )
+                  : _bookmarks.isEmpty
+                      ? _buildEmptyState()
+                      : _buildBookmarkList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGrabber() {
+    final color = _isDark
+        ? Colors.white24
+        : AppDesignTokens.textMuted.withValues(alpha: 0.35);
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(top: 10),
+        width: 38,
+        height: 4,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
       ),
     );
   }
@@ -172,21 +250,21 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
           Icon(
             Icons.bookmark_border,
             size: 64,
-            color: Colors.white.withValues(alpha: 0.3),
+            color: _textSubtle.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 16),
           Text(
             '暂无书签',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: _textNormal,
               fontSize: 16,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            '点击上方"添加"按钮添加当前位置',
+            '点击上方“添加”按钮添加当前位置',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: _textSubtle,
               fontSize: 14,
             ),
           ),
@@ -197,7 +275,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
   Widget _buildBookmarkList() {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
       itemCount: _bookmarks.length,
       itemBuilder: (context, index) {
         final bookmark = _bookmarks[index];
@@ -214,26 +292,46 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: Colors.red,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: _dangerBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: AppDesignTokens.error.withValues(alpha: 0.5),
+          ),
+        ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      child: ListTile(
-        onTap: () => _jumpToBookmark(bookmark),
-        leading: const Icon(Icons.bookmark, color: Colors.amber),
-        title: Text(
-          bookmark.chapterTitle,
-          style: const TextStyle(color: Colors.white),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: _cardBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _lineColor.withValues(alpha: 0.85)),
         ),
-        subtitle: Text(
-          _formatTime(bookmark.createdTime),
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
-        ),
-        trailing: IconButton(
-          icon:
-              Icon(Icons.delete_outline, color: Colors.white.withValues(alpha: 0.5)),
-          onPressed: () => _deleteBookmark(bookmark),
+        child: ListTile(
+          onTap: () => _jumpToBookmark(bookmark),
+          leading: Icon(
+            Icons.bookmark,
+            color: _accent,
+          ),
+          title: Text(
+            bookmark.chapterTitle,
+            style: TextStyle(color: _textStrong),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            _formatTime(bookmark.createdTime),
+            style: TextStyle(color: _textSubtle, fontSize: 12),
+          ),
+          trailing: IconButton(
+            icon: Icon(
+              Icons.delete_outline,
+              color: _textSubtle,
+            ),
+            onPressed: () => _deleteBookmark(bookmark),
+          ),
         ),
       ),
     );
@@ -269,13 +367,19 @@ class BookmarkIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final activeColor =
+        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final inactiveColor =
+        isDark ? CupertinoColors.systemGrey : AppDesignTokens.textMuted;
+
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: Padding(
         padding: const EdgeInsets.all(8),
         child: Icon(
           hasBookmark ? Icons.bookmark : Icons.bookmark_border,
-          color: hasBookmark ? Colors.amber : Colors.white70,
+          color: hasBookmark ? activeColor : inactiveColor,
           size: 24,
         ),
       ),

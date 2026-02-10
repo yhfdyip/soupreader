@@ -922,3 +922,27 @@
 ### 兼容影响
 - 规则协议无变更：不涉及书源解析逻辑。
 - 行为兼容：仅读取/展示样式调整，不影响阅读流程与功能行为。
+
+## 2026-02-11（P2：阅读器弹层视觉一致性收口）
+
+### 已完成
+- 统一 `chapter_list_dialog` 的亮暗主题语义色：抓手、分段控件、当前章节高亮、书签卡片与时间信息全部改为 `AppDesignTokens` 驱动。
+- 重构 `bookmark_dialog` 视觉层：
+  - 弹层壳结构改为与阅读器面板一致（抓手 + 安全区 + 标题栏分割线）；
+  - 顶部操作（添加/关闭）、空态、列表卡片、删除滑动背景、加载态统一语义色；
+  - `BookmarkIndicator` 去除硬编码颜色，改为亮暗模式自适应语义色。
+- 本次仅调整 UI 样式与可读性，不改动书签增删跳转等业务逻辑。
+
+### 为什么
+- 阅读器面板已完成多批次统一，`chapter_list_dialog` 与 `bookmark_dialog` 仍存在旧色值和硬编码，导致视觉割裂。
+- 本次收口目的是保证“目录/书签类弹层”在亮暗模式下风格、层级与交互反馈一致。
+
+### 验证方式
+- 命令：`dart format lib/features/reader/widgets/chapter_list_dialog.dart lib/features/reader/widgets/bookmark_dialog.dart`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+- 手工：阅读页打开目录/书签弹层，检查亮暗模式下的标题、卡片、当前态与删除态反馈是否一致。
+
+### 兼容影响
+- 仅 UI/UX 表现层变更，不涉及 legado 规则语义、书源解析链路与数据结构。
+- 对旧书源兼容性无负面影响，功能行为保持不变。
