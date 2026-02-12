@@ -1,5 +1,5 @@
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 /// 阅读器分页代理
 /// 重构：完全对标 Legado TextChapterLayout 逻辑
@@ -10,7 +10,7 @@ class ReaderPageAgent {
 
   // 段间距因子：由 ReadingSettings 传入 paragraphSpacing 控制
   // 如果 paragraphSpacing > 0，则在每段结束增加高度
-  static const double defaultParagraphSpacing = 0.0; 
+  static const double defaultParagraphSpacing = 0.0;
 
   /// 将内容转换为页面列表
   static List<String> paginateContent(
@@ -40,7 +40,7 @@ class ReaderPageAgent {
       fontFamily: fontFamily,
       fontWeight: fontWeight,
       decoration: underline ? TextDecoration.underline : TextDecoration.none,
-      color: Colors.black, // 颜色不影响排版，但必须指定以避免 assert 错误
+      color: const Color(0xFF000000), // 颜色不影响排版，但必须指定以避免 assert 错误
     );
     final titleStyle = textStyle.copyWith(
       fontSize: titleFontSize ?? (fontSize + 4),
@@ -56,14 +56,14 @@ class ReaderPageAgent {
     String cleanContent = content.replaceAll('\r\n', '\n');
     final rawParagraphs = cleanContent.split('\n');
     final List<String> paragraphs = [];
-    
+
     // 如果有标题，插入到最前面
     bool hasTitle = title != null && title.isNotEmpty;
     if (hasTitle) {
       paragraphs.add(title);
       paragraphs.add(''); // 标题后的视觉空行
     }
-    
+
     // 清洗段落（去除行尾空白，过滤空段落）
     for (var p in rawParagraphs) {
       final paragraphText = p.trimRight();
@@ -78,7 +78,7 @@ class ReaderPageAgent {
     List<String> pages = [];
     StringBuffer currentPageContent = StringBuffer();
     double currentY = 0;
-    double maxPageHeight = height - 1.0; 
+    double maxPageHeight = height - 1.0;
 
     // 辅助函数：提交当前页
     void commitPage() {
@@ -97,10 +97,10 @@ class ReaderPageAgent {
     // === 段落循环 ===
     for (int i = 0; i < paragraphs.length; i++) {
       String paraText = paragraphs[i];
-      
+
       // 判断是否是标题
       bool isTitle = hasTitle && i == 0;
-      
+
       // 这里的 paragraphs[i] 已经是清洗过的非空文本（除了标题后插入的空字符串）
       if (paraText.isEmpty) {
         // 仅用于标题后的空行
@@ -139,13 +139,13 @@ class ReaderPageAgent {
 
       List<ui.LineMetrics> lines = textPainter.computeLineMetrics();
       int boundaryOffset = 0;
-      
+
       for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
         final line = lines[lineIndex];
         final lineH = line.height;
 
         if (currentY + lineH > maxPageHeight) {
-          commitPage(); 
+          commitPage();
         }
 
         // 获取当前行文本（用 offset 递增的方式避免丢失行首空白）
@@ -153,39 +153,41 @@ class ReaderPageAgent {
           TextPosition(offset: boundaryOffset.clamp(0, normalizedPara.length)),
         );
         // 处理极端情况下 range 不前进导致死循环
-        if (range.end <= boundaryOffset && boundaryOffset < normalizedPara.length) {
+        if (range.end <= boundaryOffset &&
+            boundaryOffset < normalizedPara.length) {
           boundaryOffset++;
           range = textPainter.getLineBoundary(
-            TextPosition(offset: boundaryOffset.clamp(0, normalizedPara.length)),
+            TextPosition(
+                offset: boundaryOffset.clamp(0, normalizedPara.length)),
           );
         }
         final lineText = normalizedPara.substring(range.start, range.end);
         boundaryOffset = range.end;
-        
+
         currentPageContent.write(lineText);
         currentY += lineH;
-        
+
         // 段落结束处理
         if (lineIndex == lines.length - 1) {
-           currentPageContent.write('\n'); 
+          currentPageContent.write('\n');
 
-           if (isTitle && titleBottomSpacing > 0) {
-             if (currentY + titleBottomSpacing > maxPageHeight) {
-               commitPage();
-             } else {
-               currentY += titleBottomSpacing;
-             }
-           }
+          if (isTitle && titleBottomSpacing > 0) {
+            if (currentY + titleBottomSpacing > maxPageHeight) {
+              commitPage();
+            } else {
+              currentY += titleBottomSpacing;
+            }
+          }
 
-           // 段落间距逻辑：如果设置了段距且足够大，插入空行模拟
-           if (paragraphSpacing > fontSize * 0.5) {
-              double spacingHeight = fontSize * lineHeight; // 模拟一个空行的高度
-              // 只有当剩余空间足够放一个空行时才插入，避免页面底部只有空行
-              if (currentY + spacingHeight <= maxPageHeight) {
-                 currentPageContent.write('\n');
-                 currentY += spacingHeight;
-              }
-           }
+          // 段落间距逻辑：如果设置了段距且足够大，插入空行模拟
+          if (paragraphSpacing > fontSize * 0.5) {
+            double spacingHeight = fontSize * lineHeight; // 模拟一个空行的高度
+            // 只有当剩余空间足够放一个空行时才插入，避免页面底部只有空行
+            if (currentY + spacingHeight <= maxPageHeight) {
+              currentPageContent.write('\n');
+              currentY += spacingHeight;
+            }
+          }
         }
       }
     }
@@ -193,9 +195,9 @@ class ReaderPageAgent {
     if (currentPageContent.isNotEmpty) {
       pages.add(currentPageContent.toString().trimRight());
     }
-    
+
     if (pages.isEmpty) {
-        pages.add(''); 
+      pages.add('');
     }
 
     return pages;

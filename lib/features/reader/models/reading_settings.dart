@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 /// 阅读设置模型
 class ReadingSettings {
@@ -463,17 +463,17 @@ extension PageTurnModeExtension on PageTurnMode {
   IconData get icon {
     switch (this) {
       case PageTurnMode.slide:
-        return Icons.swipe;
+        return CupertinoIcons.arrow_left_right;
       case PageTurnMode.simulation:
-        return Icons.auto_stories;
+        return CupertinoIcons.book;
       case PageTurnMode.cover:
-        return Icons.layers;
+        return CupertinoIcons.square_stack;
       case PageTurnMode.none:
-        return Icons.block;
+        return CupertinoIcons.stop;
       case PageTurnMode.scroll:
-        return Icons.unfold_more;
+        return CupertinoIcons.arrow_up_arrow_down;
       case PageTurnMode.simulation2:
-        return Icons.menu_book;
+        return CupertinoIcons.book;
     }
   }
 }
@@ -526,9 +526,9 @@ extension PageDirectionExtension on PageDirection {
   IconData get icon {
     switch (this) {
       case PageDirection.horizontal:
-        return Icons.swap_horiz;
+        return CupertinoIcons.arrow_left_right;
       case PageDirection.vertical:
-        return Icons.swap_vert;
+        return CupertinoIcons.arrow_up_arrow_down;
     }
   }
 }

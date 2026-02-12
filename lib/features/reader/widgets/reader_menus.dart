@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
@@ -54,9 +53,9 @@ class ReaderTopMenu extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withValues(alpha: 0.82),
-              Colors.black.withValues(alpha: 0.58),
-              Colors.transparent,
+              const Color(0xFF000000).withValues(alpha: 0.82),
+              const Color(0xFF000000).withValues(alpha: 0.58),
+              const Color(0x00000000),
             ],
           ),
         ),
@@ -138,9 +137,11 @@ class ReaderTopMenu extends StatelessWidget {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.28),
+          color: const Color(0xFF000000).withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: Colors.white30),
+          border: Border.all(
+            color: CupertinoColors.white.withValues(alpha: 0.30),
+          ),
         ),
         child: Icon(
           icon,
@@ -165,10 +166,11 @@ class ReaderTopMenu extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? accent.withValues(alpha: 0.2)
-              : Colors.black.withValues(alpha: 0.28),
+              : const Color(0xFF000000).withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: active ? accent : Colors.white30,
+            color:
+                active ? accent : CupertinoColors.white.withValues(alpha: 0.30),
           ),
         ),
         child: Text(
@@ -239,13 +241,12 @@ class ReaderBottomMenu extends StatelessWidget {
                 Expanded(
                   child: Column(
                     children: [
-                      Slider(
+                      CupertinoSlider(
                         value: currentChapterIndex.toDouble(),
                         min: 0,
                         max: (totalChapters - 1).toDouble(),
                         activeColor: AppDesignTokens.brandSecondary,
-                        inactiveColor:
-                            CupertinoColors.systemGrey.withValues(alpha: 0.3),
+                        thumbColor: AppDesignTokens.brandSecondary,
                         onChanged: (value) {
                           // 实时更新章节（拖动时立即跳转）
                           onChapterChanged(value.toInt());
@@ -274,13 +275,12 @@ class ReaderBottomMenu extends StatelessWidget {
                 const Icon(CupertinoIcons.sun_min,
                     color: CupertinoColors.systemGrey, size: 20),
                 Expanded(
-                  child: Slider(
+                  child: CupertinoSlider(
                     value: settings.brightness,
                     min: 0.0,
                     max: 1.0,
                     activeColor: AppDesignTokens.brandSecondary,
-                    inactiveColor:
-                        CupertinoColors.systemGrey.withValues(alpha: 0.3),
+                    thumbColor: AppDesignTokens.brandSecondary,
                     onChanged: (value) {
                       onSettingsChanged(settings.copyWith(brightness: value));
                     },
@@ -371,26 +371,23 @@ class ReaderBottomMenu extends StatelessWidget {
   }
 
   Widget _buildMenuBtn(IconData icon, String label, VoidCallback onTap) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        splashColor: AppDesignTokens.brandSecondary.withValues(alpha: 0.3),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: CupertinoColors.white, size: 22),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style:
-                    const TextStyle(color: CupertinoColors.white, fontSize: 10),
-              ),
-            ],
-          ),
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: CupertinoColors.white, size: 22),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style:
+                  const TextStyle(color: CupertinoColors.white, fontSize: 10),
+            ),
+          ],
         ),
       ),
     );

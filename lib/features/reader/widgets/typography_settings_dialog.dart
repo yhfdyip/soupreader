@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors, Slider;
 
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
@@ -217,7 +216,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
 
   Widget _buildGrabber() {
     final color = _isDark
-        ? Colors.white24
+        ? CupertinoColors.white.withValues(alpha: 0.24)
         : AppDesignTokens.textMuted.withValues(alpha: 0.35);
     return Center(
       child: Container(
@@ -317,12 +316,12 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
             },
           ),
           Expanded(
-            child: Slider(
+            child: CupertinoSlider(
               value: value.clamp(min, max),
               min: min,
               max: max,
               activeColor: _accent,
-              inactiveColor: _lineColor.withValues(alpha: 0.55),
+              thumbColor: _accent,
               onChanged: onChanged,
             ),
           ),

@@ -1,7 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../../../app/theme/colors.dart';
 
@@ -25,6 +25,7 @@ class BookCoverCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final height = width * 1.4; // 封面比例
+    final textTheme = CupertinoTheme.of(context).textTheme;
 
     return GestureDetector(
       onTap: onTap,
@@ -42,7 +43,7 @@ class BookCoverCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
+                    color: const Color(0xFF000000).withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -65,7 +66,8 @@ class BookCoverCard extends StatelessWidget {
                         child: Container(
                           height: 3,
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.3),
+                            color:
+                                const Color(0xFF000000).withValues(alpha: 0.3),
                           ),
                           child: FractionallySizedBox(
                             alignment: Alignment.centerLeft,
@@ -90,9 +92,11 @@ class BookCoverCard extends StatelessWidget {
               book.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              style: textTheme.textStyle.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
 
             const SizedBox(height: 2),
@@ -102,9 +106,10 @@ class BookCoverCard extends StatelessWidget {
               book.author,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+              style: textTheme.textStyle.copyWith(
+                fontSize: 12,
+                color: AppColors.textMuted,
+              ),
             ),
           ],
         ),
@@ -167,10 +172,7 @@ class BookCoverCard extends StatelessWidget {
             ? const SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.accent,
-                ),
+                child: CupertinoActivityIndicator(radius: 12),
               )
             : Padding(
                 padding: const EdgeInsets.all(8),

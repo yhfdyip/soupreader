@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors;
 import 'package:battery_plus/battery_plus.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
@@ -560,7 +559,7 @@ class _BatteryPainter extends CustomPainter {
     // 充电图标
     if (isCharging) {
       final iconPaint = Paint()
-        ..color = Colors.green
+        ..color = CupertinoColors.systemGreen
         ..style = PaintingStyle.fill;
       final path = Path()
         ..moveTo(size.width * 0.5, 2)

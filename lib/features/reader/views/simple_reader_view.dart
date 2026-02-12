@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/database_service.dart';
@@ -646,20 +645,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _isUiDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
 
   Color get _uiCardBg => _isUiDark
-      ? Colors.white10
+      ? CupertinoColors.white.withValues(alpha: 0.1)
       : AppDesignTokens.pageBgLight.withValues(alpha: 0.9);
 
-  Color get _uiBorder =>
-      _isUiDark ? Colors.white12 : AppDesignTokens.borderLight;
+  Color get _uiBorder => _isUiDark
+      ? CupertinoColors.white.withValues(alpha: 0.12)
+      : AppDesignTokens.borderLight;
 
   Color get _uiTextStrong =>
-      _isUiDark ? Colors.white : AppDesignTokens.textStrong;
+      _isUiDark ? CupertinoColors.white : AppDesignTokens.textStrong;
 
-  Color get _uiTextNormal =>
-      _isUiDark ? Colors.white70 : AppDesignTokens.textNormal;
+  Color get _uiTextNormal => _isUiDark
+      ? CupertinoColors.white.withValues(alpha: 0.7)
+      : AppDesignTokens.textNormal;
 
-  Color get _uiTextSubtle =>
-      _isUiDark ? Colors.white54 : AppDesignTokens.textMuted;
+  Color get _uiTextSubtle => _isUiDark
+      ? CupertinoColors.white.withValues(alpha: 0.54)
+      : AppDesignTokens.textMuted;
 
   /// 获取当前字体
   String? get _currentFontFamily {
@@ -1057,7 +1059,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                           behavior: HitTestBehavior.opaque,
                           onTap: _closeReaderMenuOverlay,
                           child: Container(
-                            color: Colors.black.withValues(alpha: 0.14),
+                            color:
+                                const Color(0xFF000000).withValues(alpha: 0.14),
                           ),
                         ),
                       ),
@@ -1199,7 +1202,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (opacity <= 0) return const SizedBox.shrink();
     return IgnorePointer(
       child: Container(
-        color: Colors.black.withValues(alpha: opacity),
+        color: const Color(0xFF000000).withValues(alpha: opacity),
       ),
     );
   }
@@ -1481,12 +1484,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.42),
+          color: const Color(0xFF000000).withValues(alpha: 0.42),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white24),
+          border:
+              Border.all(color: CupertinoColors.white.withValues(alpha: 0.24)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.22),
+              color: const Color(0xFF000000).withValues(alpha: 0.22),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -1543,7 +1547,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         decoration: BoxDecoration(
           color: active
               ? _uiAccent.withValues(alpha: 0.22)
-              : Colors.black.withValues(alpha: 0.2),
+              : const Color(0xFF000000).withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: active ? _uiAccent : _uiBorder,
@@ -1828,7 +1832,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: _isUiDark
-                          ? Colors.white24
+                          ? CupertinoColors.white.withValues(alpha: 0.24)
                           : AppDesignTokens.textMuted.withValues(alpha: 0.35),
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -2195,7 +2199,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('高级排版与边距', style: TextStyle(color: Colors.white)),
+                        Text('高级排版与边距',
+                            style: TextStyle(color: CupertinoColors.white)),
                         Icon(CupertinoIcons.chevron_right,
                             color: _uiTextSubtle, size: 16),
                       ],
@@ -2980,7 +2985,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             width: 30,
             child: Text(
               displayFormat?.call(value) ?? value.toStringAsFixed(1),
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style:
+                  const TextStyle(color: CupertinoColors.white, fontSize: 13),
               textAlign: TextAlign.end,
             )),
       ],

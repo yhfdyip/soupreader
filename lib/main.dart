@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -140,16 +139,14 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   @override
   Widget build(BuildContext context) {
     final brightness = _effectiveBrightness;
-    final themeMode = switch (_settingsService.appSettings.appearanceMode) {
-      AppAppearanceMode.followSystem => ThemeMode.system,
-      AppAppearanceMode.light => ThemeMode.light,
-      AppAppearanceMode.dark => ThemeMode.dark,
-    };
+    final shadTheme = brightness == Brightness.dark
+        ? AppShadcnTheme.dark()
+        : AppShadcnTheme.light();
 
     return ShadApp.custom(
-      themeMode: themeMode,
-      theme: AppShadcnTheme.light(),
-      darkTheme: AppShadcnTheme.dark(),
+      // 直接根据设置计算后的亮度提供主题，避免依赖 Material ThemeMode。
+      theme: shadTheme,
+      darkTheme: shadTheme,
       appBuilder: (context) {
         final shad = ShadTheme.of(context);
         final cupertinoTheme = CupertinoTheme.of(context).copyWith(

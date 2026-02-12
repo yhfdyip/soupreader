@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors;
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../bookshelf/models/book.dart';
@@ -102,7 +101,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                 height: 4,
                 decoration: BoxDecoration(
                   color: _isDark
-                      ? Colors.white24
+                      ? CupertinoColors.white.withValues(alpha: 0.24)
                       : _textSubtle.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -221,7 +220,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
             decoration: BoxDecoration(
               color: isCurrentChapter
                   ? _accent.withValues(alpha: _isDark ? 0.16 : 0.12)
-                  : Colors.transparent,
+                  : const Color(0x00000000),
               borderRadius: BorderRadius.circular(8),
               border: isCurrentChapter
                   ? Border.all(

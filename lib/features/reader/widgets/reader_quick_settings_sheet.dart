@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors;
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
@@ -97,7 +96,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   Widget _buildGrabber() {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final grabberColor = isDark
-        ? Colors.white24
+        ? CupertinoColors.white.withValues(alpha: 0.24)
         : AppDesignTokens.textMuted.withValues(alpha: 0.35);
     return Center(
       child: Container(
@@ -278,11 +277,13 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final cardColor = isDark
-        ? Colors.white10
+        ? CupertinoColors.white.withValues(alpha: 0.1)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.9);
-    final borderColor = isDark ? Colors.white12 : AppDesignTokens.borderLight;
+    final borderColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.12)
+        : AppDesignTokens.borderLight;
     final titleColor = isDark
-        ? Colors.white.withValues(alpha: 0.6)
+        ? CupertinoColors.white.withValues(alpha: 0.6)
         : AppDesignTokens.textMuted;
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
@@ -489,10 +490,14 @@ class _MarginPresetRow extends StatelessWidget {
     final accent =
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     final chipBg = isDark
-        ? Colors.white10
+        ? CupertinoColors.white.withValues(alpha: 0.1)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
-    final chipBorder = isDark ? Colors.white12 : AppDesignTokens.borderLight;
-    final textNormal = isDark ? Colors.white70 : AppDesignTokens.textNormal;
+    final chipBorder = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.12)
+        : AppDesignTokens.borderLight;
+    final textNormal = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.7)
+        : AppDesignTokens.textNormal;
     Widget chip(String label, _MarginPreset v) {
       final selected = preset == v;
       return GestureDetector(
@@ -980,9 +985,11 @@ class _ModeChip extends StatelessWidget {
     final accent =
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     final bgNormal = isDark
-        ? Colors.white10
+        ? CupertinoColors.white.withValues(alpha: 0.1)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
-    final borderNormal = isDark ? Colors.white12 : AppDesignTokens.borderLight;
+    final borderNormal = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.12)
+        : AppDesignTokens.borderLight;
     final textNormal =
         isDark ? CupertinoColors.white : AppDesignTokens.textNormal;
     final baseColor =

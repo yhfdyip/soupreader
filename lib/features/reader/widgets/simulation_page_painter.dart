@@ -1,5 +1,5 @@
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 /// 仿真翻页绘制器（Shader版）
 /// 完全摒弃贝塞尔曲线，使用 GLSL Fragment Shader 实现柱面映射与阴影

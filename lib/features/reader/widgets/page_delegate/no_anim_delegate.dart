@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'page_delegate.dart';
 
 /// 无动画翻页委托

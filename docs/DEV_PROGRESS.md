@@ -140,3 +140,163 @@
 - 对书源解析、网络请求与五段链路（search/explore/bookInfo/toc/content）无逻辑改动。
 - 阅读器 UI 交互行为保持原语义，主要是组件实现替换与旧页清理。
 - `ReaderView` 已删除；若有外部分支仍直接引用该页面，需要改为 `SimpleReaderView`。
+
+## 2026-02-12（阅读器 UI 合规重构第二批：去除 Material Slider/InkWell）
+
+### 已完成
+- `lib/features/reader/widgets/reader_bottom_menu.dart`
+  - 将章节进度与亮度控制从 Material `Slider/SliderTheme` 重构为 `CupertinoSlider`；
+  - 移除 Material 依赖，仅保留 `Shadcn + Cupertino` 组合实现。
+- `lib/features/reader/widgets/typography_settings_dialog.dart`
+  - 将排版设置中的 Material `Slider` 重构为 `CupertinoSlider`；
+  - 同步移除 Material 颜色常量依赖。
+- `lib/features/reader/widgets/reader_menus.dart`
+  - 将底部菜单按钮从 `Material + InkWell` 重构为 `CupertinoButton`；
+  - 将章节/亮度滑杆替换为 `CupertinoSlider`，移除 Material 组件依赖。
+- `lib/features/reader/models/reading_settings.dart`
+  - 将翻页模式与翻页方向图标从 Material `Icons` 迁移为 `CupertinoIcons`，统一图标体系。
+
+### 为什么
+- 你要求继续按规则重构 UI，而阅读器链路中的多个菜单与设置面板仍在使用 Material 交互组件（`Slider`、`InkWell` 等），与全局 `Shadcn + Cupertino` 约束不一致。
+- 本批次优先处理“正在阅读链路中可见且交互频繁”的组件，降低 UI 体系混用风险。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 阅读页菜单 -> 底部菜单：章节拖动与亮度拖动可用；
+  - 阅读页菜单 -> 排版设置：所有滑杆可调且即时生效；
+  - 阅读页顶部/底部菜单点击反馈与原交互语义一致。
+
+### 兼容影响
+- 本次仅替换 UI 组件实现，不改阅读数据结构、请求链路与书源解析逻辑。
+- 旧书源兼容性无协议级影响。
+
+## 2026-02-12（阅读器/书架 UI 合规重构第三批：清理 Colors 级别 Material 依赖）
+
+### 已完成
+- `lib/features/bookshelf/widgets/book_cover_card.dart`
+  - 从 Material 迁移到 Cupertino：移除 `Theme.of`、`CircularProgressIndicator`；
+  - 文本样式改为 `CupertinoTheme`，加载态改为 `CupertinoActivityIndicator`。
+- 阅读器弹窗与面板清理 Material `Colors` 依赖：
+  - `lib/features/reader/views/simple_reader_view.dart`
+  - `lib/features/reader/widgets/chapter_list_dialog.dart`
+  - `lib/features/reader/widgets/click_action_config_dialog.dart`
+  - `lib/features/reader/widgets/reader_status_bar.dart`
+  - `lib/features/reader/widgets/reader_quick_settings_sheet.dart`
+  - `lib/features/reader/widgets/reader_catalog_sheet.dart`
+- 上述文件均移除 `import 'package:flutter/material.dart' show Colors`，并用 `CupertinoColors` / `Color` 常量替代。
+
+### 为什么
+- 虽然上一批已去掉主要 Material 交互组件，但仍有若干文件仅为 `Colors` 引入 Material，属于 UI 体系混用残留。
+- 本批次目标是继续收敛到 `Shadcn + Cupertino`，并尽量保持视觉和交互行为不变。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 书架页：封面卡片、占位图、加载态显示正常；
+  - 阅读页：目录弹窗、快速设置、点击区域配置、状态栏、电池图标与配色显示正常。
+
+### 兼容影响
+- 本次为 UI 实现层替换，不涉及数据模型、书源解析和网络请求逻辑变更。
+- 旧书源兼容性无协议级影响。
+
+## 2026-02-12（阅读器 UI 合规重构第四批：分页链路移除 Material 依赖）
+
+### 已完成
+- 分页核心与翻页委托链路从 `material.dart` 迁移到基础层导入（`widgets`/`cupertino`），并清理 `Colors.*` 残留：
+  - `lib/features/reader/widgets/page_factory.dart`
+  - `lib/features/reader/widgets/reader_page_agent.dart`
+  - `lib/features/reader/widgets/paged_reader_widget.dart`
+  - `lib/features/reader/widgets/simulation_page_painter.dart`
+  - `lib/features/reader/widgets/simulation_page_painter2.dart`
+  - `lib/features/reader/widgets/page_delegate/page_delegate.dart`
+  - `lib/features/reader/widgets/page_delegate/no_anim_delegate.dart`
+  - `lib/features/reader/widgets/page_delegate/slide_delegate.dart`
+  - `lib/features/reader/widgets/page_delegate/cover_delegate.dart`
+- 仅替换导入与颜色常量，不调整翻页状态机、动画轨迹与分页算法。
+
+### 为什么
+- 阅读器链路里仍有一批基础模块因为 `Colors` 或历史导入习惯依赖 `material.dart`，与全局 `Shadcn + Cupertino` 约束不一致。
+- 这批文件属于底层分页渲染链路，优先做“行为不变”的依赖收敛，降低后续维护中的 UI 体系混用风险。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 阅读页切换 `滑动/覆盖/仿真/无动画/滚动` 等翻页模式，确认翻页方向、阴影与手势行为正常；
+  - 阅读页反复切章并切换主题，确认分页与状态栏渲染无异常。
+
+### 兼容影响
+- 本次不涉及书源解析、网络请求、数据库结构与设置持久化字段变更。
+- 旧书源兼容性无协议级影响。
+
+## 2026-02-12（UI 合规重构第五批：基础主题文件去 Material 类型导入）
+
+### 已完成
+- 将以下基础主题文件从 `material.dart` 导入替换为更底层导入（不改字段语义）：
+  - `lib/app/theme/design_tokens.dart`：改为 `dart:ui`
+  - `lib/app/theme/colors.dart`：改为 `dart:ui`
+  - `lib/app/theme/typography.dart`：改为 `package:flutter/painting.dart`
+- 保留 `lib/app/theme/app_theme.dart` 的 Material 依赖（`ThemeData`/`ColorScheme`/`AppBarTheme` 等确实需要）。
+
+### 为什么
+- 在功能层 UI 已完成 `Shadcn + Cupertino` 收敛后，仍有基础主题文件仅因类型声明而依赖 Material。
+- 该批次目的是继续做低风险依赖收敛，减少 UI 体系混用的“隐式入口”。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+
+### 兼容影响
+- 本批次仅调整导入层级，不改变设计令牌、配色值、排版值或运行行为。
+- 旧书源兼容性无协议级影响。
+
+## 2026-02-12（UI 合规重构第六批：书源编辑调试文本去 Material 依赖）
+
+### 已完成
+- `lib/features/source/views/source_edit_view.dart`
+  - 移除 `SelectableText` 的 Material 导入；
+  - 将调试区两处可选中文本区域改为 `SelectableRegion + Text`（Cupertino 选择控件）；
+  - 增加并释放两个 `FocusNode`，避免选择区域焦点资源泄露。
+
+### 为什么
+- 书源编辑页调试面板仍因可选中文本使用了 Material 组件，属于 UI 体系混用残留。
+- 本批次在保持“可复制/可选中调试文本”能力不变的前提下，继续向 `Shadcn + Cupertino` 收敛。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 进入书源编辑 -> 调试标签页；
+  - 在“控制台文本”和“决策摘要”区域长按并选择文本，确认选择与复制行为可用。
+
+### 兼容影响
+- 本次仅替换调试文本展示组件，不涉及书源解析、网络请求或持久化结构变更。
+- 旧书源兼容性无协议级影响。
+
+## 2026-02-12（UI 合规重构第七批：清理最后 Material 导入）
+
+### 已完成
+- `lib/main.dart`
+  - 移除 `ThemeMode` 的 Material 导入；
+  - 改为根据 `_effectiveBrightness` 直接构造并注入 Shad 主题（`theme`/`darkTheme` 同步为当前有效主题），保持亮/暗切换行为。
+- 删除未被引用的旧 Material 主题文件：
+  - `lib/app/theme/app_theme.dart`
+- 全库扫描确认：`lib/` 下已无 `flutter/material.dart` 导入。
+
+### 为什么
+- 前几批重构后仅剩入口层与遗留主题文件在使用 Material。
+- 本批次目标是完成全链路收敛，避免后续新增 UI 继续沿用 Material 入口。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 设置中切换外观模式（浅色/深色/跟随系统）；
+  - 观察主界面与阅读器配色随设置变化是否正常。
+
+### 兼容影响
+- 不涉及书源解析、网络请求、数据库结构与阅读规则语义变更。
+- 删除的 `app_theme.dart` 为未使用遗留文件；运行路径无功能依赖。

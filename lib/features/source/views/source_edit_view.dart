@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -165,6 +164,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   bool _debugWrapLines = true; // 逐行模式自动换行
   String _debugFilter = ''; // 控制台过滤关键字（大小写不敏感）
   final Set<int> _expandedDebugBlocks = <int>{};
+  final FocusNode _consoleSelectableFocusNode = FocusNode();
+  final FocusNode _decisionSelectableFocusNode = FocusNode();
   String? _debugListSrcHtml; // state=10（搜索/发现列表页）
   String? _debugBookSrcHtml; // state=20（详情页）
   String? _debugTocSrcHtml; // state=30（目录页）
@@ -391,6 +392,8 @@ class _SourceEditViewState extends State<SourceEditView> {
     _contentNextContentUrlCtrl.dispose();
     _jsonCtrl.dispose();
     _debugKeyCtrl.dispose();
+    _consoleSelectableFocusNode.dispose();
+    _decisionSelectableFocusNode.dispose();
     super.dispose();
   }
 
@@ -1595,12 +1598,16 @@ class _SourceEditViewState extends State<SourceEditView> {
       constraints: const BoxConstraints(minHeight: 120, maxHeight: 340),
       child: CupertinoScrollbar(
         child: SingleChildScrollView(
-          child: SelectableText(
-            show,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12.5,
-              color: CupertinoColors.label.resolveFrom(context),
+          child: SelectableRegion(
+            focusNode: _consoleSelectableFocusNode,
+            selectionControls: cupertinoTextSelectionControls,
+            child: Text(
+              show,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
           ),
         ),
@@ -1620,12 +1627,16 @@ class _SourceEditViewState extends State<SourceEditView> {
       constraints: const BoxConstraints(minHeight: 88, maxHeight: 220),
       child: CupertinoScrollbar(
         child: SingleChildScrollView(
-          child: SelectableText(
-            show,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12.5,
-              color: CupertinoColors.label.resolveFrom(context),
+          child: SelectableRegion(
+            focusNode: _decisionSelectableFocusNode,
+            selectionControls: cupertinoTextSelectionControls,
+            child: Text(
+              show,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
           ),
         ),

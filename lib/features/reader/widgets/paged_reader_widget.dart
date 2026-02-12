@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -192,7 +192,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   Future<void> _initBattery() async {
     try {
       _batteryLevel = await _battery.batteryLevel;
-      _batteryStateSubscription = _battery.onBatteryStateChanged.listen((state) {
+      _batteryStateSubscription =
+          _battery.onBatteryStateChanged.listen((state) {
         setState(() {});
         _updateBatteryLevel();
       });
@@ -245,8 +246,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       final textPainter = TextPainter(
         text: TextSpan(text: content, style: widget.textStyle),
         textDirection: ui.TextDirection.ltr,
-        textAlign:
-            widget.settings.textFullJustify ? TextAlign.justify : TextAlign.left,
+        textAlign: widget.settings.textFullJustify
+            ? TextAlign.justify
+            : TextAlign.left,
       );
 
       final contentWidth =
@@ -358,7 +360,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         textDirection: ui.TextDirection.ltr,
         maxLines: 1,
         ellipsis: '...',
-      )..layout(maxWidth: size.width - widget.padding.left - widget.padding.right);
+      )..layout(
+          maxWidth: size.width - widget.padding.left - widget.padding.right);
       final x = (size.width - painter.width) / 2;
       painter.paint(canvas, Offset(x, y));
     }
@@ -396,9 +399,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       case 0:
         return isHeader
             ? widget.bookTitle
-            : _progressText(bookProgress, enabled: widget.settings.showProgress);
+            : _progressText(bookProgress,
+                enabled: widget.settings.showProgress);
       case 1:
-        return isHeader ? _factory.currentChapterTitle : _pageText(includeTotal: true);
+        return isHeader
+            ? _factory.currentChapterTitle
+            : _pageText(includeTotal: true);
       case 2:
         return isHeader ? '' : _timeText(time);
       case 3:
@@ -1016,8 +1022,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       return _buildRecordedPage(_curPagePicture, _factory.curPage);
     }
     final clamped = offset.clamp(-screenWidth, screenWidth);
-    final shadowOpacity =
-        (clamped.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
+    final shadowOpacity = (clamped.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
 
     // 如果偏移量极小，不渲染阴影层，直接显示当前页内容（无阴影容器）
     // 这解决了动画结束后阴影可能残留 1 秒的问题
@@ -1040,7 +1045,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                   decoration: BoxDecoration(
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: shadowOpacity),
+                        color: const Color(0xFF000000)
+                            .withValues(alpha: shadowOpacity),
                         blurRadius: 20,
                         spreadRadius: 5,
                         offset: Offset(clamped > 0 ? -8 : 8, 0),

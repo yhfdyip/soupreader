@@ -1,12 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart'
-    show
-        Colors,
-        RoundSliderOverlayShape,
-        RoundSliderThumbShape,
-        Slider,
-        SliderTheme,
-        SliderThemeData;
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/theme/colors.dart';
@@ -83,8 +75,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           boxShadow: [
             BoxShadow(
               color: _isDarkMode
-                  ? Colors.black.withValues(alpha: 0.35)
-                  : Colors.black.withValues(alpha: 0.12),
+                  ? const Color(0xFF000000).withValues(alpha: 0.35)
+                  : const Color(0xFF000000).withValues(alpha: 0.12),
               blurRadius: _isDarkMode ? 22 : 16,
               offset: const Offset(0, -4),
             ),
@@ -191,37 +183,26 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               ),
             ),
             Expanded(
-              child: SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 4,
-                  thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 8),
-                  overlayShape:
-                      const RoundSliderOverlayShape(overlayRadius: 15),
-                  activeTrackColor: accent,
-                  inactiveTrackColor:
-                      scheme.mutedForeground.withValues(alpha: 0.28),
-                  thumbColor: _isDarkMode ? CupertinoColors.white : accent,
-                ),
-                child: Slider(
-                  value: _isDragging
-                      ? _dragValue.clamp(0, maxPage.toDouble())
-                      : widget.currentPageIndex
-                          .toDouble()
-                          .clamp(0, maxPage.toDouble()),
-                  min: 0,
-                  max: maxPage.toDouble(),
-                  onChanged: (value) {
-                    setState(() {
-                      _isDragging = true;
-                      _dragValue = value;
-                    });
-                  },
-                  onChangeEnd: (value) {
-                    setState(() => _isDragging = false);
-                    widget.onPageChanged(value.toInt());
-                  },
-                ),
+              child: CupertinoSlider(
+                value: _isDragging
+                    ? _dragValue.clamp(0, maxPage.toDouble())
+                    : widget.currentPageIndex
+                        .toDouble()
+                        .clamp(0, maxPage.toDouble()),
+                min: 0,
+                max: maxPage.toDouble(),
+                activeColor: accent,
+                thumbColor: _isDarkMode ? CupertinoColors.white : accent,
+                onChanged: (value) {
+                  setState(() {
+                    _isDragging = true;
+                    _dragValue = value;
+                  });
+                },
+                onChangeEnd: (value) {
+                  setState(() => _isDragging = false);
+                  widget.onPageChanged(value.toInt());
+                },
               ),
             ),
             ShadButton.ghost(
@@ -265,27 +246,17 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             ignoring: widget.settings.useSystemBrightness,
             child: Opacity(
               opacity: widget.settings.useSystemBrightness ? 0.35 : 1.0,
-              child: SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 3,
-                  thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 7),
-                  activeTrackColor: accent,
-                  inactiveTrackColor: scheme.mutedForeground.withValues(
-                    alpha: 0.25,
-                  ),
-                  thumbColor: accent,
-                ),
-                child: Slider(
-                  value: widget.settings.brightness.clamp(0.0, 1.0),
-                  min: 0.0,
-                  max: 1.0,
-                  onChanged: (value) {
-                    widget.onSettingsChanged(
-                      widget.settings.copyWith(brightness: value),
-                    );
-                  },
-                ),
+              child: CupertinoSlider(
+                value: widget.settings.brightness.clamp(0.0, 1.0),
+                min: 0.0,
+                max: 1.0,
+                activeColor: accent,
+                thumbColor: accent,
+                onChanged: (value) {
+                  widget.onSettingsChanged(
+                    widget.settings.copyWith(brightness: value),
+                  );
+                },
               ),
             ),
           ),
@@ -365,7 +336,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         decoration: BoxDecoration(
           color: isSelected
               ? accent.withValues(alpha: _isDarkMode ? 0.2 : 0.12)
-              : Colors.transparent,
+              : const Color(0x00000000),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected

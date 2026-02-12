@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart';
 
 /// SoupReader 字体样式系统
 /// 使用 Noto Serif TC (标题) + Noto Sans TC (正文)

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'page_delegate.dart';
 
 /// 覆盖翻页委托
@@ -226,7 +226,7 @@ class CoverPageDelegate extends PageDelegate {
                 boxShadow: direction != PageDirection.none
                     ? [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
+                          color: const Color(0xFF000000).withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(-5, 0),
                         ),

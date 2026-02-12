@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'dart:ui';
 
 /// 全局设计令牌：用于统一品牌、语义色、节奏与交互时长。
 class AppDesignTokens {

@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors;
 
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
@@ -175,7 +174,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
 
   Widget _buildGrabber() {
     final color = _isDark
-        ? Colors.white24
+        ? CupertinoColors.white.withValues(alpha: 0.24)
         : AppDesignTokens.textMuted.withValues(alpha: 0.35);
     return Center(
       child: Container(

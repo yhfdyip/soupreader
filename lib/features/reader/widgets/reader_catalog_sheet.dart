@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors;
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
@@ -173,7 +172,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   Widget _buildGrabber() {
     final color = _isDark
         ? AppDesignTokens.textMuted.withValues(alpha: 0.45)
-        : Colors.black12;
+        : const Color(0x1F000000);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 8),
@@ -301,7 +300,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: isSelected ? _accent : Colors.transparent,
+              color: isSelected ? _accent : const Color(0x00000000),
               width: 2,
             ),
           ),
@@ -751,14 +750,14 @@ class _BookCover extends StatelessWidget {
         color: isDark ? AppDesignTokens.pageBgDark : const Color(0xFFE8E4DF),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: isDark ? AppDesignTokens.borderDark : Colors.black12,
+          color: isDark ? AppDesignTokens.borderDark : const Color(0x1F000000),
         ),
       ),
       alignment: Alignment.center,
       child: Text(
         first,
         style: TextStyle(
-          color: isDark ? AppDesignTokens.textMuted : Colors.black38,
+          color: isDark ? AppDesignTokens.textMuted : const Color(0x61000000),
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),

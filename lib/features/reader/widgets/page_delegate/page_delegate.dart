@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 /// 翻页委托抽象类
 /// 定义不同翻页动画模式的通用接口

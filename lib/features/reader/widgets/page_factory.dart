@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'reader_page_agent.dart';
 
 /// 页面工厂（对标 Legado TextPageFactory）
@@ -122,7 +122,6 @@ class PageFactory {
       _contentHeight,
       _contentWidth,
       _fontSize,
-
       lineHeight: _lineHeight,
       letterSpacing: _letterSpacing,
       paragraphSpacing: _paragraphSpacing,
