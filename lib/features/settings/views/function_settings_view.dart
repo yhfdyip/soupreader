@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../bookshelf/views/reading_history_view.dart';
 import 'backup_settings_view.dart';
 import 'global_reading_settings_view.dart';
 import 'other_settings_view.dart';
@@ -40,11 +41,12 @@ class FunctionSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('阅读记录'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text('历史列表'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '阅读记录暂未实现',
+                onTap: () => Navigator.of(context).push(
+                  CupertinoPageRoute<void>(
+                    builder: (context) => const ReadingHistoryView(),
+                  ),
                 ),
               ),
               CupertinoListTile.notched(

@@ -168,7 +168,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
-      title: '阅读偏好',
+      title: '样式与排版',
       child: ListView(
         children: [
           CupertinoListSection.insetGrouped(
@@ -185,6 +185,16 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 additionalInfo: Text(_settings.pageTurnMode.name),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickPageTurnMode,
+              ),
+              _SliderTile(
+                title: '翻页动画时长',
+                value: _settings.pageAnimDuration.toDouble(),
+                min: 100,
+                max: 600,
+                display: '${_settings.pageAnimDuration}ms',
+                onChanged: (v) => _update(
+                  _settings.copyWith(pageAnimDuration: v.toInt()),
+                ),
               ),
               CupertinoListTile.notched(
                 title: const Text('两端对齐'),

@@ -36,18 +36,7 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
       child: ListView(
         children: [
           CupertinoListSection.insetGrouped(
-            header: const Text('翻页动画'),
-            children: [
-              CupertinoListTile.notched(
-                title: const Text('动画时长'),
-                additionalInfo: Text('${_settings.pageAnimDuration} ms'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _pickAnimDuration(),
-              ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('触发与按键'),
+            header: const Text('翻页触发'),
             children: [
               CupertinoListTile.notched(
                 title: const Text('翻页触发灵敏度'),
@@ -55,6 +44,11 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickTouchSlop,
               ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('按键与文本'),
+            children: [
               CupertinoListTile.notched(
                 title: const Text('音量键翻页'),
                 trailing: CupertinoSwitch(
@@ -63,48 +57,20 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                       _update(_settings.copyWith(volumeKeyPage: v)),
                 ),
               ),
+              CupertinoListTile.notched(
+                title: const Text('净化章节标题'),
+                trailing: CupertinoSwitch(
+                  value: _settings.cleanChapterTitle,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(cleanChapterTitle: v)),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),
         ],
       ),
     );
-  }
-
-  Future<void> _pickAnimDuration() async {
-    final controller =
-        TextEditingController(text: _settings.pageAnimDuration.toString());
-    final result = await showCupertinoDialog<int>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('动画时长 (ms)'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            placeholder: '100 - 600',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('取消'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: const Text('确定'),
-            onPressed: () {
-              final raw = int.tryParse(controller.text.trim());
-              Navigator.pop(context, raw);
-            },
-          ),
-        ],
-      ),
-    );
-    if (result == null) return;
-    final duration = result.clamp(100, 600);
-    _update(_settings.copyWith(pageAnimDuration: duration));
   }
 
   Future<void> _pickTouchSlop() async {

@@ -2384,6 +2384,77 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
           _buildSettingsCard(
+            title: '翻页动画',
+            child: Column(
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      PageTurnModeUi.values(current: _settings.pageTurnMode)
+                          .map((mode) {
+                    final isSelected = _settings.pageTurnMode == mode;
+                    final isHiddenMode = PageTurnModeUi.isHidden(mode);
+                    return Opacity(
+                      opacity: isHiddenMode ? 0.5 : 1,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        onPressed: isHiddenMode
+                            ? null
+                            : () {
+                                _updateSettingsFromSheet(
+                                  setPopupState,
+                                  _settings.copyWith(pageTurnMode: mode),
+                                );
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _uiAccent.withValues(alpha: 0.2)
+                                : _uiCardBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected ? _uiAccent : _uiBorder,
+                            ),
+                          ),
+                          child: Text(
+                            isHiddenMode ? '${mode.name}（隐藏）' : mode.name,
+                            style: TextStyle(
+                              color: isSelected ? _uiAccent : _uiTextNormal,
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                _buildSliderSetting(
+                  '动画',
+                  _settings.pageAnimDuration.toDouble(),
+                  100,
+                  600,
+                  (val) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(pageAnimDuration: val.toInt()),
+                    );
+                  },
+                  displayFormat: (v) => '${v.toInt()}ms',
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
             title: '内容边距（常用）',
             child: Column(
               children: [
@@ -2458,19 +2529,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
           _buildSettingsCard(
-            title: '页眉页脚（常用）',
+            title: '页眉页脚',
             child: Column(
               children: [
-                _buildSwitchRow('隐藏页眉', _settings.hideHeader, (value) {
+                _buildSwitchRow('显示页眉', !_settings.hideHeader, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
-                    _settings.copyWith(hideHeader: value),
-                  );
-                }),
-                _buildSwitchRow('隐藏页脚', _settings.hideFooter, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(hideFooter: value),
+                    _settings.copyWith(hideHeader: !value),
                   );
                 }),
                 _buildSwitchRow('页眉分割线', _settings.showHeaderLine, (value) {
@@ -2479,12 +2544,121 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(showHeaderLine: value),
                   );
                 }),
+                _buildOptionRow(
+                  '页眉左侧',
+                  _headerTipLabel(_settings.headerLeftContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉左侧',
+                      options: _headerTipOptions,
+                      currentValue: _settings.headerLeftContent,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(headerLeftContent: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '页眉中间',
+                  _headerTipLabel(_settings.headerCenterContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉中间',
+                      options: _headerTipOptions,
+                      currentValue: _settings.headerCenterContent,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(headerCenterContent: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '页眉右侧',
+                  _headerTipLabel(_settings.headerRightContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉右侧',
+                      options: _headerTipOptions,
+                      currentValue: _settings.headerRightContent,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(headerRightContent: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 4),
+                _buildSwitchRow('显示页脚', !_settings.hideFooter, (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(hideFooter: !value),
+                  );
+                }),
                 _buildSwitchRow('页脚分割线', _settings.showFooterLine, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
                     _settings.copyWith(showFooterLine: value),
                   );
                 }),
+                _buildOptionRow(
+                  '页脚左侧',
+                  _footerTipLabel(_settings.footerLeftContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚左侧',
+                      options: _footerTipOptions,
+                      currentValue: _settings.footerLeftContent,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(footerLeftContent: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '页脚中间',
+                  _footerTipLabel(_settings.footerCenterContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚中间',
+                      options: _footerTipOptions,
+                      currentValue: _settings.footerCenterContent,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(footerCenterContent: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '页脚右侧',
+                  _footerTipLabel(_settings.footerRightContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚右侧',
+                      options: _footerTipOptions,
+                      currentValue: _settings.footerRightContent,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(footerRightContent: value),
+                        );
+                      },
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -2502,60 +2676,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSettingsCard(
-            title: '翻页设置（常用）',
+            title: '翻页操作',
             child: Column(
               children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      PageTurnModeUi.values(current: _settings.pageTurnMode)
-                          .map((mode) {
-                    final isSelected = _settings.pageTurnMode == mode;
-                    final isHiddenMode = PageTurnModeUi.isHidden(mode);
-                    return Opacity(
-                      opacity: isHiddenMode ? 0.5 : 1,
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        onPressed: isHiddenMode
-                            ? null
-                            : () {
-                                _updateSettingsFromSheet(
-                                  setPopupState,
-                                  _settings.copyWith(pageTurnMode: mode),
-                                );
-                              },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? _uiAccent.withValues(alpha: 0.2)
-                                : _uiCardBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected ? _uiAccent : _uiBorder,
-                            ),
-                          ),
-                          child: Text(
-                            isHiddenMode ? '${mode.name}（隐藏）' : mode.name,
-                            style: TextStyle(
-                              color: isSelected ? _uiAccent : _uiTextNormal,
-                              fontSize: 13,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
                 _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
@@ -2575,20 +2698,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             title: '翻页手感',
             child: Column(
               children: [
-                _buildSliderSetting(
-                  '动画',
-                  _settings.pageAnimDuration.toDouble(),
-                  100,
-                  600,
-                  (val) {
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(pageAnimDuration: val.toInt()),
-                    );
-                  },
-                  displayFormat: (v) => '${v.toInt()}ms',
-                ),
-                const SizedBox(height: 8),
                 _buildSliderSetting(
                   '灵敏',
                   _settings.pageTouchSlop.toDouble(),
@@ -2653,146 +2762,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(showBattery: value),
                   );
                 }),
-              ],
-            ),
-          ),
-          _buildSettingsCard(
-            title: '页眉',
-            child: Column(
-              children: [
-                _buildSwitchRow('显示页眉', !_settings.hideHeader, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(hideHeader: !value),
-                  );
-                }),
-                _buildSwitchRow('页眉分割线', _settings.showHeaderLine, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(showHeaderLine: value),
-                  );
-                }),
-                _buildOptionRow(
-                  '左侧',
-                  _headerTipLabel(_settings.headerLeftContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉左侧',
-                      options: _headerTipOptions,
-                      currentValue: _settings.headerLeftContent,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(headerLeftContent: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '中间',
-                  _headerTipLabel(_settings.headerCenterContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉中间',
-                      options: _headerTipOptions,
-                      currentValue: _settings.headerCenterContent,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(headerCenterContent: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '右侧',
-                  _headerTipLabel(_settings.headerRightContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉右侧',
-                      options: _headerTipOptions,
-                      currentValue: _settings.headerRightContent,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(headerRightContent: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          _buildSettingsCard(
-            title: '页脚',
-            child: Column(
-              children: [
-                _buildSwitchRow('显示页脚', !_settings.hideFooter, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(hideFooter: !value),
-                  );
-                }),
-                _buildSwitchRow('页脚分割线', _settings.showFooterLine, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(showFooterLine: value),
-                  );
-                }),
-                _buildOptionRow(
-                  '左侧',
-                  _footerTipLabel(_settings.footerLeftContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页脚左侧',
-                      options: _footerTipOptions,
-                      currentValue: _settings.footerLeftContent,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(footerLeftContent: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '中间',
-                  _footerTipLabel(_settings.footerCenterContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页脚中间',
-                      options: _footerTipOptions,
-                      currentValue: _settings.footerCenterContent,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(footerCenterContent: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '右侧',
-                  _footerTipLabel(_settings.footerRightContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页脚右侧',
-                      options: _footerTipOptions,
-                      currentValue: _settings.footerRightContent,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(footerRightContent: value),
-                        );
-                      },
-                    );
-                  },
-                ),
               ],
             ),
           ),
@@ -2985,8 +2954,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             width: 30,
             child: Text(
               displayFormat?.call(value) ?? value.toStringAsFixed(1),
-              style:
-                  const TextStyle(color: CupertinoColors.white, fontSize: 13),
+              style: TextStyle(color: _uiTextNormal, fontSize: 13),
               textAlign: TextAlign.end,
             )),
       ],
