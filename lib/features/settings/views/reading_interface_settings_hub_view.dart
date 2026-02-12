@@ -8,7 +8,7 @@ import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/typography_settings_dialog.dart';
 import 'reading_preferences_view.dart';
-import 'reading_theme_settings_view.dart';
+import 'reading_tip_settings_view.dart';
 
 class ReadingInterfaceSettingsHubView extends StatefulWidget {
   const ReadingInterfaceSettingsHubView({super.key});
@@ -34,10 +34,10 @@ class _ReadingInterfaceSettingsHubViewState
     setState(() {});
   }
 
-  Future<void> _openTheme() async {
+  Future<void> _openTipSettings() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (context) => const ReadingThemeSettingsView(),
+        builder: (context) => const ReadingTipSettingsView(),
       ),
     );
     if (!mounted) return;
@@ -79,27 +79,36 @@ class _ReadingInterfaceSettingsHubViewState
             child: Column(
               children: [
                 _buildItem(
-                  title: '常用样式与亮度',
-                  info: '主题 / 字号 / 亮度',
+                  title: '样式与排版',
+                  info: '主题 / 字体 / 排版 / 翻页动画',
                   onTap: _openPreferences,
                 ),
                 const ShadSeparator.horizontal(
                   margin: EdgeInsets.symmetric(horizontal: 12),
                 ),
                 _buildItem(
-                  title: '排版与边距',
-                  info: '字距 / 段距 / 四边边距',
-                  onTap: _openTypographyDialog,
-                ),
-                const ShadSeparator.horizontal(
-                  margin: EdgeInsets.symmetric(horizontal: 12),
-                ),
-                _buildItem(
-                  title: '阅读主题',
-                  info: '主题色卡与预览',
-                  onTap: _openTheme,
+                  title: '页眉页脚与标题',
+                  info: '内容位 / 分割线 / 标题显示',
+                  onTap: _openTipSettings,
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '高级',
+            style: theme.textTheme.small.copyWith(
+              color: scheme.mutedForeground,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ShadCard(
+            padding: EdgeInsets.zero,
+            child: _buildItem(
+              title: '排版与边距（高级）',
+              info: '标题/正文/边距滑杆',
+              onTap: _openTypographyDialog,
             ),
           ),
         ],

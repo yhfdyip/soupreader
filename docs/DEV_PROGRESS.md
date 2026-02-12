@@ -1,5 +1,38 @@
 # SoupReader 开发进度日志
 
+## 2026-02-12（阅读器配置复刻 legado：布局排版与操作逻辑重排）
+
+### 已完成
+- 阅读页内配置弹层按 legado 语义重排：
+  - `界面` 分组新增并承接 `翻页动画`（翻页模式 + 动画时长）；
+  - 将 `页眉页脚` 的显示开关、分割线和三栏内容位配置迁移到 `界面` 分组；
+  - `设置` 分组收敛为行为项：翻页触发/按键、状态栏显示、点击区域、自动阅读与其他行为。
+- 全局阅读设置入口与阅读页分组同构：
+  - `reading_interface_settings_hub_view.dart` 改为 `样式与排版`、`页眉页脚与标题`、`排版与边距（高级）` 三段结构；
+  - 新增 `reading_tip_settings_view.dart` 承接 legado `TipConfig` 对应能力（标题位置、页眉页脚内容位/分割线）；
+  - `reading_behavior_settings_hub_view.dart` 与子页面文案/分组同步收敛为行为域。
+- 全局子页面职责重排：
+  - `reading_preferences_view.dart` 增加 `翻页动画时长`（界面域）；
+  - `reading_page_settings_view.dart` 移除动画项，仅保留翻页触发与按键/文本行为；
+  - `reading_status_action_settings_view.dart` 移除页眉页脚配置，仅保留状态栏与点击区域。
+
+### 为什么
+- 需求要求“复刻 legado 的布局排版与操作逻辑”，并保持 `Shadcn + Cupertino` 组件约束。
+- 现状中 `翻页动画` 与 `页眉页脚` 分散在行为页，导致与 legado 的 `界面/设置` 分工不一致，用户操作路径不稳定。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 阅读页 -> 菜单 -> `界面`：确认可设置主题/排版/翻页动画/页眉页脚；
+  - 阅读页 -> 菜单 -> `设置`：确认仅剩行为项（灵敏度/按键/点击区域/自动阅读等）；
+  - 设置 -> 功能&设置 -> 阅读设置 -> `界面（样式）/设置（行为）`：确认分组与阅读页内同构。
+
+### 兼容影响
+- 仅调整阅读器配置 UI 的分组与入口，不变更 `ReadingSettings` 存储结构与解析逻辑。
+- 不涉及书源解析、网络请求和五段链路（search/explore/bookInfo/toc/content）。
+- 旧书源兼容性无协议级影响。
+
 ## 2026-02-12（阅读器配置 UI/UX 重构：操作路径对齐 legado + Shadcn）
 
 ### 已完成
@@ -300,3 +333,30 @@
 ### 兼容影响
 - 不涉及书源解析、网络请求、数据库结构与阅读规则语义变更。
 - 删除的 `app_theme.dart` 为未使用遗留文件；运行路径无功能依赖。
+
+## 2026-02-12（功能入口落地：功能设置中的“阅读记录”接入实际页面）
+
+### 已完成
+- `lib/features/settings/views/function_settings_view.dart`
+  - 将“阅读记录”从“暂未实现”占位改为实际可用入口；
+  - 点击后跳转到 `ReadingHistoryView`；
+  - 右侧说明文案从“暂未实现”调整为“历史列表”。
+
+### 为什么
+- legacy 对应行为是“我的 -> 阅读记录”直接进入阅读记录列表（`ReadRecordActivity`），不是占位弹窗。
+- 当前项目已有 `ReadingHistoryView` 可承接该能力，继续保留占位会造成路径割裂。
+
+### legado 对标（已完整读取）
+- `../legado/app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt`
+- `../legado/app/src/main/java/io/legado/app/ui/main/my/MyFragment.kt`
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 设置 -> 功能 & 设置 -> 阅读记录；
+  - 应进入阅读记录列表页（`ReadingHistoryView`），不再弹“暂未实现”提示。
+
+### 兼容影响
+- 本次仅调整设置入口导航，不改阅读数据结构和记录存储逻辑。
+- 旧书源兼容性无协议级影响。

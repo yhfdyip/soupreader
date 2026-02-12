@@ -34,7 +34,7 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
                 _buildItem(
                   context,
                   title: '翻页与按键',
-                  info: '翻页模式 / 灵敏度 / 音量键',
+                  info: '灵敏度 / 音量键 / 净化标题',
                   onTap: () => Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) => const ReadingPageSettingsView(),
@@ -47,7 +47,7 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
                 _buildItem(
                   context,
                   title: '状态栏与点击区域',
-                  info: '页眉页脚 / 点击动作',
+                  info: '状态栏显示 / 点击动作',
                   onTap: () => Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) =>
