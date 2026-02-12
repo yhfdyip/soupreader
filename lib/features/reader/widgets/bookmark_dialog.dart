@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
@@ -91,22 +92,48 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
     _loadBookmarks();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _isDark ? const Color(0xFF2C2C2E) : _panelBg,
-          content: Text(
-            '书签已添加',
-            style: TextStyle(color: _textStrong),
-          ),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      _showToast('书签已添加');
     }
   }
 
+  void _showToast(String message) {
+    if (!mounted) return;
+
+    showCupertinoModalPopup<void>(
+      context: context,
+      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
+      builder: (toastContext) {
+        final navigator = Navigator.of(toastContext);
+        unawaited(Future<void>.delayed(const Duration(milliseconds: 900), () {
+          if (navigator.mounted && navigator.canPop()) {
+            navigator.pop();
+          }
+        }));
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: (_isDark ? const Color(0xFF2C2C2E) : _panelBg)
+                    .withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _lineColor.withValues(alpha: 0.9)),
+              ),
+              child: Text(
+                message,
+                style: TextStyle(color: _textStrong, fontSize: 13),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _deleteBookmark(BookmarkEntity bookmark) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('删除书签'),
@@ -227,7 +254,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
   Widget _buildGrabber() {
     final color = _isDark
-        ? Colors.white24
+        ? CupertinoColors.white.withValues(alpha: 0.24)
         : AppDesignTokens.textMuted.withValues(alpha: 0.35);
     return Center(
       child: Container(
@@ -248,7 +275,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.bookmark_border,
+            CupertinoIcons.bookmark,
             size: 64,
             color: _textSubtle.withValues(alpha: 0.6),
           ),
@@ -300,7 +327,10 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
             color: AppDesignTokens.error.withValues(alpha: 0.5),
           ),
         ),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: const Icon(
+          CupertinoIcons.delete_solid,
+          color: CupertinoColors.white,
+        ),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -309,28 +339,49 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: _lineColor.withValues(alpha: 0.85)),
         ),
-        child: ListTile(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => _jumpToBookmark(bookmark),
-          leading: Icon(
-            Icons.bookmark,
-            color: _accent,
-          ),
-          title: Text(
-            bookmark.chapterTitle,
-            style: TextStyle(color: _textStrong),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            _formatTime(bookmark.createdTime),
-            style: TextStyle(color: _textSubtle, fontSize: 12),
-          ),
-          trailing: IconButton(
-            icon: Icon(
-              Icons.delete_outline,
-              color: _textSubtle,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.bookmark_fill,
+                  color: _accent,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        bookmark.chapterTitle,
+                        style: TextStyle(color: _textStrong),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTime(bookmark.createdTime),
+                        style: TextStyle(color: _textSubtle, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                CupertinoButton(
+                  padding: const EdgeInsets.all(6),
+                  minimumSize: const Size(28, 28),
+                  onPressed: () => _deleteBookmark(bookmark),
+                  child: Icon(
+                    CupertinoIcons.delete,
+                    color: _textSubtle,
+                    size: 18,
+                  ),
+                ),
+              ],
             ),
-            onPressed: () => _deleteBookmark(bookmark),
           ),
         ),
       ),
@@ -378,7 +429,9 @@ class BookmarkIndicator extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Icon(
-          hasBookmark ? Icons.bookmark : Icons.bookmark_border,
+          hasBookmark
+              ? CupertinoIcons.bookmark_fill
+              : CupertinoIcons.bookmark,
           color: hasBookmark ? activeColor : inactiveColor,
           size: 24,
         ),

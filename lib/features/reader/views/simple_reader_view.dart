@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart'
-    hide Slider; // 隐藏 Slider 以避免与 Cupertino 冲突
+import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/database_service.dart';
@@ -2508,29 +2507,46 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       PageTurnModeUi.values(current: _settings.pageTurnMode)
                           .map((mode) {
                     final isSelected = _settings.pageTurnMode == mode;
-                    return ChoiceChip(
-                      label: Text(
-                        PageTurnModeUi.isHidden(mode)
-                            ? '${mode.name}（隐藏）'
-                            : mode.name,
-                      ),
-                      selected: isSelected,
-                      selectedColor: _uiAccent,
-                      backgroundColor: _uiCardBg,
-                      labelStyle: TextStyle(
-                        color: isSelected ? _uiTextStrong : _uiTextNormal,
-                        fontSize: 13,
-                      ),
-                      onSelected: PageTurnModeUi.isHidden(mode)
-                          ? null
-                          : (selected) {
-                              if (selected) {
+                    final isHiddenMode = PageTurnModeUi.isHidden(mode);
+                    return Opacity(
+                      opacity: isHiddenMode ? 0.5 : 1,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        onPressed: isHiddenMode
+                            ? null
+                            : () {
                                 _updateSettingsFromSheet(
                                   setPopupState,
                                   _settings.copyWith(pageTurnMode: mode),
                                 );
-                              }
-                            },
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _uiAccent.withValues(alpha: 0.2)
+                                : _uiCardBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected ? _uiAccent : _uiBorder,
+                            ),
+                          ),
+                          child: Text(
+                            isHiddenMode ? '${mode.name}（隐藏）' : mode.name,
+                            style: TextStyle(
+                              color: isSelected ? _uiAccent : _uiTextNormal,
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
                     );
                   }).toList(),
                 ),
@@ -3017,18 +3033,41 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               itemBuilder: (ctx, index) {
                 final font = ReadingFontFamily.presets[index];
                 final isSelected = _settings.fontFamilyIndex == index;
-                return ListTile(
-                  title: Text(font.name,
-                      style: TextStyle(
-                          color: isSelected ? _uiAccent : _uiTextStrong)),
-                  trailing: isSelected
-                      ? Icon(CupertinoIcons.checkmark, color: _uiAccent)
-                      : null,
-                  onTap: () {
+                return CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
                     _updateSettings(_settings.copyWith(fontFamilyIndex: index));
                     parentSetState(() {}); // Ensure sheet updates
                     Navigator.pop(ctx);
                   },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: _uiBorder.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            font.name,
+                            style: TextStyle(
+                              color: isSelected ? _uiAccent : _uiTextStrong,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          Icon(CupertinoIcons.checkmark, color: _uiAccent),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),

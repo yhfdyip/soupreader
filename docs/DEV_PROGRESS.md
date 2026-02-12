@@ -89,3 +89,54 @@
 ### 兼容影响
 - 不涉及书源解析逻辑与数据结构变更，仅为入口导航调整。
 - 旧书源兼容性无协议级影响。
+
+## 2026-02-12（协作规范更新：UI 约束升级为全局强制）
+
+### 已完成
+- 更新 `AGENTS.md` 的 `1.2 UI 规范（强制）`，将 `Shadcn + Cupertino` 从原则要求升级为全项目强制约束。
+- 新增明确规则：
+  - 全项目新增/改造 UI 必须使用 `Shadcn + Cupertino` 组合；
+  - 禁止引入或混用其它 UI 体系作为主实现；
+  - 特殊场景需在任务说明与进度文档中记录原因、范围和替代方案；
+  - 不符合该规范的改动在评审中视为阻塞项。
+
+### 为什么
+- 需求明确要求“全局强制使用 `Shadcn + Cupertino`”，需要在项目协作规范中固化，避免后续执行口径不一致。
+
+### 如何验证
+- 手工检查：
+  - 打开 `AGENTS.md`，确认 `1.2 UI 规范（强制）` 已包含上述 4 条新增约束。
+  - 后续任务设计与实现需按该条款执行，若有例外必须在 `docs/DEV_PROGRESS.md` 记录说明。
+
+### 兼容影响
+- 该改动仅影响协作与评审规范，不影响现有运行时代码逻辑与旧书源兼容性。
+
+## 2026-02-12（阅读器 UI 合规重构：SimpleReaderView 子弹窗 + 书签弹窗）
+
+### 已完成
+- `simple_reader_view.dart`：
+  - 将翻页模式选择从 `ChoiceChip` 替换为 `CupertinoButton + 自定义容器` 方案，保留“隐藏模式”不可选语义；
+  - 将字体选择弹窗条目从 `ListTile` 替换为 `CupertinoButton + Row` 方案，保留选中态勾选与点击即生效行为；
+  - Material 导入收敛为 `show Colors`，避免引入 Material 组件实现。
+- `bookmark_dialog.dart`：
+  - 移除 `SnackBar/ScaffoldMessenger`，改为 Cupertino 弹出式轻提示；
+  - 书签空态、滑删背景、列表项、删除按钮全部替换为 Cupertino 图标与 Cupertino 交互组件；
+  - 移除 `ListTile`，改为自定义行布局，保留“点条目跳转 / 点删除移除 / 左滑删除”语义。
+- 删除未被路由使用的旧页面：`lib/features/reader/views/reader_view.dart`。
+
+### 为什么
+- 协作规范已升级为全项目强制 `Shadcn + Cupertino`，阅读器仍存在 Material 组件残留（`ChoiceChip`、`ListTile`、`SnackBar` 等），与规范冲突。
+- `ReaderView` 已不在实际跳转链路中，继续保留会造成维护噪音和潜在误用。
+
+### 如何验证
+- 静态检查：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 打开阅读器设置 -> 翻页设置，验证模式切换可用，带“隐藏”标识的模式不可点选；
+  - 打开字体选择弹窗，点击任意字体应立即生效并关闭弹窗；
+  - 打开书签弹窗，验证添加提示、点击跳转、右侧删除、左滑删除均可用。
+
+### 兼容影响
+- 对书源解析、网络请求与五段链路（search/explore/bookInfo/toc/content）无逻辑改动。
+- 阅读器 UI 交互行为保持原语义，主要是组件实现替换与旧页清理。
+- `ReaderView` 已删除；若有外部分支仍直接引用该页面，需要改为 `SimpleReaderView`。

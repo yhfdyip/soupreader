@@ -17,6 +17,10 @@
 ### 1.2 UI 规范（强制）
 
 - 使用 `Shadcn + Cupertino`。
+- 全项目新增/改造 UI 必须使用 `Shadcn + Cupertino` 组合。
+- 禁止引入或混用其它 UI 组件体系（如纯 Material 风格组件）作为主实现。
+- 若遇到 `Shadcn/Cupertino` 暂无等价能力的特殊场景，必须在任务说明与 `docs/DEV_PROGRESS.md` 中写明原因、范围和替代方案。
+- 评审若发现不符合本规范，视为阻塞项，需整改后再提交。
 - 文档：`https://mariuti.com/flutter-shadcn-ui/llms.txt`
 
 ---
