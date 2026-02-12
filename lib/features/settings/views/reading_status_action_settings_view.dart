@@ -36,6 +36,7 @@ class _ReadingStatusActionSettingsViewState
     return AppCupertinoPageScaffold(
       title: '状态栏与操作',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('状态栏'),

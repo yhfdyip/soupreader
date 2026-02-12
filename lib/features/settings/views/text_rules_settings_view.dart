@@ -34,6 +34,7 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
     return AppCupertinoPageScaffold(
       title: '替换净化',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('内置开关'),

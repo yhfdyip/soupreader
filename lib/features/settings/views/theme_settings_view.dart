@@ -7,6 +7,7 @@ import '../../../core/services/settings_service.dart';
 import 'appearance_settings_view.dart';
 import 'reading_theme_settings_view.dart';
 import 'settings_placeholders.dart';
+import 'settings_ui_tokens.dart';
 
 class ThemeSettingsView extends StatelessWidget {
   const ThemeSettingsView({super.key});
@@ -24,6 +25,7 @@ class ThemeSettingsView extends StatelessWidget {
     return AppCupertinoPageScaffold(
       title: '主题',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('颜色主题'),
@@ -54,7 +56,7 @@ class ThemeSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('白天/黑夜主题'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -68,7 +70,7 @@ class ThemeSettingsView extends StatelessWidget {
             children: [
               CupertinoListTile.notched(
                 title: const Text('动态颜色/色差'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -77,7 +79,7 @@ class ThemeSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('操作栏模糊'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -86,7 +88,7 @@ class ThemeSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('列表点击效果'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -95,7 +97,7 @@ class ThemeSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('网页主题化'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -104,7 +106,7 @@ class ThemeSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('缩放'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -113,7 +115,7 @@ class ThemeSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('自定义图标'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -122,7 +124,7 @@ class ThemeSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('自定义颜色'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -146,5 +148,12 @@ class ThemeSettingsView extends StatelessWidget {
       case AppAppearanceMode.dark:
         return '深色';
     }
+  }
+
+  Widget _plannedInfo() {
+    return const Text(
+      SettingsUiTokens.plannedLabel,
+      style: TextStyle(color: CupertinoColors.secondaryLabel),
+    );
   }
 }

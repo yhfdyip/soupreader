@@ -34,6 +34,7 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
     return AppCupertinoPageScaffold(
       title: '翻页与按键',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('翻页触发'),

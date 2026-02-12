@@ -39,6 +39,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     return AppCupertinoPageScaffold(
       title: '关于与诊断',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('应用'),

@@ -7,6 +7,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/format_utils.dart';
+import 'settings_ui_tokens.dart';
 
 class StorageSettingsView extends StatefulWidget {
   const StorageSettingsView({super.key});
@@ -49,6 +50,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     return AppCupertinoPageScaffold(
       title: '下载与缓存',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('下载'),
@@ -73,7 +75,8 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
             children: [
               CupertinoListTile.notched(
                 title: const Text('章节缓存占用'),
-                additionalInfo: Text('$cacheText（$chapterText）'),
+                additionalInfo:
+                    Text(SettingsUiTokens.status(cacheText, chapterText)),
               ),
               CupertinoListTile.notched(
                 title: const Text('清理章节缓存（在线书籍）'),

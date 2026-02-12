@@ -45,6 +45,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     return AppCupertinoPageScaffold(
       title: '外观与通用',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('外观'),

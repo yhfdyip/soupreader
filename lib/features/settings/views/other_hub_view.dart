@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import 'about_settings_view.dart';
 import 'settings_placeholders.dart';
+import 'settings_ui_tokens.dart';
 
 class OtherHubView extends StatelessWidget {
   const OtherHubView({super.key});
@@ -12,13 +13,17 @@ class OtherHubView extends StatelessWidget {
     return AppCupertinoPageScaffold(
       title: '其它',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('其它'),
             children: [
               CupertinoListTile.notched(
                 title: const Text('分享'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text(
+                  SettingsUiTokens.plannedLabel,
+                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -27,7 +32,10 @@ class OtherHubView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('好评支持'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text(
+                  SettingsUiTokens.plannedLabel,
+                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,

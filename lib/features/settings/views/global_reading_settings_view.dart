@@ -72,7 +72,7 @@ class _GlobalReadingSettingsViewState extends State<GlobalReadingSettingsView> {
     return AppCupertinoPageScaffold(
       title: '阅读（全局默认）',
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
         children: [
           Text(
             '入口与阅读页保持一致',
@@ -88,7 +88,7 @@ class _GlobalReadingSettingsViewState extends State<GlobalReadingSettingsView> {
               children: [
                 _buildItem(
                   title: '界面（样式）',
-                  info: '主题 / 字体 / 排版 / 边距',
+                  info: '主题 / 字体 / 排版 / 翻页动画',
                   onTap: _openInterfaceHub,
                 ),
                 const ShadSeparator.horizontal(

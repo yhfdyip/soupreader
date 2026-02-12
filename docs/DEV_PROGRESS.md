@@ -1,5 +1,79 @@
 # SoupReader 开发进度日志
 
+## 2026-02-12（设置系统 UI/UX 优化第二批：全页密度一致性收口）
+
+### 已完成
+- 对剩余设置子页统一应用“紧凑留白”规范，收敛视觉密度：
+  - `about_settings_view.dart`
+  - `appearance_settings_view.dart`
+  - `backup_settings_view.dart`
+  - `storage_settings_view.dart`
+  - `text_rules_settings_view.dart`
+  - `reading_preferences_view.dart`
+  - `reading_theme_settings_view.dart`
+  - `reading_tip_settings_view.dart`
+  - `reading_page_settings_view.dart`
+  - `reading_status_action_settings_view.dart`
+  - `reading_other_settings_view.dart`
+- `storage_settings_view.dart` 缓存状态文案统一为短标签格式：
+  - `缓存大小 · 章节数量`（复用 `SettingsUiTokens.status`）。
+- 延续“计划中”弱化策略到 Hub/源管理等补充页面：
+  - `source_management_view.dart`
+  - `other_hub_view.dart`
+  - `function_settings_view.dart`
+
+### 为什么
+- 第一批已优化首页和主二级页，但部分子页仍存在默认留白与文案密度不一致，切换页面时观感跳变明显。
+- 需要将设置系统整体拉齐到同一信息密度与语义表达规范。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 从设置首页依次进入“主题/功能&设置/源管理/其它设置/阅读设置”，确认列表顶部留白与分组密度一致；
+  - 进入“下载与缓存”，确认缓存状态文案改为 `值 · 值` 的短标签风格；
+  - 进入占位项，确认仍展示统一的“计划中”弹窗。
+
+### 兼容影响
+- 本批次仅为设置页面布局密度和文案样式统一，不涉及数据模型、存储键、网络与书源链路。
+- 旧书源兼容性无协议级影响。
+
+## 2026-02-12（设置系统 UI/UX 优化：信息密度优先 + 计划中弱化）
+
+### 已完成
+- 设置系统首页与二级页完成统一优化（iOS 风格、可用项优先）：
+  - `settings_view.dart`
+    - 四区块结构保持不变（源管理/主题/功能&设置/其它），但区块内按“可用优先、计划中后置”重排；
+    - 压缩列表密度（顶部/底部留白、区块间距、行内垂直 padding、图标尺寸）；
+    - 新增“计划中”弱化样式：占位项标题、图标和右侧状态文案统一降权；
+    - 状态文案统一为短标签 + 数值（如 `仅 Wi‑Fi · 缓存 xxx`）。
+  - `theme_settings_view.dart`、`other_settings_view.dart`、`function_settings_view.dart`、`source_management_view.dart`、`other_hub_view.dart`
+    - 将右侧 `暂未实现` 统一改为 `计划中`，并使用次级颜色显示；
+    - 页面列表统一收紧顶部/底部空白，提升同屏可见信息量。
+  - `global_reading_settings_view.dart`
+    - 同步收紧列表顶部间距；
+    - `界面（样式）`摘要更新为 `主题 / 字体 / 排版 / 翻页动画`，与当前阅读设置语义一致。
+- 新增设置 UI 规范常量：
+  - `settings_ui_tokens.dart`：统一 `计划中` 文案、状态拼接与占位文案归一化能力。
+- 占位弹窗统一：
+  - `settings_placeholders.dart` 改为统一标题 `计划中`，并自动将传入文案中的 `暂未实现` 归一化为 `计划中`。
+
+### 为什么
+- 你要求对设置页做优化，目标是“信息密度 + 可读性”优先，并在全设置系统范围内保持一致。
+- 原实现中“暂未实现”项视觉权重过高，且列表行高/留白偏松，导致有效信息同屏承载不足。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 设置首页：确认可用项前置、`计划中`项弱化、同屏可见项增多；
+  - 进入 `主题` / `其它设置` / `源管理` / `功能&设置`：确认占位项右侧文案统一为 `计划中`；
+  - 点击任一占位项：弹窗标题统一为 `计划中`，内容文案不再出现“暂未实现”原词。
+
+### 兼容影响
+- 本次仅为设置系统 UI/UX 与文案层调整，不涉及数据结构、存储键、书源解析与请求链路。
+- 旧书源兼容性无协议级影响。
+
 ## 2026-02-12（阅读器配置复刻 legado：布局排版与操作逻辑重排）
 
 ### 已完成

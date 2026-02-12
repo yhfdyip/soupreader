@@ -6,6 +6,7 @@ import 'backup_settings_view.dart';
 import 'global_reading_settings_view.dart';
 import 'other_settings_view.dart';
 import 'settings_placeholders.dart';
+import 'settings_ui_tokens.dart';
 
 class FunctionSettingsView extends StatelessWidget {
   const FunctionSettingsView({super.key});
@@ -15,6 +16,7 @@ class FunctionSettingsView extends StatelessWidget {
     return AppCupertinoPageScaffold(
       title: '功能 & 设置',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('核心'),
@@ -51,7 +53,10 @@ class FunctionSettingsView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('隔空阅读'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text(
+                  SettingsUiTokens.plannedLabel,
+                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,

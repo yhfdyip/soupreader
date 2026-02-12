@@ -34,6 +34,7 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
     return AppCupertinoPageScaffold(
       title: '其他',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('阅读行为'),

@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../source/views/source_list_view.dart';
 import 'settings_placeholders.dart';
+import 'settings_ui_tokens.dart';
 import 'text_rules_settings_view.dart';
 
 class SourceManagementView extends StatelessWidget {
@@ -13,6 +14,7 @@ class SourceManagementView extends StatelessWidget {
     return AppCupertinoPageScaffold(
       title: '源管理',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('管理'),
@@ -31,7 +33,10 @@ class SourceManagementView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('订阅管理'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text(
+                  SettingsUiTokens.plannedLabel,
+                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -40,7 +45,10 @@ class SourceManagementView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('语音管理'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text(
+                  SettingsUiTokens.plannedLabel,
+                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -78,7 +86,10 @@ class SourceManagementView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('广告屏蔽'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text(
+                  SettingsUiTokens.plannedLabel,
+                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,

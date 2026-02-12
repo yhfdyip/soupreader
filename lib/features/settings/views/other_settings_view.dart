@@ -7,6 +7,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import 'settings_placeholders.dart';
+import 'settings_ui_tokens.dart';
 import 'storage_settings_view.dart';
 
 class OtherSettingsView extends StatefulWidget {
@@ -140,13 +141,14 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     return AppCupertinoPageScaffold(
       title: '其它设置',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('基本设置'),
             children: [
               CupertinoListTile.notched(
                 title: const Text('主页面'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -155,7 +157,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('更换图标'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -164,7 +166,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('自动刷新'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -173,7 +175,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('竖屏锁定'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -187,7 +189,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             children: [
               CupertinoListTile.notched(
                 title: const Text('服务器证书验证'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -196,7 +198,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('开启 18+ 网址检测'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -205,7 +207,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('高级搜索'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -214,7 +216,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('智能评估'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -245,7 +247,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('启动自动跳转之前阅读'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -254,7 +256,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('新书默认开启净化替换'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -268,7 +270,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             children: [
               CupertinoListTile.notched(
                 title: const Text('下载与缓存'),
-                additionalInfo: const Text('Wi‑Fi / 清理'),
+                additionalInfo: const Text('仅 Wi‑Fi · 清理'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
@@ -283,7 +285,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             children: [
               CupertinoListTile.notched(
                 title: const Text('订阅设置'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -297,7 +299,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             children: [
               CupertinoListTile.notched(
                 title: const Text('日志文件'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: _plannedInfo(),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -323,5 +325,12 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
       case BookshelfSortMode.author:
         return '作者';
     }
+  }
+
+  Widget _plannedInfo() {
+    return const Text(
+      SettingsUiTokens.plannedLabel,
+      style: TextStyle(color: CupertinoColors.secondaryLabel),
+    );
   }
 }

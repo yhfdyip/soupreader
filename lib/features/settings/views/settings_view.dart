@@ -17,6 +17,7 @@ import 'backup_settings_view.dart';
 import 'theme_settings_view.dart';
 import 'other_settings_view.dart';
 import 'settings_placeholders.dart';
+import 'settings_ui_tokens.dart';
 import 'text_rules_settings_view.dart';
 
 /// 设置首页
@@ -110,14 +111,14 @@ class _SettingsViewState extends State<SettingsView> {
     final auto =
         _settingsService.appSettings.autoUpdateSources ? '自动更新开' : '自动更新关';
     if (count == null) return auto;
-    return '$count 个 · $auto';
+    return SettingsUiTokens.status('$count 个', auto);
   }
 
   String get _otherSettingsSummary {
     final wifi =
         _settingsService.appSettings.wifiOnlyDownload ? '仅 Wi‑Fi' : '不限网络';
     final cache = FormatUtils.formatBytes(_cacheInfo.bytes);
-    return '$wifi · 缓存 $cache';
+    return SettingsUiTokens.status(wifi, '缓存 $cache');
   }
 
   String get _readingHistorySummary {
@@ -131,7 +132,7 @@ class _SettingsViewState extends State<SettingsView> {
     return AppCupertinoPageScaffold(
       title: '设置',
       child: ListView(
-        padding: const EdgeInsets.only(top: 12, bottom: 24),
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           _buildSection(
             title: '源管理',
@@ -144,30 +145,6 @@ class _SettingsViewState extends State<SettingsView> {
                 title: '书源管理',
                 info: _sourceSummary,
                 onTap: _openSourceList,
-              ),
-              _buildSettingsItem(
-                icon: _buildIconBox(
-                  CupertinoIcons.collections_solid,
-                  CupertinoColors.systemCyan,
-                ),
-                title: '订阅管理',
-                info: '暂未实现',
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '订阅管理暂未实现',
-                ),
-              ),
-              _buildSettingsItem(
-                icon: _buildIconBox(
-                  CupertinoIcons.speaker_2_fill,
-                  CupertinoColors.systemCyan,
-                ),
-                title: '语音管理',
-                info: '暂未实现',
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '语音管理（TTS）暂未实现',
-                ),
               ),
               _buildSettingsItem(
                 icon: _buildIconBox(
@@ -189,11 +166,38 @@ class _SettingsViewState extends State<SettingsView> {
               ),
               _buildSettingsItem(
                 icon: _buildIconBox(
+                  CupertinoIcons.collections_solid,
+                  CupertinoColors.systemCyan,
+                ),
+                title: '订阅管理',
+                info: SettingsUiTokens.plannedLabel,
+                isPlanned: true,
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '订阅管理暂未实现',
+                ),
+              ),
+              _buildSettingsItem(
+                icon: _buildIconBox(
+                  CupertinoIcons.speaker_2_fill,
+                  CupertinoColors.systemCyan,
+                ),
+                title: '语音管理',
+                info: SettingsUiTokens.plannedLabel,
+                isPlanned: true,
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '语音管理（TTS）暂未实现',
+                ),
+              ),
+              _buildSettingsItem(
+                icon: _buildIconBox(
                   CupertinoIcons.nosign,
                   CupertinoColors.systemCyan,
                 ),
                 title: '广告屏蔽',
-                info: '暂未实现',
+                info: SettingsUiTokens.plannedLabel,
+                isPlanned: true,
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
                   title: '广告屏蔽规则暂未实现',
@@ -224,6 +228,7 @@ class _SettingsViewState extends State<SettingsView> {
                   CupertinoColors.systemGreen,
                 ),
                 title: '备份/同步',
+                info: '导入/导出',
                 onTap: _openBackup,
               ),
               _buildSettingsItem(
@@ -237,24 +242,25 @@ class _SettingsViewState extends State<SettingsView> {
               ),
               _buildSettingsItem(
                 icon: _buildIconBox(
-                  CupertinoIcons.airplane,
-                  CupertinoColors.systemBlue,
-                ),
-                title: '隔空阅读',
-                info: '暂未实现',
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '隔空阅读（接力/Handoff）暂未实现',
-                ),
-              ),
-              _buildSettingsItem(
-                icon: _buildIconBox(
                   CupertinoIcons.gear_solid,
                   CupertinoColors.systemOrange,
                 ),
                 title: '其它设置',
                 info: _otherSettingsSummary,
                 onTap: _openOtherSettings,
+              ),
+              _buildSettingsItem(
+                icon: _buildIconBox(
+                  CupertinoIcons.airplane,
+                  CupertinoColors.systemBlue,
+                ),
+                title: '隔空阅读',
+                info: SettingsUiTokens.plannedLabel,
+                isPlanned: true,
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '隔空阅读（接力/Handoff）暂未实现',
+                ),
               ),
             ],
           ),
@@ -266,8 +272,18 @@ class _SettingsViewState extends State<SettingsView> {
                   CupertinoIcons.share,
                   CupertinoColors.systemGrey,
                 ),
+                title: '关于我们',
+                info: _version.isEmpty ? '—' : _version,
+                onTap: _openAbout,
+              ),
+              _buildSettingsItem(
+                icon: _buildIconBox(
+                  CupertinoIcons.share,
+                  CupertinoColors.systemGrey,
+                ),
                 title: '分享',
-                info: '暂未实现',
+                info: SettingsUiTokens.plannedLabel,
+                isPlanned: true,
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
                   title: '分享暂未实现（可考虑接入 share_plus）',
@@ -279,20 +295,12 @@ class _SettingsViewState extends State<SettingsView> {
                   CupertinoColors.systemGrey,
                 ),
                 title: '好评支持',
-                info: '暂未实现',
+                info: SettingsUiTokens.plannedLabel,
+                isPlanned: true,
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
                   title: '好评支持暂未实现',
                 ),
-              ),
-              _buildSettingsItem(
-                icon: _buildIconBox(
-                  CupertinoIcons.info_circle_fill,
-                  CupertinoColors.systemGrey,
-                ),
-                title: '关于我们',
-                info: _version.isEmpty ? '—' : _version,
-                onTap: _openAbout,
               ),
             ],
           ),
@@ -309,12 +317,12 @@ class _SettingsViewState extends State<SettingsView> {
     final scheme = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
             child: Text(
               title,
               style: theme.textTheme.small.copyWith(
@@ -353,16 +361,24 @@ class _SettingsViewState extends State<SettingsView> {
     required Widget icon,
     required String title,
     String? info,
+    bool isPlanned = false,
     required VoidCallback onTap,
   }) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
+    final titleColor = isPlanned ? scheme.mutedForeground : scheme.foreground;
+    final infoColor = isPlanned
+        ? scheme.mutedForeground.withValues(alpha: 0.75)
+        : scheme.mutedForeground;
 
     return ShadButton.ghost(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       mainAxisAlignment: MainAxisAlignment.start,
-      leading: icon,
+      leading: Opacity(
+        opacity: isPlanned ? 0.65 : 1.0,
+        child: icon,
+      ),
       onPressed: onTap,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -370,8 +386,10 @@ class _SettingsViewState extends State<SettingsView> {
           if (info != null && info.isNotEmpty) ...[
             Text(
               info,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.small.copyWith(
-                color: scheme.mutedForeground,
+                color: infoColor,
               ),
             ),
             const SizedBox(width: 8),
@@ -385,20 +403,20 @@ class _SettingsViewState extends State<SettingsView> {
       ),
       child: Text(
         title,
-        style: theme.textTheme.p.copyWith(color: scheme.foreground),
+        style: theme.textTheme.p.copyWith(color: titleColor),
       ),
     );
   }
 
   Widget _buildIconBox(IconData icon, Color color) {
     return Container(
-      width: 29,
-      height: 29,
+      width: 26,
+      height: 26,
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
       ),
-      child: Icon(icon, color: CupertinoColors.white, size: 17),
+      child: Icon(icon, color: CupertinoColors.white, size: 15),
     );
   }
 

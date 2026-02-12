@@ -18,6 +18,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     return AppCupertinoPageScaffold(
       title: '备份与恢复',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('导出'),

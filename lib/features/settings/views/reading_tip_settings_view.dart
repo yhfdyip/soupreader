@@ -41,6 +41,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
     return AppCupertinoPageScaffold(
       title: '页眉页脚与标题',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('标题显示'),

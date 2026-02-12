@@ -170,6 +170,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
     return AppCupertinoPageScaffold(
       title: '样式与排版',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('常用'),

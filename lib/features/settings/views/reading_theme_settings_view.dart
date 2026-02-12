@@ -44,6 +44,7 @@ class _ReadingThemeSettingsViewState extends State<ReadingThemeSettingsView> {
     return AppCupertinoPageScaffold(
       title: '阅读主题',
       child: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
             header: const Text('选择主题'),
