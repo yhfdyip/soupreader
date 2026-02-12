@@ -184,11 +184,8 @@ class _SettingsViewState extends State<SettingsView> {
                   CupertinoColors.systemCyan,
                 ),
                 title: '目录规则',
-                info: '暂未实现',
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '目录规则管理暂未实现（后续会合并到书源编辑器/规则调试）',
-                ),
+                info: '书源编辑',
+                onTap: _openSourceList,
               ),
               _buildSettingsItem(
                 icon: _buildIconBox(

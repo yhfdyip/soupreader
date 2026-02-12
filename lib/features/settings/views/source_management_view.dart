@@ -66,12 +66,15 @@ class SourceManagementView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('目录规则'),
-                additionalInfo: const Text('暂未实现'),
+                additionalInfo: const Text('书源编辑'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '目录规则管理暂未实现（后续会合并到书源编辑器/规则调试）',
-                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute<void>(
+                      builder: (context) => const SourceListView(),
+                    ),
+                  );
+                },
               ),
               CupertinoListTile.notched(
                 title: const Text('广告屏蔽'),

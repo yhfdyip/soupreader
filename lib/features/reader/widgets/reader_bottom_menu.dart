@@ -9,6 +9,7 @@ import 'package:flutter/material.dart'
         SliderThemeData;
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
 
@@ -177,7 +178,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               onPressed: widget.currentChapterIndex > 0
                   ? () =>
-                        widget.onChapterChanged(widget.currentChapterIndex - 1)
+                      widget.onChapterChanged(widget.currentChapterIndex - 1)
                   : null,
               child: Text(
                 '上一章',
@@ -227,7 +228,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               onPressed: widget.currentChapterIndex < widget.totalChapters - 1
                   ? () =>
-                        widget.onChapterChanged(widget.currentChapterIndex + 1)
+                      widget.onChapterChanged(widget.currentChapterIndex + 1)
                   : null,
               child: Text(
                 '下一章',

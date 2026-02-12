@@ -59,6 +59,10 @@ class RuleParserEngine {
     return dio;
   }
 
+  // 对标 legado：并发率限制记录按 sourceKey 维度共享（跨 RuleParserEngine 实例生效）。
+  static final Map<String, _ConcurrentRecord> _concurrentRecordMap =
+      <String, _ConcurrentRecord>{};
+
   // URL 选项里的 js（Legado 格式）需要一个 JS 执行环境。
   // iOS 下为 JavaScriptCore；Android/Linux 下为 QuickJS（flutter_js）。
   // 这里只用于“URL 参数处理”，不做复杂脚本引擎承诺。
@@ -1990,6 +1994,177 @@ class RuleParserEngine {
     return enabledCookieJar ? _dioCookie : _dioPlain;
   }
 
+  @visibleForTesting
+  static void debugResetConcurrentRateLimiterForTest() {
+    _concurrentRecordMap.clear();
+  }
+
+  _ConcurrentRateSpec? _parseConcurrentRateSpec(String? concurrentRateRaw) {
+    final raw = (concurrentRateRaw ?? '').trim();
+    if (raw.isEmpty || raw == '0') return null;
+
+    final slashIndex = raw.indexOf('/');
+    if (slashIndex <= 0) {
+      final intervalMs = int.tryParse(raw);
+      if (intervalMs == null || intervalMs <= 0) return null;
+      return _ConcurrentRateSpec.interval(raw: raw, intervalMs: intervalMs);
+    }
+
+    final countText = raw.substring(0, slashIndex).trim();
+    final windowText = raw.substring(slashIndex + 1).trim();
+    final count = int.tryParse(countText);
+    final windowMs = int.tryParse(windowText);
+    if (count == null || count <= 0 || windowMs == null || windowMs <= 0) {
+      return null;
+    }
+    return _ConcurrentRateSpec.window(
+      raw: raw,
+      maxCount: count,
+      windowMs: windowMs,
+    );
+  }
+
+  _ConcurrentAcquireStep _tryAcquireConcurrentRate({
+    required String sourceKey,
+    required _ConcurrentRateSpec spec,
+  }) {
+    final key = sourceKey.trim();
+    if (key.isEmpty) {
+      return _ConcurrentAcquireStep(
+        record: null,
+        waitMs: 0,
+        decision: '${spec.modeLabel}（sourceKey 为空，跳过限制）',
+      );
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    var record = _concurrentRecordMap[key];
+    if (record == null) {
+      record = _ConcurrentRecord(
+        isWindowMode: spec.isWindowMode,
+        timeMs: now,
+        frequency: 1,
+      );
+      _concurrentRecordMap[key] = record;
+      return _ConcurrentAcquireStep(
+        record: record,
+        waitMs: 0,
+        decision: spec.modeLabel,
+      );
+    }
+
+    if (!record.isWindowMode) {
+      final intervalMs = spec.intervalMs;
+      if (intervalMs == null || intervalMs <= 0) {
+        return const _ConcurrentAcquireStep(
+          record: null,
+          waitMs: 0,
+          decision: '并发率格式非法，跳过限制',
+        );
+      }
+      if (record.frequency > 0) {
+        return _ConcurrentAcquireStep(
+          record: record,
+          waitMs: intervalMs,
+          decision: spec.modeLabel,
+        );
+      }
+      final nextTime = record.timeMs + intervalMs;
+      if (now >= nextTime) {
+        record.timeMs = now;
+        record.frequency = 1;
+        return _ConcurrentAcquireStep(
+          record: record,
+          waitMs: 0,
+          decision: spec.modeLabel,
+        );
+      }
+      return _ConcurrentAcquireStep(
+        record: record,
+        waitMs: nextTime - now,
+        decision: spec.modeLabel,
+      );
+    }
+
+    final maxCount = spec.maxCount;
+    final windowMs = spec.windowMs;
+    if (maxCount == null ||
+        maxCount <= 0 ||
+        windowMs == null ||
+        windowMs <= 0) {
+      return const _ConcurrentAcquireStep(
+        record: null,
+        waitMs: 0,
+        decision: '并发率格式非法，跳过限制',
+      );
+    }
+
+    final nextTime = record.timeMs + windowMs;
+    if (now >= nextTime) {
+      record.timeMs = now;
+      record.frequency = 1;
+      return _ConcurrentAcquireStep(
+        record: record,
+        waitMs: 0,
+        decision: spec.modeLabel,
+      );
+    }
+
+    // 对标 legado：使用 `>`，允许窗口内先通过 maxCount+1 次后再等待。
+    if (record.frequency > maxCount) {
+      return _ConcurrentAcquireStep(
+        record: record,
+        waitMs: nextTime - now,
+        decision: spec.modeLabel,
+      );
+    }
+
+    record.frequency += 1;
+    return _ConcurrentAcquireStep(
+      record: record,
+      waitMs: 0,
+      decision: spec.modeLabel,
+    );
+  }
+
+  Future<_ConcurrentAcquireResult> _acquireConcurrentRatePermit({
+    required String? sourceKey,
+    required String? concurrentRate,
+  }) async {
+    final spec = _parseConcurrentRateSpec(concurrentRate);
+    if (spec == null) {
+      return _ConcurrentAcquireResult(
+        record: null,
+        waitMs: 0,
+        decision: '未启用并发率限制',
+      );
+    }
+
+    var totalWaitMs = 0;
+    while (true) {
+      final step = _tryAcquireConcurrentRate(
+        sourceKey: sourceKey ?? '',
+        spec: spec,
+      );
+      if (step.waitMs <= 0) {
+        return _ConcurrentAcquireResult(
+          record: step.record,
+          waitMs: totalWaitMs,
+          decision: step.decision,
+        );
+      }
+      totalWaitMs += step.waitMs;
+      await Future<void>.delayed(Duration(milliseconds: step.waitMs));
+    }
+  }
+
+  void _releaseConcurrentRatePermit(_ConcurrentRecord? record) {
+    if (record == null || record.isWindowMode) return;
+    if (record.frequency > 0) {
+      record.frequency -= 1;
+    }
+  }
+
   Map<String, String> _buildEffectiveRequestHeaders(
     String url, {
     required Map<String, String> customHeaders,
@@ -3075,6 +3250,7 @@ class RuleParserEngine {
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
+        concurrentRate: source.concurrentRate,
       );
       if (response == null) return [];
 
@@ -3233,6 +3409,7 @@ class RuleParserEngine {
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
+        concurrentRate: source.concurrentRate,
       );
       if (res.headersWarning != null && res.headersWarning!.trim().isNotEmpty) {
         log('└请求头解析提示：${res.headersWarning}', state: 1, showTime: false);
@@ -3247,6 +3424,11 @@ class RuleParserEngine {
       if (res.retryCount > 0) {
         log('└重试次数：${res.retryCount}', state: 1, showTime: false);
       }
+      log(
+        '└并发率：${res.concurrentDecision}；等待=${res.concurrentWaitMs}ms',
+        state: 1,
+        showTime: false,
+      );
       log('└请求决策：${res.methodDecision}', state: 1, showTime: false);
       log(
         '└重试决策：${res.retryDecision}；实际重试=${res.retryCount}',
@@ -4133,6 +4315,7 @@ class RuleParserEngine {
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
+      concurrentRate: source.concurrentRate,
     );
     if (fetch.body == null) {
       return SearchDebugResult(
@@ -4329,6 +4512,7 @@ class RuleParserEngine {
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
+        concurrentRate: source.concurrentRate,
       );
       if (response == null) return [];
 
@@ -4460,6 +4644,7 @@ class RuleParserEngine {
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
+      concurrentRate: source.concurrentRate,
     );
     if (fetch.body == null) {
       return ExploreDebugResult(
@@ -4648,6 +4833,7 @@ class RuleParserEngine {
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
+        concurrentRate: source.concurrentRate,
       );
       if (response == null) return null;
 
@@ -4756,6 +4942,7 @@ class RuleParserEngine {
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
+      concurrentRate: source.concurrentRate,
     );
     if (fetch.body == null) {
       return BookInfoDebugResult(
@@ -4961,6 +5148,7 @@ class RuleParserEngine {
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
           sourceKey: source.bookSourceUrl,
+          concurrentRate: source.concurrentRate,
         );
         if (response == null) break;
 
@@ -5092,6 +5280,7 @@ class RuleParserEngine {
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
+      concurrentRate: source.concurrentRate,
     );
     if (fetch.body == null) {
       return TocDebugResult(
@@ -5319,6 +5508,7 @@ class RuleParserEngine {
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
           sourceKey: source.bookSourceUrl,
+          concurrentRate: source.concurrentRate,
         );
         if (response == null) break;
 
@@ -5435,6 +5625,7 @@ class RuleParserEngine {
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
+      concurrentRate: source.concurrentRate,
     );
     if (fetch.body == null) {
       return ContentDebugResult(
@@ -5477,6 +5668,7 @@ class RuleParserEngine {
                 timeoutMs: source.respondTime,
                 enabledCookieJar: source.enabledCookieJar,
                 sourceKey: source.bookSourceUrl,
+                concurrentRate: source.concurrentRate,
               );
         if (body == null) break;
 
@@ -5607,6 +5799,7 @@ class RuleParserEngine {
     int? timeoutMs,
     bool? enabledCookieJar,
     String? sourceKey,
+    String? concurrentRate,
   }) async {
     try {
       final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
@@ -5670,15 +5863,24 @@ class RuleParserEngine {
         headers: requestHeaders,
       );
 
-      final dio = _selectDio(enabledCookieJar: enabledCookieJar);
-      final requestResult = await _requestBytesWithRetry(
-        dio: dio,
-        url: finalUrl,
-        options: opts,
-        method: method,
-        body: body,
-        retry: retry,
+      final permit = await _acquireConcurrentRatePermit(
+        sourceKey: sourceKey,
+        concurrentRate: concurrentRate,
       );
+      late ({Response<List<int>> response, int retryCount}) requestResult;
+      final dio = _selectDio(enabledCookieJar: enabledCookieJar);
+      try {
+        requestResult = await _requestBytesWithRetry(
+          dio: dio,
+          url: finalUrl,
+          options: opts,
+          method: method,
+          body: body,
+          retry: retry,
+        );
+      } finally {
+        _releaseConcurrentRatePermit(permit.record);
+      }
       final resp = requestResult.response;
       final bytes = Uint8List.fromList(resp.data ?? const <int>[]);
       final respHeaders =
@@ -5702,6 +5904,7 @@ class RuleParserEngine {
     int? timeoutMs,
     bool? enabledCookieJar,
     String? sourceKey,
+    String? concurrentRate,
   }) async {
     final sw = Stopwatch()..start();
     final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
@@ -5750,6 +5953,8 @@ class RuleParserEngine {
     final bodyEncoding = normalized.bodyEncoding;
     final bodyDecision = normalized.bodyDecision;
     finalUrl = normalized.url;
+    var concurrentWaitMs = 0;
+    var concurrentDecision = '未启用并发率限制';
 
     final forLog = Map<String, String>.from(requestHeaders);
     final cookieJarOn = enabledCookieJar ?? true;
@@ -5784,14 +5989,25 @@ class RuleParserEngine {
         headers: requestHeaders,
       );
 
-      final requestResult = await _requestBytesWithRetry(
-        dio: _selectDio(enabledCookieJar: enabledCookieJar),
-        url: finalUrl,
-        options: options,
-        method: method,
-        body: body,
-        retry: retry,
+      final permit = await _acquireConcurrentRatePermit(
+        sourceKey: sourceKey,
+        concurrentRate: concurrentRate,
       );
+      concurrentWaitMs = permit.waitMs;
+      concurrentDecision = permit.decision;
+      late ({Response<List<int>> response, int retryCount}) requestResult;
+      try {
+        requestResult = await _requestBytesWithRetry(
+          dio: _selectDio(enabledCookieJar: enabledCookieJar),
+          url: finalUrl,
+          options: options,
+          method: method,
+          body: body,
+          retry: retry,
+        );
+      } finally {
+        _releaseConcurrentRatePermit(permit.record);
+      }
       final response = requestResult.response;
       final retryCount = requestResult.retryCount;
       final respHeaders = response.headers.map.map(
@@ -5826,6 +6042,8 @@ class RuleParserEngine {
         bodyDecision: bodyDecision,
         responseCharsetSource: decoded.charsetSource,
         responseCharsetDecision: decoded.charsetDecision,
+        concurrentWaitMs: concurrentWaitMs,
+        concurrentDecision: concurrentDecision,
         body: decoded.text,
       );
     } catch (e) {
@@ -5889,6 +6107,8 @@ class RuleParserEngine {
           bodyDecision: bodyDecision,
           responseCharsetSource: responseCharsetSource,
           responseCharsetDecision: responseCharsetDecision,
+          concurrentWaitMs: concurrentWaitMs,
+          concurrentDecision: concurrentDecision,
           body: bodyText,
         );
       }
@@ -5914,6 +6134,8 @@ class RuleParserEngine {
         bodyDecision: bodyDecision,
         responseCharsetSource: null,
         responseCharsetDecision: null,
+        concurrentWaitMs: concurrentWaitMs,
+        concurrentDecision: concurrentDecision,
         body: null,
       );
     }
@@ -7244,6 +7466,71 @@ class _TopLevelRuleSplit {
   });
 }
 
+class _ConcurrentRateSpec {
+  final String raw;
+  final bool isWindowMode;
+  final int? intervalMs;
+  final int? maxCount;
+  final int? windowMs;
+
+  const _ConcurrentRateSpec.interval({
+    required this.raw,
+    required this.intervalMs,
+  })  : isWindowMode = false,
+        maxCount = null,
+        windowMs = null;
+
+  const _ConcurrentRateSpec.window({
+    required this.raw,
+    required this.maxCount,
+    required this.windowMs,
+  })  : isWindowMode = true,
+        intervalMs = null;
+
+  String get modeLabel {
+    if (!isWindowMode) {
+      return '间隔模式 ${intervalMs ?? 0}ms';
+    }
+    return '窗口模式 ${maxCount ?? 0}/${windowMs ?? 0}ms';
+  }
+}
+
+class _ConcurrentRecord {
+  final bool isWindowMode;
+  int timeMs;
+  int frequency;
+
+  _ConcurrentRecord({
+    required this.isWindowMode,
+    required this.timeMs,
+    required this.frequency,
+  });
+}
+
+class _ConcurrentAcquireStep {
+  final _ConcurrentRecord? record;
+  final int waitMs;
+  final String decision;
+
+  const _ConcurrentAcquireStep({
+    required this.record,
+    required this.waitMs,
+    required this.decision,
+  });
+}
+
+class _ConcurrentAcquireResult {
+  final _ConcurrentRecord? record;
+  final int waitMs;
+  final String decision;
+
+  const _ConcurrentAcquireResult({
+    required this.record,
+    required this.waitMs,
+    required this.decision,
+  });
+}
+
 enum _DebugListMode { search, explore }
 
 class SourceDebugEvent {
@@ -7299,6 +7586,12 @@ class FetchDebugResult {
   /// 响应编码判定与解码器决策说明。
   final String? responseCharsetDecision;
 
+  /// 并发率限流累计等待时长（毫秒）。
+  final int concurrentWaitMs;
+
+  /// 并发率决策说明（对标 legado：间隔模式 / 窗口模式）。
+  final String concurrentDecision;
+
   /// 原始响应体（仅用于编辑器调试；不要在普通 UI 中到处传递）
   final String? body;
 
@@ -7324,6 +7617,8 @@ class FetchDebugResult {
     this.bodyDecision = '未解析',
     this.responseCharsetSource,
     this.responseCharsetDecision,
+    this.concurrentWaitMs = 0,
+    this.concurrentDecision = '未启用并发率限制',
     required this.body,
   });
 
@@ -7350,6 +7645,8 @@ class FetchDebugResult {
       bodyDecision: '未解析',
       responseCharsetSource: null,
       responseCharsetDecision: null,
+      concurrentWaitMs: 0,
+      concurrentDecision: '未启用并发率限制',
       body: null,
     );
   }
