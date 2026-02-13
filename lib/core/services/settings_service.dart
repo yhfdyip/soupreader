@@ -89,7 +89,7 @@ class SettingsService {
     return 'page_progress_${bookId}_c$chapterIndex';
   }
 
-  /// 保存特定书籍的滚动偏移量 (临时方案，可考虑存入 Hive)
+  /// 保存特定书籍的滚动偏移量（当前落盘到 SharedPreferences）
   Future<void> saveScrollOffset(
     String bookId,
     double offset, {
@@ -99,22 +99,11 @@ class SettingsService {
       _scrollOffsetKey(bookId, chapterIndex: chapterIndex),
       offset,
     );
-
-    // 兼容旧键：保留“书籍级最后偏移”，便于平滑升级。
-    if (chapterIndex != null) {
-      await _prefs.setDouble(_scrollOffsetKey(bookId), offset);
-    }
   }
 
   double getScrollOffset(String bookId, {int? chapterIndex}) {
-    if (chapterIndex != null) {
-      final chapterValue =
-          _prefs.getDouble(_scrollOffsetKey(bookId, chapterIndex: chapterIndex));
-      if (chapterValue != null) {
-        return chapterValue;
-      }
-    }
-    return _prefs.getDouble(_scrollOffsetKey(bookId)) ?? 0.0;
+    return _prefs.getDouble(_scrollOffsetKey(bookId, chapterIndex: chapterIndex)) ??
+        0.0;
   }
 
   Future<void> saveChapterPageProgress(

@@ -8,7 +8,6 @@ import '../../utils/legado_json.dart';
 import '../database_service.dart';
 import '../drift/source_drift_database.dart';
 import '../drift/source_drift_service.dart';
-import '../entities/book_entity.dart';
 
 /// 书源存储仓库（drift）
 ///
@@ -172,10 +171,6 @@ class SourceRepository {
         .go();
   }
 
-  List<BookSource> fromEntities(Iterable<BookSourceEntity> entities) {
-    return entities.map(_entityToSource).toList(growable: false);
-  }
-
   SourceRecordsCompanion _sourceToCompanion(
     BookSource source, {
     String? rawJsonOverride,
@@ -237,59 +232,5 @@ class SourceRepository {
       'bookSourceComment': row.bookSourceComment,
       'lastUpdateTime': row.lastUpdateTime,
     });
-  }
-
-  BookSource _entityToSource(BookSourceEntity entity) {
-    final raw = entity.rawJson;
-    if (raw != null && raw.trim().isNotEmpty) {
-      try {
-        final decoded = json.decode(raw);
-        if (decoded is Map<String, dynamic>) {
-          return BookSource.fromJson(decoded);
-        }
-        if (decoded is Map) {
-          return BookSource.fromJson(
-            decoded.map((key, value) => MapEntry('$key', value)),
-          );
-        }
-      } catch (_) {
-        // fallthrough
-      }
-    }
-
-    return BookSource.fromJson({
-      'bookSourceUrl': entity.bookSourceUrl,
-      'bookSourceName': entity.bookSourceName,
-      'bookSourceGroup': entity.bookSourceGroup,
-      'bookSourceType': entity.bookSourceType,
-      'customOrder': 0,
-      'enabled': entity.enabled,
-      'enabledExplore': true,
-      'enabledCookieJar': true,
-      'respondTime': 180000,
-      'weight': entity.weight,
-      'header': entity.header,
-      'loginUrl': entity.loginUrl,
-      'bookSourceComment': entity.bookSourceComment,
-      'lastUpdateTime': entity.lastUpdateTime?.millisecondsSinceEpoch ?? 0,
-      'ruleSearch': _decodeRule(entity.ruleSearchJson),
-      'ruleBookInfo': _decodeRule(entity.ruleBookInfoJson),
-      'ruleToc': _decodeRule(entity.ruleTocJson),
-      'ruleContent': _decodeRule(entity.ruleContentJson),
-    });
-  }
-
-  Map<String, dynamic>? _decodeRule(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return null;
-    try {
-      final decoded = json.decode(raw);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) {
-        return decoded.map((key, value) => MapEntry('$key', value));
-      }
-    } catch (_) {
-      return null;
-    }
-    return null;
   }
 }

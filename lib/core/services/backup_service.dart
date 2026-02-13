@@ -204,19 +204,19 @@ class BackupService {
 
     final localBookIds = books.where((b) => b.isLocal).map((b) => b.id).toSet();
     final allChapters = <Chapter>[];
-    for (final entity in _db.chaptersBox.values) {
-      final isLocalBook = localBookIds.contains(entity.bookId);
+    for (final chapter in _chapterRepo.getAllChapters()) {
+      final isLocalBook = localBookIds.contains(chapter.bookId);
       if (!isLocalBook && !includeOnlineCache) continue;
 
       allChapters.add(
         Chapter(
-          id: entity.id,
-          bookId: entity.bookId,
-          title: entity.title,
-          url: entity.url,
-          index: entity.index,
-          isDownloaded: entity.isDownloaded,
-          content: entity.content,
+          id: chapter.id,
+          bookId: chapter.bookId,
+          title: chapter.title,
+          url: chapter.url,
+          index: chapter.index,
+          isDownloaded: chapter.isDownloaded,
+          content: chapter.content,
         ),
       );
     }

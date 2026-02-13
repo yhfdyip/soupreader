@@ -1,30 +1,59 @@
-import 'package:hive/hive.dart';
+import 'dart:async';
+
+import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
+
+import '../drift/source_drift_database.dart';
+import '../drift/source_drift_service.dart';
 import '../entities/bookmark_entity.dart';
 
-/// 书签仓库
+/// 书签仓库（drift）
 class BookmarkRepository {
-  static const String _boxName = 'bookmarks';
   static const _uuid = Uuid();
 
-  Box<BookmarkEntity>? _box;
+  final SourceDriftService _driftService = SourceDriftService();
+
+  static final StreamController<List<BookmarkEntity>> _watchController =
+      StreamController<List<BookmarkEntity>>.broadcast();
+  static StreamSubscription<List<BookmarkRecord>>? _watchSub;
+  static final Map<String, BookmarkEntity> _cacheById =
+      <String, BookmarkEntity>{};
+  static bool _cacheReady = false;
+
+  SourceDriftDatabase get _db => _driftService.db;
 
   /// 初始化
   Future<void> init() async {
-    if (!Hive.isAdapterRegistered(3)) {
-      Hive.registerAdapter(BookmarkEntityAdapter());
+    await _driftService.init();
+    _ensureWatchStarted();
+    if (!_cacheReady) {
+      await _reloadCacheFromDb();
     }
-    _box = await Hive.openBox<BookmarkEntity>(_boxName);
   }
 
-  Box<BookmarkEntity> get _bookmarksBox {
-    if (_box == null) {
-      throw StateError('BookmarkRepository 未初始化，请先调用 init()');
-    }
-    return _box!;
+  void _ensureWatchStarted() {
+    if (_watchSub != null) return;
+    _watchSub = _db.select(_db.bookmarkRecords).watch().listen((rows) {
+      _updateCacheFromRows(rows);
+    });
   }
 
-  /// 添加书签
+  Future<void> _reloadCacheFromDb() async {
+    final rows = await _db.select(_db.bookmarkRecords).get();
+    _updateCacheFromRows(rows);
+  }
+
+  static void _updateCacheFromRows(List<BookmarkRecord> rows) {
+    _cacheById
+      ..clear()
+      ..addEntries(rows.map((row) {
+        final model = _rowToEntity(row);
+        return MapEntry(model.id, model);
+      }));
+    _cacheReady = true;
+    _watchController.add(_cacheById.values.toList(growable: false));
+  }
+
   Future<BookmarkEntity> addBookmark({
     required String bookId,
     required String bookName,
@@ -44,63 +73,85 @@ class BookmarkRepository {
       chapterPos: chapterPos,
       content: content,
     );
-
-    await _bookmarksBox.put(bookmark.id, bookmark);
+    await _db.into(_db.bookmarkRecords).insertOnConflictUpdate(
+          _entityToCompanion(bookmark),
+        );
     return bookmark;
   }
 
-  /// 删除书签
   Future<void> removeBookmark(String id) async {
-    await _bookmarksBox.delete(id);
+    await (_db.delete(_db.bookmarkRecords)..where((b) => b.id.equals(id))).go();
   }
 
-  /// 获取书籍的所有书签
   List<BookmarkEntity> getBookmarksForBook(String bookId) {
-    return _bookmarksBox.values.where((b) => b.bookId == bookId).toList()
-      ..sort((a, b) => b.createdTime.compareTo(a.createdTime));
+    final list = _cacheById.values
+        .where((b) => b.bookId == bookId)
+        .toList(growable: false);
+    list.sort((a, b) => b.createdTime.compareTo(a.createdTime));
+    return list;
   }
 
-  /// 获取所有书签
   List<BookmarkEntity> getAllBookmarks() {
-    return _bookmarksBox.values.toList()
-      ..sort((a, b) => b.createdTime.compareTo(a.createdTime));
+    final list = _cacheById.values.toList(growable: false);
+    list.sort((a, b) => b.createdTime.compareTo(a.createdTime));
+    return list;
   }
 
-  /// 检查是否存在书签
   bool hasBookmark(String bookId, int chapterIndex, {int? chapterPos}) {
-    return _bookmarksBox.values.any((b) =>
+    return _cacheById.values.any((b) =>
         b.bookId == bookId &&
         b.chapterIndex == chapterIndex &&
         (chapterPos == null || b.chapterPos == chapterPos));
   }
 
-  /// 获取特定位置的书签
-  BookmarkEntity? getBookmarkAt(
-      String bookId, int chapterIndex, int chapterPos) {
-    try {
-      return _bookmarksBox.values.firstWhere((b) =>
-          b.bookId == bookId &&
-          b.chapterIndex == chapterIndex &&
-          b.chapterPos == chapterPos);
-    } catch (e) {
-      return null;
+  BookmarkEntity? getBookmarkAt(String bookId, int chapterIndex, int chapterPos) {
+    for (final item in _cacheById.values) {
+      if (item.bookId == bookId &&
+          item.chapterIndex == chapterIndex &&
+          item.chapterPos == chapterPos) {
+        return item;
+      }
     }
+    return null;
   }
 
-  /// 删除书籍的所有书签
   Future<void> removeAllBookmarksForBook(String bookId) async {
-    final keysToRemove = _bookmarksBox.values
-        .where((b) => b.bookId == bookId)
-        .map((b) => b.id)
-        .toList();
-
-    for (final key in keysToRemove) {
-      await _bookmarksBox.delete(key);
-    }
+    await (_db.delete(_db.bookmarkRecords)
+          ..where((b) => b.bookId.equals(bookId)))
+        .go();
   }
 
-  /// 书签数量
   int getBookmarkCount(String bookId) {
-    return _bookmarksBox.values.where((b) => b.bookId == bookId).length;
+    return _cacheById.values.where((b) => b.bookId == bookId).length;
+  }
+
+  BookmarkRecordsCompanion _entityToCompanion(BookmarkEntity entity) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return BookmarkRecordsCompanion.insert(
+      id: entity.id,
+      bookId: entity.bookId,
+      bookName: Value(entity.bookName),
+      bookAuthor: Value(entity.bookAuthor),
+      chapterIndex: Value(entity.chapterIndex),
+      chapterTitle: Value(entity.chapterTitle),
+      chapterPos: Value(entity.chapterPos),
+      content: Value(entity.content),
+      createdTime: Value(entity.createdTime.millisecondsSinceEpoch),
+      updatedAt: Value(now),
+    );
+  }
+
+  static BookmarkEntity _rowToEntity(BookmarkRecord row) {
+    return BookmarkEntity(
+      id: row.id,
+      bookId: row.bookId,
+      bookName: row.bookName,
+      bookAuthor: row.bookAuthor,
+      chapterIndex: row.chapterIndex,
+      chapterTitle: row.chapterTitle,
+      chapterPos: row.chapterPos,
+      content: row.content,
+      createdTime: DateTime.fromMillisecondsSinceEpoch(row.createdTime),
+    );
   }
 }

@@ -8,6 +8,8 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'app/theme/cupertino_theme.dart';
 import 'app/theme/shadcn_theme.dart';
 import 'core/database/database_service.dart';
+import 'core/database/repositories/book_repository.dart';
+import 'core/database/repositories/replace_rule_repository.dart';
 import 'core/database/repositories/source_repository.dart';
 import 'core/models/app_settings.dart';
 import 'core/services/cookie_store.dart';
@@ -54,6 +56,15 @@ Future<BootFailure?> _bootstrapApp() async {
     });
     await _runBootStep('SourceRepository.bootstrap', () async {
       await SourceRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('BookRepository.bootstrap', () async {
+      await BookRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('ChapterRepository.bootstrap', () async {
+      await ChapterRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('ReplaceRuleRepository.bootstrap', () async {
+      await ReplaceRuleRepository.bootstrap(DatabaseService());
     });
     await _runBootStep('SettingsService.init', () async {
       await SettingsService().init();

@@ -1,167 +1,232 @@
+import 'dart:async';
 import 'dart:convert';
+
+import 'package:drift/drift.dart';
 
 import '../../../features/bookshelf/models/book.dart';
 import '../database_service.dart';
-import '../entities/book_entity.dart';
+import '../drift/source_drift_database.dart';
 
-/// 书籍存储仓库
+/// 书籍存储仓库（drift）
 class BookRepository {
-  final DatabaseService _db;
+  final SourceDriftDatabase _driftDb;
 
-  BookRepository(this._db);
+  static final StreamController<List<Book>> _watchController =
+      StreamController<List<Book>>.broadcast();
+  static StreamSubscription<List<BookRecord>>? _watchSub;
+  static final Map<String, Book> _cacheById = <String, Book>{};
+  static bool _cacheReady = false;
 
-  /// 获取所有书籍
+  BookRepository(DatabaseService db) : _driftDb = db.driftDb {
+    _ensureWatchStarted();
+  }
+
+  static Future<void> bootstrap(DatabaseService db) async {
+    final repo = BookRepository(db);
+    await repo._reloadCacheFromDb();
+    repo._ensureWatchStarted();
+  }
+
+  void _ensureWatchStarted() {
+    if (_watchSub != null) return;
+    _watchSub = _driftDb.select(_driftDb.bookRecords).watch().listen((rows) {
+      _updateCacheFromRows(rows);
+    });
+  }
+
+  Future<void> _reloadCacheFromDb() async {
+    final rows = await _driftDb.select(_driftDb.bookRecords).get();
+    _updateCacheFromRows(rows);
+  }
+
+  static void _updateCacheFromRows(List<BookRecord> rows) {
+    _cacheById
+      ..clear()
+      ..addEntries(rows.map((row) {
+        final model = _rowToBook(row);
+        return MapEntry(model.id, model);
+      }));
+    _cacheReady = true;
+    _watchController.add(_cacheById.values.toList(growable: false));
+  }
+
   List<Book> getAllBooks() {
-    return _db.booksBox.values.map(_entityToBook).toList();
+    if (!_cacheReady) return const <Book>[];
+    return _cacheById.values.toList(growable: false);
   }
 
-  /// 根据ID获取书籍
+  Stream<List<Book>> watchAllBooks() async* {
+    if (!_cacheReady) {
+      await _reloadCacheFromDb();
+    }
+    yield getAllBooks();
+    yield* _watchController.stream;
+  }
+
   Book? getBookById(String id) {
-    final entity = _db.booksBox.get(id);
-    return entity != null ? _entityToBook(entity) : null;
+    if (!_cacheReady) return null;
+    return _cacheById[id];
   }
 
-  /// 添加书籍
   Future<void> addBook(Book book) async {
-    await _db.booksBox.put(book.id, _bookToEntity(book));
+    await _driftDb
+        .into(_driftDb.bookRecords)
+        .insertOnConflictUpdate(_bookToCompanion(book));
   }
 
-  /// 更新书籍
   Future<void> updateBook(Book book) async {
-    await _db.booksBox.put(book.id, _bookToEntity(book));
+    await addBook(book);
   }
 
-  /// 删除书籍
   Future<void> deleteBook(String id) async {
-    await _db.booksBox.delete(id);
-    // 同时删除相关章节
-    final chaptersToDelete = _db.chaptersBox.values
-        .where((c) => c.bookId == id)
-        .map((c) => c.id)
-        .toList();
-    await _db.chaptersBox.deleteAll(chaptersToDelete);
+    await _driftDb.transaction(() async {
+      await (_driftDb.delete(_driftDb.bookRecords)
+            ..where((tbl) => tbl.id.equals(id)))
+          .go();
+      await (_driftDb.delete(_driftDb.chapterRecords)
+            ..where((tbl) => tbl.bookId.equals(id)))
+          .go();
+    });
   }
 
-  /// 更新阅读进度
   Future<void> updateReadProgress(
     String bookId, {
     required int currentChapter,
     required double readProgress,
   }) async {
-    final entity = _db.booksBox.get(bookId);
-    if (entity != null) {
-      final updated = BookEntity(
-        id: entity.id,
-        title: entity.title,
-        author: entity.author,
-        coverUrl: entity.coverUrl,
-        intro: entity.intro,
-        sourceId: entity.sourceId,
-        sourceUrl: entity.sourceUrl,
-        latestChapter: entity.latestChapter,
-        totalChapters: entity.totalChapters,
-        currentChapter: currentChapter,
-        readProgress: readProgress,
-        lastReadTime: DateTime.now(),
-        addedTime: entity.addedTime,
-        isLocal: entity.isLocal,
-        localPath: entity.localPath,
-      );
-      await _db.booksBox.put(bookId, updated);
-    }
+    final entity = getBookById(bookId);
+    if (entity == null) return;
+    final updated = entity.copyWith(
+      currentChapter: currentChapter,
+      readProgress: readProgress,
+      lastReadTime: DateTime.now(),
+    );
+    await addBook(updated);
   }
 
-  /// 清除阅读记录（不删除书籍/章节）
-  ///
-  /// 对标“阅读记录列表 -> 删除阅读记录”的基础语义：清空上次阅读时间与进度。
   Future<void> clearReadingRecord(String bookId) async {
-    final entity = _db.booksBox.get(bookId);
+    final entity = getBookById(bookId);
     if (entity == null) return;
-    final updated = BookEntity(
-      id: entity.id,
-      title: entity.title,
-      author: entity.author,
-      coverUrl: entity.coverUrl,
-      intro: entity.intro,
-      sourceId: entity.sourceId,
-      sourceUrl: entity.sourceUrl,
-      latestChapter: entity.latestChapter,
-      totalChapters: entity.totalChapters,
+    final updated = entity.copyWith(
       currentChapter: 0,
       readProgress: 0.0,
       lastReadTime: null,
-      addedTime: entity.addedTime,
-      isLocal: entity.isLocal,
-      localPath: entity.localPath,
     );
-    await _db.booksBox.put(bookId, updated);
+    await addBook(updated);
   }
 
-  /// 检查书籍是否存在
-  bool hasBook(String id) => _db.booksBox.containsKey(id);
+  bool hasBook(String id) => _cacheById.containsKey(id);
 
-  /// 获取书籍数量
-  int get bookCount => _db.booksBox.length;
+  int get bookCount => _cacheById.length;
 
-  /// 清空所有书籍
   Future<void> clearAll() async {
-    await _db.booksBox.clear();
-    await _db.chaptersBox.clear();
+    await _driftDb.transaction(() async {
+      await _driftDb.delete(_driftDb.bookRecords).go();
+      await _driftDb.delete(_driftDb.chapterRecords).go();
+    });
   }
 
-  // === 转换方法 ===
-
-  Book _entityToBook(BookEntity entity) {
-    return Book(
-      id: entity.id,
-      title: entity.title,
-      author: entity.author,
-      coverUrl: entity.coverUrl,
-      intro: entity.intro,
-      sourceId: entity.sourceId,
-      sourceUrl: entity.sourceUrl,
-      latestChapter: entity.latestChapter,
-      totalChapters: entity.totalChapters,
-      currentChapter: entity.currentChapter,
-      readProgress: entity.readProgress,
-      lastReadTime: entity.lastReadTime,
-      addedTime: entity.addedTime,
-      isLocal: entity.isLocal,
-      localPath: entity.localPath,
+  BookRecordsCompanion _bookToCompanion(Book book) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return BookRecordsCompanion.insert(
+      id: book.id,
+      title: Value(book.title),
+      author: Value(book.author),
+      coverUrl: Value(book.coverUrl),
+      intro: Value(book.intro),
+      sourceId: Value(book.sourceId),
+      sourceUrl: Value(book.sourceUrl),
+      latestChapter: Value(book.latestChapter),
+      totalChapters: Value(book.totalChapters),
+      currentChapter: Value(book.currentChapter),
+      readProgress: Value(book.readProgress),
+      lastReadTime: Value(book.lastReadTime?.millisecondsSinceEpoch),
+      addedTime: Value(book.addedTime?.millisecondsSinceEpoch),
+      isLocal: Value(book.isLocal),
+      localPath: Value(book.localPath),
+      updatedAt: Value(now),
     );
   }
 
-  BookEntity _bookToEntity(Book book) {
-    return BookEntity(
-      id: book.id,
-      title: book.title,
-      author: book.author,
-      coverUrl: book.coverUrl,
-      intro: book.intro,
-      sourceId: book.sourceId,
-      sourceUrl: book.sourceUrl,
-      latestChapter: book.latestChapter,
-      totalChapters: book.totalChapters,
-      currentChapter: book.currentChapter,
-      readProgress: book.readProgress,
-      lastReadTime: book.lastReadTime,
-      addedTime: book.addedTime,
-      isLocal: book.isLocal,
-      localPath: book.localPath,
+  static Book _rowToBook(BookRecord row) {
+    return Book(
+      id: row.id,
+      title: row.title,
+      author: row.author,
+      coverUrl: row.coverUrl,
+      intro: row.intro,
+      sourceId: row.sourceId,
+      sourceUrl: row.sourceUrl,
+      latestChapter: row.latestChapter,
+      totalChapters: row.totalChapters,
+      currentChapter: row.currentChapter,
+      readProgress: row.readProgress,
+      lastReadTime:
+          row.lastReadTime == null ? null : DateTime.fromMillisecondsSinceEpoch(row.lastReadTime!),
+      addedTime: row.addedTime == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(row.addedTime!),
+      isLocal: row.isLocal,
+      localPath: row.localPath,
     );
   }
 }
 
-/// 章节存储仓库
+/// 章节存储仓库（drift）
 class ChapterRepository {
-  final DatabaseService _db;
+  final SourceDriftDatabase _driftDb;
 
-  ChapterRepository(this._db);
+  static final StreamController<List<Chapter>> _watchController =
+      StreamController<List<Chapter>>.broadcast();
+  static StreamSubscription<List<ChapterRecord>>? _watchSub;
+  static final Map<String, Chapter> _cacheById = <String, Chapter>{};
+  static bool _cacheReady = false;
 
-  ChapterCacheInfo getDownloadedCacheInfo({Set<String> protectBookIds = const {}}) {
+  ChapterRepository(DatabaseService db) : _driftDb = db.driftDb {
+    _ensureWatchStarted();
+  }
+
+  static Future<void> bootstrap(DatabaseService db) async {
+    final repo = ChapterRepository(db);
+    await repo._reloadCacheFromDb();
+    repo._ensureWatchStarted();
+  }
+
+  void _ensureWatchStarted() {
+    if (_watchSub != null) return;
+    _watchSub =
+        _driftDb.select(_driftDb.chapterRecords).watch().listen((rows) {
+      _updateCacheFromRows(rows);
+    });
+  }
+
+  Future<void> _reloadCacheFromDb() async {
+    final rows = await _driftDb.select(_driftDb.chapterRecords).get();
+    _updateCacheFromRows(rows);
+  }
+
+  static void _updateCacheFromRows(List<ChapterRecord> rows) {
+    _cacheById
+      ..clear()
+      ..addEntries(rows.map((row) {
+        final model = _rowToChapter(row);
+        return MapEntry(model.id, model);
+      }));
+    _cacheReady = true;
+    _watchController.add(_cacheById.values.toList(growable: false));
+  }
+
+  List<Chapter> getAllChapters() {
+    if (!_cacheReady) return const <Chapter>[];
+    return _cacheById.values.toList(growable: false);
+  }
+
+  ChapterCacheInfo getDownloadedCacheInfo({
+    Set<String> protectBookIds = const {},
+  }) {
     var bytes = 0;
     var chapters = 0;
-    for (final entity in _db.chaptersBox.values) {
+    for (final entity in _cacheById.values) {
       if (protectBookIds.contains(entity.bookId)) continue;
       final content = entity.content;
       if (!entity.isDownloaded || content == null || content.isEmpty) continue;
@@ -174,7 +239,7 @@ class ChapterRepository {
   ChapterCacheInfo getDownloadedCacheInfoForBook(String bookId) {
     var bytes = 0;
     var chapters = 0;
-    for (final entity in _db.chaptersBox.values) {
+    for (final entity in _cacheById.values) {
       if (entity.bookId != bookId) continue;
       final content = entity.content;
       if (!entity.isDownloaded || content == null || content.isEmpty) continue;
@@ -184,129 +249,118 @@ class ChapterRepository {
     return ChapterCacheInfo(bytes: bytes, chapters: chapters);
   }
 
-  /// 清除已下载章节的缓存内容（不删除章节条目，以保留目录/进度）
-  ///
-  /// - `protectBookIds`：需要保护的书籍（例如本地导入书籍），不清理其章节内容
   Future<ChapterCacheInfo> clearDownloadedCache({
     Set<String> protectBookIds = const {},
   }) async {
     var bytes = 0;
     var chapters = 0;
 
-    for (final entity in _db.chaptersBox.values) {
-      if (protectBookIds.contains(entity.bookId)) continue;
+    final targets = _cacheById.values.where((entity) {
+      if (protectBookIds.contains(entity.bookId)) return false;
       final content = entity.content;
-      if (!entity.isDownloaded || content == null || content.isEmpty) continue;
+      return entity.isDownloaded && content != null && content.isNotEmpty;
+    }).toList(growable: false);
 
+    if (targets.isEmpty) {
+      return const ChapterCacheInfo(bytes: 0, chapters: 0);
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final companions = <ChapterRecordsCompanion>[];
+    for (final entity in targets) {
+      final content = entity.content ?? '';
       chapters++;
       bytes += utf8.encode(content).length;
-
-      final updated = ChapterEntity(
-        id: entity.id,
-        bookId: entity.bookId,
-        title: entity.title,
-        url: entity.url,
-        index: entity.index,
-        isDownloaded: false,
-        content: null,
+      companions.add(
+        ChapterRecordsCompanion(
+          id: Value(entity.id),
+          bookId: Value(entity.bookId),
+          title: Value(entity.title),
+          url: Value(entity.url),
+          chapterIndex: Value(entity.index),
+          isDownloaded: const Value(false),
+          content: const Value(null),
+          updatedAt: Value(now),
+        ),
       );
-      await _db.chaptersBox.put(entity.id, updated);
     }
+
+    await _driftDb.batch((batch) {
+      batch.insertAllOnConflictUpdate(_driftDb.chapterRecords, companions);
+    });
 
     return ChapterCacheInfo(bytes: bytes, chapters: chapters);
   }
 
-  /// 清除指定书籍的章节缓存内容（不删除章节条目，以保留目录/进度）
   Future<ChapterCacheInfo> clearDownloadedCacheForBook(String bookId) async {
-    var bytes = 0;
-    var chapters = 0;
-
-    for (final entity in _db.chaptersBox.values) {
-      if (entity.bookId != bookId) continue;
-      final content = entity.content;
-      if (!entity.isDownloaded || content == null || content.isEmpty) continue;
-
-      chapters++;
-      bytes += utf8.encode(content).length;
-
-      final updated = ChapterEntity(
-        id: entity.id,
-        bookId: entity.bookId,
-        title: entity.title,
-        url: entity.url,
-        index: entity.index,
-        isDownloaded: false,
-        content: null,
-      );
-      await _db.chaptersBox.put(entity.id, updated);
-    }
-
-    return ChapterCacheInfo(bytes: bytes, chapters: chapters);
-  }
-
-  /// 获取书籍的所有章节
-  List<Chapter> getChaptersForBook(String bookId) {
-    return _db.chaptersBox.values
-        .where((c) => c.bookId == bookId)
-        .map(_entityToChapter)
-        .toList()
-      ..sort((a, b) => a.index.compareTo(b.index));
-  }
-
-  /// 添加章节列表
-  Future<void> addChapters(List<Chapter> chapters) async {
-    for (final chapter in chapters) {
-      await _db.chaptersBox.put(chapter.id, _chapterToEntity(chapter));
-    }
-  }
-
-  /// 更新章节内容（缓存）
-  Future<void> cacheChapterContent(String chapterId, String content) async {
-    final entity = _db.chaptersBox.get(chapterId);
-    if (entity != null) {
-      final updated = ChapterEntity(
-        id: entity.id,
-        bookId: entity.bookId,
-        title: entity.title,
-        url: entity.url,
-        index: entity.index,
-        isDownloaded: true,
-        content: content,
-      );
-      await _db.chaptersBox.put(chapterId, updated);
-    }
-  }
-
-  /// 清除书籍的所有章节缓存
-  Future<void> clearChaptersForBook(String bookId) async {
-    final keys = _db.chaptersBox.values
-        .where((c) => c.bookId == bookId)
-        .map((c) => c.id)
-        .toList();
-    await _db.chaptersBox.deleteAll(keys);
-  }
-
-  Chapter _entityToChapter(ChapterEntity entity) {
-    return Chapter(
-      id: entity.id,
-      bookId: entity.bookId,
-      title: entity.title,
-      url: entity.url,
-      index: entity.index,
-      isDownloaded: entity.isDownloaded,
-      content: entity.content,
+    return clearDownloadedCache(
+      protectBookIds: _cacheById.values
+          .where((entity) => entity.bookId != bookId)
+          .map((entity) => entity.bookId)
+          .toSet(),
     );
   }
 
-  ChapterEntity _chapterToEntity(Chapter chapter) {
-    return ChapterEntity(
-      id: chapter.id,
-      bookId: chapter.bookId,
-      title: chapter.title,
-      url: chapter.url,
-      index: chapter.index,
-      isDownloaded: chapter.isDownloaded,
-      content: chapter.content,
+  List<Chapter> getChaptersForBook(String bookId) {
+    return _cacheById.values
+        .where((c) => c.bookId == bookId)
+        .toList(growable: false)
+      ..sort((a, b) => a.index.compareTo(b.index));
+  }
+
+  Future<void> addChapters(List<Chapter> chapters) async {
+    if (chapters.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final companions = chapters
+        .map((chapter) => ChapterRecordsCompanion.insert(
+              id: chapter.id,
+              bookId: chapter.bookId,
+              title: Value(chapter.title),
+              url: Value(chapter.url),
+              chapterIndex: Value(chapter.index),
+              isDownloaded: Value(chapter.isDownloaded),
+              content: Value(chapter.content),
+              updatedAt: Value(now),
+            ))
+        .toList(growable: false);
+    await _driftDb.batch((batch) {
+      batch.insertAllOnConflictUpdate(_driftDb.chapterRecords, companions);
+    });
+  }
+
+  Future<void> cacheChapterContent(String chapterId, String content) async {
+    final entity = _cacheById[chapterId];
+    if (entity == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _driftDb.into(_driftDb.chapterRecords).insertOnConflictUpdate(
+          ChapterRecordsCompanion(
+            id: Value(entity.id),
+            bookId: Value(entity.bookId),
+            title: Value(entity.title),
+            url: Value(entity.url),
+            chapterIndex: Value(entity.index),
+            isDownloaded: const Value(true),
+            content: Value(content),
+            updatedAt: Value(now),
+          ),
+        );
+  }
+
+  Future<void> clearChaptersForBook(String bookId) async {
+    await (_driftDb.delete(_driftDb.chapterRecords)
+          ..where((c) => c.bookId.equals(bookId)))
+        .go();
+  }
+
+  static Chapter _rowToChapter(ChapterRecord row) {
+    return Chapter(
+      id: row.id,
+      bookId: row.bookId,
+      title: row.title,
+      url: row.url,
+      index: row.chapterIndex,
+      isDownloaded: row.isDownloaded,
+      content: row.content,
     );
   }
 }

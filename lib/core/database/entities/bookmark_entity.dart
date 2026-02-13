@@ -1,35 +1,21 @@
-import 'package:hive/hive.dart';
-
-part 'bookmark_entity.g.dart';
-
-/// Hive 存储用的书签实体
-@HiveType(typeId: 3)
-class BookmarkEntity extends HiveObject {
-  @HiveField(0)
+/// 书签实体（纯数据模型）
+class BookmarkEntity {
   final String id;
 
-  @HiveField(1)
   final String bookId;
 
-  @HiveField(2)
   final String bookName;
 
-  @HiveField(3)
   final String bookAuthor;
 
-  @HiveField(4)
   final int chapterIndex;
 
-  @HiveField(5)
   final String chapterTitle;
 
-  @HiveField(6)
   final int chapterPos; // 章节内字符位置
 
-  @HiveField(7)
   final String content; // 书签处的文本内容（预览用）
 
-  @HiveField(8)
   final DateTime createdTime;
 
   BookmarkEntity({

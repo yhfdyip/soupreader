@@ -1,8 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../core/database/database_service.dart';
-import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../reader/views/simple_reader_view.dart';
@@ -19,24 +17,22 @@ class ReadingHistoryView extends StatefulWidget {
 }
 
 class _ReadingHistoryViewState extends State<ReadingHistoryView> {
-  late final DatabaseService _db;
   late final BookRepository _bookRepo;
 
   @override
   void initState() {
     super.initState();
-    _db = DatabaseService();
-    _bookRepo = BookRepository(_db);
+    _bookRepo = BookRepository(DatabaseService());
   }
 
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '阅读记录',
-      child: ValueListenableBuilder<Box<BookEntity>>(
-        valueListenable: _db.booksBox.listenable(),
-        builder: (context, _, __) {
-          final books = _bookRepo.getAllBooks();
+      child: StreamBuilder<List<Book>>(
+        stream: _bookRepo.watchAllBooks(),
+        builder: (context, snapshot) {
+          final books = snapshot.data ?? _bookRepo.getAllBooks();
           final history =
               books.where((b) => b.lastReadTime != null && b.isReading).toList()
                 ..sort((a, b) {
