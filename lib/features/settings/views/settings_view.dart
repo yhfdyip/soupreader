@@ -17,6 +17,7 @@ import 'about_settings_view.dart';
 import 'backup_settings_view.dart';
 import 'theme_settings_view.dart';
 import 'other_settings_view.dart';
+import 'developer_tools_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_ui_tokens.dart';
 import 'text_rules_settings_view.dart';
@@ -251,6 +252,15 @@ class _SettingsViewState extends State<SettingsView> {
                 title: '其它设置',
                 info: _otherSettingsSummary,
                 onTap: _openOtherSettings,
+              ),
+              _buildSettingsItem(
+                icon: _buildIconBox(
+                  CupertinoIcons.hammer_fill,
+                  CupertinoColors.systemTeal,
+                ),
+                title: '开发工具',
+                info: '异常日志',
+                onTap: _openDeveloperTools,
               ),
               _buildSettingsItem(
                 icon: _buildIconBox(
@@ -493,6 +503,15 @@ class _SettingsViewState extends State<SettingsView> {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (context) => const ReadingHistoryView(),
+      ),
+    );
+    await _refreshStats();
+  }
+
+  Future<void> _openDeveloperTools() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const DeveloperToolsView(),
       ),
     );
     await _refreshStats();

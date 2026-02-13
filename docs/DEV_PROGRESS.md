@@ -1,5 +1,42 @@
 # SoupReader 开发进度日志
 
+## 2026-02-13（设置新增开发工具：异常日志面板 + 关键节点异常采集）
+
+### 已完成
+- 新增异常日志服务（对标 legado `AppLog`/`AppLogDialog` 思路）：
+  - `lib/core/services/exception_log_service.dart`
+  - 支持内存日志、Drift 持久化（`app_key_value_records`）、数量上限、清空。
+- 设置入口新增“开发工具”：
+  - `lib/features/settings/views/settings_view.dart` 增加“开发工具 -> 异常日志”入口；
+  - `lib/features/settings/views/other_settings_view.dart` 原“日志文件暂未实现”改为可用入口。
+- 新增开发工具与异常日志 UI：
+  - `lib/features/settings/views/developer_tools_view.dart`
+  - `lib/features/settings/views/exception_logs_view.dart`
+  - 能力包括：日志列表、异常详情、复制详情、清空日志。
+- 关键节点异常采集接入：
+  - 全局：`lib/main.dart`（`FlutterError.onError`、`PlatformDispatcher.onError`、`runZonedGuarded`、启动步骤失败）
+  - 书源五段链路：`lib/features/source/services/rule_parser_engine.dart`
+    - `search` / `explore` / `bookInfo` / `toc` / `content` catch 节点
+  - 书源导入与设置读写：`lib/features/source/views/source_list_view.dart`
+
+### 为什么
+- 你需要“在设置中添加开发工具，能看异常日志，并在关键节点定位异常原因”。
+- 现状仅 `debugPrint`，无法在 UI 中留存和回看异常上下文，排查效率低。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 设置 -> 开发工具 -> 异常日志：可进入并看到日志列表；
+  - 点击日志项：可查看节点、消息、错误、上下文、堆栈；
+  - 点击“复制”：可复制完整日志详情；
+  - 点击“清空”：日志被清空；
+  - 触发一次书源导入异常或规则解析异常后，列表出现对应节点日志（如 `source.import.*`、`source.search` 等）。
+
+### 兼容影响
+- 不涉及书源协议解析逻辑变更，仅增加异常可观测性。
+- 旧版本无“开发工具/异常日志”入口，本次新增后默认可用，无需兼容旧 UI 行为。
+
 ## 2026-02-13（页面顶出修复：统一顶部安全区 + 书源管理筛选防裁切）
 
 ### 已完成

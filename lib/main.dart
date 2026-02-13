@@ -13,6 +13,7 @@ import 'core/database/repositories/replace_rule_repository.dart';
 import 'core/database/repositories/source_repository.dart';
 import 'core/models/app_settings.dart';
 import 'core/services/cookie_store.dart';
+import 'core/services/exception_log_service.dart';
 import 'core/services/settings_service.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
 import 'features/discovery/views/discovery_view.dart';
@@ -26,6 +27,15 @@ void main() {
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint('[flutter-error] ${details.exceptionAsString()}');
+    ExceptionLogService().record(
+      node: 'global.flutter_error',
+      message: details.exceptionAsString(),
+      error: details.exception,
+      stackTrace: details.stack,
+      context: <String, dynamic>{
+        if (details.library != null) 'library': details.library!,
+      },
+    );
     if (details.stack != null) {
       debugPrintStack(stackTrace: details.stack);
     }
@@ -33,6 +43,12 @@ void main() {
 
   PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
     debugPrint('[platform-error] $error');
+    ExceptionLogService().record(
+      node: 'global.platform_error',
+      message: 'PlatformDispatcher.onError',
+      error: error,
+      stackTrace: stack,
+    );
     debugPrintStack(stackTrace: stack);
     return true;
   };
@@ -45,6 +61,12 @@ void main() {
     debugPrint('[boot] runApp done');
   }, (Object error, StackTrace stack) {
     debugPrint('[zone-error] $error');
+    ExceptionLogService().record(
+      node: 'global.zone_error',
+      message: 'runZonedGuarded 捕获未处理异常',
+      error: error,
+      stackTrace: stack,
+    );
     debugPrintStack(stackTrace: stack);
   });
 }
@@ -53,6 +75,9 @@ Future<BootFailure?> _bootstrapApp() async {
   try {
     await _runBootStep('DatabaseService.init', () async {
       await DatabaseService().init();
+    });
+    await _runBootStep('ExceptionLogService.bootstrap', () async {
+      await ExceptionLogService().bootstrap();
     });
     await _runBootStep('SourceRepository.bootstrap', () async {
       await SourceRepository.bootstrap(DatabaseService());
@@ -99,6 +124,12 @@ Future<void> _runBootStep(
   } catch (e, st) {
     debugPrint('[boot] $name failed: $e');
     debugPrintStack(stackTrace: st);
+    ExceptionLogService().record(
+      node: 'bootstrap.$name',
+      message: '启动步骤失败',
+      error: e,
+      stackTrace: st,
+    );
     throw _BootStepException(
       stepName: name,
       error: e,

@@ -8,6 +8,7 @@ import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fast_gbk/fast_gbk.dart';
 import '../../../core/services/js_runtime.dart';
+import '../../../core/services/exception_log_service.dart';
 import 'package:json_path/json_path.dart';
 import 'package:xpath_selector_html_parser/xpath_selector_html_parser.dart';
 import '../../../core/utils/html_text_formatter.dart';
@@ -3344,8 +3345,19 @@ class RuleParserEngine {
       }
 
       return results;
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('搜索失败: $e');
+      ExceptionLogService().record(
+        node: 'source.search',
+        message: '搜索解析失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+          'keyword': keyword,
+        },
+      );
       return [];
     }
   }
@@ -4610,8 +4622,19 @@ class RuleParserEngine {
       }
 
       return results;
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('发现失败: $e');
+      ExceptionLogService().record(
+        node: 'source.explore',
+        message: '发现解析失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+          'exploreUrl': exploreUrlOverride ?? source.exploreUrl,
+        },
+      );
       return [];
     }
   }
@@ -4916,8 +4939,19 @@ class RuleParserEngine {
         tocUrl: tocUrl,
         bookUrl: fullUrl,
       );
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('获取书籍详情失败: $e');
+      ExceptionLogService().record(
+        node: 'source.bookInfo',
+        message: '详情解析失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+          'bookUrl': bookUrl,
+        },
+      );
       return null;
     }
   }
@@ -5257,8 +5291,19 @@ class RuleParserEngine {
         jsLib: source.jsLib,
       );
       return formatted;
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('获取目录失败: $e');
+      ExceptionLogService().record(
+        node: 'source.toc',
+        message: '目录解析失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+          'tocUrl': tocUrl,
+        },
+      );
       return [];
     }
   }
@@ -5599,8 +5644,20 @@ class RuleParserEngine {
       }
 
       return parts.join('\n');
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('获取正文失败: $e');
+      ExceptionLogService().record(
+        node: 'source.content',
+        message: '正文解析失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+          'chapterUrl': chapterUrl,
+          'nextChapterUrl': nextChapterUrl,
+        },
+      );
       return '';
     }
   }

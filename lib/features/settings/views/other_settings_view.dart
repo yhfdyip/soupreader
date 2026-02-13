@@ -6,6 +6,7 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
+import 'developer_tools_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_ui_tokens.dart';
 import 'storage_settings_view.dart';
@@ -295,15 +296,16 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('日志'),
+            header: const Text('开发工具'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('日志文件'),
-                additionalInfo: _plannedInfo(),
+                title: const Text('异常日志'),
+                additionalInfo: const Text('查看/清空'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '日志文件暂未实现',
+                onTap: () => Navigator.of(context).push(
+                  CupertinoPageRoute<void>(
+                    builder: (context) => const DeveloperToolsView(),
+                  ),
                 ),
               ),
             ],

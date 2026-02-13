@@ -12,6 +12,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../search/views/search_view.dart';
@@ -2410,6 +2411,12 @@ class _SourceListViewState extends State<SourceListView> {
       data = await Clipboard.getData('text/plain');
     } catch (e, st) {
       debugPrint('[source-import] 读取剪贴板失败: $e');
+      ExceptionLogService().record(
+        node: 'source.import.clipboard',
+        message: '读取剪贴板失败',
+        error: e,
+        stackTrace: st,
+      );
       debugPrintStack(stackTrace: st);
       _showMessage('读取剪贴板失败：$e');
       return;
@@ -2771,6 +2778,12 @@ class _SourceListViewState extends State<SourceListView> {
       );
     } catch (e, st) {
       debugPrint('[source-import] 导入流程异常: $e');
+      ExceptionLogService().record(
+        node: 'source.import.commit',
+        message: '导入流程异常',
+        error: e,
+        stackTrace: st,
+      );
       debugPrintStack(stackTrace: st);
       _showMessage('导入流程异常：$e');
     }
@@ -3492,6 +3505,12 @@ class _SourceListViewState extends State<SourceListView> {
       return true;
     } catch (e, st) {
       debugPrint('[source-settings] $actionName 前检查失败: $e');
+      ExceptionLogService().record(
+        node: 'source.settings.ready',
+        message: '$actionName 前检查失败',
+        error: e,
+        stackTrace: st,
+      );
       debugPrintStack(stackTrace: st);
       _showMessage('应用初始化未完成，暂时无法$actionName。请稍后重试。');
       return false;
@@ -3506,6 +3525,13 @@ class _SourceListViewState extends State<SourceListView> {
       return _db.getSetting(key, defaultValue: defaultValue);
     } catch (e, st) {
       debugPrint('[source-settings] 读取 $key 失败: $e');
+      ExceptionLogService().record(
+        node: 'source.settings.read',
+        message: '读取设置失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{'key': key},
+      );
       debugPrintStack(stackTrace: st);
       return defaultValue;
     }
@@ -3520,6 +3546,13 @@ class _SourceListViewState extends State<SourceListView> {
       return true;
     } catch (e, st) {
       debugPrint('[source-settings] 写入 $key 失败: $e');
+      ExceptionLogService().record(
+        node: 'source.settings.write',
+        message: '写入设置失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{'key': key},
+      );
       debugPrintStack(stackTrace: st);
       _showMessage('设置保存失败：$e');
       return false;
