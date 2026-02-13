@@ -457,11 +457,13 @@ class _SourceEditViewState extends State<SourceEditView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _save,
             child: const Text('保存'),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _showMore,
             child: const Icon(CupertinoIcons.ellipsis),
           ),
@@ -471,7 +473,10 @@ class _SourceEditViewState extends State<SourceEditView> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: tabControl,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: tabControl,
+            ),
           ),
           Expanded(
             child: IndexedStack(
@@ -988,7 +993,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   Widget _buildDebugPrimaryInputSection() {
     return CupertinoListSection.insetGrouped(
       header: const Text('输入'),
-      footer: const Text('关键字/URL/前缀调试；完整语法见“更多工具 -> 调试帮助”。'),
+      footer: const Text('关键字/URL/前缀调试；完整语法见“菜单（对标 Legado）-> 调试帮助”。'),
       children: [
         CupertinoListTile.notched(
           title: const Text('Key'),
@@ -1001,11 +1006,6 @@ class _SourceEditViewState extends State<SourceEditView> {
             onSubmitted: (_) => _startDebugFromInputSubmit(),
             onChanged: (_) => setState(() {}),
           ),
-        ),
-        CupertinoListTile.notched(
-          title: const Text('扫码填充 Key'),
-          trailing: const CupertinoListTileChevron(),
-          onTap: _debugLoading ? null : _scanDebugKeyFromQr,
         ),
         CupertinoListTile.notched(
           title: const Text('开始调试'),
@@ -1033,25 +1033,16 @@ class _SourceEditViewState extends State<SourceEditView> {
             },
           ),
         CupertinoListTile.notched(
-          title: const Text('查看源码'),
-          subtitle: const Text('搜索/详情/目录/正文/正文结果'),
-          additionalInfo: Text('${_debugSourceReadyCount()}/5'),
-          trailing: const CupertinoListTileChevron(),
-          onTap: _showDebugSourceEntrySheet,
-        ),
-        CupertinoListTile.notched(
-          title: const Text('刷新发现快捷项'),
-          subtitle: const Text('对标 Legado「刷新发现」入口'),
+          title: const Text('菜单（对标 Legado）'),
+          subtitle: const Text('扫码/查看源码/刷新发现/调试帮助'),
           additionalInfo:
               _refreshingExploreQuickActions ? const Text('刷新中…') : null,
           trailing: const CupertinoListTileChevron(),
-          onTap: _refreshingExploreQuickActions
-              ? null
-              : _refreshExploreQuickActions,
+          onTap: _showDebugLegacyMenuSheet,
         ),
         CupertinoListTile.notched(
-          title: const Text('更多工具'),
-          subtitle: const Text('导出/摘要/变量快照/帮助/网页验证'),
+          title: const Text('高级工具'),
+          subtitle: const Text('导出/摘要/变量快照/网页验证'),
           trailing: const CupertinoListTileChevron(),
           onTap: _showDebugMoreToolsSheet,
         ),
@@ -1121,17 +1112,6 @@ class _SourceEditViewState extends State<SourceEditView> {
     _debugTabScrollController.jumpTo(target);
   }
 
-  int _debugSourceReadyCount() {
-    final candidates = <String?>[
-      _debugListSrcHtml,
-      _debugBookSrcHtml,
-      _debugTocSrcHtml,
-      _debugContentSrcHtml,
-      _debugContentResult,
-    ];
-    return candidates.where((e) => e?.trim().isNotEmpty == true).length;
-  }
-
   String? _structuredSummaryText() {
     if (_debugLinesAll.isEmpty) return null;
     return _prettyJson(LegadoJson.encode(_buildStructuredDebugSummary()));
@@ -1142,54 +1122,78 @@ class _SourceEditViewState extends State<SourceEditView> {
     return _prettyJson(LegadoJson.encode(_debugRuntimeVarsSnapshot));
   }
 
-  Future<void> _showDebugSourceEntrySheet() async {
+  Future<void> _showDebugLegacyMenuSheet() async {
     await showCupertinoModalPopup<void>(
       context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('查看源码 / 结果'),
-        message: const Text('源码查看已下沉到二级入口，减少主屏干扰。'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _openDebugSourceFromMenu('列表页源码', _debugListSrcHtml);
-            },
-            child: const Text('列表页源码'),
+      builder: (sheetContext) {
+        void closeThen(VoidCallback action) {
+          Navigator.pop(sheetContext);
+          Future<void>.delayed(Duration.zero, () {
+            if (!mounted) return;
+            action();
+          });
+        }
+
+        return CupertinoActionSheet(
+          title: const Text('菜单（对标 Legado）'),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                if (_debugLoading) {
+                  _showMessage('调试运行中，请稍后再试');
+                  return;
+                }
+                _scanDebugKeyFromQr();
+              }),
+              child: const Text('扫码填充 Key'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                _openDebugSourceFromMenu('列表页源码', _debugListSrcHtml);
+              }),
+              child: const Text('查看搜索源码'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                _openDebugSourceFromMenu('详情页源码', _debugBookSrcHtml);
+              }),
+              child: const Text('查看详情源码'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                _openDebugSourceFromMenu('目录页源码', _debugTocSrcHtml);
+              }),
+              child: const Text('查看目录源码'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                _openDebugSourceFromMenu('正文页源码', _debugContentSrcHtml);
+              }),
+              child: const Text('查看正文源码'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                if (_refreshingExploreQuickActions) {
+                  _showMessage('发现快捷项刷新中，请稍后再试');
+                  return;
+                }
+                _refreshExploreQuickActions();
+              }),
+              child: const Text('刷新发现快捷项'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                _showDebugHelp();
+              }),
+              child: const Text('调试帮助'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(sheetContext),
+            child: const Text('取消'),
           ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _openDebugSourceFromMenu('详情页源码', _debugBookSrcHtml);
-            },
-            child: const Text('详情页源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _openDebugSourceFromMenu('目录页源码', _debugTocSrcHtml);
-            },
-            child: const Text('目录页源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _openDebugSourceFromMenu('正文页源码', _debugContentSrcHtml);
-            },
-            child: const Text('正文页源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _openDebugSourceFromMenu('正文结果', _debugContentResult);
-            },
-            child: const Text('正文结果（清理后）'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1206,15 +1210,9 @@ class _SourceEditViewState extends State<SourceEditView> {
         }
 
         return CupertinoActionSheet(
-          title: const Text('更多工具'),
-          message: const Text('高级能力下沉：主流程保留输入、快捷和日志。'),
+          title: const Text('高级工具'),
+          message: const Text('问题复现与导出能力，集中在二级入口。'),
           actions: [
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                _showDebugHelp();
-              }),
-              child: const Text('调试帮助'),
-            ),
             CupertinoActionSheetAction(
               onPressed: () => closeThen(_openWebVerify),
               child: const Text('网页验证（Cloudflare）'),
@@ -1994,7 +1992,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       if (totalLines > visibleLines.length)
         CupertinoListTile.notched(
           title: Text('当前展示最近 ${visibleLines.length} 行'),
-          subtitle: Text('完整日志共 $totalLines 行，可用“更多工具 -> 复制控制台（全部）”导出'),
+          subtitle: Text('完整日志共 $totalLines 行，可用“高级工具 -> 复制控制台（全部）”导出'),
         ),
     ];
 

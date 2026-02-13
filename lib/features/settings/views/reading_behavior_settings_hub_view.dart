@@ -84,19 +84,38 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
   }) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
+    final infoText = info.trim();
 
     return ShadButton.ghost(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       mainAxisAlignment: MainAxisAlignment.start,
       onPressed: onTap,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Text(
-            info,
-            style: theme.textTheme.small.copyWith(
-              color: scheme.mutedForeground,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.p.copyWith(color: scheme.foreground),
+                ),
+                if (infoText.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    infoText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.small.copyWith(
+                      color: scheme.mutedForeground,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(width: 8),
@@ -106,10 +125,6 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
             color: scheme.mutedForeground,
           ),
         ],
-      ),
-      child: Text(
-        title,
-        style: theme.textTheme.p.copyWith(color: scheme.foreground),
       ),
     );
   }

@@ -362,6 +362,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       title: '书架',
       leading: CupertinoButton(
         padding: EdgeInsets.zero,
+        minimumSize: const Size(30, 30),
         onPressed: _isImporting ? null : _importLocalBook,
         child: _isImporting
             ? const CupertinoActivityIndicator()
@@ -372,11 +373,13 @@ class _BookshelfViewState extends State<BookshelfView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _openReadingHistory,
             child: const Icon(CupertinoIcons.clock),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),
           ),

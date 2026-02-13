@@ -372,40 +372,52 @@ class _SettingsViewState extends State<SettingsView> {
     final infoColor = isPlanned
         ? scheme.mutedForeground.withValues(alpha: 0.75)
         : scheme.mutedForeground;
+    final normalizedInfo = info?.trim() ?? '';
 
     return ShadButton.ghost(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       mainAxisAlignment: MainAxisAlignment.start,
-      leading: Opacity(
-        opacity: isPlanned ? 0.65 : 1.0,
-        child: icon,
-      ),
       onPressed: onTap,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          if (info != null && info.isNotEmpty) ...[
-            Text(
-              info,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.small.copyWith(
-                color: infoColor,
-              ),
+          Opacity(
+            opacity: isPlanned ? 0.65 : 1.0,
+            child: icon,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.p.copyWith(color: titleColor),
+                ),
+                if (normalizedInfo.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    normalizedInfo,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.small.copyWith(
+                      color: infoColor,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(width: 8),
-          ],
+          ),
+          const SizedBox(width: 8),
           Icon(
             LucideIcons.chevronRight,
             size: 16,
             color: scheme.mutedForeground,
           ),
         ],
-      ),
-      child: Text(
-        title,
-        style: theme.textTheme.p.copyWith(color: titleColor),
       ),
     );
   }

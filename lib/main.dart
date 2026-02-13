@@ -23,61 +23,114 @@ void main() {
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    debugPrint('[flutter-error] \${details.exceptionAsString()}');
+    debugPrint('[flutter-error] ${details.exceptionAsString()}');
     if (details.stack != null) {
       debugPrintStack(stackTrace: details.stack);
     }
   };
 
   PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    debugPrint('[platform-error] \$error');
+    debugPrint('[platform-error] $error');
     debugPrintStack(stackTrace: stack);
     return true;
   };
 
   runZonedGuarded(() async {
-    await _safeBootStep('DatabaseService.init', () async {
-      await DatabaseService().init();
-    });
-
-    await _safeBootStep('SourceRepository.bootstrap', () async {
-      await SourceRepository.bootstrap(DatabaseService());
-    });
-
-    await _safeBootStep('SettingsService.init', () async {
-      await SettingsService().init();
-    });
-
-    await _safeBootStep('CookieStore.setup', () async {
-      await CookieStore.setup();
-    });
+    final bootFailure = await _bootstrapApp();
 
     debugPrint('[boot] runApp start');
-    runApp(const SoupReaderApp());
+    runApp(SoupReaderApp(initialBootFailure: bootFailure));
     debugPrint('[boot] runApp done');
   }, (Object error, StackTrace stack) {
-    debugPrint('[zone-error] \$error');
+    debugPrint('[zone-error] $error');
     debugPrintStack(stackTrace: stack);
   });
 }
 
-Future<void> _safeBootStep(
+Future<BootFailure?> _bootstrapApp() async {
+  try {
+    await _runBootStep('DatabaseService.init', () async {
+      await DatabaseService().init();
+    });
+    await _runBootStep('SourceRepository.bootstrap', () async {
+      await SourceRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('SettingsService.init', () async {
+      await SettingsService().init();
+    });
+    await _runBootStep('CookieStore.setup', () async {
+      await CookieStore.setup();
+    });
+    return null;
+  } on _BootStepException catch (e) {
+    return BootFailure(
+      stepName: e.stepName,
+      error: e.error,
+      stack: e.stack,
+    );
+  } catch (e, st) {
+    return BootFailure(
+      stepName: 'unknown',
+      error: e,
+      stack: st,
+    );
+  }
+}
+
+Future<void> _runBootStep(
   String name,
   Future<void> Function() action,
 ) async {
-  debugPrint('[boot] \$name start');
+  debugPrint('[boot] $name start');
   try {
     await action();
-    debugPrint('[boot] \$name ok');
+    debugPrint('[boot] $name ok');
   } catch (e, st) {
-    debugPrint('[boot] \$name failed: \$e');
+    debugPrint('[boot] $name failed: $e');
     debugPrintStack(stackTrace: st);
+    throw _BootStepException(
+      stepName: name,
+      error: e,
+      stack: st,
+    );
   }
+}
+
+class _BootStepException implements Exception {
+  final String stepName;
+  final Object error;
+  final StackTrace stack;
+
+  const _BootStepException({
+    required this.stepName,
+    required this.error,
+    required this.stack,
+  });
+
+  @override
+  String toString() => 'BootStepException($stepName): $error';
+}
+
+class BootFailure {
+  final String stepName;
+  final Object error;
+  final StackTrace stack;
+
+  const BootFailure({
+    required this.stepName,
+    required this.error,
+    required this.stack,
+  });
 }
 
 /// SoupReader 阅读应用
 class SoupReaderApp extends StatefulWidget {
-  const SoupReaderApp({super.key});
+  final BootFailure? initialBootFailure;
+
+  const SoupReaderApp({
+    super.key,
+    this.initialBootFailure,
+  });
 
   @override
   State<SoupReaderApp> createState() => _SoupReaderAppState();
@@ -87,10 +140,13 @@ class _SoupReaderAppState extends State<SoupReaderApp>
     with WidgetsBindingObserver {
   final SettingsService _settingsService = SettingsService();
   late Brightness _platformBrightness;
+  BootFailure? _bootFailure;
+  bool _bootRetrying = false;
 
   @override
   void initState() {
     super.initState();
+    _bootFailure = widget.initialBootFailure;
     WidgetsBinding.instance.addObserver(this);
     _platformBrightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
@@ -118,6 +174,17 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   void _onAppSettingsChanged() {
     setState(() {});
     _applySystemUiOverlayStyle();
+  }
+
+  Future<void> _retryBoot() async {
+    if (_bootRetrying) return;
+    setState(() => _bootRetrying = true);
+    final failure = await _bootstrapApp();
+    if (!mounted) return;
+    setState(() {
+      _bootFailure = failure;
+      _bootRetrying = false;
+    });
   }
 
   Brightness get _effectiveBrightness {
@@ -172,7 +239,13 @@ class _SoupReaderAppState extends State<SoupReaderApp>
             Locale('zh', 'CN'),
             Locale('en', 'US'),
           ],
-          home: MainScreen(brightness: brightness),
+          home: _bootFailure == null
+              ? MainScreen(brightness: brightness)
+              : _BootFailureView(
+                  failure: _bootFailure!,
+                  retrying: _bootRetrying,
+                  onRetry: _retryBoot,
+                ),
           builder: (context, child) => ShadAppBuilder(child: child!),
         );
       },
@@ -242,6 +315,48 @@ class MainScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _BootFailureView extends StatelessWidget {
+  final BootFailure failure;
+  final bool retrying;
+  final VoidCallback onRetry;
+
+  const _BootFailureView({
+    required this.failure,
+    required this.retrying,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('启动异常'),
+      ),
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          children: [
+            const Text(
+              '应用初始化失败，已阻止进入主界面以避免后续导入/书源管理出现连锁异常。',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '失败步骤：${failure.stepName}\n错误：${failure.error}',
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            CupertinoButton.filled(
+              onPressed: retrying ? null : onRetry,
+              child: Text(retrying ? '重试中…' : '重试初始化'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

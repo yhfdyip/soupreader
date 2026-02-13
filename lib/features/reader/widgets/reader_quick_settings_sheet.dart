@@ -154,30 +154,33 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   }
 
   Widget _buildTabs() {
-    return CupertinoSlidingSegmentedControl<ReaderQuickSettingsTab>(
-      groupValue: _tab,
-      onValueChanged: (v) {
-        if (v == null) return;
-        setState(() => _tab = v);
-      },
-      children: const <ReaderQuickSettingsTab, Widget>{
-        ReaderQuickSettingsTab.typography: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text('字体'),
-        ),
-        ReaderQuickSettingsTab.interface: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text('界面'),
-        ),
-        ReaderQuickSettingsTab.page: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text('设置'),
-        ),
-        ReaderQuickSettingsTab.more: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text('更多'),
-        ),
-      },
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: CupertinoSlidingSegmentedControl<ReaderQuickSettingsTab>(
+        groupValue: _tab,
+        onValueChanged: (v) {
+          if (v == null) return;
+          setState(() => _tab = v);
+        },
+        children: const <ReaderQuickSettingsTab, Widget>{
+          ReaderQuickSettingsTab.typography: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text('字体'),
+          ),
+          ReaderQuickSettingsTab.interface: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text('界面'),
+          ),
+          ReaderQuickSettingsTab.page: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text('设置'),
+          ),
+          ReaderQuickSettingsTab.more: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text('更多'),
+          ),
+        },
+      ),
     );
   }
 

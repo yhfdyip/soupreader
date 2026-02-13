@@ -20,20 +20,45 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     this.includeBottomSafeArea = true,
   });
 
+  Widget? _buildNavBarItem(
+    BuildContext context,
+    Widget? child, {
+    required Alignment alignment,
+  }) {
+    if (child == null) return null;
+    final width = MediaQuery.sizeOf(context).width;
+    final maxWidth = width * 0.42;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: alignment,
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
     final shad = ShadTheme.of(context);
     final scheme = shad.colorScheme;
     final isDark = shad.brightness == Brightness.dark;
-    final borderColor =
-        scheme.border.withValues(alpha: isDark ? 0.85 : 1);
+    final borderColor = scheme.border.withValues(alpha: isDark ? 0.85 : 1);
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: Text(title),
-        leading: leading,
-        trailing: trailing,
+        leading: _buildNavBarItem(
+          context,
+          leading,
+          alignment: Alignment.centerLeft,
+        ),
+        trailing: _buildNavBarItem(
+          context,
+          trailing,
+          alignment: Alignment.centerRight,
+        ),
         backgroundColor: theme.barBackgroundColor,
         border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
       ),

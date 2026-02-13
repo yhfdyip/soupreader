@@ -48,11 +48,13 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _createRule,
             child: const Icon(CupertinoIcons.add),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),
           ),

@@ -115,41 +115,44 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                 children: [
                   // Tab 切换
                   Expanded(
-                    child: CupertinoSlidingSegmentedControl<int>(
-                      groupValue: _currentTab,
-                      backgroundColor: _chipBg,
-                      thumbColor: _accent,
-                      children: {
-                        0: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(
-                            '目录 (${widget.chapters.length})',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: _currentTab == 0
-                                  ? CupertinoColors.white
-                                  : _textSubtle,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: CupertinoSlidingSegmentedControl<int>(
+                        groupValue: _currentTab,
+                        backgroundColor: _chipBg,
+                        thumbColor: _accent,
+                        children: {
+                          0: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Text(
+                              '目录 (${widget.chapters.length})',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _currentTab == 0
+                                    ? CupertinoColors.white
+                                    : _textSubtle,
+                              ),
                             ),
                           ),
-                        ),
-                        1: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(
-                            '书签 (${widget.bookmarks.length})',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: _currentTab == 1
-                                  ? CupertinoColors.white
-                                  : _textSubtle,
+                          1: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Text(
+                              '书签 (${widget.bookmarks.length})',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _currentTab == 1
+                                    ? CupertinoColors.white
+                                    : _textSubtle,
+                              ),
                             ),
                           ),
-                        ),
-                      },
-                      onValueChanged: (value) {
-                        setState(() {
-                          _currentTab = value ?? 0;
-                        });
-                      },
+                        },
+                        onValueChanged: (value) {
+                          setState(() {
+                            _currentTab = value ?? 0;
+                          });
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

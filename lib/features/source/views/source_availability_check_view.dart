@@ -507,11 +507,13 @@ class _SourceAvailabilityCheckViewState
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _copyReport,
             child: const Text('复制'),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _exportReportToFile,
             child: const Text('导出'),
           ),
@@ -528,24 +530,32 @@ class _SourceAvailabilityCheckViewState
               ),
               CupertinoListTile.notched(
                 title: const Text('结果'),
-                additionalInfo: Text(
-                    '可用 $ok / 失败 $fail / 空 $empty / 超时 $timedOut / 跳过 $skipped'),
+                subtitle: Text(
+                  '可用 $ok / 失败 $fail / 空 $empty / 超时 $timedOut / 跳过 $skipped',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               CupertinoListTile.notched(
                 title: const Text('结果筛选'),
-                subtitle: CupertinoSlidingSegmentedControl<_ResultFilter>(
-                  groupValue: _resultFilter,
-                  children: {
-                    for (final f in _ResultFilter.values)
-                      f: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Text('${_filterLabel(f)}(${_countByFilter(f)})'),
-                      ),
-                  },
-                  onValueChanged: (v) {
-                    if (v == null) return;
-                    setState(() => _resultFilter = v);
-                  },
+                subtitle: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: CupertinoSlidingSegmentedControl<_ResultFilter>(
+                    groupValue: _resultFilter,
+                    children: {
+                      for (final f in _ResultFilter.values)
+                        f: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            '${_filterLabel(f)}(${_countByFilter(f)})',
+                          ),
+                        ),
+                    },
+                    onValueChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _resultFilter = v);
+                    },
+                  ),
                 ),
               ),
               CupertinoListTile.notched(

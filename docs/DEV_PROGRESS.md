@@ -992,3 +992,130 @@
 
 ### 兼容影响
 - 仅调试页 UI 交互收口，不改调试引擎、书源协议、数据库结构。
+
+## 2026-02-13（iOS 调试菜单再对齐 legado：菜单动作前置，高级能力后置）
+
+### 已完成
+- `source_edit_view.dart`
+  - 调试工具区改为两级入口：
+    - `菜单（对标 Legado）`：扫码填充 Key、查看搜索/详情/目录/正文源码、刷新发现快捷项、调试帮助；
+    - `高级工具`：网页验证、高级诊断、结构化摘要、调试包导出、变量快照、控制台复制等。
+  - 输入区移除独立“扫码填充 Key”行，扫码入口统一收口到 legado 菜单动作。
+  - 主屏文案同步调整：`菜单（对标 Legado）-> 调试帮助`、`高级工具 -> 复制控制台（全部）`。
+  - 清理不再使用的“源码二级菜单计数”辅助方法，减少冗余状态。
+
+### 为什么
+- legado 的调试能力入口以菜单动作为主，扫码/源码/刷新/帮助是同一层级；
+- 当前实现虽有能力，但入口分散在主屏多个位置，不利于形成一致操作心智。
+
+### legado 对标（已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
+- `/home/server/legado/app/src/main/res/menu/book_source_debug.xml`
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 书源编辑 -> 调试 -> 工具区点击“菜单（对标 Legado）”，确认包含扫码/源码/刷新/帮助动作；
+  - 点击“高级工具”，确认高级导出与诊断能力仍可达；
+  - 验证“刷新发现快捷项”在菜单中可用且刷新中会提示。
+
+### 兼容影响
+- 仅入口层级与排版重排，不改调试引擎语义、书源协议、数据库结构。
+
+## 2026-02-13（打包后导入不可用与设置页溢出修复：启动硬化 + 导入防护 + 布局调整）
+
+### 已完成
+- `lib/main.dart`
+  - 启动流程改为严格串行初始化：`DatabaseService.init -> SourceRepository.bootstrap -> SettingsService.init -> CookieStore.setup`。
+  - 修复启动日志字符串插值（`$name/$error`）问题，避免 release 包日志不可读。
+  - 初始化失败时不再“继续进入主界面”，改为展示可见错误页（含失败步骤、错误摘要与“重试初始化”入口），防止后续书源管理链路在未初始化状态下连锁异常。
+- `lib/features/source/views/source_list_view.dart`
+  - 导入链路增强异常可观测性：
+    - 剪贴板读取失败增加 `try/catch` 与错误提示；
+    - 导入提交流程 `_commitImportResult` 增加总兜底 `try/catch`；
+    - 设置读写统一走 `_settingsGet/_settingsPut`，避免 `settingsBox` 异常导致静默失败。
+  - 在导入前增加初始化检查 `_ensureSettingsReady`，未就绪时直接提示并中止导入流程。
+  - 顶部导航右侧按钮收紧为 `minimumSize: Size(30, 30)`，降低小屏挤压导致的顶栏溢出风险。
+- `lib/features/settings/views/settings_view.dart`
+  - 设置项布局改为“标题 + 说明纵向”结构，避免原 `trailing` 文本被压缩/截断。
+  - `info` 支持两行省略，改善“主设置界面文字显示不全”问题。
+- `android/app/src/main/AndroidManifest.xml`
+  - 增加 `android.permission.INTERNET`，修复 Android 打包后网络导入的基础权限阻断。
+
+### 为什么
+- 现场问题表现为“打包后网络导入/剪贴板导入不可用 + 设置/源管理界面异常”。
+- 根因之一是初始化失败后仍继续进入 UI，导致后续导入和设置存储链路在未就绪状态触发异常。
+- 设置页原行布局把状态文本放在 trailing，遇到小屏或较长文案会被过度压缩。
+
+### legado 对标（已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/OnLineImportActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceViewModel.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditViewModel.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditAdapter.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugModel.kt`
+- `/home/server/legado/app/src/main/res/menu/book_source.xml`
+- `/home/server/legado/app/src/main/res/menu/source_edit.xml`
+- `/home/server/legado/app/src/main/res/menu/import_source.xml`
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 打包安装后进入书源管理，分别验证“从网络导入 / 从剪贴板导入”；
+  - 若初始化异常，启动后应显示“启动异常”页面而非进入主界面；
+  - 进入设置首页，检查各条目说明文字在小屏下不再被单行截断；
+  - 进入书源管理页，检查顶栏按钮与标题不再发生挤压溢出。
+
+### 兼容影响
+- 启动阶段由“容错继续”改为“失败阻断 + 可见错误页”，属于行为收敛，可能让历史上被静默吞掉的初始化错误变为显式可见；
+- 未改书源导入协议与解析语义（URL/JSON/sourceUrls/#requestWithoutUA），仅增强稳定性与可观测性。
+
+## 2026-02-13（全页面防溢出巡检与修复：导航栏、分段控件、设置项信息布局）
+
+### 已完成
+- `lib/app/widgets/app_cupertino_page_scaffold.dart`
+  - 导航栏 `leading/trailing` 增加统一宽度约束 + `FittedBox(scaleDown)`，避免各页面右上角多按钮在窄屏/大字号下挤出屏幕。
+- 导航栏多按钮页面收敛按钮最小尺寸（减少横向占用）：
+  - `lib/features/bookshelf/views/bookshelf_view.dart`
+  - `lib/features/replace/views/replace_rule_list_view.dart`
+  - `lib/features/source/views/source_edit_view.dart`
+  - `lib/features/source/views/source_availability_check_view.dart`
+  - `lib/features/source/views/source_list_view.dart`
+- 设置类入口页（阅读全局/界面/行为）条目布局改为“标题 + 说明纵向”并加省略策略，避免右侧 `info` 挤压标题：
+  - `lib/features/settings/views/global_reading_settings_view.dart`
+  - `lib/features/settings/views/reading_interface_settings_hub_view.dart`
+  - `lib/features/settings/views/reading_behavior_settings_hub_view.dart`
+- 高风险分段控件（`CupertinoSlidingSegmentedControl`）统一加横向滚动容器，避免小屏横向溢出：
+  - `lib/features/source/views/source_list_view.dart`
+  - `lib/features/source/views/source_edit_view.dart`
+  - `lib/features/source/views/source_availability_check_view.dart`
+  - `lib/features/reader/views/simple_reader_view.dart`
+  - `lib/features/reader/widgets/chapter_list_dialog.dart`
+  - `lib/features/reader/widgets/reader_quick_settings_sheet.dart`
+- 书源可用性检测页结果摘要文案由 `additionalInfo` 下沉为 `subtitle`（两行省略），降低长文案挤压风险：
+  - `lib/features/source/views/source_availability_check_view.dart`
+
+### 为什么
+- 用户反馈“页面顶出屏幕/文字显示不全”本质是横向空间竞争与小屏适配问题；
+- 问题集中在三个模式：导航栏右侧多动作、条目行右侧信息过长、分段控件宽度不足。
+
+### legado 对标说明
+- 本次为跨页面适配与容器层防溢出治理，不改变书源/阅读业务语义与状态流转；
+- 未修改 legado 对齐的核心功能路径，仅做显示层容错与布局稳健性增强。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径建议：
+  - 书架 / 书源管理 / 书源编辑 / 替换规则列表，检查导航栏按钮不再挤出；
+  - 设置首页、阅读（全局默认）、界面（样式）、设置（行为），检查标题与说明在小屏下无横向溢出；
+  - 书源可用性检测与阅读器相关设置弹层，检查分段控件在窄屏可横向滚动且不触发 overflow。
+
+### 兼容影响
+- 仅布局与容器防溢出增强，不改业务逻辑、数据结构和协议解析行为。

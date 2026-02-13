@@ -156,16 +156,19 @@ class _SourceListViewState extends State<SourceListView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _showImportOptions,
             child: const Icon(CupertinoIcons.add),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: _showManageOptions,
             child: const Icon(CupertinoIcons.ellipsis),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
             onPressed: () {
               setState(() {
                 _selectionMode = !_selectionMode;
@@ -268,26 +271,29 @@ class _SourceListViewState extends State<SourceListView> {
   Widget _buildEnabledFilter() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: CupertinoSlidingSegmentedControl<SourceEnabledFilter>(
-        groupValue: _enabledFilter,
-        children: const {
-          SourceEnabledFilter.all: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Text('全部状态'),
-          ),
-          SourceEnabledFilter.enabled: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Text('仅启用'),
-          ),
-          SourceEnabledFilter.disabled: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Text('仅禁用'),
-          ),
-        },
-        onValueChanged: (value) {
-          if (value == null) return;
-          setState(() => _enabledFilter = value);
-        },
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: CupertinoSlidingSegmentedControl<SourceEnabledFilter>(
+          groupValue: _enabledFilter,
+          children: const {
+            SourceEnabledFilter.all: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('全部状态'),
+            ),
+            SourceEnabledFilter.enabled: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('仅启用'),
+            ),
+            SourceEnabledFilter.disabled: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('仅禁用'),
+            ),
+          },
+          onValueChanged: (value) {
+            if (value == null) return;
+            setState(() => _enabledFilter = value);
+          },
+        ),
       ),
     );
   }
@@ -2114,11 +2120,10 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<String?> _askCheckKeyword() async {
-    final cached = (_db.settingsBox.get(
-              _prefCheckKeyword,
-              defaultValue: '我的',
-            ) ??
-            '我的')
+    if (!_ensureSettingsReady(actionName: '保存校验关键词')) {
+      return null;
+    }
+    final cached = (_settingsGet(_prefCheckKeyword, defaultValue: '我的') ?? '我的')
         .toString();
     final controller = TextEditingController(text: cached);
     final value = await showCupertinoDialog<String>(
@@ -2151,7 +2156,7 @@ class _SourceListViewState extends State<SourceListView> {
     final keyword = normalized.isNotEmpty
         ? normalized
         : (cached.trim().isNotEmpty ? cached.trim() : '我的');
-    await _db.settingsBox.put(_prefCheckKeyword, keyword);
+    await _settingsPut(_prefCheckKeyword, keyword);
     return keyword;
   }
 
@@ -2400,7 +2405,15 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _importFromClipboard() async {
-    final data = await Clipboard.getData('text/plain');
+    ClipboardData? data;
+    try {
+      data = await Clipboard.getData('text/plain');
+    } catch (e, st) {
+      debugPrint('[source-import] 读取剪贴板失败: $e');
+      debugPrintStack(stackTrace: st);
+      _showMessage('读取剪贴板失败：$e');
+      return;
+    }
     final text = data?.text?.trim();
     if (text == null || text.isEmpty) {
       _showMessage('剪贴板为空');
@@ -2606,7 +2619,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   List<String> _loadOnlineImportHistory() {
-    final raw = _db.settingsBox.get(_prefImportOnlineHistory);
+    final raw = _settingsGet(_prefImportOnlineHistory);
     if (raw is List) {
       return raw
           .map((e) => e.toString().trim())
@@ -2631,7 +2644,7 @@ class _SourceListViewState extends State<SourceListView> {
         .where((e) => e.isNotEmpty)
         .toSet()
         .toList(growable: false);
-    await _db.settingsBox.put(_prefImportOnlineHistory, normalized);
+    await _settingsPut(_prefImportOnlineHistory, normalized);
   }
 
   Future<void> _pushImportHistory(String url) async {
@@ -2674,83 +2687,93 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _commitImportResult(SourceImportResult result) async {
-    if (!result.success) {
-      if (!result.cancelled) {
-        _showImportError(result);
+    try {
+      if (!result.success) {
+        if (!result.cancelled) {
+          _showImportError(result);
+        }
+        return;
       }
-      return;
-    }
+      if (!_ensureSettingsReady(actionName: '导入书源')) {
+        return;
+      }
 
-    final entries = <_ImportEntry>[];
-    final localMap = _localSourceMap();
-    for (final source in result.sources) {
-      final url = source.bookSourceUrl.trim();
-      if (url.isEmpty) continue;
-      final rawJson =
-          result.rawJsonForSourceUrl(url) ?? LegadoJson.encode(source.toJson());
-      entries.add(
-        _ImportEntry(
-          incoming: source,
-          existing: localMap[url],
-          rawJson: rawJson,
-          selected: true,
-        ),
+      final entries = <_ImportEntry>[];
+      final localMap = _localSourceMap();
+      for (final source in result.sources) {
+        final url = source.bookSourceUrl.trim();
+        if (url.isEmpty) continue;
+        final rawJson = result.rawJsonForSourceUrl(url) ??
+            LegadoJson.encode(source.toJson());
+        entries.add(
+          _ImportEntry(
+            incoming: source,
+            existing: localMap[url],
+            rawJson: rawJson,
+            selected: true,
+          ),
+        );
+      }
+
+      _refreshImportEntries(entries, localMap);
+
+      if (entries.isEmpty) {
+        _showMessage('没有可导入的书源');
+        return;
+      }
+
+      final decision = await _showImportSelectionDialog(entries);
+      if (decision == null) {
+        _showMessage('已取消导入');
+        return;
+      }
+
+      final selectedEntries =
+          decision.entries.where((e) => e.selected).toList();
+      if (selectedEntries.isEmpty) {
+        _showMessage('未选择任何书源，导入取消');
+        return;
+      }
+
+      // 导入时按 URL 去重，保留最后一个被选中的条目（与 legado 重复覆盖语义一致）。
+      final dedupSelected = <String, _ImportEntry>{};
+      for (final entry in selectedEntries) {
+        dedupSelected[entry.incoming.bookSourceUrl.trim()] = entry;
+      }
+      final finalEntries = dedupSelected.values.toList(growable: false);
+
+      var imported = 0;
+      var newCount = 0;
+      var updateCount = 0;
+      var keepCount = 0;
+
+      for (final entry in finalEntries) {
+        final isNew = entry.isNew;
+        if (isNew) {
+          newCount++;
+        } else if (entry.isUpdate) {
+          updateCount++;
+        } else {
+          keepCount++;
+        }
+
+        final mergedRaw = _buildMergedRawJson(entry, decision.policy);
+        await _sourceRepo.upsertSourceRawJson(rawJson: mergedRaw);
+        imported++;
+      }
+
+      _showImportSummary(
+        result,
+        imported: imported,
+        newCount: newCount,
+        updateCount: updateCount,
+        existingCount: keepCount,
       );
+    } catch (e, st) {
+      debugPrint('[source-import] 导入流程异常: $e');
+      debugPrintStack(stackTrace: st);
+      _showMessage('导入流程异常：$e');
     }
-
-    _refreshImportEntries(entries, localMap);
-
-    if (entries.isEmpty) {
-      _showMessage('没有可导入的书源');
-      return;
-    }
-
-    final decision = await _showImportSelectionDialog(entries);
-    if (decision == null) {
-      _showMessage('已取消导入');
-      return;
-    }
-
-    final selectedEntries = decision.entries.where((e) => e.selected).toList();
-    if (selectedEntries.isEmpty) {
-      _showMessage('未选择任何书源，导入取消');
-      return;
-    }
-
-    // 导入时按 URL 去重，保留最后一个被选中的条目（与 legado 重复覆盖语义一致）。
-    final dedupSelected = <String, _ImportEntry>{};
-    for (final entry in selectedEntries) {
-      dedupSelected[entry.incoming.bookSourceUrl.trim()] = entry;
-    }
-    final finalEntries = dedupSelected.values.toList(growable: false);
-
-    var imported = 0;
-    var newCount = 0;
-    var updateCount = 0;
-    var keepCount = 0;
-
-    for (final entry in finalEntries) {
-      final isNew = entry.isNew;
-      if (isNew) {
-        newCount++;
-      } else if (entry.isUpdate) {
-        updateCount++;
-      } else {
-        keepCount++;
-      }
-
-      final mergedRaw = _buildMergedRawJson(entry, decision.policy);
-      await _sourceRepo.upsertSourceRawJson(rawJson: mergedRaw);
-      imported++;
-    }
-
-    _showImportSummary(
-      result,
-      imported: imported,
-      newCount: newCount,
-      updateCount: updateCount,
-      existingCount: keepCount,
-    );
   }
 
   BookSource _mergeWithPolicy(_ImportEntry entry, _ImportPolicy policy) {
@@ -2983,17 +3006,16 @@ class _SourceListViewState extends State<SourceListView> {
     final localMap = _localSourceMap();
     _refreshImportEntries(entries, localMap);
     var keepName =
-        _db.settingsBox.get(_prefImportKeepName, defaultValue: false) == true;
+        _settingsGet(_prefImportKeepName, defaultValue: false) == true;
     var keepGroup =
-        _db.settingsBox.get(_prefImportKeepGroup, defaultValue: false) == true;
+        _settingsGet(_prefImportKeepGroup, defaultValue: false) == true;
     var keepEnabled =
-        _db.settingsBox.get(_prefImportKeepEnabled, defaultValue: false) ==
-            true;
+        _settingsGet(_prefImportKeepEnabled, defaultValue: false) == true;
     var customGroup =
-        (_db.settingsBox.get(_prefImportCustomGroup, defaultValue: '') ?? '')
+        (_settingsGet(_prefImportCustomGroup, defaultValue: '') ?? '')
             .toString();
     var appendGroup =
-        _db.settingsBox.get(_prefImportAppendGroup, defaultValue: true) == true;
+        _settingsGet(_prefImportAppendGroup, defaultValue: true) == true;
 
     void markAll(bool selected) {
       for (final entry in entries) {
@@ -3309,26 +3331,31 @@ class _SourceListViewState extends State<SourceListView> {
                           Expanded(
                             child: CupertinoButton.filled(
                               onPressed: () async {
-                                await _db.settingsBox.put(
+                                final savedKeepName = await _settingsPut(
                                   _prefImportKeepName,
                                   keepName,
                                 );
-                                await _db.settingsBox.put(
+                                if (!savedKeepName) return;
+                                final savedKeepGroup = await _settingsPut(
                                   _prefImportKeepGroup,
                                   keepGroup,
                                 );
-                                await _db.settingsBox.put(
+                                if (!savedKeepGroup) return;
+                                final savedKeepEnabled = await _settingsPut(
                                   _prefImportKeepEnabled,
                                   keepEnabled,
                                 );
-                                await _db.settingsBox.put(
+                                if (!savedKeepEnabled) return;
+                                final savedCustomGroup = await _settingsPut(
                                   _prefImportCustomGroup,
                                   customGroup,
                                 );
-                                await _db.settingsBox.put(
+                                if (!savedCustomGroup) return;
+                                final savedAppendGroup = await _settingsPut(
                                   _prefImportAppendGroup,
                                   appendGroup,
                                 );
+                                if (!savedAppendGroup) return;
 
                                 if (!context.mounted) return;
                                 Navigator.pop(
@@ -3456,6 +3483,46 @@ class _SourceListViewState extends State<SourceListView> {
         return '响应时间';
       case _SourceSortMode.enabled:
         return '启用状态';
+    }
+  }
+
+  bool _ensureSettingsReady({required String actionName}) {
+    try {
+      _db.settingsBox;
+      return true;
+    } catch (e, st) {
+      debugPrint('[source-settings] $actionName 前检查失败: $e');
+      debugPrintStack(stackTrace: st);
+      _showMessage('应用初始化未完成，暂时无法$actionName。请稍后重试。');
+      return false;
+    }
+  }
+
+  dynamic _settingsGet(
+    String key, {
+    dynamic defaultValue,
+  }) {
+    try {
+      return _db.settingsBox.get(key, defaultValue: defaultValue);
+    } catch (e, st) {
+      debugPrint('[source-settings] 读取 $key 失败: $e');
+      debugPrintStack(stackTrace: st);
+      return defaultValue;
+    }
+  }
+
+  Future<bool> _settingsPut(
+    String key,
+    dynamic value,
+  ) async {
+    try {
+      await _db.settingsBox.put(key, value);
+      return true;
+    } catch (e, st) {
+      debugPrint('[source-settings] 写入 $key 失败: $e');
+      debugPrintStack(stackTrace: st);
+      _showMessage('设置保存失败：$e');
+      return false;
     }
   }
 

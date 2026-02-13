@@ -1919,18 +1919,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       );
     }
 
-    return CupertinoSlidingSegmentedControl<int>(
-      groupValue: selectedTab,
-      backgroundColor: _uiCardBg,
-      thumbColor: _uiAccent,
-      children: {
-        for (final tab in tabs)
-          tab: buildTab(labels[tab] ?? '设置', selectedTab == tab),
-      },
-      onValueChanged: (value) {
-        if (value == null) return;
-        onChanged(value);
-      },
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: CupertinoSlidingSegmentedControl<int>(
+        groupValue: selectedTab,
+        backgroundColor: _uiCardBg,
+        thumbColor: _uiAccent,
+        children: {
+          for (final tab in tabs)
+            tab: buildTab(labels[tab] ?? '设置', selectedTab == tab),
+        },
+        onValueChanged: (value) {
+          if (value == null) return;
+          onChanged(value);
+        },
+      ),
     );
   }
 
@@ -2067,46 +2070,49 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                CupertinoSlidingSegmentedControl<int>(
-                  groupValue: _settings.textBold,
-                  backgroundColor: _uiCardBg,
-                  thumbColor: _uiAccent,
-                  children: {
-                    2: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      child: Text('细体',
-                          style: TextStyle(
-                              color: _uiTextNormal,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                    0: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      child: Text('正常',
-                          style: TextStyle(
-                              color: _uiTextNormal,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                    1: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      child: Text('粗体',
-                          style: TextStyle(
-                              color: _uiTextNormal,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  },
-                  onValueChanged: (value) {
-                    if (value == null) return;
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(textBold: value),
-                    );
-                  },
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: CupertinoSlidingSegmentedControl<int>(
+                    groupValue: _settings.textBold,
+                    backgroundColor: _uiCardBg,
+                    thumbColor: _uiAccent,
+                    children: {
+                      2: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Text('细体',
+                            style: TextStyle(
+                                color: _uiTextNormal,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      0: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Text('正常',
+                            style: TextStyle(
+                                color: _uiTextNormal,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      1: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Text('粗体',
+                            style: TextStyle(
+                                color: _uiTextNormal,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    },
+                    onValueChanged: (value) {
+                      if (value == null) return;
+                      _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(textBold: value),
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
