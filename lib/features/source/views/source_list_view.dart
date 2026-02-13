@@ -300,10 +300,10 @@ class _SourceListViewState extends State<SourceListView> {
 
   Widget _buildGroupFilter(List<String> groups, String activeGroup) {
     return SizedBox(
-      height: 42,
+      height: 46,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         itemCount: groups.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
@@ -3488,7 +3488,7 @@ class _SourceListViewState extends State<SourceListView> {
 
   bool _ensureSettingsReady({required String actionName}) {
     try {
-      _db.settingsBox;
+      _db.driftDb;
       return true;
     } catch (e, st) {
       debugPrint('[source-settings] $actionName 前检查失败: $e');
@@ -3503,7 +3503,7 @@ class _SourceListViewState extends State<SourceListView> {
     dynamic defaultValue,
   }) {
     try {
-      return _db.settingsBox.get(key, defaultValue: defaultValue);
+      return _db.getSetting(key, defaultValue: defaultValue);
     } catch (e, st) {
       debugPrint('[source-settings] 读取 $key 失败: $e');
       debugPrintStack(stackTrace: st);
@@ -3516,7 +3516,7 @@ class _SourceListViewState extends State<SourceListView> {
     dynamic value,
   ) async {
     try {
-      await _db.settingsBox.put(key, value);
+      await _db.putSetting(key, value);
       return true;
     } catch (e, st) {
       debugPrint('[source-settings] 写入 $key 失败: $e');

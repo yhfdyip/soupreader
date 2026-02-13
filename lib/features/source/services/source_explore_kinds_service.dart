@@ -239,7 +239,7 @@ class SourceExploreKindsService {
 
   dynamic _safeGetSetting(String key) {
     try {
-      return _db.settingsBox.get(key);
+      return _db.getSetting(key);
     } catch (_) {
       return null;
     }
@@ -247,7 +247,7 @@ class SourceExploreKindsService {
 
   Future<void> _safePutSetting(String key, dynamic value) async {
     try {
-      await _db.settingsBox.put(key, value);
+      await _db.putSetting(key, value);
     } catch (_) {
       // ignore cache write failures
     }
@@ -255,7 +255,7 @@ class SourceExploreKindsService {
 
   Future<void> _safeDeleteSetting(String key) async {
     try {
-      await _db.settingsBox.delete(key);
+      await _db.deleteSetting(key);
     } catch (_) {
       // ignore cache delete failures
     }

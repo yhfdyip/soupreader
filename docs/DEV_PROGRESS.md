@@ -1,5 +1,52 @@
 # SoupReader 开发进度日志
 
+## 2026-02-13（页面顶出修复：统一顶部安全区 + 书源管理筛选防裁切）
+
+### 已完成
+- 修复通用页面容器顶部被导航栏挤压问题：
+  - `lib/app/widgets/app_cupertino_page_scaffold.dart`
+  - `includeTopSafeArea` 默认值由 `false` 调整为 `true`，统一避免页面首屏内容被状态栏/导航栏遮挡。
+- 书源管理页面顶部筛选行做防裁切微调：
+  - `lib/features/source/views/source_list_view.dart`
+  - 分组筛选容器高度 `42 -> 46`；
+  - 横向列表增加垂直内边距 `EdgeInsets.symmetric(horizontal: 16, vertical: 2)`。
+
+### 为什么
+- 线上反馈“进入设置、源管理会顶出界面”“主设置界面文字显示不全”，截图可见顶部筛选控件被裁切。
+- 根因是通用容器顶部安全区默认关闭，叠加书源管理筛选行高度偏紧，导致在 iOS 设备上首屏顶部显示不稳定。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 手工路径：
+  - 进入 `设置`：首个分组卡片需完整显示，不再贴顶或被导航栏压住；
+  - 进入 `书源管理`：顶部分类胶囊和“全部状态/仅启用/仅禁用”分段控件完整显示；
+  - 在小屏机型（如 iPhone SE）与大屏机型（如 Pro Max）抽检首屏无越界。
+
+### 兼容影响
+- 不保留旧的“顶部安全区默认关闭”行为，统一按新布局策略渲染。
+- 该改动仅影响页面可视布局，不改变书源管理与设置页的业务逻辑。
+
+## 2026-02-13（去兼容继续收口：移除 settingsBox 兼容层）
+
+### 已完成
+- 删除 `DatabaseService` 中 `DriftSettingsBox` 兼容壳与 `settingsBox` getter。
+- 书源相关调用点改为直接使用数据库服务原生方法：
+  - `source_explore_kinds_service.dart`：`getSetting/putSetting/deleteSetting`
+  - `source_list_view.dart`：设置读写与初始化检查不再依赖 `settingsBox`
+
+### 为什么
+- 你已明确“不用兼容”，因此继续清理旧接口封装，减少一层历史适配代码与调用歧义。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 进入书源管理，执行导入流程并观察导入配置项（保留原名、分组等）是否正常记忆；
+  - 在书源编辑页触发发现页分类调试缓存，确认不报设置存取异常。
+
+### 兼容影响
+- 不再保留 `settingsBox` 旧调用入口，内部统一为 `DatabaseService` 直接设置 API。
+
 ## 2026-02-13（明确不做历史兼容：移除旧键回退逻辑）
 
 ### 已完成

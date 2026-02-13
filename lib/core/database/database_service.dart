@@ -15,7 +15,6 @@ class DatabaseService {
   bool _isInitialized = false;
 
   final Map<String, dynamic> _settingsCache = <String, dynamic>{};
-  late final DriftSettingsBox _settingsBox = DriftSettingsBox._(this);
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -27,11 +26,6 @@ class DatabaseService {
   SourceDriftDatabase get driftDb {
     _checkInitialized();
     return _driftService.db;
-  }
-
-  DriftSettingsBox get settingsBox {
-    _checkInitialized();
-    return _settingsBox;
   }
 
   dynamic getSetting(
@@ -104,24 +98,5 @@ class DatabaseService {
     if (!_isInitialized) {
       throw StateError('DatabaseService 未初始化，请先调用 init()');
     }
-  }
-}
-
-/// 兼容旧调用形态：`settingsBox.get/put/delete`
-class DriftSettingsBox {
-  final DatabaseService _service;
-
-  DriftSettingsBox._(this._service);
-
-  dynamic get(String key, {dynamic defaultValue}) {
-    return _service.getSetting(key, defaultValue: defaultValue);
-  }
-
-  Future<void> put(String key, dynamic value) {
-    return _service.putSetting(key, value);
-  }
-
-  Future<void> delete(String key) {
-    return _service.deleteSetting(key);
   }
 }

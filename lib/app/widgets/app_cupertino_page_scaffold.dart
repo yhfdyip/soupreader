@@ -16,7 +16,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     required this.child,
     this.leading,
     this.trailing,
-    this.includeTopSafeArea = false,
+    this.includeTopSafeArea = true,
     this.includeBottomSafeArea = true,
   });
 
