@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
@@ -952,18 +953,177 @@ class _SourceEditViewState extends State<SourceEditView> {
     return ListView(
       controller: _debugTabScrollController,
       children: [
+        _buildDebugOverviewSection(),
         _buildDebugPrimaryInputSection(),
         if (_showDebugQuickHelp) _buildDebugQuickActionsSection(),
+        _buildDebugResultNavSection(),
         _buildDebugSecondaryToolsSection(),
         _buildDebugConsoleSection(),
       ],
     );
   }
 
-  Widget _buildDebugPrimaryInputSection() {
+  String _debugStatusText() {
+    if (_debugLoading) return '运行中';
+    if ((_debugError ?? '').trim().isNotEmpty) return '失败';
+    if (_debugLinesAll.isNotEmpty) return '已完成';
+    return '未开始';
+  }
+
+  Color _debugStatusColor() {
+    if (_debugLoading) {
+      return CupertinoColors.systemBlue.resolveFrom(context);
+    }
+    if ((_debugError ?? '').trim().isNotEmpty) {
+      return CupertinoColors.systemRed.resolveFrom(context);
+    }
+    if (_debugLinesAll.isNotEmpty) {
+      return CupertinoColors.systemGreen.resolveFrom(context);
+    }
+    return CupertinoColors.secondaryLabel.resolveFrom(context);
+  }
+
+  Widget _buildDebugOverviewSection() {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+    final totalLines = _debugLinesAll.length;
+    final hasLines = totalLines > 0;
+    final hasError = (_debugError ?? '').trim().isNotEmpty;
+    final statusColor = _debugStatusColor();
+
     return CupertinoListSection.insetGrouped(
-      header: const Text('输入'),
-      footer: const Text('关键字/URL/前缀调试；完整语法见“菜单（对标 Legado）-> 调试帮助”。'),
+      header: const Text('调试状态'),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: ShadCard(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '意图：${_currentDebugIntentHint()}',
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.mutedForeground,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.36),
+                        ),
+                      ),
+                      child: Text(
+                        _debugStatusText(),
+                        style: theme.textTheme.small.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const ShadSeparator.horizontal(),
+                const SizedBox(height: 8),
+                Text(
+                  '日志 $totalLines 行 · 自动跟随 ${_debugAutoFollowLogs ? '开启' : '暂停'}',
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
+                  ),
+                ),
+                if (hasError) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemRed
+                          .resolveFrom(context)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: CupertinoColors.systemRed
+                            .resolveFrom(context)
+                            .withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Text(
+                      _debugError!.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.small.copyWith(
+                        color: CupertinoColors.systemRed.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ShadButton.ghost(
+                      onPressed:
+                          (hasLines && !_debugAutoFollowLogs)
+                              ? () => _scrollDebugToBottom(
+                                    forceFollow: true,
+                                    animated: true,
+                                  )
+                              : null,
+                      child: const Text('回到最新日志'),
+                    ),
+                    ShadButton.ghost(
+                      onPressed: hasLines ? _copyDebugConsole : null,
+                      child: const Text('复制控制台'),
+                    ),
+                    ShadButton.ghost(
+                      onPressed: hasLines ? _copyMinimalReproInfo : null,
+                      child: const Text('复制复现信息'),
+                    ),
+                    ShadButton.ghost(
+                      onPressed: hasLines ? _clearDebugConsole : null,
+                      child: const Text('清空日志'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDebugResultNavSection() {
+    return Column(
+      children: [
+        _buildDiagnosisSection(),
+        _buildDebugSourcesSection(),
+      ],
+    );
+  }
+
+  Widget _buildDebugPrimaryInputSection() {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+
+    return CupertinoListSection.insetGrouped(
+      header: const Text('快速输入'),
+      footer: const Text('关键字/URL/前缀调试；完整语法见“工具 -> 菜单（对标 Legado）-> 调试帮助”。'),
       children: [
         CupertinoListTile.notched(
           title: const Text('Key'),
@@ -977,31 +1137,51 @@ class _SourceEditViewState extends State<SourceEditView> {
             onChanged: (_) => setState(() {}),
           ),
         ),
-        CupertinoListTile.notched(
-          title: const Text('开始调试'),
-          subtitle: const Text('对标 Legado 主流程：输入后立即执行'),
-          additionalInfo: _debugLoading ? const Text('运行中…') : null,
-          trailing: const CupertinoListTileChevron(),
-          onTap: _debugLoading ? null : _startLegadoStyleDebug,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShadButton(
+                width: double.infinity,
+                onPressed: _debugLoading ? null : _startLegadoStyleDebug,
+                child: Text(_debugLoading ? '调试运行中…' : '开始调试'),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '对标 legado：输入后即按对应链路执行（搜索/详情/发现/目录/正文）。',
+                style: theme.textTheme.small.copyWith(
+                  color: scheme.mutedForeground,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
   Widget _buildDebugSecondaryToolsSection() {
+    final hasLogs = _debugLinesAll.isNotEmpty;
+    final quickToggleTitle = _showDebugQuickHelp ? '收起快捷动作' : '显示快捷动作';
+    final quickToggleDesc = _showDebugQuickHelp
+        ? '减少首屏占用，保留核心输入与结果'
+        : '重新展开“我的/系统/发现候选/++/--”快捷区';
+
     return CupertinoListSection.insetGrouped(
       header: const Text('工具'),
       children: [
-        if (!_showDebugQuickHelp)
-          CupertinoListTile.notched(
-            title: const Text('显示快捷提示'),
-            subtitle: const Text('重新展开“我的/系统/发现候选/++/--”快捷区'),
-            trailing: const CupertinoListTileChevron(),
-            onTap: () {
-              setState(() => _showDebugQuickHelp = true);
+        CupertinoListTile.notched(
+          title: Text(quickToggleTitle),
+          subtitle: Text(quickToggleDesc),
+          trailing: const CupertinoListTileChevron(),
+          onTap: () {
+            setState(() => _showDebugQuickHelp = !_showDebugQuickHelp);
+            if (_showDebugQuickHelp) {
               _debugKeyFocusNode.requestFocus();
-            },
-          ),
+            }
+          },
+        ),
         CupertinoListTile.notched(
           title: const Text('菜单（对标 Legado）'),
           subtitle: const Text('扫码/查看源码/刷新发现/调试帮助'),
@@ -1016,15 +1196,20 @@ class _SourceEditViewState extends State<SourceEditView> {
           trailing: const CupertinoListTileChevron(),
           onTap: _showDebugMoreToolsSheet,
         ),
-        if (!_debugAutoFollowLogs && _debugLinesAll.isNotEmpty)
-          CupertinoListTile.notched(
-            title: const Text('回到最新日志'),
-            subtitle: Text('当前已暂停自动跟随（共 ${_debugLinesAll.length} 行）'),
-            trailing: const CupertinoListTileChevron(),
-            onTap: () {
-              _scrollDebugToBottom(forceFollow: true, animated: true);
-            },
-          ),
+        CupertinoListTile.notched(
+          title: const Text('复制控制台（全部）'),
+          subtitle: Text(hasLogs ? '共 ${_debugLinesAll.length} 行' : '暂无日志'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: hasLogs ? _copyDebugConsole : null,
+        ),
+        CupertinoListTile.notched(
+          title: const Text('一键导出调试包（推荐）'),
+          subtitle: const Text('自动打包摘要、控制台与书源 JSON'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: hasLogs
+              ? () => _exportDebugBundleToFile(includeRawSources: false)
+              : null,
+        ),
       ],
     );
   }
@@ -1042,9 +1227,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   void _onDebugKeyFocusChanged() {
-    if (!_debugKeyFocusNode.hasFocus) return;
-    if (!mounted || _showDebugQuickHelp) return;
-    setState(() => _showDebugQuickHelp = true);
+    if (!_debugKeyFocusNode.hasFocus || !mounted) return;
   }
 
   void _queueDebugAutoScroll({bool force = false}) {
@@ -1431,16 +1614,11 @@ class _SourceEditViewState extends State<SourceEditView> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: CupertinoColors.systemGrey5.resolveFrom(context),
+    return ShadButton.ghost(
       onPressed: onTap,
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 13,
-          color: CupertinoColors.label.resolveFrom(context),
-        ),
+        style: const TextStyle(fontSize: 13),
       ),
     );
   }
@@ -1941,6 +2119,14 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
 
     final children = <Widget>[
+      CupertinoListTile.notched(
+        title: Text('总 $totalLines 行 · 展示 ${visibleLines.length} 行'),
+        subtitle: Text(
+          _debugAutoFollowLogs
+              ? '自动跟随开启'
+              : '自动跟随暂停（可在顶部点击“回到最新日志”恢复）',
+        ),
+      ),
       if (_debugError != null && _debugError!.trim().isNotEmpty)
         CupertinoListTile.notched(
           title: Text(
@@ -1958,11 +2144,21 @@ class _SourceEditViewState extends State<SourceEditView> {
               color: CupertinoColors.systemRed.resolveFrom(context),
             ),
           ),
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
+            onPressed: _copyMinimalReproInfo,
+            child: const Icon(CupertinoIcons.doc_on_doc, size: 16),
+          ),
+          onTap: () => _openDebugText(
+            title: '最近错误',
+            text: _debugError!.trim(),
+          ),
         ),
       if (totalLines > visibleLines.length)
         CupertinoListTile.notched(
           title: Text('当前展示最近 ${visibleLines.length} 行'),
-          subtitle: Text('完整日志共 $totalLines 行，可用“高级工具 -> 复制控制台（全部）”导出'),
+          subtitle: const Text('完整日志可用“复制控制台（全部）”或“导出调试包”获取'),
         ),
     ];
 
@@ -2636,7 +2832,6 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
 
     setState(() {
-      _showDebugQuickHelp = false;
       _debugLoading = true;
       _debugError = null;
       _debugLines.clear();

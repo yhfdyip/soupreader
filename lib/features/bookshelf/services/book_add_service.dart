@@ -231,12 +231,12 @@ class BookAddService {
       persistedBookId = bookId;
       await _chapterRepo.addChapters(chapters);
 
-      final storedChapterCount = _chapterRepo.getChaptersForBook(bookId).length;
+      final storedChapterCount = await _chapterRepo.countChaptersForBook(bookId);
       if (storedChapterCount <= 0) {
         await _bookRepo.deleteBook(bookId);
         persistedBookId = null;
         return BookAddResult.error(
-          '加入失败：章节写入失败（0/${chapters.length}），请检查目录规则',
+          '加入失败：章节写入失败（$storedChapterCount/${chapters.length}），请检查目录规则',
         );
       }
 

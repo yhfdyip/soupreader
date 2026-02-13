@@ -39,6 +39,11 @@ class ReplaceRuleRepository {
     _updateCacheFromRows(rows);
   }
 
+  static void _emitCacheSnapshot() {
+    _cacheReady = true;
+    _watchController.add(_cacheById.values.toList(growable: false));
+  }
+
   static void _updateCacheFromRows(List<ReplaceRuleRecord> rows) {
     _cacheById
       ..clear()
@@ -46,8 +51,7 @@ class ReplaceRuleRepository {
         final model = _rowToModel(row);
         return MapEntry(model.id, model);
       }));
-    _cacheReady = true;
-    _watchController.add(_cacheById.values.toList(growable: false));
+    _emitCacheSnapshot();
   }
 
   List<ReplaceRule> getAllRules() {
@@ -73,6 +77,8 @@ class ReplaceRuleRepository {
     await _driftDb
         .into(_driftDb.replaceRuleRecords)
         .insertOnConflictUpdate(_modelToCompanion(rule));
+    _cacheById[rule.id] = rule;
+    _emitCacheSnapshot();
   }
 
   Future<void> addRules(List<ReplaceRule> rules) async {
@@ -82,6 +88,10 @@ class ReplaceRuleRepository {
     await _driftDb.batch((batch) {
       batch.insertAllOnConflictUpdate(_driftDb.replaceRuleRecords, companions);
     });
+    for (final rule in rules) {
+      _cacheById[rule.id] = rule;
+    }
+    _emitCacheSnapshot();
   }
 
   Future<void> updateRule(ReplaceRule rule) async {
@@ -92,12 +102,16 @@ class ReplaceRuleRepository {
     await (_driftDb.delete(_driftDb.replaceRuleRecords)
           ..where((r) => r.id.equals(id)))
         .go();
+    _cacheById.remove(id);
+    _emitCacheSnapshot();
   }
 
   Future<void> deleteDisabledRules() async {
     await (_driftDb.delete(_driftDb.replaceRuleRecords)
           ..where((r) => r.isEnabled.equals(false)))
         .go();
+    _cacheById.removeWhere((_, rule) => !rule.isEnabled);
+    _emitCacheSnapshot();
   }
 
   String exportToJson(List<ReplaceRule> rules) {

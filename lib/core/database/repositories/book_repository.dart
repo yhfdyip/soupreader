@@ -39,6 +39,11 @@ class BookRepository {
     _updateCacheFromRows(rows);
   }
 
+  static void _emitCacheSnapshot() {
+    _cacheReady = true;
+    _watchController.add(_cacheById.values.toList(growable: false));
+  }
+
   static void _updateCacheFromRows(List<BookRecord> rows) {
     _cacheById
       ..clear()
@@ -46,8 +51,7 @@ class BookRepository {
         final model = _rowToBook(row);
         return MapEntry(model.id, model);
       }));
-    _cacheReady = true;
-    _watchController.add(_cacheById.values.toList(growable: false));
+    _emitCacheSnapshot();
   }
 
   List<Book> getAllBooks() {
@@ -72,6 +76,8 @@ class BookRepository {
     await _driftDb
         .into(_driftDb.bookRecords)
         .insertOnConflictUpdate(_bookToCompanion(book));
+    _cacheById[book.id] = book;
+    _emitCacheSnapshot();
   }
 
   Future<void> updateBook(Book book) async {
@@ -87,6 +93,9 @@ class BookRepository {
             ..where((tbl) => tbl.bookId.equals(id)))
           .go();
     });
+    _cacheById.remove(id);
+    _emitCacheSnapshot();
+    ChapterRepository._removeCacheByBookId(id);
   }
 
   Future<void> updateReadProgress(
@@ -124,6 +133,9 @@ class BookRepository {
       await _driftDb.delete(_driftDb.bookRecords).go();
       await _driftDb.delete(_driftDb.chapterRecords).go();
     });
+    _cacheById.clear();
+    _emitCacheSnapshot();
+    ChapterRepository._clearAllCache();
   }
 
   BookRecordsCompanion _bookToCompanion(Book book) {
@@ -205,6 +217,11 @@ class ChapterRepository {
     _updateCacheFromRows(rows);
   }
 
+  static void _emitCacheSnapshot() {
+    _cacheReady = true;
+    _watchController.add(_cacheById.values.toList(growable: false));
+  }
+
   static void _updateCacheFromRows(List<ChapterRecord> rows) {
     _cacheById
       ..clear()
@@ -212,8 +229,17 @@ class ChapterRepository {
         final model = _rowToChapter(row);
         return MapEntry(model.id, model);
       }));
-    _cacheReady = true;
-    _watchController.add(_cacheById.values.toList(growable: false));
+    _emitCacheSnapshot();
+  }
+
+  static void _removeCacheByBookId(String bookId) {
+    _cacheById.removeWhere((_, chapter) => chapter.bookId == bookId);
+    _emitCacheSnapshot();
+  }
+
+  static void _clearAllCache() {
+    _cacheById.clear();
+    _emitCacheSnapshot();
   }
 
   List<Chapter> getAllChapters() {
@@ -252,6 +278,10 @@ class ChapterRepository {
   Future<ChapterCacheInfo> clearDownloadedCache({
     Set<String> protectBookIds = const {},
   }) async {
+    if (!_cacheReady) {
+      await _reloadCacheFromDb();
+    }
+
     var bytes = 0;
     var chapters = 0;
 
@@ -289,10 +319,23 @@ class ChapterRepository {
       batch.insertAllOnConflictUpdate(_driftDb.chapterRecords, companions);
     });
 
+    for (final entity in targets) {
+      final current = _cacheById[entity.id];
+      if (current == null) continue;
+      _cacheById[entity.id] = current.copyWith(
+        isDownloaded: false,
+        content: null,
+      );
+    }
+    _emitCacheSnapshot();
+
     return ChapterCacheInfo(bytes: bytes, chapters: chapters);
   }
 
   Future<ChapterCacheInfo> clearDownloadedCacheForBook(String bookId) async {
+    if (!_cacheReady) {
+      await _reloadCacheFromDb();
+    }
     return clearDownloadedCache(
       protectBookIds: _cacheById.values
           .where((entity) => entity.bookId != bookId)
@@ -306,6 +349,13 @@ class ChapterRepository {
         .where((c) => c.bookId == bookId)
         .toList(growable: false)
       ..sort((a, b) => a.index.compareTo(b.index));
+  }
+
+  Future<int> countChaptersForBook(String bookId) async {
+    final rows = await (_driftDb.select(_driftDb.chapterRecords)
+          ..where((tbl) => tbl.bookId.equals(bookId)))
+        .get();
+    return rows.length;
   }
 
   Future<void> addChapters(List<Chapter> chapters) async {
@@ -326,30 +376,43 @@ class ChapterRepository {
     await _driftDb.batch((batch) {
       batch.insertAllOnConflictUpdate(_driftDb.chapterRecords, companions);
     });
+    if (!_cacheReady) {
+      await _reloadCacheFromDb();
+      return;
+    }
+    for (final chapter in chapters) {
+      _cacheById[chapter.id] = chapter;
+    }
+    _emitCacheSnapshot();
   }
 
   Future<void> cacheChapterContent(String chapterId, String content) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await (_driftDb.update(_driftDb.chapterRecords)
+          ..where((tbl) => tbl.id.equals(chapterId)))
+        .write(
+      ChapterRecordsCompanion(
+        isDownloaded: const Value(true),
+        content: Value(content),
+        updatedAt: Value(now),
+      ),
+    );
+    if (!_cacheReady) return;
     final entity = _cacheById[chapterId];
     if (entity == null) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    await _driftDb.into(_driftDb.chapterRecords).insertOnConflictUpdate(
-          ChapterRecordsCompanion(
-            id: Value(entity.id),
-            bookId: Value(entity.bookId),
-            title: Value(entity.title),
-            url: Value(entity.url),
-            chapterIndex: Value(entity.index),
-            isDownloaded: const Value(true),
-            content: Value(content),
-            updatedAt: Value(now),
-          ),
-        );
+    _cacheById[chapterId] = entity.copyWith(
+      isDownloaded: true,
+      content: content,
+    );
+    _emitCacheSnapshot();
   }
 
   Future<void> clearChaptersForBook(String bookId) async {
     await (_driftDb.delete(_driftDb.chapterRecords)
           ..where((c) => c.bookId.equals(bookId)))
         .go();
+    if (!_cacheReady) return;
+    _removeCacheByBookId(bookId);
   }
 
   static Chapter _rowToChapter(ChapterRecord row) {

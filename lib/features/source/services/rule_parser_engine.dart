@@ -73,6 +73,7 @@ class RuleParserEngine {
   }
 
   final Map<String, String> _runtimeVariables = <String, String>{};
+  final Map<String, String> _bookInfoTocHtmlCache = <String, String>{};
 
   bool _isValidJsIdentifier(String key) {
     return RegExp(r'^[A-Za-z_\$][A-Za-z0-9_\$]*$').hasMatch(key);
@@ -423,6 +424,30 @@ class RuleParserEngine {
     return uri.replace(fragment: '').toString();
   }
 
+  void _cacheBookInfoTocHtml({
+    required String tocUrl,
+    required String html,
+  }) {
+    final key = _normalizeUrlVisitKey(tocUrl);
+    final value = html.trim();
+    if (key.isEmpty || value.isEmpty) return;
+
+    // 仅缓存小体量源码，避免内存异常增长。
+    if (value.length > 2 * 1024 * 1024) return;
+
+    _bookInfoTocHtmlCache[key] = value;
+    const maxEntries = 8;
+    while (_bookInfoTocHtmlCache.length > maxEntries) {
+      _bookInfoTocHtmlCache.remove(_bookInfoTocHtmlCache.keys.first);
+    }
+  }
+
+  String? _getCachedBookInfoTocHtml(String tocUrl) {
+    final key = _normalizeUrlVisitKey(tocUrl);
+    if (key.isEmpty) return null;
+    return _bookInfoTocHtmlCache[key];
+  }
+
   String? _buildNextChapterUrlKey({
     required String chapterEntryUrl,
     String? nextChapterUrl,
@@ -652,6 +677,7 @@ class RuleParserEngine {
 
   void _clearRuntimeVariables() {
     _runtimeVariables.clear();
+    _bookInfoTocHtmlCache.clear();
   }
 
   String _replaceGetTokens(String input) {
@@ -3891,6 +3917,12 @@ class RuleParserEngine {
         baseUrl: parseBaseUrl,
       );
       log('└$tocUrl');
+      if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(parseBaseUrl)) {
+        _cacheBookInfoTocHtml(
+          tocUrl: tocUrl,
+          html: body,
+        );
+      }
 
       if (name.isEmpty &&
           author.isEmpty &&
@@ -3946,6 +3978,12 @@ class RuleParserEngine {
       baseUrl: parseBaseUrl,
     );
     log('└$tocUrl');
+    if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(parseBaseUrl)) {
+      _cacheBookInfoTocHtml(
+        tocUrl: tocUrl,
+        html: body,
+      );
+    }
 
     if (name.isEmpty &&
         author.isEmpty &&
@@ -3992,8 +4030,18 @@ class RuleParserEngine {
       queuedUrlKeys.remove(_normalizeUrlVisitKey(currentUrl));
 
       log('≡目录页请求:${page + 1}');
-      final fetch = await fetchStage(currentUrl, rawState: 30);
-      final body = fetch.body!;
+      final cached = page == 0 ? _getCachedBookInfoTocHtml(currentUrl) : null;
+      String body;
+      if (cached != null) {
+        log('└复用详情页源码作为目录页', showTime: false);
+        body = cached;
+      } else {
+        final fetch = await fetchStage(currentUrl, rawState: 30);
+        if (fetch.body == null) {
+          break;
+        }
+        body = fetch.body!;
+      }
       final stageBody = _applyStageResponseJs(
         responseText: body,
         jsRule: tocRule.preUpdateJs,
@@ -4045,7 +4093,7 @@ class RuleParserEngine {
           }
         }
       } else {
-        final document = html_parser.parse(body);
+        final document = html_parser.parse(stageBody);
         final elements =
             _selectAllElementsByRule(document, normalized.selector);
         log('└列表大小:${elements.length}');
@@ -4895,6 +4943,13 @@ class RuleParserEngine {
               _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, parseBaseUrl),
           baseUrl: parseBaseUrl,
         );
+        if (_normalizeUrlVisitKey(tocUrl) ==
+            _normalizeUrlVisitKey(parseBaseUrl)) {
+          _cacheBookInfoTocHtml(
+            tocUrl: tocUrl,
+            html: response,
+          );
+        }
 
         var coverUrl =
             _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, parseBaseUrl);
@@ -4935,6 +4990,13 @@ class RuleParserEngine {
         rawValue: _parseRule(root, bookInfoRule.tocUrl, parseBaseUrl),
         baseUrl: parseBaseUrl,
       );
+      if (_normalizeUrlVisitKey(tocUrl) ==
+          _normalizeUrlVisitKey(parseBaseUrl)) {
+        _cacheBookInfoTocHtml(
+          tocUrl: tocUrl,
+          html: response,
+        );
+      }
 
       var coverUrl = _parseRule(root, bookInfoRule.coverUrl, parseBaseUrl);
       if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
@@ -5198,7 +5260,8 @@ class RuleParserEngine {
         if (!_markVisitedUrl(visitedUrlKeys, currentUrl)) break;
         queuedUrlKeys.remove(_normalizeUrlVisitKey(currentUrl));
 
-        final response = await _fetch(
+        var response = page == 0 ? _getCachedBookInfoTocHtml(currentUrl) : null;
+        response ??= await _fetch(
           currentUrl,
           header: source.header,
           jsLib: source.jsLib,

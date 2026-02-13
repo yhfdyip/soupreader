@@ -1,5 +1,36 @@
 # SoupReader 开发进度日志
 
+## 2026-02-13（搜索加入书架失败：章节写入 0 条误判修复）
+
+### 已完成
+- 修复“点击搜索结果加入书架，提示章节写入失败”的核心误判：
+  - 文件：`lib/features/bookshelf/services/book_add_service.dart`
+  - 变更：加入书架后不再用内存缓存判断章节数，改为直接查询 Drift 实际落库数量（`countChaptersForBook`）。
+  - 错误文案同步显示真实写入数（`stored/expected`），提升可观测性。
+- 章节仓库新增数据库计数接口：
+  - 文件：`lib/core/database/repositories/book_repository.dart`
+  - 新增：`ChapterRepository.countChaptersForBook(String bookId)`。
+- 补齐书源仓库“写后读”一致性（避免缓存异步刷新竞态）：
+  - 文件：`lib/core/database/repositories/source_repository.dart`
+  - 变更：`addSource/addSources/upsertSourceRawJson/deleteSource` 成功后同步刷新内存缓存并广播；
+  - `deleteDisabledSources` 执行后主动重载缓存。
+
+### 为什么
+- 线上现象是“书源调试正常，但搜索结果点击加入失败，提示章节写入失败”。
+- 根因是加入流程在写入后立即从内存缓存读取章节数，缓存刷新是异步 watch 驱动，存在短暂窗口返回 0 的竞态，导致误判失败。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 执行：`flutter test test/book_add_service_test.dart test/bookshelf_booklist_import_service_test.dart`
+- 结果：`All tests passed!`
+- 执行：`flutter test test/rule_parser_engine_*`
+- 结果：`All tests passed!`
+
+### 兼容影响
+- 仅修复写后校验时序与缓存一致性，不改变书源解析规则与章节结构语义。
+- 对既有书籍数据无迁移影响；对导入/加书稳定性为增强。
+
 ## 2026-02-13（书源详情 tocUrl 语义收敛：严格对齐 legado）
 
 ### 已完成
@@ -14,6 +45,11 @@
   - 在 `_fetch(...)` 增加 `onFinalUrl` 回调，暴露响应最终 URL；
   - `getBookInfo` 与 `getBookInfoDebug` 使用最终 URL 作为字段解析与相对链接绝对化的 base；
   - `_debugBookInfo` 同步使用 `fetch.finalUrl` 作为解析 base，并输出“详情页重定向至”调试信息。
+- 对齐 legado 的“详情页即目录页”复用语义：
+  - 新增 `bookInfo -> toc` 临时源码缓存（按 URL 归一键）；
+  - 当 `tocUrl == 详情页URL` 时，缓存详情页源码；
+  - `getToc` 首次目录页解析优先复用缓存源码，减少一次网络请求；
+  - 调试链路 `_debugTocThenContent` 同步复用缓存并输出日志“复用详情页源码作为目录页”。
 - 修复调试日志可观测性：
   - “获取目录链接”改为输出最终生效值（空值时先提示回退，再输出回退后的详情页 URL）。
 - 新增回归测试覆盖 `tocUrl` 容错：
@@ -1473,3 +1509,109 @@
 
 ### 兼容影响
 - 仅修复启动失败分支的状态访问时序，不改主流程功能与交互语义。
+
+## 2026-02-13（全局排查并修复“写后立即读旧缓存”竞态）
+
+### 已完成
+- `lib/features/bookshelf/services/book_add_service.dart`
+  - 保持此前修复：加入书架后不再依赖章节内存缓存判定是否写入成功，改为 DB 计数校验，规避 watch 异步刷新短窗导致的“章节写入失败”误报。
+- `lib/core/database/repositories/book_repository.dart`
+  - `BookRepository` 写操作（`addBook/deleteBook/clearAll`）后同步更新内存缓存并立刻广播。
+  - `ChapterRepository` 写操作（`addChapters/cacheChapterContent/clearChaptersForBook/clearDownloadedCache`）后同步更新内存缓存并立刻广播。
+  - `BookRepository.deleteBook/clearAll` 同步清理章节缓存，避免删书后章节缓存残留导致的“读到旧章节”。
+- `lib/core/database/repositories/bookmark_repository.dart`
+  - `addBookmark/removeBookmark/removeAllBookmarksForBook` 后同步更新缓存并广播，消除“刚添加/删除书签，列表仍是旧值”的竞态窗口。
+- `lib/core/database/repositories/replace_rule_repository.dart`
+  - `addRule/addRules/deleteRule/deleteDisabledRules` 后同步更新缓存并广播，避免规则管理页在同一调用链里读取到旧缓存。
+- `lib/core/database/repositories/source_repository.dart`
+  - 保持此前修复：书源增删改后同步缓存并广播，`deleteDisabledSources` 后全量回载缓存。
+- 新增回归测试 `test/repository_write_read_consistency_test.dart`
+  - 覆盖 Book/Chapter、Bookmark、ReplaceRule 三类“写后立即读”一致性场景。
+
+### 为什么
+- 用户反馈“搜索点击结果后加入失败：章节写入失败”，本质是仓储层采用“DB 写入 + watch 异步回填缓存”，业务层在写入后立刻读取同步缓存，可能读到旧值。
+- 该模式不只存在于章节写入，书签与替换规则等模块同样存在潜在竞态窗口，需要统一治理。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 执行：`flutter test test/book_add_service_test.dart test/repository_write_read_consistency_test.dart`
+- 执行：`flutter test test/bookshelf_booklist_import_service_test.dart`
+- 执行：`flutter test test/replace_rule_engine_test.dart`
+- 结果：全部通过。
+
+### 兼容影响
+- 不改 legado 书源规则语义与五段链路解析逻辑，仅修复本地仓储“可见性时序”问题；
+- 行为变化是“写入成功后同调用链立即可读最新状态”，属于一致性增强，对旧书源规则无破坏性影响。
+
+## 2026-02-13（设置页扁平化：一级下静态展示二级菜单）
+
+### 已完成
+- `lib/features/settings/views/settings_view.dart`
+  - 将设置首页从“一级入口跳转二级Hub”改为“一级分组下直接展示二级菜单”。
+  - 首页新增/直连以下二级项（保持现有页面与逻辑不变）：
+    - 源管理：书源管理、替换净化、目录规则、订阅管理、语音管理、广告屏蔽
+    - 主题：应用外观、阅读主题、白天/黑夜主题、动态颜色/色差
+    - 功能 & 设置：备份/同步、阅读设置（界面）、阅读设置（行为）、阅读记录、其它设置、隔空阅读
+    - 其它：分享、好评支持、关于我们
+    - 诊断：开发工具
+  - 保留原先统计摘要能力（书源数量、阅读记录/缓存、版本号）并挂到对应二级项 `additionalInfo`。
+  - 未实现能力继续走占位提示（`SettingsPlaceholders.showNotImplemented`），避免行为断裂。
+
+### 为什么
+- 用户要求“设置页面不要展示分层，将二级菜单挂在一级菜单下面”，需要减少跳转层级，进入设置后即看到可操作项。
+- 该调整是信息架构优化，不改业务状态流与功能语义。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 手工路径：
+  - 打开设置页，确认不再只有一级入口，而是直接看到各分组下二级项；
+  - 点击“书源管理/替换净化/阅读设置（界面）/阅读设置（行为）/开发工具”等项可直达目标页面；
+  - 未实现项点击后展示对应提示，不出现空白页或异常。
+
+### 兼容影响
+- 仅调整设置首页菜单编排与导航入口，不修改数据结构、存储或解析链路；
+- 旧二级Hub页面文件仍保留，避免潜在外部引用失效。
+
+## 2026-02-13（书源编辑调试页优化：信息层级重排，严格保留 legado 调试语义）
+
+### 已完成
+- `lib/features/source/views/source_edit_view.dart`
+  - 调试 Tab 结构重排为：
+    - 调试状态（新增）
+    - 快速输入
+    - 快捷动作（对标 legado）
+    - 诊断结果导航（诊断标签 + 源码/摘要/变量）
+    - 工具
+    - 控制台
+  - 新增调试状态总览卡片（`ShadCard`）：
+    - 展示当前意图、运行状态、日志数量、自动跟随状态、最近错误；
+    - 提供高频操作：回到最新日志、复制控制台、复制复现信息、清空日志。
+  - 快速输入区改为主按钮直达（`ShadButton`），保留 key 语法与 legado 一致。
+  - 快捷按钮改为 `ShadButton.ghost`，统一交互视觉并保留原有动作。
+  - 工具区收敛为高频项：菜单（对标 legado）、高级工具、复制控制台、一键导出调试包。
+  - 控制台增强：
+    - 增加头部状态行（总行数/展示行数/自动跟随状态）；
+    - 错误区支持一键复制最小复现信息；
+    - 保留逐行复制与日志上下文查看。
+  - 保持调试链路语义不变：
+    - `search/bookInfo/explore/toc/content` 意图判定与执行流程未改；
+    - `++/--/::/URL` key 规则未改；
+    - 菜单与高级工具能力未删减（扫码、源码、导出、帮助等）。
+  - UI 组件符合约束：使用 `Shadcn + Cupertino` 组合实现。
+
+### 为什么
+- 旧布局中输入、工具、控制台在首屏层级并列，错误与关键状态不够突出，排查路径长。
+- 本次优化目标是让“是否失败、失败在哪、下一步做什么”在首屏可见，提升调试效率。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 进入书源编辑 -> 调试 Tab，确认首屏先展示状态总览和开始调试入口；
+  - 输入普通关键词、`++url`、`--url`、`标题::url`，确认意图提示与链路执行正常；
+  - 构造失败规则，确认“最近错误”高亮出现且可一键复制复现信息；
+  - 确认菜单（对标 legado）与高级工具仍可用。
+
+### 兼容影响
+- 仅 UI/交互层优化，不变更调试引擎、数据结构、书源解析语义；
+- 与 legado 的调试 key 规则和链路语义保持一致。

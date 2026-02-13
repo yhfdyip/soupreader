@@ -43,6 +43,11 @@ class BookmarkRepository {
     _updateCacheFromRows(rows);
   }
 
+  static void _emitCacheSnapshot() {
+    _cacheReady = true;
+    _watchController.add(_cacheById.values.toList(growable: false));
+  }
+
   static void _updateCacheFromRows(List<BookmarkRecord> rows) {
     _cacheById
       ..clear()
@@ -50,8 +55,7 @@ class BookmarkRepository {
         final model = _rowToEntity(row);
         return MapEntry(model.id, model);
       }));
-    _cacheReady = true;
-    _watchController.add(_cacheById.values.toList(growable: false));
+    _emitCacheSnapshot();
   }
 
   Future<BookmarkEntity> addBookmark({
@@ -76,11 +80,15 @@ class BookmarkRepository {
     await _db.into(_db.bookmarkRecords).insertOnConflictUpdate(
           _entityToCompanion(bookmark),
         );
+    _cacheById[bookmark.id] = bookmark;
+    _emitCacheSnapshot();
     return bookmark;
   }
 
   Future<void> removeBookmark(String id) async {
     await (_db.delete(_db.bookmarkRecords)..where((b) => b.id.equals(id))).go();
+    _cacheById.remove(id);
+    _emitCacheSnapshot();
   }
 
   List<BookmarkEntity> getBookmarksForBook(String bookId) {
@@ -119,6 +127,8 @@ class BookmarkRepository {
     await (_db.delete(_db.bookmarkRecords)
           ..where((b) => b.bookId.equals(bookId)))
         .go();
+    _cacheById.removeWhere((_, bookmark) => bookmark.bookId == bookId);
+    _emitCacheSnapshot();
   }
 
   int getBookmarkCount(String bookId) {

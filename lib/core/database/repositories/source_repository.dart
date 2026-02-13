@@ -63,6 +63,10 @@ class SourceRepository {
         return raw != null && raw.trim().isNotEmpty;
       }).map((row) => MapEntry(row.bookSourceUrl, row.rawJson!.trim())));
 
+    _emitCacheSnapshot();
+  }
+
+  static void _emitCacheSnapshot() {
     _cacheReady = true;
     _watchController.add(_cacheByUrl.values.toList(growable: false));
   }
@@ -101,6 +105,9 @@ class SourceRepository {
     await _driftDb
         .into(_driftDb.sourceRecords)
         .insertOnConflictUpdate(_sourceToCompanion(source));
+    _cacheByUrl[source.bookSourceUrl] = source;
+    _rawJsonByUrl[source.bookSourceUrl] = LegadoJson.encode(source.toJson());
+    _emitCacheSnapshot();
   }
 
   Future<void> addSources(List<BookSource> sources) async {
@@ -114,6 +121,14 @@ class SourceRepository {
     await _driftDb.batch((batch) {
       batch.insertAllOnConflictUpdate(_driftDb.sourceRecords, companions);
     });
+
+    for (final source in sources) {
+      final url = source.bookSourceUrl.trim();
+      if (url.isEmpty) continue;
+      _cacheByUrl[url] = source;
+      _rawJsonByUrl[url] = LegadoJson.encode(source.toJson());
+    }
+    _emitCacheSnapshot();
   }
 
   Future<void> updateSource(BookSource source) async {
@@ -157,18 +172,32 @@ class SourceRepository {
             companion,
           );
     });
+
+    if (originalUrl != null &&
+        originalUrl.trim().isNotEmpty &&
+        originalUrl.trim() != url) {
+      _cacheByUrl.remove(originalUrl.trim());
+      _rawJsonByUrl.remove(originalUrl.trim());
+    }
+    _cacheByUrl[url] = source;
+    _rawJsonByUrl[url] = normalizedRawJson;
+    _emitCacheSnapshot();
   }
 
   Future<void> deleteSource(String url) async {
     await (_driftDb.delete(_driftDb.sourceRecords)
           ..where((tbl) => tbl.bookSourceUrl.equals(url)))
         .go();
+    _cacheByUrl.remove(url);
+    _rawJsonByUrl.remove(url);
+    _emitCacheSnapshot();
   }
 
   Future<void> deleteDisabledSources() async {
     await (_driftDb.delete(_driftDb.sourceRecords)
           ..where((tbl) => tbl.enabled.equals(false)))
         .go();
+    await _reloadCacheFromDb();
   }
 
   SourceRecordsCompanion _sourceToCompanion(
