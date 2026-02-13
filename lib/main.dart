@@ -8,6 +8,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'app/theme/cupertino_theme.dart';
 import 'app/theme/shadcn_theme.dart';
 import 'core/database/database_service.dart';
+import 'core/database/repositories/source_repository.dart';
 import 'core/models/app_settings.dart';
 import 'core/services/cookie_store.dart';
 import 'core/services/settings_service.dart';
@@ -37,6 +38,10 @@ void main() {
   runZonedGuarded(() async {
     await _safeBootStep('DatabaseService.init', () async {
       await DatabaseService().init();
+    });
+
+    await _safeBootStep('SourceRepository.bootstrap', () async {
+      await SourceRepository.bootstrap(DatabaseService());
     });
 
     await _safeBootStep('SettingsService.init', () async {

@@ -7,12 +7,18 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../../core/services/source_login_store.dart';
 import '../models/book_source.dart';
+import '../constants/source_help_texts.dart';
 import '../services/rule_parser_engine.dart';
 import '../services/source_debug_export_service.dart';
+import '../services/source_debug_key_parser.dart';
+import '../services/source_debug_orchestrator.dart';
+import '../services/source_explore_kinds_service.dart';
 import '../services/source_debug_summary_parser.dart';
+import '../services/source_debug_summary_store.dart';
 import '../services/source_quick_test_helper.dart';
 import '../services/source_rule_lint_service.dart';
 import 'source_debug_text_view.dart';
@@ -61,6 +67,23 @@ class SourceEditView extends StatefulWidget {
     );
   }
 
+  static SourceEditView fromSource(
+    BookSource source, {
+    String? rawJson,
+    int? initialTab,
+    String? initialDebugKey,
+  }) {
+    final normalizedRaw = (rawJson != null && rawJson.trim().isNotEmpty)
+        ? rawJson
+        : LegadoJson.encode(source.toJson());
+    return SourceEditView(
+      originalUrl: source.bookSourceUrl,
+      initialRawJson: normalizedRaw,
+      initialTab: initialTab,
+      initialDebugKey: initialDebugKey,
+    );
+  }
+
   @override
   State<SourceEditView> createState() => _SourceEditViewState();
 }
@@ -69,8 +92,11 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final DatabaseService _db;
   late final SourceRepository _repo;
   final RuleParserEngine _engine = RuleParserEngine();
+  late final SourceDebugOrchestrator _debugOrchestrator;
   final SourceDebugExportService _debugExportService =
       SourceDebugExportService();
+  final SourceExploreKindsService _exploreKindsService =
+      SourceExploreKindsService();
   final SourceRuleLintService _ruleLintService = const SourceRuleLintService();
 
   int _tab = 0; // 0 基础 1 规则 2 JSON 3 调试
@@ -155,17 +181,14 @@ class _SourceEditViewState extends State<SourceEditView> {
 
   // 调试
   final TextEditingController _debugKeyCtrl = TextEditingController();
+  final FocusNode _debugKeyFocusNode = FocusNode();
   bool _debugLoading = false;
   String? _debugError;
   final List<_DebugLine> _debugLines = <_DebugLine>[];
   final List<_DebugLine> _debugLinesAll = <_DebugLine>[];
-  int _debugConsoleMode = 1; // 0 分段 1 文本 2 逐行
-  bool _debugShowAllLines = true; // 全量展示（可能卡顿）
-  bool _debugWrapLines = true; // 逐行模式自动换行
-  String _debugFilter = ''; // 控制台过滤关键字（大小写不敏感）
-  final Set<int> _expandedDebugBlocks = <int>{};
-  final FocusNode _consoleSelectableFocusNode = FocusNode();
-  final FocusNode _decisionSelectableFocusNode = FocusNode();
+  final ScrollController _debugTabScrollController = ScrollController();
+  bool _debugAutoFollowLogs = true;
+  bool _debugAutoScrollQueued = false;
   String? _debugListSrcHtml; // state=10（搜索/发现列表页）
   String? _debugBookSrcHtml; // state=20（详情页）
   String? _debugTocSrcHtml; // state=30（目录页）
@@ -178,6 +201,11 @@ class _SourceEditViewState extends State<SourceEditView> {
   String? _debugResponseCharset;
   String? _debugResponseCharsetDecision;
   Map<String, String> _debugRuntimeVarsSnapshot = <String, String>{};
+  SourceDebugIntentType? _debugIntentType;
+  List<MapEntry<String, String>> _cachedExploreQuickEntries =
+      <MapEntry<String, String>>[];
+  bool _refreshingExploreQuickActions = false;
+  bool _showDebugQuickHelp = true;
   String? _previewChapterName;
   String? _previewChapterUrl;
   bool _awaitingChapterNameValue = false;
@@ -188,6 +216,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     super.initState();
     _db = DatabaseService();
     _repo = SourceRepository(_db);
+    _debugOrchestrator = SourceDebugOrchestrator(engine: _engine);
 
     _tab = widget.initialTab ?? 0;
     _jsonCtrl = TextEditingController(text: _prettyJson(widget.initialRawJson));
@@ -323,6 +352,8 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     _validateJson(silent: true);
     _loadLoginStateForSource(source?.bookSourceUrl ?? widget.originalUrl);
+    _debugKeyFocusNode.addListener(_onDebugKeyFocusChanged);
+    _debugTabScrollController.addListener(_onDebugTabScrolled);
   }
 
   @override
@@ -392,8 +423,10 @@ class _SourceEditViewState extends State<SourceEditView> {
     _contentNextContentUrlCtrl.dispose();
     _jsonCtrl.dispose();
     _debugKeyCtrl.dispose();
-    _consoleSelectableFocusNode.dispose();
-    _decisionSelectableFocusNode.dispose();
+    _debugKeyFocusNode.removeListener(_onDebugKeyFocusChanged);
+    _debugKeyFocusNode.dispose();
+    _debugTabScrollController.removeListener(_onDebugTabScrolled);
+    _debugTabScrollController.dispose();
     super.dispose();
   }
 
@@ -942,87 +975,358 @@ class _SourceEditViewState extends State<SourceEditView> {
 
   Widget _buildDebugTab() {
     return ListView(
+      controller: _debugTabScrollController,
       children: [
-        CupertinoListSection.insetGrouped(
-          header: const Text('输入'),
-          footer: const Text(
-            '对标 Legado：\n'
-            '- 关键字：搜索→详情→目录→正文\n'
-            '- 绝对 URL：http/https 详情调试\n'
-            '- 发现：标题::url\n'
-            '- 目录：++tocUrl\n'
-            '- 正文：--contentUrl',
-          ),
-          children: [
-            CupertinoListTile.notched(
-              title: const Text('Key'),
-              subtitle: CupertinoTextField(
-                controller: _debugKeyCtrl,
-                placeholder: '输入关键字或调试 key',
-              ),
-            ),
-            CupertinoListTile.notched(
-              title: const Text('开始调试'),
-              additionalInfo: _debugLoading ? const Text('运行中…') : null,
-              trailing: const CupertinoListTileChevron(),
-              onTap: _debugLoading ? null : _startLegadoStyleDebug,
-            ),
-            CupertinoListTile.notched(
-              title: const Text('网页验证（Cloudflare）'),
-              subtitle: const Text('打开 WebView 完成人机验证，然后导入 Cookie'),
-              trailing: const CupertinoListTileChevron(),
-              onTap: _openWebVerify,
-            ),
-            CupertinoListTile.notched(
-              title: const Text('一键导出调试包（推荐）'),
-              subtitle: const Text('保存为 zip：控制台 + 书源 JSON（不含网页源码）'),
-              trailing: const CupertinoListTileChevron(),
-              onTap: _debugLinesAll.isEmpty
-                  ? null
-                  : () => _exportDebugBundleToFile(includeRawSources: false),
-            ),
-            CupertinoListTile.notched(
-              title: const Text('导出调试包（更多选项）'),
-              subtitle: const Text('可选择：复制 / 保存（含源码）'),
-              trailing: const CupertinoListTileChevron(),
-              onTap:
-                  _debugLinesAll.isEmpty ? null : _showExportDebugBundleSheet,
-            ),
-            CupertinoListTile.notched(
-              title: const Text('清空控制台'),
-              trailing: const CupertinoListTileChevron(),
-              onTap: _clearDebugConsole,
-            ),
-            CupertinoListTile.notched(
-              title: const Text('复制控制台（全部）'),
-              additionalInfo: Text('${_debugLinesAll.length} 行'),
-              trailing: const CupertinoListTileChevron(),
-              onTap: _copyDebugConsole,
-            ),
-            CupertinoListTile.notched(
-              title: const Text('复制最小复现信息'),
-              subtitle: const Text('包含书源关键字段、请求决策摘要、最近日志'),
-              trailing: const CupertinoListTileChevron(),
-              onTap: _copyMinimalReproInfo,
-            ),
-          ],
-        ),
-        _buildDebugQuickActionsSection(),
-        if (_debugError != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              _debugError!,
-              style: TextStyle(
-                color: CupertinoColors.systemRed.resolveFrom(context),
-                fontSize: 13,
-              ),
-            ),
-          ),
-        _buildDiagnosisSection(),
-        _buildDebugSourcesSection(),
+        _buildDebugPrimaryInputSection(),
+        if (_showDebugQuickHelp) _buildDebugQuickActionsSection(),
+        _buildDebugSecondaryToolsSection(),
         _buildDebugConsoleSection(),
       ],
+    );
+  }
+
+  Widget _buildDebugPrimaryInputSection() {
+    return CupertinoListSection.insetGrouped(
+      header: const Text('输入'),
+      footer: const Text('关键字/URL/前缀调试；完整语法见“更多工具 -> 调试帮助”。'),
+      children: [
+        CupertinoListTile.notched(
+          title: const Text('Key'),
+          additionalInfo: Text(_currentDebugIntentHint()),
+          subtitle: CupertinoTextField(
+            controller: _debugKeyCtrl,
+            focusNode: _debugKeyFocusNode,
+            placeholder: '输入关键字或调试 key',
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => _startDebugFromInputSubmit(),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        CupertinoListTile.notched(
+          title: const Text('扫码填充 Key'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: _debugLoading ? null : _scanDebugKeyFromQr,
+        ),
+        CupertinoListTile.notched(
+          title: const Text('开始调试'),
+          subtitle: const Text('对标 Legado 主流程：输入后立即执行'),
+          additionalInfo: _debugLoading ? const Text('运行中…') : null,
+          trailing: const CupertinoListTileChevron(),
+          onTap: _debugLoading ? null : _startLegadoStyleDebug,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDebugSecondaryToolsSection() {
+    return CupertinoListSection.insetGrouped(
+      header: const Text('工具'),
+      children: [
+        if (!_showDebugQuickHelp)
+          CupertinoListTile.notched(
+            title: const Text('显示快捷提示'),
+            subtitle: const Text('重新展开“我的/系统/发现候选/++/--”快捷区'),
+            trailing: const CupertinoListTileChevron(),
+            onTap: () {
+              setState(() => _showDebugQuickHelp = true);
+              _debugKeyFocusNode.requestFocus();
+            },
+          ),
+        CupertinoListTile.notched(
+          title: const Text('查看源码'),
+          subtitle: const Text('搜索/详情/目录/正文/正文结果'),
+          additionalInfo: Text('${_debugSourceReadyCount()}/5'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: _showDebugSourceEntrySheet,
+        ),
+        CupertinoListTile.notched(
+          title: const Text('刷新发现快捷项'),
+          subtitle: const Text('对标 Legado「刷新发现」入口'),
+          additionalInfo:
+              _refreshingExploreQuickActions ? const Text('刷新中…') : null,
+          trailing: const CupertinoListTileChevron(),
+          onTap: _refreshingExploreQuickActions
+              ? null
+              : _refreshExploreQuickActions,
+        ),
+        CupertinoListTile.notched(
+          title: const Text('更多工具'),
+          subtitle: const Text('导出/摘要/变量快照/帮助/网页验证'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: _showDebugMoreToolsSheet,
+        ),
+        if (!_debugAutoFollowLogs && _debugLinesAll.isNotEmpty)
+          CupertinoListTile.notched(
+            title: const Text('回到最新日志'),
+            subtitle: Text('当前已暂停自动跟随（共 ${_debugLinesAll.length} 行）'),
+            trailing: const CupertinoListTileChevron(),
+            onTap: () {
+              _scrollDebugToBottom(forceFollow: true, animated: true);
+            },
+          ),
+      ],
+    );
+  }
+
+  void _onDebugTabScrolled() {
+    if (!_debugTabScrollController.hasClients) return;
+    final position = _debugTabScrollController.position;
+    final nearBottom = (position.maxScrollExtent - position.pixels) <= 72;
+    if (nearBottom == _debugAutoFollowLogs) return;
+    if (!mounted) {
+      _debugAutoFollowLogs = nearBottom;
+      return;
+    }
+    setState(() => _debugAutoFollowLogs = nearBottom);
+  }
+
+  void _onDebugKeyFocusChanged() {
+    if (!_debugKeyFocusNode.hasFocus) return;
+    if (!mounted || _showDebugQuickHelp) return;
+    setState(() => _showDebugQuickHelp = true);
+  }
+
+  void _queueDebugAutoScroll({bool force = false}) {
+    if (!force && !_debugAutoFollowLogs) return;
+    if (_debugAutoScrollQueued) return;
+    _debugAutoScrollQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _debugAutoScrollQueued = false;
+      if (!mounted || !_debugTabScrollController.hasClients) return;
+      _scrollDebugToBottom(forceFollow: force, animated: false);
+    });
+  }
+
+  void _scrollDebugToBottom({
+    bool forceFollow = false,
+    bool animated = false,
+  }) {
+    if (!_debugTabScrollController.hasClients) return;
+    final target = _debugTabScrollController.position.maxScrollExtent;
+    if (forceFollow && _debugAutoFollowLogs != true) {
+      if (mounted) {
+        setState(() => _debugAutoFollowLogs = true);
+      } else {
+        _debugAutoFollowLogs = true;
+      }
+    }
+    if (animated) {
+      _debugTabScrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+      return;
+    }
+    _debugTabScrollController.jumpTo(target);
+  }
+
+  int _debugSourceReadyCount() {
+    final candidates = <String?>[
+      _debugListSrcHtml,
+      _debugBookSrcHtml,
+      _debugTocSrcHtml,
+      _debugContentSrcHtml,
+      _debugContentResult,
+    ];
+    return candidates.where((e) => e?.trim().isNotEmpty == true).length;
+  }
+
+  String? _structuredSummaryText() {
+    if (_debugLinesAll.isEmpty) return null;
+    return _prettyJson(LegadoJson.encode(_buildStructuredDebugSummary()));
+  }
+
+  String? _runtimeSnapshotText() {
+    if (_debugRuntimeVarsSnapshot.isEmpty) return null;
+    return _prettyJson(LegadoJson.encode(_debugRuntimeVarsSnapshot));
+  }
+
+  Future<void> _showDebugSourceEntrySheet() async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('查看源码 / 结果'),
+        message: const Text('源码查看已下沉到二级入口，减少主屏干扰。'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openDebugSourceFromMenu('列表页源码', _debugListSrcHtml);
+            },
+            child: const Text('列表页源码'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openDebugSourceFromMenu('详情页源码', _debugBookSrcHtml);
+            },
+            child: const Text('详情页源码'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openDebugSourceFromMenu('目录页源码', _debugTocSrcHtml);
+            },
+            child: const Text('目录页源码'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openDebugSourceFromMenu('正文页源码', _debugContentSrcHtml);
+            },
+            child: const Text('正文页源码'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openDebugSourceFromMenu('正文结果', _debugContentResult);
+            },
+            child: const Text('正文结果（清理后）'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDebugMoreToolsSheet() async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) {
+        void closeThen(VoidCallback action) {
+          Navigator.pop(sheetContext);
+          Future<void>.delayed(Duration.zero, () {
+            if (!mounted) return;
+            action();
+          });
+        }
+
+        return CupertinoActionSheet(
+          title: const Text('更多工具'),
+          message: const Text('高级能力下沉：主流程保留输入、快捷和日志。'),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                _showDebugHelp();
+              }),
+              child: const Text('调试帮助'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(_openWebVerify),
+              child: const Text('网页验证（Cloudflare）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                _openDebugAdvancedPanel();
+              }),
+              child: const Text('高级诊断与源码'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                final text = _structuredSummaryText();
+                if (text == null) {
+                  _showMessage('暂无调试摘要，请先执行调试');
+                  return;
+                }
+                _openDebugText(title: '结构化调试摘要', text: text);
+              }),
+              child: const Text('结构化调试摘要（脱敏）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                final text = _structuredSummaryText();
+                if (text == null) {
+                  _showMessage('暂无调试摘要，请先执行调试');
+                  return;
+                }
+                Clipboard.setData(ClipboardData(text: text));
+                _showMessage('已复制调试摘要（脱敏）');
+              }),
+              child: const Text('复制调试摘要（脱敏）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                if (_debugLinesAll.isEmpty) {
+                  _showMessage('暂无调试日志，请先执行调试');
+                  return;
+                }
+                _exportDebugBundleToFile(includeRawSources: false);
+              }),
+              child: const Text('一键导出调试包（推荐）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                if (_debugLinesAll.isEmpty) {
+                  _showMessage('暂无调试日志，请先执行调试');
+                  return;
+                }
+                _showExportDebugBundleSheet();
+              }),
+              child: const Text('导出调试包（更多选项）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                final text = _runtimeSnapshotText();
+                if (text == null) {
+                  _showMessage('暂无变量快照');
+                  return;
+                }
+                _openDebugText(title: '运行时变量快照（脱敏）', text: text);
+              }),
+              child: const Text('运行时变量快照（脱敏）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(() {
+                final text = _runtimeSnapshotText();
+                if (text == null) {
+                  _showMessage('暂无变量快照');
+                  return;
+                }
+                Clipboard.setData(ClipboardData(text: text));
+                _showMessage('已复制变量快照（脱敏）');
+              }),
+              child: const Text('复制变量快照（脱敏）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(_copyDebugConsole),
+              child: const Text('复制控制台（全部）'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => closeThen(_copyMinimalReproInfo),
+              child: const Text('复制最小复现信息'),
+            ),
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () => closeThen(_clearDebugConsole),
+              child: const Text('清空控制台'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(sheetContext),
+            child: const Text('取消'),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openDebugAdvancedPanel() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => AppCupertinoPageScaffold(
+          title: '高级调试',
+          child: ListView(
+            children: [
+              _buildDiagnosisSection(),
+              _buildDebugSourcesSection(),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1090,41 +1394,65 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildDebugQuickActionsSection() {
-    final exploreUrl = _exploreUrlCtrl.text.trim();
-
-    List<Widget> actions = [
+    final defaultSearchKey = _defaultDebugSearchKey();
+    final myLabel = defaultSearchKey;
+    final exploreEntries = _collectExploreQuickEntries();
+    final actions = <Widget>[
       _buildQuickActionButton(
-        label: '我的',
-        onTap: () => _setDebugKeyAndMaybeRun('我的', run: false),
+        label: myLabel,
+        onTap: () => _setDebugKeyAndMaybeRun(defaultSearchKey, run: true),
+      ),
+      _buildQuickActionButton(
+        label: '系统',
+        onTap: () => _setDebugKeyAndMaybeRun('系统', run: true),
+      ),
+      if (exploreEntries.isNotEmpty)
+        _buildQuickActionButton(
+          label: exploreEntries.first.value,
+          onTap: () =>
+              _setDebugKeyAndMaybeRun(exploreEntries.first.key, run: true),
+        ),
+      if (exploreEntries.length > 1)
+        _buildQuickActionButton(
+          label: '发现候选',
+          onTap: () => _showExploreQuickPicker(exploreEntries),
+        ),
+      _buildQuickActionButton(
+        label: '详情URL',
+        onTap: _runCurrentKey,
       ),
       _buildQuickActionButton(
         label: '++目录',
-        onTap: () => _prefixKey('++'),
+        onTap: () => _prefixKeyAndMaybeRun('++'),
       ),
       _buildQuickActionButton(
         label: '--正文',
-        onTap: () => _prefixKey('--'),
+        onTap: () => _prefixKeyAndMaybeRun('--'),
       ),
     ];
 
-    if (exploreUrl.isNotEmpty) {
-      actions.add(
-        _buildQuickActionButton(
-          label: '发现::exploreUrl',
-          onTap: () => _setDebugKeyAndMaybeRun('发现::$exploreUrl', run: false),
-        ),
-      );
-    }
-
     return CupertinoListSection.insetGrouped(
-      header: const Text('快捷'),
+      header: const Text('快捷（对标 Legado）'),
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: actions,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '搜索关键字：我的 / 系统；发现：标题::url；目录：++url；正文：--url',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: actions,
+              ),
+            ],
           ),
         ),
       ],
@@ -1149,11 +1477,215 @@ class _SourceEditViewState extends State<SourceEditView> {
     );
   }
 
+  String _currentDebugIntentHint() {
+    final parsed = _debugOrchestrator.parseKey(_debugKeyCtrl.text.trim());
+    final intent = parsed.intent;
+    if (intent != null) {
+      return intent.label;
+    }
+    final last = _debugIntentType;
+    if (last == null) return '无效';
+    return '上次:${_intentTypeLabel(last)}';
+  }
+
+  String _intentTypeLabel(SourceDebugIntentType type) {
+    switch (type) {
+      case SourceDebugIntentType.search:
+        return '搜索';
+      case SourceDebugIntentType.bookInfo:
+        return '详情';
+      case SourceDebugIntentType.explore:
+        return '发现';
+      case SourceDebugIntentType.toc:
+        return '目录';
+      case SourceDebugIntentType.content:
+        return '正文';
+    }
+  }
+
+  String _defaultDebugSearchKey() {
+    final searchKey = _searchCheckKeyWordCtrl.text.trim();
+    return searchKey.isEmpty ? '我的' : searchKey;
+  }
+
+  void _startDebugFromInputSubmit() {
+    if (_debugLoading) return;
+    _startLegadoStyleDebug();
+  }
+
   void _setDebugKeyAndMaybeRun(String key, {required bool run}) {
     setState(() => _debugKeyCtrl.text = key);
     if (run && !_debugLoading) {
       _startLegadoStyleDebug();
     }
+  }
+
+  Future<void> _showExploreQuickPicker(
+    List<MapEntry<String, String>> entries,
+  ) async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('选择发现入口'),
+        actions: entries
+            .map(
+              (entry) => CupertinoActionSheetAction(
+                child: Text(entry.value),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _setDebugKeyAndMaybeRun(entry.key, run: true);
+                },
+              ),
+            )
+            .toList(growable: false),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  List<MapEntry<String, String>> _collectExploreQuickEntries() {
+    final parsed = _parseExploreQuickEntries(
+      exploreUrl: _exploreUrlCtrl.text,
+      exploreScreen: _exploreScreenCtrl.text,
+    );
+    if (_cachedExploreQuickEntries.isEmpty) {
+      return parsed;
+    }
+    return _mergeExploreQuickEntries([
+      ..._cachedExploreQuickEntries,
+      ...parsed,
+    ]);
+  }
+
+  List<MapEntry<String, String>> _parseExploreQuickEntries({
+    required String exploreUrl,
+    required String exploreScreen,
+  }) {
+    final result = <MapEntry<String, String>>[];
+    final seen = <String>{};
+
+    void addEntry(String title, String url) {
+      final normalizedUrl = url.trim();
+      if (normalizedUrl.isEmpty) return;
+      final normalizedTitle = title.trim().isEmpty ? '发现' : title.trim();
+      final key = '$normalizedTitle::$normalizedUrl';
+      if (!seen.add(key)) return;
+      final displayUrl = normalizedUrl.length <= 22
+          ? normalizedUrl
+          : '${normalizedUrl.substring(0, 22)}...';
+      result.add(MapEntry(key, '$normalizedTitle::$displayUrl'));
+    }
+
+    bool isHttp(String value) {
+      return value.startsWith('http://') || value.startsWith('https://');
+    }
+
+    void parseDynamic(dynamic node) {
+      if (node is List) {
+        for (final item in node) {
+          parseDynamic(item);
+        }
+        return;
+      }
+      if (node is! Map) return;
+      final map = node.map((key, value) => MapEntry('$key', value));
+      final title = (map['title'] ?? map['name'] ?? '').toString().trim();
+      final url =
+          (map['url'] ?? map['value'] ?? map['link'] ?? '').toString().trim();
+      if (isHttp(url)) {
+        addEntry(title, url);
+      }
+    }
+
+    final trimmedExploreUrl = exploreUrl.trim();
+    if (trimmedExploreUrl.isNotEmpty) {
+      final parts = trimmedExploreUrl.split(RegExp(r'(?:&&|\r?\n)+'));
+      for (final rawPart in parts) {
+        final part = rawPart.trim();
+        if (part.isEmpty) continue;
+        final idx = part.indexOf('::');
+        if (idx >= 0) {
+          final title = part.substring(0, idx).trim();
+          final url = part.substring(idx + 2).trim();
+          if (isHttp(url)) {
+            addEntry(title, url);
+          }
+          continue;
+        }
+        if (isHttp(part)) {
+          addEntry('发现', part);
+        }
+      }
+      if (result.isEmpty &&
+          (trimmedExploreUrl.startsWith('[') ||
+              trimmedExploreUrl.startsWith('{'))) {
+        try {
+          parseDynamic(json.decode(trimmedExploreUrl));
+        } catch (_) {
+          // ignore parse failure
+        }
+      }
+    }
+
+    final raw = exploreScreen.trim();
+    if (raw.isNotEmpty) {
+      try {
+        parseDynamic(json.decode(raw));
+      } catch (_) {
+        final regex = RegExp(r'([^:\n]+)::(https?://\S+)');
+        for (final match in regex.allMatches(raw)) {
+          final title = (match.group(1) ?? '').trim();
+          final url = (match.group(2) ?? '').trim();
+          if (url.isEmpty) continue;
+          addEntry(title, url);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  List<MapEntry<String, String>> _entriesFromExploreKinds(
+    List<SourceExploreKind> kinds,
+  ) {
+    final out = <MapEntry<String, String>>[];
+    for (final kind in kinds) {
+      final url = (kind.url ?? '').trim();
+      if (!(url.startsWith('http://') || url.startsWith('https://'))) {
+        continue;
+      }
+      final title = kind.title.trim().isEmpty ? '发现' : kind.title.trim();
+      final key = '$title::$url';
+      final displayUrl = url.length <= 22 ? url : '${url.substring(0, 22)}...';
+      out.add(MapEntry(key, '$title::$displayUrl'));
+    }
+    return out;
+  }
+
+  List<MapEntry<String, String>> _mergeExploreQuickEntries(
+    List<MapEntry<String, String>> entries,
+  ) {
+    final seen = <String>{};
+    final merged = <MapEntry<String, String>>[];
+    for (final entry in entries) {
+      final key = entry.key.trim();
+      if (key.isEmpty || !seen.add(key)) continue;
+      merged.add(entry);
+    }
+    return merged;
+  }
+
+  Future<void> _scanDebugKeyFromQr() async {
+    final text = await QrScanService.scanText(
+      context,
+      title: '扫码填充调试 Key',
+    );
+    final value = text?.trim();
+    if (value == null || value.isEmpty || !mounted) return;
+    setState(() => _debugKeyCtrl.text = value);
   }
 
   void _runQuickSearchRuleTest() {
@@ -1187,15 +1719,116 @@ class _SourceEditViewState extends State<SourceEditView> {
     _setDebugKeyAndMaybeRun(key, run: true);
   }
 
-  void _prefixKey(String prefix) {
+  void _prefixKeyAndMaybeRun(String prefix) {
     final text = _debugKeyCtrl.text.trim();
     if (text.isEmpty || text.length <= 2) {
       setState(() => _debugKeyCtrl.text = prefix);
       return;
     }
-    if (!text.startsWith(prefix)) {
-      setState(() => _debugKeyCtrl.text = '$prefix$text');
+    final next = text.startsWith(prefix) ? text : '$prefix$text';
+    setState(() => _debugKeyCtrl.text = next);
+    if (!_debugLoading) {
+      _startLegadoStyleDebug();
     }
+  }
+
+  void _runCurrentKey() {
+    final key = _debugKeyCtrl.text.trim();
+    if (key.isEmpty) {
+      _showMessage('请先输入调试 key');
+      return;
+    }
+    if (!_debugLoading) {
+      _startLegadoStyleDebug();
+    }
+  }
+
+  void _openDebugSourceFromMenu(String title, String? content) {
+    final text = content?.trim();
+    if (text == null || text.isEmpty) {
+      _showMessage('$title 暂无内容，请先执行调试');
+      return;
+    }
+    _openDebugText(title: title, text: text);
+  }
+
+  Future<void> _refreshExploreQuickActions() async {
+    if (_refreshingExploreQuickActions) return;
+
+    final map = _buildPatchedJsonForDebug();
+    if (map == null) {
+      _showMessage('JSON 格式错误');
+      return;
+    }
+    final source = BookSource.fromJson(map);
+    if (source.bookSourceUrl.trim().isEmpty) {
+      _showMessage('bookSourceUrl 不能为空');
+      return;
+    }
+
+    setState(() => _refreshingExploreQuickActions = true);
+    try {
+      await _exploreKindsService.clearExploreKindsCache(source);
+      final exploreKinds = await _exploreKindsService.exploreKinds(
+        source,
+        forceRefresh: true,
+      );
+      final refreshed = <MapEntry<String, String>>[
+        ..._entriesFromExploreKinds(exploreKinds),
+        ..._parseExploreQuickEntries(
+          exploreUrl: '',
+          exploreScreen: source.exploreScreen ?? '',
+        ),
+      ];
+      final debug = await _engine.exploreDebug(source);
+      final requestUrl =
+          (debug.fetch.finalUrl ?? debug.fetch.requestUrl).trim();
+      if (requestUrl.isNotEmpty &&
+          (requestUrl.startsWith('http://') ||
+              requestUrl.startsWith('https://'))) {
+        final key = '发现::$requestUrl';
+        final display = requestUrl.length <= 22
+            ? requestUrl
+            : '${requestUrl.substring(0, 22)}...';
+        refreshed.insert(0, MapEntry(key, '发现::$display'));
+      }
+
+      final merged = _mergeExploreQuickEntries(refreshed);
+      setState(() => _cachedExploreQuickEntries = merged);
+
+      if (merged.isEmpty) {
+        _showMessage('当前未解析到发现快捷项，请检查 exploreUrl/exploreScreen');
+        return;
+      }
+      if (debug.fetch.body == null || debug.error != null) {
+        final reason = (debug.error ?? debug.fetch.error ?? '请求失败').trim();
+        _showMessage('已刷新发现快捷项（${merged.length} 项），请求返回异常：$reason');
+        return;
+      }
+      _showMessage('已刷新发现快捷项（${merged.length} 项）');
+    } catch (e) {
+      final fallback = _parseExploreQuickEntries(
+        exploreUrl: _exploreUrlCtrl.text,
+        exploreScreen: _exploreScreenCtrl.text,
+      );
+      setState(() => _cachedExploreQuickEntries = fallback);
+      _showMessage('刷新失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() => _refreshingExploreQuickActions = false);
+      }
+    }
+  }
+
+  Future<void> _showDebugHelp() async {
+    await _openDebugText(
+      title: '调试帮助（对标 Legado）',
+      text: _debugHelpText(),
+    );
+  }
+
+  String _debugHelpText() {
+    return SourceHelpTexts.debug;
   }
 
   Widget _buildDebugSourcesSection() {
@@ -1319,101 +1952,50 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildDebugConsoleSection() {
-    final hasLines = _debugLinesAll.isNotEmpty;
-    final mode = _debugConsoleMode;
-    final modeLabel = mode == 0
-        ? '分段'
-        : mode == 1
-            ? '文本'
-            : '逐行';
-    final allText =
-        hasLines ? _debugLinesAll.map((e) => e.text).join('\n') : '';
+    final hasLines = _debugLines.isNotEmpty;
     final totalLines = _debugLinesAll.length;
-    final baseLines = _debugShowAllLines ? _debugLinesAll : _debugLines;
-    final filterActive = _debugFilter.trim().isNotEmpty;
-    final visibleLines = filterActive
-        ? baseLines
-            .where(
-              (e) => e.text.toLowerCase().contains(_debugFilter.toLowerCase()),
-            )
-            .toList(growable: false)
-        : baseLines;
-    final uiLines = visibleLines.length;
-    final effectiveMode = filterActive ? 2 : mode;
+    final visibleLines = _debugLines;
 
-    final decisionSummary = _buildDebugDecisionSummaryLines();
+    String buildContextText(_DebugLine picked, {int radius = 28}) {
+      final idx = _debugLinesAll.indexOf(picked);
+      if (idx < 0) return picked.text;
+      final start = (idx - radius) < 0 ? 0 : (idx - radius);
+      final end = (idx + radius + 1) > _debugLinesAll.length
+          ? _debugLinesAll.length
+          : (idx + radius + 1);
+      final slice = _debugLinesAll.sublist(start, end);
+      final buf = StringBuffer();
+      for (var i = 0; i < slice.length; i++) {
+        final lineNo = start + i + 1;
+        buf.writeln('${lineNo.toString().padLeft(4)}│ ${slice[i].text}');
+      }
+      return buf.toString().trimRight();
+    }
 
     final children = <Widget>[
-      if (decisionSummary.isNotEmpty)
+      if (_debugError != null && _debugError!.trim().isNotEmpty)
         CupertinoListTile.notched(
-          title: const Text('请求决策摘要（最近一次）'),
-          subtitle: _buildDecisionSummaryPanel(decisionSummary.join('\n')),
-          trailing: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () {
-              Clipboard.setData(
-                ClipboardData(text: decisionSummary.join('\n')),
-              );
-              _showMessage('已复制请求决策摘要');
-            },
-            child: const Icon(
-              CupertinoIcons.doc_on_doc,
-              size: 18,
+          title: Text(
+            '最近错误',
+            style: TextStyle(
+              color: CupertinoColors.systemRed.resolveFrom(context),
+            ),
+          ),
+          subtitle: Text(
+            _debugError!,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.systemRed.resolveFrom(context),
             ),
           ),
         ),
-      CupertinoListTile.notched(
-        title: const Text('显示模式'),
-        subtitle: CupertinoSlidingSegmentedControl<int>(
-          groupValue: _debugConsoleMode,
-          children: const {
-            0: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text('分段')),
-            1: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text('文本')),
-            2: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text('逐行')),
-          },
-          onValueChanged: (v) {
-            if (v == null) return;
-            setState(() => _debugConsoleMode = v);
-          },
+      if (totalLines > visibleLines.length)
+        CupertinoListTile.notched(
+          title: Text('当前展示最近 ${visibleLines.length} 行'),
+          subtitle: Text('完整日志共 $totalLines 行，可用“更多工具 -> 复制控制台（全部）”导出'),
         ),
-      ),
-      CupertinoListTile.notched(
-        title: const Text('显示全部日志（全局放开）'),
-        subtitle: const Text('开启后可能卡顿；建议排查时临时开启'),
-        trailing: CupertinoSwitch(
-          value: _debugShowAllLines,
-          onChanged: (v) => setState(() => _debugShowAllLines = v),
-        ),
-      ),
-      CupertinoListTile.notched(
-        title: const Text('过滤关键字'),
-        subtitle: CupertinoSearchTextField(
-          placeholder: '输入后仅展示命中行（不区分大小写）',
-          onChanged: (v) => setState(() => _debugFilter = v),
-          onSuffixTap: () => setState(() => _debugFilter = ''),
-        ),
-      ),
-      CupertinoListTile.notched(
-        title: const Text('逐行自动换行'),
-        subtitle: const Text('仅影响“逐行”模式；关闭时更清爽'),
-        trailing: CupertinoSwitch(
-          value: _debugWrapLines,
-          onChanged: (v) => setState(() => _debugWrapLines = v),
-        ),
-      ),
-      CupertinoListTile.notched(
-        title: const Text('打开全文控制台'),
-        additionalInfo: Text('$totalLines 行'),
-        trailing: const CupertinoListTileChevron(),
-        onTap:
-            hasLines ? () => _openDebugText(title: '控制台', text: allText) : null,
-      ),
     ];
 
     if (!hasLines) {
@@ -1428,219 +2010,45 @@ class _SourceEditViewState extends State<SourceEditView> {
       );
     }
 
-    if (effectiveMode == 1) {
-      final visibleText = visibleLines.map((e) => e.text).join('\n');
+    for (final line in visibleLines) {
+      if (line.text.trim().isEmpty) continue;
+      final color = line.state == -1
+          ? CupertinoColors.systemRed.resolveFrom(context)
+          : line.state == 1000
+              ? CupertinoColors.systemGreen.resolveFrom(context)
+              : CupertinoColors.label.resolveFrom(context);
       children.add(
         CupertinoListTile.notched(
-          title: const Text('文本控制台'),
-          subtitle: _buildConsoleTextPanel(visibleText),
-          trailing: const CupertinoListTileChevron(),
-          onTap: () => _openDebugText(title: '控制台', text: allText),
+          title: Text(
+            line.text,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              color: color,
+            ),
+          ),
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: line.text));
+              _showMessage('已复制该行日志');
+            },
+            child: const Icon(
+              CupertinoIcons.doc_on_doc,
+              size: 18,
+            ),
+          ),
+          onTap: () => _openDebugText(
+            title: '日志上下文',
+            text: buildContextText(line),
+          ),
         ),
       );
-    } else if (effectiveMode == 2) {
-      String buildContextText(_DebugLine picked, {int radius = 28}) {
-        final idx = _debugLinesAll.indexOf(picked);
-        if (idx < 0) return picked.text;
-        final start = (idx - radius) < 0 ? 0 : (idx - radius);
-        final end = (idx + radius + 1) > _debugLinesAll.length
-            ? _debugLinesAll.length
-            : (idx + radius + 1);
-        final slice = _debugLinesAll.sublist(start, end);
-        final buf = StringBuffer();
-        for (var i = 0; i < slice.length; i++) {
-          final lineNo = start + i + 1;
-          buf.writeln('${lineNo.toString().padLeft(4)}│ ${slice[i].text}');
-        }
-        return buf.toString().trimRight();
-      }
-
-      if (filterActive && mode == 0) {
-        children.add(
-          const CupertinoListTile.notched(
-            title: Text('提示'),
-            subtitle: Text('过滤开启时，分段模式会自动按逐行展示'),
-          ),
-        );
-      }
-
-      for (final line in visibleLines) {
-        if (line.text.trim().isEmpty) continue;
-        final color = line.state == -1
-            ? CupertinoColors.systemRed.resolveFrom(context)
-            : line.state == 1000
-                ? CupertinoColors.systemGreen.resolveFrom(context)
-                : CupertinoColors.label.resolveFrom(context);
-        children.add(
-          CupertinoListTile.notched(
-            title: Text(
-              line.text,
-              maxLines: _debugWrapLines ? null : 3,
-              overflow: _debugWrapLines
-                  ? TextOverflow.visible
-                  : TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12.5,
-                color: color,
-              ),
-            ),
-            trailing: CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: line.text));
-                _showMessage('已复制该行日志');
-              },
-              child: const Icon(
-                CupertinoIcons.doc_on_doc,
-                size: 18,
-              ),
-            ),
-            onTap: () => _openDebugText(
-              title: '日志上下文',
-              text: buildContextText(line),
-            ),
-          ),
-        );
-      }
-    } else {
-      final blocks = _buildDebugBlocks(lines: visibleLines);
-      for (var i = 0; i < blocks.length; i++) {
-        final block = blocks[i];
-        final expanded = _expandedDebugBlocks.contains(i);
-
-        final statusColor = block.hasError
-            ? CupertinoColors.systemRed.resolveFrom(context)
-            : CupertinoColors.secondaryLabel.resolveFrom(context);
-
-        children.add(
-          CupertinoListTile.notched(
-            title: Text(block.titlePlain),
-            subtitle: Text(
-              block.summary ?? '—',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12.0,
-                color: statusColor,
-              ),
-            ),
-            trailing: Icon(
-              expanded
-                  ? CupertinoIcons.chevron_down
-                  : CupertinoIcons.chevron_right,
-              size: 16,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-            ),
-            onTap: () {
-              setState(() {
-                if (expanded) {
-                  _expandedDebugBlocks.remove(i);
-                } else {
-                  _expandedDebugBlocks.add(i);
-                }
-              });
-            },
-          ),
-        );
-
-        if (expanded) {
-          final preview = block.previewText(maxLines: 18);
-          children.add(
-            CupertinoListTile.notched(
-              title: const Text('内容预览'),
-              subtitle: Text(
-                preview,
-                maxLines: 18,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12.5,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
-              trailing: const CupertinoListTileChevron(),
-              onTap: () => _openDebugText(title: '日志分段', text: block.fullText),
-            ),
-          );
-        }
-      }
     }
 
     return CupertinoListSection.insetGrouped(
-      header: Text(
-        () {
-          if (effectiveMode == 1) {
-            return '控制台（$modeLabel，总 $totalLines 行）';
-          }
-          final baseCount = baseLines.length;
-          final scopeLabel = _debugShowAllLines ? '全量' : '最近';
-          final filterLabel = filterActive ? '过滤+逐行' : modeLabel;
-          final shown = uiLines;
-          return '控制台（$filterLabel，$scopeLabel $shown/$baseCount，总 $totalLines 行）';
-        }(),
-      ),
+      header: Text('控制台（共 $totalLines 行）'),
       children: children,
-    );
-  }
-
-  Widget _buildConsoleTextPanel(String text) {
-    final t = text.trimRight();
-    final show = t.isEmpty ? '—' : t;
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6.resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      constraints: const BoxConstraints(minHeight: 120, maxHeight: 340),
-      child: CupertinoScrollbar(
-        child: SingleChildScrollView(
-          child: SelectableRegion(
-            focusNode: _consoleSelectableFocusNode,
-            selectionControls: cupertinoTextSelectionControls,
-            child: Text(
-              show,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12.5,
-                color: CupertinoColors.label.resolveFrom(context),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDecisionSummaryPanel(String text) {
-    final show = text.trim().isEmpty ? '—' : text.trimRight();
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6.resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      constraints: const BoxConstraints(minHeight: 88, maxHeight: 220),
-      child: CupertinoScrollbar(
-        child: SingleChildScrollView(
-          child: SelectableRegion(
-            focusNode: _decisionSelectableFocusNode,
-            selectionControls: cupertinoTextSelectionControls,
-            child: Text(
-              show,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12.5,
-                color: CupertinoColors.label.resolveFrom(context),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -1744,7 +2152,8 @@ class _SourceEditViewState extends State<SourceEditView> {
     setState(() {
       _debugLines.clear();
       _debugLinesAll.clear();
-      _expandedDebugBlocks.clear();
+      _debugAutoFollowLogs = true;
+      _debugAutoScrollQueued = false;
       _debugError = null;
       _debugListSrcHtml = null;
       _debugBookSrcHtml = null;
@@ -1763,6 +2172,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       _awaitingChapterNameValue = false;
       _awaitingChapterUrlValue = false;
     });
+    _queueDebugAutoScroll(force: true);
   }
 
   void _copyDebugConsole() {
@@ -2084,33 +2494,6 @@ class _SourceEditViewState extends State<SourceEditView> {
     _showMessage(ok ? '已导出：$fileName' : '导出取消或失败');
   }
 
-  List<_DebugBlock> _buildDebugBlocks({required List<_DebugLine> lines}) {
-    final blocks = <_DebugBlock>[];
-    _DebugBlock? current;
-
-    String stripTimePrefix(String text) {
-      final t = text.trimLeft();
-      if (!t.startsWith('[')) return text;
-      final idx = t.indexOf('] ');
-      if (idx < 0) return text;
-      return t.substring(idx + 2);
-    }
-
-    for (final line in lines) {
-      final plain = stripTimePrefix(line.text).trimLeft();
-      if (plain.startsWith('︾')) {
-        current = _DebugBlock(title: line.text);
-        blocks.add(current);
-      }
-      (current ??= _DebugBlock(title: '日志')).lines.add(line);
-    }
-
-    for (final b in blocks) {
-      b.updateComputed();
-    }
-    return blocks;
-  }
-
   Map<String, dynamic>? _buildPatchedJsonForDebug() {
     final base = _tryDecodeJsonMap(_jsonCtrl.text);
     if (base == null) return null;
@@ -2260,6 +2643,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Future<void> _startLegadoStyleDebug() async {
+    _debugKeyFocusNode.unfocus();
+
     final map = _buildPatchedJsonForDebug();
     if (map == null) {
       setState(() => _debugError = 'JSON 格式错误');
@@ -2270,17 +2655,26 @@ class _SourceEditViewState extends State<SourceEditView> {
       setState(() => _debugError = 'bookSourceUrl 不能为空（否则无法构建请求地址）');
       return;
     }
-    final key = _debugKeyCtrl.text.trim();
+    var key = _debugKeyCtrl.text.trim();
     if (key.isEmpty) {
-      setState(() => _debugError = '请输入 key');
+      key = _defaultDebugSearchKey();
+      _debugKeyCtrl.text = key;
+    }
+    final parsed = _debugOrchestrator.parseKey(key);
+    final intent = parsed.intent;
+    if (intent == null) {
+      setState(() => _debugError = parsed.error ?? '请输入有效 key');
       return;
     }
 
     setState(() {
+      _showDebugQuickHelp = false;
       _debugLoading = true;
       _debugError = null;
       _debugLines.clear();
       _debugLinesAll.clear();
+      _debugAutoFollowLogs = true;
+      _debugAutoScrollQueued = false;
       _debugListSrcHtml = null;
       _debugBookSrcHtml = null;
       _debugTocSrcHtml = null;
@@ -2293,25 +2687,42 @@ class _SourceEditViewState extends State<SourceEditView> {
       _debugResponseCharset = null;
       _debugResponseCharsetDecision = null;
       _debugRuntimeVarsSnapshot = <String, String>{};
+      _debugIntentType = intent.type;
       _previewChapterName = null;
       _previewChapterUrl = null;
       _awaitingChapterNameValue = false;
       _awaitingChapterUrlValue = false;
     });
+    _queueDebugAutoScroll(force: true);
 
+    SourceDebugRunResult? runResult;
     try {
-      await _engine.debugRun(
-        source,
-        key,
+      runResult = await _debugOrchestrator.run(
+        source: source,
+        key: key,
         onEvent: _onDebugEvent,
       );
       if (!mounted) return;
       setState(() {
         _debugRuntimeVarsSnapshot = _engine.debugRuntimeVariablesSnapshot();
+        if (_debugError == null &&
+            runResult?.error?.trim().isNotEmpty == true) {
+          _debugError = runResult!.error!.trim();
+        }
       });
+      _publishDebugSummary(
+        source: source,
+        intent: runResult.intent,
+        runResult: runResult,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _debugError = '调试失败：$e');
+      _publishDebugSummary(
+        source: source,
+        intent: intent,
+        runResult: runResult,
+      );
     } finally {
       if (mounted) {
         setState(() => _debugLoading = false);
@@ -2360,6 +2771,61 @@ class _SourceEditViewState extends State<SourceEditView> {
         _debugError = event.message;
       }
     });
+    _queueDebugAutoScroll();
+  }
+
+  void _publishDebugSummary({
+    required BookSource source,
+    required SourceDebugIntent intent,
+    required SourceDebugRunResult? runResult,
+  }) {
+    final logLines = _debugLinesAll.map((line) => line.text).toList();
+    final errorLines = _debugLinesAll
+        .where((line) => line.state == -1)
+        .map((line) => line.text)
+        .toList();
+    final summary = SourceDebugSummaryParser.build(
+      logLines: logLines,
+      debugError: _debugError,
+      errorLines: errorLines,
+    );
+    final diagnosisRaw = summary['diagnosis'];
+    final diagnosis = diagnosisRaw is Map
+        ? diagnosisRaw.map((k, v) => MapEntry('$k', v))
+        : const <String, dynamic>{};
+    final primary = (diagnosis['primary'] ?? 'no_data').toString();
+    final labels = (diagnosis['labels'] is List)
+        ? (diagnosis['labels'] as List)
+            .map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
+            .toList(growable: false)
+        : const <String>[];
+    final hints = (diagnosis['hints'] is List)
+        ? (diagnosis['hints'] as List)
+            .map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
+            .toList(growable: false)
+        : const <String>[];
+
+    final success = runResult?.success ??
+        (_debugError == null &&
+            !labels.contains('request_failure') &&
+            !labels.contains('parse_failure'));
+
+    SourceDebugSummaryStore.instance.push(
+      SourceDebugSummary(
+        finishedAt: DateTime.now(),
+        sourceUrl: source.bookSourceUrl,
+        sourceName: source.bookSourceName,
+        key: intent.runKey,
+        intentType: intent.type,
+        success: success,
+        debugError: _debugError,
+        primaryDiagnosis: primary,
+        diagnosisLabels: labels,
+        diagnosisHints: hints,
+      ),
+    );
   }
 
   Future<void> _openDebugText({
@@ -2901,79 +3367,4 @@ class _DebugLine {
     required this.state,
     required this.text,
   });
-}
-
-class _DebugBlock {
-  final String title;
-  final List<_DebugLine> lines = <_DebugLine>[];
-
-  bool hasError = false;
-  String? summary;
-
-  _DebugBlock({required this.title});
-
-  String _stripTimePrefix(String text) {
-    final t = text.trimLeft();
-    if (!t.startsWith('[')) return text;
-    final idx = t.indexOf('] ');
-    if (idx < 0) return text;
-    return t.substring(idx + 2);
-  }
-
-  String get titlePlain {
-    final plain = _stripTimePrefix(title).trim();
-    return plain.isEmpty ? '日志' : plain;
-  }
-
-  String get fullText => lines.map((e) => e.text).join('\n');
-
-  String previewText({required int maxLines}) {
-    if (maxLines <= 0) return '';
-    final nonEmpty = lines
-        .map((e) => e.text)
-        .where((e) => e.trim().isNotEmpty)
-        .toList(growable: false);
-    if (nonEmpty.isEmpty) return '';
-    final start = nonEmpty.length > maxLines ? nonEmpty.length - maxLines : 0;
-    return nonEmpty.sublist(start).join('\n');
-  }
-
-  void updateComputed() {
-    hasError = lines.any((e) => e.state == -1);
-    summary = _buildSummary();
-  }
-
-  String? _buildSummary() {
-    final plain = lines
-        .map((e) => _stripTimePrefix(e.text).trimRight())
-        .where((e) => e.trim().isNotEmpty)
-        .toList(growable: false);
-    if (plain.isEmpty) return null;
-
-    String? firstWhere(bool Function(String s) test) {
-      for (final s in plain) {
-        if (test(s)) return s;
-      }
-      return null;
-    }
-
-    String? lastWhere(bool Function(String s) test) {
-      for (var i = plain.length - 1; i >= 0; i--) {
-        final s = plain[i];
-        if (test(s)) return s;
-      }
-      return null;
-    }
-
-    final errorDetail = firstWhere(
-      (s) => s.contains('DioException') || s.contains('HTTP 状态码异常'),
-    );
-    if (hasError && errorDetail != null) return errorDetail;
-
-    final requestLine = lastWhere((s) => s.startsWith('≡'));
-    if (requestLine != null) return requestLine;
-
-    final anyLine = lastWhere((s) => s.startsWith('└') || s.startsWith('◇'));
-    return anyLine ?? plain.first;
-  }
 }

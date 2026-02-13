@@ -5,34 +5,10 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
-import '../models/book_source.dart';
-import '../services/rule_parser_engine.dart';
-import '../services/source_availability_diagnosis_service.dart';
+import '../services/source_availability_check_task_service.dart';
 import '../services/source_debug_export_service.dart';
 import 'source_debug_text_view.dart';
 import 'source_edit_view.dart';
-
-enum _CheckStatus {
-  pending,
-  running,
-  ok,
-  empty,
-  fail,
-  skipped,
-}
-
-class _CheckItem {
-  BookSource source;
-  _CheckStatus status = _CheckStatus.pending;
-  String? message;
-  String? requestUrl;
-  int elapsedMs = 0;
-  int listCount = 0;
-  String? debugKey;
-  DiagnosisSummary diagnosis = DiagnosisSummary.noData;
-
-  _CheckItem({required this.source});
-}
 
 enum _ResultFilter {
   all,
@@ -45,10 +21,14 @@ enum _ResultFilter {
 
 class SourceAvailabilityCheckView extends StatefulWidget {
   final bool includeDisabled;
+  final List<String>? sourceUrls;
+  final String? keywordOverride;
 
   const SourceAvailabilityCheckView({
     super.key,
     this.includeDisabled = false,
+    this.sourceUrls,
+    this.keywordOverride,
   });
 
   @override
@@ -58,166 +38,98 @@ class SourceAvailabilityCheckView extends StatefulWidget {
 
 class _SourceAvailabilityCheckViewState
     extends State<SourceAvailabilityCheckView> {
-  final RuleParserEngine _engine = RuleParserEngine();
-  final SourceAvailabilityDiagnosisService _diagnosisService =
-      const SourceAvailabilityDiagnosisService();
+  final SourceAvailabilityCheckTaskService _taskService =
+      SourceAvailabilityCheckTaskService.instance;
   final SourceDebugExportService _exportService = SourceDebugExportService();
-  late final DatabaseService _db;
   late final SourceRepository _repo;
 
-  bool _running = false;
-  bool _cancelRequested = false;
-  final List<_CheckItem> _items = <_CheckItem>[];
   _ResultFilter _resultFilter = _ResultFilter.all;
+  late final SourceCheckTaskConfig _initialConfig;
 
   @override
   void initState() {
     super.initState();
-    _db = DatabaseService();
-    _repo = SourceRepository(_db);
-    _resetItems();
-    _start();
-  }
-
-  void _resetItems() {
-    final sources = _repo.getAllSources()
-      ..sort((a, b) {
-        if (a.weight != b.weight) return b.weight.compareTo(a.weight);
-        return a.bookSourceName.compareTo(b.bookSourceName);
-      });
-    _items
-      ..clear()
-      ..addAll(sources.map((s) => _CheckItem(source: s)));
-  }
-
-  Future<void> _start() async {
-    if (_running) return;
-    setState(() {
-      _running = true;
-      _cancelRequested = false;
-      for (final item in _items) {
-        item.status = _CheckStatus.pending;
-        item.message = null;
-        item.requestUrl = null;
-        item.elapsedMs = 0;
-        item.listCount = 0;
-        item.debugKey = null;
-        item.diagnosis = DiagnosisSummary.noData;
-      }
+    _repo = SourceRepository(DatabaseService());
+    _initialConfig = SourceCheckTaskConfig(
+      includeDisabled: widget.includeDisabled,
+      sourceUrls: widget.sourceUrls,
+      keywordOverride: widget.keywordOverride,
+    );
+    _taskService.listenable.addListener(_onTaskUpdate);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureTaskStarted();
     });
+  }
 
-    for (final item in _items) {
-      if (_cancelRequested) break;
+  @override
+  void dispose() {
+    _taskService.listenable.removeListener(_onTaskUpdate);
+    super.dispose();
+  }
 
-      final source = item.source;
-      if (!widget.includeDisabled && !source.enabled) {
-        if (!mounted) return;
-        setState(() {
-          item.status = _CheckStatus.skipped;
-          item.message = '已跳过（未启用）';
-        });
-        continue;
-      }
-
-      if (!mounted) return;
-      setState(() {
-        item.status = _CheckStatus.running;
-        item.message = '检测中…';
-      });
-
-      try {
-        final hasSearch =
-            (source.searchUrl != null && source.searchUrl!.trim().isNotEmpty) &&
-                source.ruleSearch != null;
-        final hasExplore = (source.exploreUrl != null &&
-                source.exploreUrl!.trim().isNotEmpty) &&
-            source.ruleExplore != null;
-
-        if (hasSearch) {
-          final keyword =
-              source.ruleSearch?.checkKeyWord?.trim().isNotEmpty == true
-                  ? source.ruleSearch!.checkKeyWord!.trim()
-                  : '我的';
-          item.debugKey = keyword;
-          final debug = await _engine.searchDebug(source, keyword);
-          final ok = debug.fetch.body != null;
-          final cnt = debug.listCount;
-          if (!mounted) return;
-          setState(() {
-            item.elapsedMs = debug.fetch.elapsedMs;
-            item.requestUrl = debug.fetch.finalUrl ?? debug.fetch.requestUrl;
-            item.listCount = cnt;
-            item.diagnosis = _diagnosisService.diagnoseSearch(
-              debug: debug,
-              keyword: keyword,
-            );
-            if (!ok) {
-              item.status = _CheckStatus.fail;
-              item.message = debug.error ?? debug.fetch.error ?? '请求失败';
-            } else if (cnt <= 0) {
-              item.status = _CheckStatus.empty;
-              item.message =
-                  '请求成功，但列表为空（${keyword.isEmpty ? '无关键字' : '关键字: $keyword'}）';
-            } else {
-              item.status = _CheckStatus.ok;
-              item.message = '可用（列表 $cnt）';
-            }
-          });
-          continue;
-        }
-
-        if (hasExplore) {
-          final url = source.exploreUrl!.trim();
-          item.debugKey = '发现::$url';
-          final debug = await _engine.exploreDebug(source);
-          final ok = debug.fetch.body != null;
-          final cnt = debug.listCount;
-          if (!mounted) return;
-          setState(() {
-            item.elapsedMs = debug.fetch.elapsedMs;
-            item.requestUrl = debug.fetch.finalUrl ?? debug.fetch.requestUrl;
-            item.listCount = cnt;
-            item.diagnosis = _diagnosisService.diagnoseExplore(debug: debug);
-            if (!ok) {
-              item.status = _CheckStatus.fail;
-              item.message = debug.error ?? debug.fetch.error ?? '请求失败';
-            } else if (cnt <= 0) {
-              item.status = _CheckStatus.empty;
-              item.message = '请求成功，但列表为空';
-            } else {
-              item.status = _CheckStatus.ok;
-              item.message = '可用（列表 $cnt）';
-            }
-          });
-          continue;
-        }
-
-        if (!mounted) return;
-        setState(() {
-          item.status = _CheckStatus.fail;
-          item.message =
-              '缺少 searchUrl/ruleSearch 或 exploreUrl/ruleExplore，无法检测';
-          item.diagnosis = _diagnosisService.diagnoseMissingRule();
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          item.status = _CheckStatus.fail;
-          item.message = '异常：$e';
-          item.diagnosis = _diagnosisService.diagnoseException(e);
-        });
-      }
-    }
-
+  void _onTaskUpdate() {
     if (!mounted) return;
-    setState(() => _running = false);
+    setState(() {});
+  }
+
+  SourceCheckTaskSnapshot? get _snapshot => _taskService.snapshot;
+
+  SourceCheckTaskConfig get _activeConfig =>
+      _snapshot?.config ?? _initialConfig;
+
+  List<SourceCheckItem> get _items =>
+      _snapshot?.items ?? const <SourceCheckItem>[];
+
+  bool get _running => _snapshot?.running == true;
+
+  bool get _stopRequested => _snapshot?.stopRequested == true;
+
+  Future<void> _ensureTaskStarted({bool forceRestart = false}) async {
+    final config = _activeConfig;
+    final result = await _taskService.start(
+      config,
+      forceRestart: forceRestart,
+    );
+    if (!mounted) return;
+    if (result.type == SourceCheckStartType.runningOtherTask) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('提示'),
+          content: Text('\n${result.message}'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('好'),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (result.type == SourceCheckStartType.emptySource) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('提示'),
+          content: Text('\n${result.message}'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('好'),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   void _stop() {
-    setState(() {
-      _cancelRequested = true;
-      _running = false;
-    });
+    _taskService.requestStop();
+  }
+
+  Future<void> _start() async {
+    await _ensureTaskStarted(forceRestart: true);
   }
 
   Color _accentColor() {
@@ -227,36 +139,36 @@ class _SourceAvailabilityCheckViewState
         : AppDesignTokens.brandPrimary;
   }
 
-  Color _statusColor(_CheckStatus status) {
+  Color _statusColor(SourceCheckStatus status) {
     switch (status) {
-      case _CheckStatus.ok:
+      case SourceCheckStatus.ok:
         return CupertinoColors.systemGreen.resolveFrom(context);
-      case _CheckStatus.empty:
+      case SourceCheckStatus.empty:
         return CupertinoColors.systemOrange.resolveFrom(context);
-      case _CheckStatus.fail:
+      case SourceCheckStatus.fail:
         return CupertinoColors.systemRed.resolveFrom(context);
-      case _CheckStatus.running:
+      case SourceCheckStatus.running:
         return _accentColor();
-      case _CheckStatus.skipped:
+      case SourceCheckStatus.skipped:
         return CupertinoColors.systemGrey.resolveFrom(context);
-      case _CheckStatus.pending:
+      case SourceCheckStatus.pending:
         return CupertinoColors.secondaryLabel.resolveFrom(context);
     }
   }
 
-  String _statusText(_CheckStatus status) {
+  String _statusText(SourceCheckStatus status) {
     switch (status) {
-      case _CheckStatus.pending:
+      case SourceCheckStatus.pending:
         return '待检测';
-      case _CheckStatus.running:
+      case SourceCheckStatus.running:
         return '检测中';
-      case _CheckStatus.ok:
+      case SourceCheckStatus.ok:
         return '可用';
-      case _CheckStatus.empty:
+      case SourceCheckStatus.empty:
         return '空列表';
-      case _CheckStatus.fail:
+      case SourceCheckStatus.fail:
         return '失败';
-      case _CheckStatus.skipped:
+      case SourceCheckStatus.skipped:
         return '跳过';
     }
   }
@@ -272,21 +184,21 @@ class _SourceAvailabilityCheckViewState
         text.contains('超时');
   }
 
-  bool _matchesFilter(_CheckItem item, _ResultFilter filter) {
+  bool _matchesFilter(SourceCheckItem item, _ResultFilter filter) {
     switch (filter) {
       case _ResultFilter.all:
         return true;
       case _ResultFilter.available:
-        return item.status == _CheckStatus.ok;
+        return item.status == SourceCheckStatus.ok;
       case _ResultFilter.failed:
-        return item.status == _CheckStatus.fail;
+        return item.status == SourceCheckStatus.fail;
       case _ResultFilter.empty:
-        return item.status == _CheckStatus.empty;
+        return item.status == SourceCheckStatus.empty;
       case _ResultFilter.timeout:
-        return item.status == _CheckStatus.fail &&
+        return item.status == SourceCheckStatus.fail &&
             _isTimeoutMessage(item.message);
       case _ResultFilter.skipped:
-        return item.status == _CheckStatus.skipped;
+        return item.status == SourceCheckStatus.skipped;
     }
   }
 
@@ -342,6 +254,7 @@ class _SourceAvailabilityCheckViewState
   }
 
   String _buildReportText({required bool onlyVisible}) {
+    final activeConfig = _activeConfig;
     final now = DateTime.now().toIso8601String();
     final pool = onlyVisible
         ? _items.where((e) => _matchesFilter(e, _resultFilter)).toList()
@@ -350,13 +263,15 @@ class _SourceAvailabilityCheckViewState
     final lines = <String>[
       'SoupReader 书源可用性检测报告',
       '生成时间：$now',
-      '范围：${widget.includeDisabled ? '全部书源' : '仅启用书源'}',
+      '范围：${activeConfig.includeDisabled ? '全部书源' : '仅启用书源'}',
+      if (activeConfig.normalizedKeyword().isNotEmpty)
+        '关键词：${activeConfig.normalizedKeyword()}',
       '筛选：${_filterLabel(_resultFilter)}',
       '总计：${pool.length}',
-      '可用：${pool.where((e) => e.status == _CheckStatus.ok).length}',
-      '失败：${pool.where((e) => e.status == _CheckStatus.fail).length}',
-      '空列表：${pool.where((e) => e.status == _CheckStatus.empty).length}',
-      '跳过：${pool.where((e) => e.status == _CheckStatus.skipped).length}',
+      '可用：${pool.where((e) => e.status == SourceCheckStatus.ok).length}',
+      '失败：${pool.where((e) => e.status == SourceCheckStatus.fail).length}',
+      '空列表：${pool.where((e) => e.status == SourceCheckStatus.empty).length}',
+      '跳过：${pool.where((e) => e.status == SourceCheckStatus.skipped).length}',
       '',
     ];
 
@@ -443,8 +358,8 @@ class _SourceAvailabilityCheckViewState
     final targets = _items
         .where((item) =>
             item.source.enabled &&
-            (item.status == _CheckStatus.fail ||
-                item.status == _CheckStatus.empty))
+            (item.status == SourceCheckStatus.fail ||
+                item.status == SourceCheckStatus.empty))
         .toList(growable: false);
     if (targets.isEmpty) {
       await showCupertinoDialog<void>(
@@ -490,6 +405,7 @@ class _SourceAvailabilityCheckViewState
       item.source = updated;
       item.message = '${item.message ?? '已检测'}；已自动禁用';
     }
+    _taskService.touch();
 
     if (!mounted) return;
     setState(() {});
@@ -508,7 +424,7 @@ class _SourceAvailabilityCheckViewState
     );
   }
 
-  Future<void> _openItemDetails(_CheckItem item) async {
+  Future<void> _openItemDetails(SourceCheckItem item) async {
     final s = item.source;
     final details = <String>[
       '名称：${s.bookSourceName}',
@@ -531,9 +447,9 @@ class _SourceAvailabilityCheckViewState
     );
   }
 
-  Future<void> _openEditorAtDebug(_CheckItem item) async {
-    final entity = _db.sourcesBox.get(item.source.bookSourceUrl);
-    if (entity == null) {
+  Future<void> _openEditorAtDebug(SourceCheckItem item) async {
+    final source = _repo.getSourceByUrl(item.source.bookSourceUrl);
+    if (source == null) {
       await showCupertinoDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
@@ -551,8 +467,9 @@ class _SourceAvailabilityCheckViewState
     }
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView.fromEntity(
-          entity,
+        builder: (_) => SourceEditView.fromSource(
+          source,
+          rawJson: _repo.getRawJsonByUrl(source.bookSourceUrl),
           initialTab: 3,
           initialDebugKey: item.debugKey,
         ),
@@ -565,18 +482,19 @@ class _SourceAvailabilityCheckViewState
     final total = _items.length;
     final done = _items
         .where((e) =>
-            e.status != _CheckStatus.pending &&
-            e.status != _CheckStatus.running)
+            e.status != SourceCheckStatus.pending &&
+            e.status != SourceCheckStatus.running)
         .length;
-    final ok = _items.where((e) => e.status == _CheckStatus.ok).length;
-    final fail = _items.where((e) => e.status == _CheckStatus.fail).length;
-    final empty = _items.where((e) => e.status == _CheckStatus.empty).length;
+    final ok = _items.where((e) => e.status == SourceCheckStatus.ok).length;
+    final fail = _items.where((e) => e.status == SourceCheckStatus.fail).length;
+    final empty =
+        _items.where((e) => e.status == SourceCheckStatus.empty).length;
     final timedOut = _items
         .where((e) =>
-            e.status == _CheckStatus.fail && _isTimeoutMessage(e.message))
+            e.status == SourceCheckStatus.fail && _isTimeoutMessage(e.message))
         .length;
     final skipped =
-        _items.where((e) => e.status == _CheckStatus.skipped).length;
+        _items.where((e) => e.status == SourceCheckStatus.skipped).length;
 
     final visibleItems = _items
         .where((e) => _matchesFilter(e, _resultFilter))
@@ -637,7 +555,8 @@ class _SourceAvailabilityCheckViewState
                 onTap: _disableUnavailableSources,
               ),
               CupertinoListTile.notched(
-                title: Text(_running ? '停止检测' : '重新检测'),
+                title: Text(
+                    _running ? (_stopRequested ? '停止中…' : '停止检测') : '重新检测'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _running ? _stop : _start,
               ),

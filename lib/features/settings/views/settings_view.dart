@@ -6,6 +6,7 @@ import '../../../app/theme/colors.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
+import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/format_utils.dart';
@@ -64,8 +65,9 @@ class _SettingsViewState extends State<SettingsView> {
   Future<void> _refreshStats() async {
     final db = DatabaseService();
     final chapterRepo = ChapterRepository(db);
+    final sourceRepo = SourceRepository(db);
 
-    final sourceCount = db.sourcesBox.length;
+    final sourceCount = sourceRepo.getAllSources().length;
     final readingHistoryCount = db.booksBox.values
         .where((b) =>
             b.lastReadTime != null &&
