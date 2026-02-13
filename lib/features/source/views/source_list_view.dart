@@ -2035,7 +2035,7 @@ class _SourceListViewState extends State<SourceListView> {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toSet()
-        .toList(growable: false);
+        .toList();
   }
 
   String? _joinGroups(List<String> groups) {

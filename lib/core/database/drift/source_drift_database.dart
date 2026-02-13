@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
+import 'source_drift_connection.dart';
 
 part 'source_drift_database.g.dart';
 
@@ -208,11 +205,5 @@ class SourceDriftDatabase extends _$SourceDriftDatabase {
 }
 
 LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final file = File(
-      p.join(documentsDirectory.path, 'soupreader_sources.sqlite'),
-    );
-    return NativeDatabase.createInBackground(file);
-  });
+  return LazyDatabase(openSourceDriftConnection);
 }

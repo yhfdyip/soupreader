@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -30,6 +31,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   late final SettingsService _settingsService;
   late final BookshelfImportExportService _bookshelfIo;
   late final BookshelfBooklistImportService _booklistImporter;
+  StreamSubscription<List<Book>>? _booksSubscription;
   List<Book> _books = [];
   bool _isImporting = false;
   String? _initError;
@@ -47,12 +49,25 @@ class _BookshelfViewState extends State<BookshelfView> {
       _isGridView = _settingsService.appSettings.bookshelfViewMode ==
           BookshelfViewMode.grid;
       _loadBooks();
+      _booksSubscription = _bookRepo.watchAllBooks().listen((books) {
+        if (!mounted) return;
+        setState(() {
+          _books = List<Book>.from(books);
+          _sortBooks(_settingsService.appSettings.bookshelfSortMode);
+        });
+      });
       debugPrint('[bookshelf] init done, books=\${_books.length}');
     } catch (e, st) {
       _initError = '书架初始化异常: $e';
       debugPrint('[bookshelf] init failed: $e');
       debugPrintStack(stackTrace: st);
     }
+  }
+
+  @override
+  void dispose() {
+    _booksSubscription?.cancel();
+    super.dispose();
   }
 
   void _loadBooks() {

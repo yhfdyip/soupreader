@@ -1,5 +1,145 @@
 # SoupReader 开发进度日志
 
+## 2026-02-13（Web 打包部署修复：Drift Web 连接 + JS 整数兼容）
+
+### 已完成
+- 修复 Web 构建被 `dart:ffi` 阻塞的问题（Drift 连接改为平台分离）：
+  - `lib/core/database/drift/source_drift_database.dart`
+  - `lib/core/database/drift/source_drift_connection.dart`
+  - `lib/core/database/drift/source_drift_connection_native.dart`
+  - `lib/core/database/drift/source_drift_connection_web.dart`
+  - `lib/core/database/drift/source_drift_connection_stub.dart`
+- 修复书源发现分类缓存 key 在 Web 下的 JS 整数精度报错：
+  - `lib/features/source/services/source_explore_kinds_service.dart`
+  - 将 64 位 FNV 哈希改为 32 位 FNV-1a，避免 `dart2js` 对大整数常量报错。
+- 完成 Web 打包与部署：
+  - 构建：`flutter build web --release`
+  - 部署：`rsync -a --delete build/web/ /home/soup_dist/`
+
+### 为什么
+- 你要求“打包 web 端并部署到 `/home/soup_dist/`”。
+- 现状阻塞点：
+  - Drift 原实现直接依赖 `native`（`dart:ffi`），Web 无法编译；
+  - 书源缓存 key 使用 64 位整数字面量，Web(JS number) 无法精确表示。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 执行：`flutter build web --release`
+- 结果：`✓ Built build/web`
+- 执行：`ls -la /home/soup_dist`
+- 结果：包含 `index.html`、`main.dart.js`、`assets/`、`canvaskit/` 等完整静态产物。
+
+### 兼容影响
+- 移动端/桌面端继续使用原生 Drift 存储路径；
+- Web 端切换为 Drift Web 存储实现（浏览器存储）；
+- `source_explore_kinds` 缓存 key 算法更新后，旧 key 仅会失效重建，不影响书源功能语义。
+
+## 2026-02-13（本地 TXT 导入后书架不刷新 + 阅读乱码修复）
+
+### 已完成
+- 修复“导入 TXT 成功但书架列表不刷新”：
+  - 文件：`lib/features/bookshelf/views/bookshelf_view.dart`
+  - 改动：书架页新增 `watchAllBooks()` 流订阅，数据库变更后自动刷新 `_books`，并在 `dispose` 中取消订阅。
+  - 语义对齐 legado：书架数据变化后由观察流驱动 UI 更新（而非仅依赖一次性读取）。
+- 修复“进入阅读界面内容乱码”：
+  - 文件：`lib/features/import/txt_parser.dart`
+  - 改动：TXT 解码策略调整为：
+    - UTF-8 BOM
+    - UTF-16 LE/BE BOM
+    - UTF-8 严格解码
+    - GBK 解码回退（`fast_gbk`）
+    - UTF-8 容错兜底
+  - 移除旧的 `latin1` 回退，避免中文 TXT 被错误按西文编码解码。
+- legado 对照（完整读取）：
+  - `/home/server/legado/app/src/main/java/io/legado/app/model/localBook/TextFile.kt`
+  - `/home/server/legado/app/src/main/java/io/legado/app/utils/EncodingDetect.kt`
+  - `/home/server/legado/app/src/main/java/io/legado/app/ui/main/bookshelf/BookshelfViewModel.kt`
+  - `/home/server/legado/app/src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt`
+
+### 为什么
+- 你反馈两个问题：
+  - 导入 TXT 提示成功后，书架未及时显示新书；
+  - 打开阅读后正文乱码。
+- 根因分别是：
+  - 书架页缺少持续数据订阅，导入后仅一次性读取可能拿到旧快照；
+  - TXT 解码回退使用 `latin1`，对中文（GBK/GB18030）文本会产生乱码。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 书架 -> 本机导入 -> 选择 `.txt`；
+  - 提示导入成功后，书架列表应立即出现新书；
+  - 点击进入阅读，正文应为正常中文，不出现大面积乱码。
+
+### 兼容影响
+- 仅影响本地 TXT 导入后的 UI 刷新与文本解码策略，不改书源五段链路解析逻辑。
+- 乱码修复对“新导入 TXT”立即生效；已导入且已写入乱码内容的旧书需重新导入以应用新解码策略。
+
+## 2026-02-13（书源导入异常修复：分组追加时 fixed-length list 崩溃）
+
+### 已完成
+- 修复“添加/导入书源”时可能出现的异常：
+  - 错误：`Unsupported operation: Cannot remove from a fixed-length list`
+  - 文件：`lib/features/source/views/source_list_view.dart`
+  - 改动：`_extractGroups()` 返回值由固定长度列表改为可变列表（`toList()`），确保后续 `add/remove` 分组操作可执行。
+- 对照 legado 导入逻辑确认语义：
+  - 参考并完整读取：`/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt`
+  - 保持“导入时按策略追加/覆盖分组”的行为一致，不改导入决策逻辑。
+
+### 为什么
+- 你反馈添加书源时报错，堆栈信息指向对固定长度列表执行 `remove`。
+- 当前实现中导入合并策略会对分组列表执行 `add/remove`，但分组提取函数返回的是不可变长度列表，导致运行时崩溃。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 书源管理 -> 导入（网络/剪贴板/文件）；
+  - 在导入选项里使用“保留分组/追加分组/覆盖分组”组合提交；
+  - 确认导入成功，不再出现 fixed-length list 异常。
+
+### 兼容影响
+- 仅修复分组列表可变性问题，不改变书源字段语义与导入策略。
+- 对既有书源数据结构无兼容破坏。
+
+## 2026-02-13（设置首页信息架构重排：分组导航替代平铺菜单）
+
+### 已完成
+- 重构设置首页为“一级入口页”，不再平铺大量细项：
+  - `lib/features/settings/views/settings_view.dart`
+  - 首屏改为两组 `insetGrouped`：
+    - `设置分组`：源管理、主题、功能 & 设置、其它
+    - `诊断`：开发工具
+- 具体设置项下沉到既有二级页面，通过导航进入：
+  - `SourceManagementView`
+  - `ThemeSettingsView`
+  - `FunctionSettingsView`
+  - `OtherHubView`
+  - `DeveloperToolsView`
+- 保留设置首页关键摘要信息，避免信息损失：
+  - 书源数量与自动更新状态
+  - 主题摘要（外观模式 + 阅读主题）
+  - 阅读记录与缓存摘要
+  - 版本信息
+
+### 为什么
+- 你反馈“设置页面菜单太挤”，首屏平铺项过多导致扫描成本高、点击区域密集。
+- 通过入口化分层可降低首屏密度，保持 legado 风格的分组导航语义与可达性。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 进入设置首页，确认仅展示分组入口与摘要信息，不再出现拥挤平铺；
+  - 依次点击 `源管理/主题/功能 & 设置/其它/开发工具`，确认可正常进入二级页并返回；
+  - 返回设置首页后，摘要信息可刷新显示。
+
+### 兼容影响
+- 仅调整设置首页的信息架构与布局排版，不改变书源管理、阅读设置、开发工具等业务逻辑。
+- 不涉及书源五段链路（search/explore/bookInfo/toc/content）协议与解析行为。
+
 ## 2026-02-13（设置新增开发工具：异常日志面板 + 关键节点异常采集）
 
 ### 已完成

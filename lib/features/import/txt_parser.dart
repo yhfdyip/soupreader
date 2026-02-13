@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:fast_gbk/fast_gbk.dart';
 import 'package:uuid/uuid.dart';
 import '../bookshelf/models/book.dart';
 
@@ -58,6 +59,8 @@ class TxtParser {
 
   /// 自动检测编码并解码
   static String _decodeContent(Uint8List bytes) {
+    if (bytes.isEmpty) return '';
+
     // 检测 BOM
     if (bytes.length >= 3 &&
         bytes[0] == 0xEF &&
@@ -66,24 +69,43 @@ class TxtParser {
       // UTF-8 with BOM
       return utf8.decode(bytes.sublist(3));
     }
+    if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+      // UTF-16 LE BOM
+      return _decodeUtf16(bytes.sublist(2), littleEndian: true);
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+      // UTF-16 BE BOM
+      return _decodeUtf16(bytes.sublist(2), littleEndian: false);
+    }
 
-    // 尝试 UTF-8
+    // 优先 UTF-8（对标 legado：优先使用探测结果中的 Unicode 编码）
     try {
-      final utf8Result = utf8.decode(bytes, allowMalformed: false);
-      // 检查是否有大量替换字符
-      final badChars = utf8Result.split('\uFFFD').length - 1;
-      if (badChars < 10) {
-        return utf8Result;
-      }
+      return utf8.decode(bytes, allowMalformed: false);
     } catch (_) {}
 
-    // 尝试 GBK (使用 latin1 作为备选)
+    // 非 UTF-8 时，优先按 GBK 解码（中文 TXT 常见；对齐 legado 的编码探测目标）
     try {
-      return latin1.decode(bytes);
+      return gbk.decode(bytes, allowMalformed: true);
     } catch (_) {}
 
-    // 最后使用 UTF-8 允许错误
+    // 最后回退：UTF-8 容错，尽量不崩溃
     return utf8.decode(bytes, allowMalformed: true);
+  }
+
+  static String _decodeUtf16(
+    Uint8List bytes, {
+    required bool littleEndian,
+  }) {
+    final length = bytes.length;
+    if (length < 2) return '';
+    final evenLength = length - (length % 2);
+    final data = ByteData.sublistView(bytes, 0, evenLength);
+    final codeUnits = Uint16List(evenLength ~/ 2);
+    final endian = littleEndian ? Endian.little : Endian.big;
+    for (var i = 0; i < codeUnits.length; i++) {
+      codeUnits[i] = data.getUint16(i * 2, endian);
+    }
+    return String.fromCharCodes(codeUnits);
   }
 
   /// 解析内容

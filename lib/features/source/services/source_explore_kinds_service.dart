@@ -229,12 +229,13 @@ class SourceExploreKindsService {
 
   String _buildCacheKey(String sourceUrl, String exploreUrl) {
     final input = '$sourceUrl\n$exploreUrl';
-    var hash = 0xcbf29ce484222325;
+    // 使用 32 位 FNV-1a，避免 Web(JS number) 下 64 位整数字面量精度问题。
+    var hash = 0x811c9dc5;
     for (final unit in input.codeUnits) {
       hash ^= unit;
-      hash = (hash * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
     }
-    return hash.toRadixString(16).padLeft(16, '0');
+    return hash.toRadixString(16).padLeft(8, '0');
   }
 
   dynamic _safeGetSetting(String key) {
