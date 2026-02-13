@@ -4,12 +4,16 @@ import 'dart:io';
 import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../core/utils/legado_json.dart';
 
 typedef SourceImportHttpFetcher = Future<Response<String>> Function(Uri uri);
 
 /// 书源导入导出服务
 class SourceImportExportService {
+  static const String _requestWithoutUaSuffix = '#requestWithoutUA';
+  static const int _maxImportDepth = 3;
+
   final SourceImportHttpFetcher? _httpFetcher;
   final bool _isWeb;
 
@@ -19,7 +23,10 @@ class SourceImportExportService {
   })  : _httpFetcher = httpFetcher,
         _isWeb = isWeb ?? kIsWeb;
 
-  Future<Response<String>> _defaultFetch(Uri uri) {
+  Future<Response<String>> _defaultFetch(
+    Uri uri, {
+    required bool requestWithoutUa,
+  }) {
     return Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 20),
@@ -29,15 +36,26 @@ class SourceImportExportService {
         responseType: ResponseType.plain,
         validateStatus: (_) => true,
       ),
-    ).get<String>(uri.toString());
+    ).get<String>(
+      uri.toString(),
+      options: Options(
+        headers: requestWithoutUa ? const {'User-Agent': 'null'} : null,
+      ),
+    );
   }
 
-  Future<Response<String>> _fetchFromUrl(Uri uri) {
+  Future<Response<String>> _fetchFromUrl(
+    Uri uri, {
+    required bool requestWithoutUa,
+  }) {
     final fetcher = _httpFetcher;
     if (fetcher != null) {
       return fetcher(uri);
     }
-    return _defaultFetch(uri);
+    return _defaultFetch(
+      uri,
+      requestWithoutUa: requestWithoutUa,
+    );
   }
 
   SourceImportResult _copyWithWarnings(
@@ -115,6 +133,174 @@ class SourceImportExportService {
     return '网络请求失败: $error';
   }
 
+  bool _isHttpUrl(String value) {
+    final uri = Uri.tryParse(value);
+    if (uri == null || uri.host.isEmpty) return false;
+    return uri.scheme == 'http' || uri.scheme == 'https';
+  }
+
+  List<String>? _extractSourceUrls(dynamic decoded) {
+    if (decoded is! Map) return null;
+    if (!decoded.containsKey('sourceUrls')) return null;
+
+    final urls = <String>[];
+    void addUrl(dynamic value) {
+      final text = value?.toString().trim();
+      if (text == null || text.isEmpty) return;
+      urls.add(text);
+    }
+
+    final raw = _decodeNestedJsonValue(decoded['sourceUrls']);
+    if (raw is List) {
+      for (final item in raw) {
+        addUrl(item);
+      }
+    } else if (raw is String) {
+      final normalized = _sanitizeJsonInput(raw);
+      if (normalized.startsWith('[')) {
+        final nested = _decodeNestedJsonValue(normalized);
+        if (nested is List) {
+          for (final item in nested) {
+            addUrl(item);
+          }
+        } else {
+          addUrl(normalized);
+        }
+      } else {
+        final parts = normalized.split(RegExp(r'[\n,]'));
+        for (final part in parts) {
+          addUrl(part);
+        }
+      }
+    } else {
+      addUrl(raw);
+    }
+
+    return urls;
+  }
+
+  Future<SourceImportResult> _importFromSourceUrls(
+    List<String> sourceUrls, {
+    required int depth,
+  }) async {
+    final warnings = <String>[];
+    var invalidCount = 0;
+    var duplicateCount = 0;
+    final sourceByUrl = <String, BookSource>{};
+    final sourceRawJsonByUrl = <String, String>{};
+
+    for (var i = 0; i < sourceUrls.length; i++) {
+      final targetUrl = sourceUrls[i].trim();
+      if (targetUrl.isEmpty) {
+        invalidCount++;
+        warnings.add('sourceUrls 第${i + 1}项为空，已跳过');
+        continue;
+      }
+      if (!_isHttpUrl(targetUrl)) {
+        invalidCount++;
+        warnings.add('sourceUrls 第${i + 1}项不是有效 http/https 链接：$targetUrl');
+        continue;
+      }
+
+      final result = await _importFromUrl(targetUrl, depth: depth + 1);
+      if (!result.success) {
+        invalidCount++;
+        final reason = result.errorMessage?.trim();
+        warnings.add(
+          'sourceUrls 第${i + 1}项导入失败：$targetUrl${(reason == null || reason.isEmpty) ? '' : '（$reason）'}',
+        );
+        continue;
+      }
+
+      warnings.addAll(
+        result.warnings.map((warning) => '[$targetUrl] $warning'),
+      );
+
+      for (final source in result.sources) {
+        final url = source.bookSourceUrl.trim();
+        if (url.isEmpty) continue;
+        if (sourceByUrl.containsKey(url)) {
+          duplicateCount++;
+          sourceByUrl.remove(url);
+        }
+        sourceByUrl[url] = source;
+        sourceRawJsonByUrl[url] = result.rawJsonForSourceUrl(url) ??
+            LegadoJson.encode(source.toJson());
+      }
+    }
+
+    final sources = sourceByUrl.values.toList(growable: false);
+    if (sources.isEmpty) {
+      return SourceImportResult(
+        success: false,
+        errorMessage: '未识别到有效书源（sourceUrls）',
+        totalInputCount: sourceUrls.length,
+        invalidCount: invalidCount,
+        duplicateCount: duplicateCount,
+        warnings: warnings,
+      );
+    }
+
+    return SourceImportResult(
+      success: true,
+      sources: sources,
+      importCount: sources.length,
+      totalInputCount: sourceUrls.length,
+      invalidCount: invalidCount,
+      duplicateCount: duplicateCount,
+      warnings: warnings,
+      sourceRawJsonByUrl: sourceRawJsonByUrl,
+    );
+  }
+
+  Future<SourceImportResult> _importFromText(
+    String text, {
+    required int depth,
+  }) async {
+    if (depth > _maxImportDepth) {
+      return const SourceImportResult(
+        success: false,
+        errorMessage: '导入层级过深，请检查输入内容是否循环引用',
+      );
+    }
+
+    final raw = _sanitizeJsonInput(text);
+    if (raw.isEmpty) {
+      return const SourceImportResult(
+        success: false,
+        errorMessage: '内容为空',
+      );
+    }
+
+    if (_isHttpUrl(raw)) {
+      return _importFromUrl(raw, depth: depth + 1);
+    }
+
+    dynamic decoded;
+    try {
+      decoded = json.decode(raw);
+      decoded = _decodeNestedJsonValue(decoded);
+    } catch (_) {
+      return const SourceImportResult(
+        success: false,
+        errorMessage: '格式错误：需为书源 JSON、sourceUrls JSON 或 http/https 链接',
+      );
+    }
+
+    final sourceUrls = _extractSourceUrls(decoded);
+    if (sourceUrls != null) {
+      if (sourceUrls.isEmpty) {
+        return const SourceImportResult(
+          success: false,
+          errorMessage: 'sourceUrls 为空',
+        );
+      }
+      return _importFromSourceUrls(sourceUrls, depth: depth + 1);
+    }
+
+    return importFromJson(raw);
+  }
+
   /// 从JSON文件导入书源
   Future<SourceImportResult> importFromFile() async {
     try {
@@ -144,7 +330,7 @@ class SourceImportExportService {
         );
       }
 
-      return importFromJson(content);
+      return importFromText(content);
     } catch (e) {
       return SourceImportResult(
         success: false,
@@ -291,10 +477,38 @@ class SourceImportExportService {
     }
   }
 
+  /// 从文本导入书源（支持 URL / JSON / {sourceUrls:[...]}）
+  Future<SourceImportResult> importFromText(String text) {
+    return _importFromText(text, depth: 0);
+  }
+
   /// 从URL导入书源
   Future<SourceImportResult> importFromUrl(String url) async {
+    return _importFromUrl(url, depth: 0);
+  }
+
+  Future<SourceImportResult> _importFromUrl(
+    String url, {
+    required int depth,
+  }) async {
+    if (depth > _maxImportDepth) {
+      return const SourceImportResult(
+        success: false,
+        errorMessage: '导入层级过深，请检查输入内容是否循环引用',
+      );
+    }
+
     try {
-      final uri = Uri.tryParse(url);
+      var normalizedUrl = url.trim();
+      var requestWithoutUa = false;
+      if (normalizedUrl.endsWith(_requestWithoutUaSuffix)) {
+        requestWithoutUa = true;
+        normalizedUrl = normalizedUrl
+            .substring(0, normalizedUrl.length - _requestWithoutUaSuffix.length)
+            .trim();
+      }
+
+      final uri = Uri.tryParse(normalizedUrl);
       if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
         return SourceImportResult(
           success: false,
@@ -302,12 +516,21 @@ class SourceImportExportService {
         );
       }
 
-      final response = await _fetchFromUrl(uri);
+      final response = await _fetchFromUrl(
+        uri,
+        requestWithoutUa: requestWithoutUa,
+      );
       final redirectHint = _buildRedirectHint(
         requested: uri,
         resolved: response.realUri,
       );
       final warnings = <String>[];
+      if (requestWithoutUa) {
+        warnings.add('已按 #requestWithoutUA 导入（User-Agent=null）');
+        if (_httpFetcher != null) {
+          warnings.add('当前为自定义网络抓取器，可能未处理 User-Agent 置空语义');
+        }
+      }
       if (redirectHint != null) {
         warnings.add(redirectHint);
       }
@@ -330,7 +553,7 @@ class SourceImportExportService {
         );
       }
 
-      final parsed = importFromJson(content);
+      final parsed = await _importFromText(content, depth: depth + 1);
       return _copyWithWarnings(parsed, warnings);
     } catch (e) {
       final err = e.toString();
@@ -376,6 +599,22 @@ class SourceImportExportService {
     } catch (e) {
       debugPrint('导出失败: $e');
       return false;
+    }
+  }
+
+  /// 生成用于系统分享的临时 JSON 文件（移动端/桌面端）
+  Future<File?> exportToShareFile(List<BookSource> sources) async {
+    if (_isWeb) return null;
+    try {
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/share_book_source_${DateTime.now().millisecondsSinceEpoch}.json';
+      final file = File(path);
+      await file.writeAsString(exportToJson(sources));
+      return file;
+    } catch (e) {
+      debugPrint('生成分享文件失败: $e');
+      return null;
     }
   }
 }

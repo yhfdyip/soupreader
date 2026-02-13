@@ -3533,12 +3533,13 @@ class RuleParserEngine {
       }
 
       if (trimmed.contains('::')) {
-        final url = trimmed.split('::').last.trim();
+        final url = trimmed.substring(trimmed.indexOf('::') + 2).trim();
         log('⇒开始访问发现页:$url');
         final firstBookUrl = await _debugBookListThenPickFirst(
           source: source,
           keyOrUrl: url,
           mode: _DebugListMode.explore,
+          exploreUrlOverride: url,
           fetchStage: fetchStage,
           log: log,
         );
@@ -3619,6 +3620,7 @@ class RuleParserEngine {
     required BookSource source,
     required String keyOrUrl,
     required _DebugListMode mode,
+    String? exploreUrlOverride,
     required Future<FetchDebugResult> Function(String url,
             {required int rawState})
         fetchStage,
@@ -3626,7 +3628,11 @@ class RuleParserEngine {
   }) async {
     final isSearch = mode == _DebugListMode.search;
     final bookListRule = isSearch ? source.ruleSearch : source.ruleExplore;
-    final urlRule = isSearch ? source.searchUrl : source.exploreUrl;
+    final urlRule = isSearch
+        ? source.searchUrl
+        : ((exploreUrlOverride != null && exploreUrlOverride.trim().isNotEmpty)
+            ? exploreUrlOverride.trim()
+            : source.exploreUrl);
 
     log(isSearch ? '︾开始解析搜索页' : '︾开始解析发现页');
 

@@ -10,7 +10,20 @@ import '../../source/services/rule_parser_engine.dart';
 
 /// 搜索页面 - 全局统一视觉风格
 class SearchView extends StatefulWidget {
-  const SearchView({super.key});
+  final List<String>? sourceUrls;
+  final String? initialKeyword;
+  final bool autoSearchOnOpen;
+
+  const SearchView({super.key})
+      : sourceUrls = null,
+        initialKeyword = null,
+        autoSearchOnOpen = false;
+  const SearchView.scoped({
+    super.key,
+    required this.sourceUrls,
+    this.initialKeyword,
+    this.autoSearchOnOpen = false,
+  });
 
   @override
   State<SearchView> createState() => _SearchViewState();
@@ -35,6 +48,20 @@ class _SearchViewState extends State<SearchView> {
     final db = DatabaseService();
     _sourceRepo = SourceRepository(db);
     _addService = BookAddService(database: db, engine: _engine);
+    final initialKeyword = widget.initialKeyword?.trim();
+    if (initialKeyword != null && initialKeyword.isNotEmpty) {
+      _searchController.text = initialKeyword;
+      _searchController.selection = TextSelection.fromPosition(
+        TextPosition(offset: initialKeyword.length),
+      );
+    }
+    if (widget.autoSearchOnOpen == true && initialKeyword != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _search();
+        }
+      });
+    }
   }
 
   @override
@@ -44,10 +71,18 @@ class _SearchViewState extends State<SearchView> {
   }
 
   List<BookSource> _enabledSources() {
+    final scopedUrls = widget.sourceUrls
+        ?.map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+
     final enabled = _sourceRepo
         .getAllSources()
         .where((source) => source.enabled == true)
-        .toList(growable: false);
+        .where((source) {
+      if (scopedUrls == null || scopedUrls.isEmpty) return true;
+      return scopedUrls.contains(source.bookSourceUrl);
+    }).toList(growable: false);
     enabled.sort((a, b) {
       if (a.weight != b.weight) {
         return b.weight.compareTo(a.weight);
@@ -289,7 +324,8 @@ class _SearchViewState extends State<SearchView> {
               borderColor: scheme.destructive,
               child: Row(
                 children: [
-                  Icon(LucideIcons.triangleAlert, size: 16, color: scheme.destructive),
+                  Icon(LucideIcons.triangleAlert,
+                      size: 16, color: scheme.destructive),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -308,7 +344,7 @@ class _SearchViewState extends State<SearchView> {
                   ),
                 ],
               ),
-          ),
+            ),
           Expanded(
             child: _results.isEmpty
                 ? _buildEmptyState()
@@ -401,7 +437,9 @@ class _SearchViewState extends State<SearchView> {
             child: result.coverUrl.isEmpty
                 ? Center(
                     child: Text(
-                      result.name.isNotEmpty ? result.name.substring(0, 1) : '?',
+                      result.name.isNotEmpty
+                          ? result.name.substring(0, 1)
+                          : '?',
                       style: theme.textTheme.h4.copyWith(
                         color: scheme.mutedForeground,
                       ),

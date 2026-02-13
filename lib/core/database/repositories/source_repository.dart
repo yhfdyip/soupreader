@@ -1,45 +1,127 @@
+import 'dart:async';
 import 'dart:convert';
+
+import 'package:drift/drift.dart';
 
 import '../../../features/source/models/book_source.dart';
 import '../../utils/legado_json.dart';
 import '../database_service.dart';
+import '../drift/source_drift_database.dart';
+import '../drift/source_drift_service.dart';
 import '../entities/book_entity.dart';
 
-/// 书源存储仓库
+/// 书源存储仓库（drift）
+///
+/// 对外尽量保持旧接口，避免上层大面积改动：
+/// - 同步读取来自内存缓存
+/// - 所有写入走 drift
+/// - watchAllSources 提供流式更新
 class SourceRepository {
-  final DatabaseService _db;
+  final SourceDriftDatabase _driftDb;
 
-  SourceRepository(this._db);
+  static final StreamController<List<BookSource>> _watchController =
+      StreamController<List<BookSource>>.broadcast();
+  static StreamSubscription<List<SourceRecord>>? _watchSub;
+
+  static final Map<String, BookSource> _cacheByUrl = <String, BookSource>{};
+  static final Map<String, String> _rawJsonByUrl = <String, String>{};
+  static bool _cacheReady = false;
+
+  SourceRepository(DatabaseService _) : _driftDb = SourceDriftService().db {
+    _ensureWatchStarted();
+  }
+
+  static Future<void> bootstrap(DatabaseService db) async {
+    final repo = SourceRepository(db);
+    await repo._reloadCacheFromDb();
+    repo._ensureWatchStarted();
+  }
+
+  void _ensureWatchStarted() {
+    if (_watchSub != null) return;
+    _watchSub = _driftDb.select(_driftDb.sourceRecords).watch().listen((rows) {
+      _updateCacheFromRows(rows);
+    });
+  }
+
+  Future<void> _reloadCacheFromDb() async {
+    final rows = await _driftDb.select(_driftDb.sourceRecords).get();
+    _updateCacheFromRows(rows);
+  }
+
+  static void _updateCacheFromRows(List<SourceRecord> rows) {
+    _cacheByUrl
+      ..clear()
+      ..addEntries(rows.map((row) {
+        final source = _rowToSource(row);
+        return MapEntry(source.bookSourceUrl, source);
+      }));
+
+    _rawJsonByUrl
+      ..clear()
+      ..addEntries(rows.where((row) {
+        final raw = row.rawJson;
+        return raw != null && raw.trim().isNotEmpty;
+      }).map((row) => MapEntry(row.bookSourceUrl, row.rawJson!.trim())));
+
+    _cacheReady = true;
+    _watchController.add(_cacheByUrl.values.toList(growable: false));
+  }
 
   List<BookSource> getAllSources() {
-    return _db.sourcesBox.values.map(_entityToSource).toList();
+    if (!_cacheReady) {
+      unawaited(_reloadCacheFromDb());
+      return const <BookSource>[];
+    }
+    return _cacheByUrl.values.toList(growable: false);
+  }
+
+  Stream<List<BookSource>> watchAllSources() async* {
+    if (!_cacheReady) {
+      await _reloadCacheFromDb();
+    }
+    yield getAllSources();
+    yield* _watchController.stream;
   }
 
   BookSource? getSourceByUrl(String url) {
-    final entity = _db.sourcesBox.get(url);
-    return entity != null ? _entityToSource(entity) : null;
+    if (!_cacheReady) {
+      unawaited(_reloadCacheFromDb());
+    }
+    return _cacheByUrl[url];
+  }
+
+  String? getRawJsonByUrl(String url) {
+    if (!_cacheReady) {
+      unawaited(_reloadCacheFromDb());
+    }
+    return _rawJsonByUrl[url];
   }
 
   Future<void> addSource(BookSource source) async {
-    await _db.sourcesBox.put(source.bookSourceUrl, _sourceToEntity(source));
+    await _driftDb
+        .into(_driftDb.sourceRecords)
+        .insertOnConflictUpdate(_sourceToCompanion(source));
   }
 
   Future<void> addSources(List<BookSource> sources) async {
-    final entries = <String, BookSourceEntity>{};
-    for (final source in sources) {
-      entries[source.bookSourceUrl] = _sourceToEntity(source);
-    }
-    await _db.sourcesBox.putAll(entries);
+    if (sources.isEmpty) return;
+    final companions = sources
+        .where((source) => source.bookSourceUrl.trim().isNotEmpty)
+        .map(_sourceToCompanion)
+        .toList(growable: false);
+    if (companions.isEmpty) return;
+
+    await _driftDb.batch((batch) {
+      batch.insertAllOnConflictUpdate(_driftDb.sourceRecords, companions);
+    });
   }
 
   Future<void> updateSource(BookSource source) async {
     await addSource(source);
   }
 
-  /// 以「原始 JSON」形式保存书源（编辑器/对标 legado 推荐用法）：
-  /// - 按 JSON 中的 `bookSourceUrl` 作为主键
-  /// - `rawJson` 会按 LegadoJson 规则剥离 null 字段
-  /// - 可选删除旧主键（当用户改了 bookSourceUrl）
+  /// 以「原始 JSON」形式保存书源（编辑器/对标 legado 推荐用法）
   Future<void> upsertSourceRawJson({
     String? originalUrl,
     required String rawJson,
@@ -53,61 +135,108 @@ class SourceRepository {
         : decoded.map((key, value) => MapEntry('$key', value));
 
     final source = BookSource.fromJson(map);
-    if (source.bookSourceUrl.trim().isEmpty) {
+    final url = source.bookSourceUrl.trim();
+    if (url.isEmpty) {
       throw const FormatException('bookSourceUrl 不能为空');
     }
 
     final normalizedRawJson = LegadoJson.encode(map);
-    final entity = _sourceToEntity(source, rawJsonOverride: normalizedRawJson);
+    final companion = _sourceToCompanion(
+      source,
+      rawJsonOverride: normalizedRawJson,
+    );
 
-    if (originalUrl != null &&
-        originalUrl.trim().isNotEmpty &&
-        originalUrl != source.bookSourceUrl) {
-      await _db.sourcesBox.delete(originalUrl);
-    }
-    await _db.sourcesBox.put(source.bookSourceUrl, entity);
+    await _driftDb.transaction(() async {
+      if (originalUrl != null &&
+          originalUrl.trim().isNotEmpty &&
+          originalUrl.trim() != url) {
+        await (_driftDb.delete(_driftDb.sourceRecords)
+              ..where((tbl) => tbl.bookSourceUrl.equals(originalUrl.trim())))
+            .go();
+      }
+      await _driftDb.into(_driftDb.sourceRecords).insertOnConflictUpdate(
+            companion,
+          );
+    });
   }
 
   Future<void> deleteSource(String url) async {
-    await _db.sourcesBox.delete(url);
+    await (_driftDb.delete(_driftDb.sourceRecords)
+          ..where((tbl) => tbl.bookSourceUrl.equals(url)))
+        .go();
   }
 
   Future<void> deleteDisabledSources() async {
-    final disabled = _db.sourcesBox.values
-        .where((source) => !source.enabled)
-        .map((source) => source.bookSourceUrl)
-        .toList();
-    await _db.sourcesBox.deleteAll(disabled);
+    await (_driftDb.delete(_driftDb.sourceRecords)
+          ..where((tbl) => tbl.enabled.equals(false)))
+        .go();
   }
 
   List<BookSource> fromEntities(Iterable<BookSourceEntity> entities) {
-    return entities.map(_entityToSource).toList();
+    return entities.map(_entityToSource).toList(growable: false);
   }
 
-  BookSourceEntity _sourceToEntity(
+  SourceRecordsCompanion _sourceToCompanion(
     BookSource source, {
     String? rawJsonOverride,
   }) {
-    final rawJson = rawJsonOverride ?? LegadoJson.encode(source.toJson());
-    return BookSourceEntity(
+    final normalizedRawJson =
+        rawJsonOverride ?? LegadoJson.encode(source.toJson());
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return SourceRecordsCompanion.insert(
       bookSourceUrl: source.bookSourceUrl,
-      bookSourceName: source.bookSourceName,
-      bookSourceGroup: source.bookSourceGroup,
-      bookSourceType: source.bookSourceType,
-      enabled: source.enabled,
-      bookSourceComment: source.bookSourceComment,
-      weight: source.weight,
-      header: source.header,
-      loginUrl: source.loginUrl,
-      lastUpdateTime: source.lastUpdateTime > 0
-          ? DateTime.fromMillisecondsSinceEpoch(source.lastUpdateTime)
-          : null,
-      ruleSearchJson: _encodeRule(source.ruleSearch?.toJson()),
-      ruleBookInfoJson: _encodeRule(source.ruleBookInfo?.toJson()),
-      ruleTocJson: _encodeRule(source.ruleToc?.toJson()),
-      ruleContentJson: _encodeRule(source.ruleContent?.toJson()),
-      rawJson: rawJson,
+      bookSourceName: Value(source.bookSourceName),
+      bookSourceGroup: Value(source.bookSourceGroup),
+      bookSourceType: Value(source.bookSourceType),
+      enabled: Value(source.enabled),
+      enabledExplore: Value(source.enabledExplore),
+      enabledCookieJar: Value(source.enabledCookieJar),
+      weight: Value(source.weight),
+      customOrder: Value(source.customOrder),
+      respondTime: Value(source.respondTime),
+      header: Value(source.header),
+      loginUrl: Value(source.loginUrl),
+      bookSourceComment: Value(source.bookSourceComment),
+      lastUpdateTime: Value(source.lastUpdateTime),
+      rawJson: Value(normalizedRawJson),
+      updatedAt: Value(now),
     );
+  }
+
+  static BookSource _rowToSource(SourceRecord row) {
+    final raw = row.rawJson;
+    if (raw != null && raw.trim().isNotEmpty) {
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is Map<String, dynamic>) {
+          return BookSource.fromJson(decoded);
+        }
+        if (decoded is Map) {
+          return BookSource.fromJson(
+            decoded.map((key, value) => MapEntry('$key', value)),
+          );
+        }
+      } catch (_) {
+        // fallback
+      }
+    }
+
+    return BookSource.fromJson({
+      'bookSourceUrl': row.bookSourceUrl,
+      'bookSourceName': row.bookSourceName,
+      'bookSourceGroup': row.bookSourceGroup,
+      'bookSourceType': row.bookSourceType,
+      'customOrder': row.customOrder,
+      'enabled': row.enabled,
+      'enabledExplore': row.enabledExplore,
+      'enabledCookieJar': row.enabledCookieJar ?? true,
+      'respondTime': row.respondTime,
+      'weight': row.weight,
+      'header': row.header,
+      'loginUrl': row.loginUrl,
+      'bookSourceComment': row.bookSourceComment,
+      'lastUpdateTime': row.lastUpdateTime,
+    });
   }
 
   BookSource _entityToSource(BookSourceEntity entity) {
@@ -128,8 +257,6 @@ class SourceRepository {
       }
     }
 
-    // 兼容旧存储：从拆分字段拼回一个 Legado 结构
-    final lastUpdateTime = entity.lastUpdateTime?.millisecondsSinceEpoch ?? 0;
     return BookSource.fromJson({
       'bookSourceUrl': entity.bookSourceUrl,
       'bookSourceName': entity.bookSourceName,
@@ -138,49 +265,30 @@ class SourceRepository {
       'customOrder': 0,
       'enabled': entity.enabled,
       'enabledExplore': true,
-      'jsLib': null,
       'enabledCookieJar': true,
-      'concurrentRate': null,
-      'header': entity.header,
-      'loginUrl': entity.loginUrl,
-      'loginUi': null,
-      'loginCheckJs': null,
-      'coverDecodeJs': null,
-      'bookSourceComment': entity.bookSourceComment,
-      'variableComment': null,
-      'lastUpdateTime': lastUpdateTime,
       'respondTime': 180000,
       'weight': entity.weight,
-      'exploreUrl': null,
-      'exploreScreen': null,
-      'ruleExplore': null,
-      'searchUrl': null,
-      'ruleSearch': _decodeRule(entity.ruleSearchJson, SearchRule.fromJson)?.toJson(),
-      'ruleBookInfo':
-          _decodeRule(entity.ruleBookInfoJson, BookInfoRule.fromJson)?.toJson(),
-      'ruleToc': _decodeRule(entity.ruleTocJson, TocRule.fromJson)?.toJson(),
-      'ruleContent':
-          _decodeRule(entity.ruleContentJson, ContentRule.fromJson)?.toJson(),
-      'ruleReview': null,
+      'header': entity.header,
+      'loginUrl': entity.loginUrl,
+      'bookSourceComment': entity.bookSourceComment,
+      'lastUpdateTime': entity.lastUpdateTime?.millisecondsSinceEpoch ?? 0,
+      'ruleSearch': _decodeRule(entity.ruleSearchJson),
+      'ruleBookInfo': _decodeRule(entity.ruleBookInfoJson),
+      'ruleToc': _decodeRule(entity.ruleTocJson),
+      'ruleContent': _decodeRule(entity.ruleContentJson),
     });
   }
 
-  String? _encodeRule(Map<String, dynamic>? rule) {
-    if (rule == null) return null;
-    return LegadoJson.encode(rule);
-  }
-
-  T? _decodeRule<T>(
-    String? jsonString,
-    T Function(Map<String, dynamic>) mapper,
-  ) {
-    if (jsonString == null || jsonString.trim().isEmpty) return null;
-    final raw = json.decode(jsonString);
-    if (raw is Map<String, dynamic>) {
-      return mapper(raw);
-    }
-    if (raw is Map) {
-      return mapper(raw.map((key, value) => MapEntry('$key', value)));
+  Map<String, dynamic>? _decodeRule(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    try {
+      final decoded = json.decode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map((key, value) => MapEntry('$key', value));
+      }
+    } catch (_) {
+      return null;
     }
     return null;
   }

@@ -155,7 +155,7 @@ class BookSourceEntityAdapter extends TypeAdapter<BookSourceEntity> {
       ruleTocJson: fields[7] as String?,
       ruleContentJson: fields[8] as String?,
       bookSourceComment: fields[9] as String?,
-      weight: fields[10] as int? ?? 0,
+      weight: fields[10] as int,
       header: fields[11] as String?,
       loginUrl: fields[12] as String?,
       lastUpdateTime: fields[13] as DateTime?,

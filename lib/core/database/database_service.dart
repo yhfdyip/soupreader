@@ -1,5 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'drift/source_drift_service.dart';
 import 'entities/book_entity.dart';
+import 'migration/source_hive_to_drift_migrator.dart';
 
 /// 数据库服务 - 管理 Hive 初始化和 Box 访问
 class DatabaseService {
@@ -20,6 +22,7 @@ class DatabaseService {
   late Box<dynamic> _settingsBox;
 
   bool _isInitialized = false;
+  bool _isSourceMigrated = false;
 
   /// 初始化数据库
   Future<void> init() async {
@@ -49,6 +52,13 @@ class DatabaseService {
     _replaceRulesBox =
         await Hive.openBox<ReplaceRuleEntity>(_replaceRulesBoxName);
     _settingsBox = await Hive.openBox(_settingsBoxName);
+
+    await SourceDriftService().init();
+    if (!_isSourceMigrated) {
+      final migrator = SourceHiveToDriftMigrator(databaseService: this);
+      await migrator.migrateIfNeeded();
+      _isSourceMigrated = true;
+    }
 
     _isInitialized = true;
   }
@@ -95,11 +105,14 @@ class DatabaseService {
     await _sourcesBox.clear();
     await _replaceRulesBox.clear();
     await _settingsBox.clear();
+    await SourceDriftService().clearAll();
   }
 
   /// 关闭数据库
   Future<void> close() async {
+    await SourceDriftService().close();
     await Hive.close();
     _isInitialized = false;
+    _isSourceMigrated = false;
   }
 }
