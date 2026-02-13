@@ -1,5 +1,47 @@
 # SoupReader 开发进度日志
 
+## 2026-02-13（书源详情 tocUrl 语义收敛：严格对齐 legado）
+
+### 已完成
+- 对齐 legado 的 `bookInfo.tocUrl` 处理语义，新增统一解析入口并替换所有关键链路调用点：
+  - 文件：`lib/features/source/services/rule_parser_engine.dart`
+  - 新增 `_resolveUrlFieldWithLegadoSemantics(...)` 与 `_resolveTocUrlLikeLegado(...)`
+  - 将以下分支统一改为使用该入口，移除分散的手写回退逻辑：
+    - `_debugBookInfo`（JSON/HTML）
+    - `getBookInfo`（JSON/HTML）
+    - `getBookInfoDebug`（JSON/HTML）
+- 对齐 legado 的重定向 URL 语义（解析基准 URL）：
+  - 在 `_fetch(...)` 增加 `onFinalUrl` 回调，暴露响应最终 URL；
+  - `getBookInfo` 与 `getBookInfoDebug` 使用最终 URL 作为字段解析与相对链接绝对化的 base；
+  - `_debugBookInfo` 同步使用 `fetch.finalUrl` 作为解析 base，并输出“详情页重定向至”调试信息。
+- 修复调试日志可观测性：
+  - “获取目录链接”改为输出最终生效值（空值时先提示回退，再输出回退后的详情页 URL）。
+- 新增回归测试覆盖 `tocUrl` 容错：
+  - 文件：`test/rule_parser_engine_bookinfo_tocurl_compat_test.dart`
+  - 覆盖：空值回退详情页、空白回退、相对链接绝对化、绝对链接保持不变。
+- legado 对照（已完整核查相关实现）：
+  - `/home/server/legado/app/src/main/java/io/legado/app/model/webBook/BookInfo.kt`
+  - `/home/server/legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt`
+  - `/home/server/legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSoup.kt`
+
+### 为什么
+- 你提供的 `soupreader_debug_bundle` 在详情阶段报错 `≡未获取到目录链接`，样例中 `ruleBookInfo.tocUrl = ".dirlist@href"` 在该站点命中为空。
+- 根因是 SoupReader 里 `tocUrl` 容错分散在多个调用点，且存在条件分叉，不等价于 legado 的统一 `isUrl` 语义（空值回退 baseUrl）。
+- 本次将语义下沉到统一函数，避免同类漏网路径。
+- 同时补齐“重定向后 URL 参与相对链接解析”的语义，避免 `bqgu -> bq00` 这类站点因 base 不一致导致字段链接偏差。
+
+### 如何验证
+- 执行：`flutter test test/rule_parser_engine_bookinfo_tocurl_compat_test.dart`
+- 结果：`All tests passed!`
+- 执行：`flutter test test/rule_parser_engine_*`
+- 结果：`All tests passed!`
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+
+### 兼容影响
+- 行为向 legado 收敛：`bookInfo.tocUrl` 为空时将统一回退到当前详情页 URL（详情页即目录页场景可继续解析）。
+- 对历史书源是兼容增强，不是破坏性变更；原本能取到有效 `tocUrl` 的书源行为不变。
+
 ## 2026-02-13（Web 打包部署修复：Drift Web 连接 + JS 整数兼容）
 
 ### 已完成

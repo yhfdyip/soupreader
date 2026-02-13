@@ -3853,6 +3853,12 @@ class RuleParserEngine {
       log('︽详情页解析失败', state: -1);
       return null;
     }
+    final parseBaseUrl = (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
+        ? fullUrl
+        : fetch.finalUrl!.trim();
+    if (parseBaseUrl != fullUrl) {
+      log('≡详情页重定向至:$parseBaseUrl', showTime: false);
+    }
 
     final trimmed = body.trimLeft();
     final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
@@ -3863,7 +3869,7 @@ class RuleParserEngine {
     if (jsonRoot != null) {
       String getField(String label, String? ruleStr) {
         log('┌$label');
-        final value = _parseValueOnNode(jsonRoot, ruleStr, fullUrl);
+        final value = _parseValueOnNode(jsonRoot, ruleStr, parseBaseUrl);
         log('└$value');
         return value;
       }
@@ -3875,13 +3881,16 @@ class RuleParserEngine {
       final lastChapter = getField('获取最新章节', rule.lastChapter);
       getField('获取简介', rule.intro);
       getField('获取封面', rule.coverUrl);
-      var tocUrl = getField('获取目录链接', rule.tocUrl);
-      if (tocUrl.trim().isEmpty) {
+      log('┌获取目录链接');
+      final rawTocUrl = _parseValueOnNode(jsonRoot, rule.tocUrl, parseBaseUrl);
+      if (rawTocUrl.trim().isEmpty) {
         log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
-        tocUrl = fullUrl;
-      } else if (!tocUrl.startsWith('http')) {
-        tocUrl = _absoluteUrl(fullUrl, tocUrl);
       }
+      final tocUrl = _resolveTocUrlLikeLegado(
+        rawValue: rawTocUrl,
+        baseUrl: parseBaseUrl,
+      );
+      log('└$tocUrl');
 
       if (name.isEmpty &&
           author.isEmpty &&
@@ -3915,7 +3924,7 @@ class RuleParserEngine {
 
     String getField(String label, String? ruleStr) {
       log('┌$label');
-      final value = _parseRule(root!, ruleStr, fullUrl);
+      final value = _parseRule(root!, ruleStr, parseBaseUrl);
       log('└$value');
       return value;
     }
@@ -3927,14 +3936,16 @@ class RuleParserEngine {
     final lastChapter = getField('获取最新章节', rule.lastChapter);
     getField('获取简介', rule.intro);
     getField('获取封面', rule.coverUrl);
-    var tocUrl = getField('获取目录链接', rule.tocUrl);
-    if (tocUrl.trim().isEmpty) {
-      // 对齐 legado 的容错：部分站点“详情页就是目录页”，tocUrl 规则为空/不匹配时允许直接用当前详情页继续。
+    log('┌获取目录链接');
+    final rawTocUrl = _parseRule(root, rule.tocUrl, parseBaseUrl);
+    if (rawTocUrl.trim().isEmpty) {
       log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
-      tocUrl = fullUrl;
-    } else if (!tocUrl.startsWith('http')) {
-      tocUrl = _absoluteUrl(fullUrl, tocUrl);
     }
+    final tocUrl = _resolveTocUrlLikeLegado(
+      rawValue: rawTocUrl,
+      baseUrl: parseBaseUrl,
+    );
+    log('└$tocUrl');
 
     if (name.isEmpty &&
         author.isEmpty &&
@@ -4855,6 +4866,7 @@ class RuleParserEngine {
 
     try {
       final fullUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
+      var parseBaseUrl = fullUrl;
       final response = await _fetch(
         fullUrl,
         header: source.header,
@@ -4863,6 +4875,11 @@ class RuleParserEngine {
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
         concurrentRate: source.concurrentRate,
+        onFinalUrl: (finalUrl) {
+          if (finalUrl.trim().isNotEmpty) {
+            parseBaseUrl = finalUrl.trim();
+          }
+        },
       );
       if (response == null) return null;
 
@@ -4873,33 +4890,33 @@ class RuleParserEngine {
 
       // JSON 模式
       if (jsonRoot != null) {
-        var tocUrl = _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, fullUrl);
-        if (tocUrl.trim().isEmpty && source.ruleToc != null) {
-          tocUrl = fullUrl;
-        } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
-          tocUrl = _absoluteUrl(fullUrl, tocUrl);
-        }
+        final tocUrl = _resolveTocUrlLikeLegado(
+          rawValue:
+              _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, parseBaseUrl),
+          baseUrl: parseBaseUrl,
+        );
 
         var coverUrl =
-            _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, fullUrl);
+            _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, parseBaseUrl);
         if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-          coverUrl = _absoluteUrl(fullUrl, coverUrl);
+          coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
         }
 
         return BookDetail(
-          name: _parseValueOnNode(jsonRoot, bookInfoRule.name, fullUrl),
-          author: _parseValueOnNode(jsonRoot, bookInfoRule.author, fullUrl),
+          name: _parseValueOnNode(jsonRoot, bookInfoRule.name, parseBaseUrl),
+          author:
+              _parseValueOnNode(jsonRoot, bookInfoRule.author, parseBaseUrl),
           coverUrl: coverUrl,
-          intro: _parseValueOnNode(jsonRoot, bookInfoRule.intro, fullUrl),
-          kind: _parseValueOnNode(jsonRoot, bookInfoRule.kind, fullUrl),
-          lastChapter:
-              _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, fullUrl),
+          intro: _parseValueOnNode(jsonRoot, bookInfoRule.intro, parseBaseUrl),
+          kind: _parseValueOnNode(jsonRoot, bookInfoRule.kind, parseBaseUrl),
+          lastChapter: _parseValueOnNode(
+              jsonRoot, bookInfoRule.lastChapter, parseBaseUrl),
           updateTime:
-              _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, fullUrl),
+              _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, parseBaseUrl),
           wordCount:
-              _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, fullUrl),
+              _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl),
           tocUrl: tocUrl,
-          bookUrl: fullUrl,
+          bookUrl: parseBaseUrl,
         );
       }
 
@@ -4914,30 +4931,27 @@ class RuleParserEngine {
 
       if (root == null) return null;
 
-      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, fullUrl);
-      if (tocUrl.trim().isEmpty && source.ruleToc != null) {
-        // 兼容 legado 常见用法：部分站点“详情页即目录页”，未配置 tocUrl 时默认使用当前详情页。
-        tocUrl = fullUrl;
-      } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
-        tocUrl = _absoluteUrl(fullUrl, tocUrl);
-      }
+      final tocUrl = _resolveTocUrlLikeLegado(
+        rawValue: _parseRule(root, bookInfoRule.tocUrl, parseBaseUrl),
+        baseUrl: parseBaseUrl,
+      );
 
-      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, fullUrl);
+      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, parseBaseUrl);
       if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-        coverUrl = _absoluteUrl(fullUrl, coverUrl);
+        coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
       }
 
       return BookDetail(
-        name: _parseRule(root, bookInfoRule.name, fullUrl),
-        author: _parseRule(root, bookInfoRule.author, fullUrl),
+        name: _parseRule(root, bookInfoRule.name, parseBaseUrl),
+        author: _parseRule(root, bookInfoRule.author, parseBaseUrl),
         coverUrl: coverUrl,
-        intro: _parseRule(root, bookInfoRule.intro, fullUrl),
-        kind: _parseRule(root, bookInfoRule.kind, fullUrl),
-        lastChapter: _parseRule(root, bookInfoRule.lastChapter, fullUrl),
-        updateTime: _parseRule(root, bookInfoRule.updateTime, fullUrl),
-        wordCount: _parseRule(root, bookInfoRule.wordCount, fullUrl),
+        intro: _parseRule(root, bookInfoRule.intro, parseBaseUrl),
+        kind: _parseRule(root, bookInfoRule.kind, parseBaseUrl),
+        lastChapter: _parseRule(root, bookInfoRule.lastChapter, parseBaseUrl),
+        updateTime: _parseRule(root, bookInfoRule.updateTime, parseBaseUrl),
+        wordCount: _parseRule(root, bookInfoRule.wordCount, parseBaseUrl),
         tocUrl: tocUrl,
-        bookUrl: fullUrl,
+        bookUrl: parseBaseUrl,
       );
     } catch (e, st) {
       debugPrint('获取书籍详情失败: $e');
@@ -4996,6 +5010,9 @@ class RuleParserEngine {
         error: fetch.error ?? '请求失败',
       );
     }
+    final parseBaseUrl = (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
+        ? fullUrl
+        : fetch.finalUrl!.trim();
 
     try {
       final body = fetch.body!;
@@ -5009,28 +5026,29 @@ class RuleParserEngine {
         final initRule = bookInfoRule.init;
         final initMatched = initRule == null || initRule.trim().isEmpty;
 
-        final name = _parseValueOnNode(jsonRoot, bookInfoRule.name, fullUrl);
+        final name =
+            _parseValueOnNode(jsonRoot, bookInfoRule.name, parseBaseUrl);
         final author =
-            _parseValueOnNode(jsonRoot, bookInfoRule.author, fullUrl);
+            _parseValueOnNode(jsonRoot, bookInfoRule.author, parseBaseUrl);
         var coverUrl =
-            _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, fullUrl);
+            _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, parseBaseUrl);
         if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-          coverUrl = _absoluteUrl(fullUrl, coverUrl);
+          coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
         }
-        final intro = _parseValueOnNode(jsonRoot, bookInfoRule.intro, fullUrl);
-        final kind = _parseValueOnNode(jsonRoot, bookInfoRule.kind, fullUrl);
-        final lastChapter =
-            _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, fullUrl);
-        final updateTime =
-            _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, fullUrl);
+        final intro =
+            _parseValueOnNode(jsonRoot, bookInfoRule.intro, parseBaseUrl);
+        final kind = _parseValueOnNode(jsonRoot, bookInfoRule.kind, parseBaseUrl);
+        final lastChapter = _parseValueOnNode(
+            jsonRoot, bookInfoRule.lastChapter, parseBaseUrl);
+        final updateTime = _parseValueOnNode(
+            jsonRoot, bookInfoRule.updateTime, parseBaseUrl);
         final wordCount =
-            _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, fullUrl);
-        var tocUrl = _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, fullUrl);
-        if (tocUrl.trim().isEmpty && source.ruleToc != null) {
-          tocUrl = fullUrl;
-        } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
-          tocUrl = _absoluteUrl(fullUrl, tocUrl);
-        }
+            _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl);
+        final tocUrl = _resolveTocUrlLikeLegado(
+          rawValue:
+              _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, parseBaseUrl),
+          baseUrl: parseBaseUrl,
+        );
 
         final detail = BookDetail(
           name: name,
@@ -5042,7 +5060,7 @@ class RuleParserEngine {
           updateTime: updateTime,
           wordCount: wordCount,
           tocUrl: tocUrl,
-          bookUrl: fullUrl,
+          bookUrl: parseBaseUrl,
         );
 
         return BookInfoDebugResult(
@@ -5089,23 +5107,22 @@ class RuleParserEngine {
         );
       }
 
-      final name = _parseRule(root, bookInfoRule.name, fullUrl);
-      final author = _parseRule(root, bookInfoRule.author, fullUrl);
-      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, fullUrl);
+      final name = _parseRule(root, bookInfoRule.name, parseBaseUrl);
+      final author = _parseRule(root, bookInfoRule.author, parseBaseUrl);
+      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, parseBaseUrl);
       if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-        coverUrl = _absoluteUrl(fullUrl, coverUrl);
+        coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
       }
-      final intro = _parseRule(root, bookInfoRule.intro, fullUrl);
-      final kind = _parseRule(root, bookInfoRule.kind, fullUrl);
-      final lastChapter = _parseRule(root, bookInfoRule.lastChapter, fullUrl);
-      final updateTime = _parseRule(root, bookInfoRule.updateTime, fullUrl);
-      final wordCount = _parseRule(root, bookInfoRule.wordCount, fullUrl);
-      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, fullUrl);
-      if (tocUrl.trim().isEmpty && source.ruleToc != null) {
-        tocUrl = fullUrl;
-      } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
-        tocUrl = _absoluteUrl(fullUrl, tocUrl);
-      }
+      final intro = _parseRule(root, bookInfoRule.intro, parseBaseUrl);
+      final kind = _parseRule(root, bookInfoRule.kind, parseBaseUrl);
+      final lastChapter =
+          _parseRule(root, bookInfoRule.lastChapter, parseBaseUrl);
+      final updateTime = _parseRule(root, bookInfoRule.updateTime, parseBaseUrl);
+      final wordCount = _parseRule(root, bookInfoRule.wordCount, parseBaseUrl);
+      final tocUrl = _resolveTocUrlLikeLegado(
+        rawValue: _parseRule(root, bookInfoRule.tocUrl, parseBaseUrl),
+        baseUrl: parseBaseUrl,
+      );
 
       final detail = BookDetail(
         name: name,
@@ -5117,7 +5134,7 @@ class RuleParserEngine {
         updateTime: updateTime,
         wordCount: wordCount,
         tocUrl: tocUrl,
-        bookUrl: fullUrl,
+        bookUrl: parseBaseUrl,
       );
 
       return BookInfoDebugResult(
@@ -5863,6 +5880,7 @@ class RuleParserEngine {
     bool? enabledCookieJar,
     String? sourceKey,
     String? concurrentRate,
+    void Function(String finalUrl)? onFinalUrl,
   }) async {
     try {
       final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
@@ -5953,6 +5971,10 @@ class RuleParserEngine {
         responseHeaders: respHeaders,
         optionCharset: parsedUrl.option?.charset,
       );
+      final finalResponseUrl = resp.realUri.toString().trim();
+      if (finalResponseUrl.isNotEmpty) {
+        onFinalUrl?.call(finalResponseUrl);
+      }
       return decoded.text;
     } catch (e) {
       debugPrint('请求失败: $url - $e');
@@ -6335,6 +6357,17 @@ class RuleParserEngine {
     );
   }
 
+  @visibleForTesting
+  String debugResolveTocUrlLikeLegadoForTest({
+    required String rawTocUrl,
+    required String detailUrl,
+  }) {
+    return _resolveTocUrlLikeLegado(
+      rawValue: rawTocUrl,
+      baseUrl: detailUrl,
+    );
+  }
+
   /// 转换为绝对URL
   String _absoluteUrl(String baseUrl, String url) {
     if (url.isEmpty) return '';
@@ -6360,6 +6393,33 @@ class RuleParserEngine {
       final trimmedUrl = url.startsWith('/') ? url.substring(1) : url;
       return '$trimmedBase/$trimmedUrl';
     }
+  }
+
+  // 对齐 legado AnalyzeRule.getString(..., isUrl=true) 的 URL 语义：
+  // 1) 规则结果为空时可回退 baseUrl；
+  // 2) 非空时统一绝对化。
+  String _resolveUrlFieldWithLegadoSemantics({
+    required String rawValue,
+    required String baseUrl,
+    required bool fallbackToBaseUrlWhenEmpty,
+  }) {
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) {
+      return fallbackToBaseUrlWhenEmpty ? baseUrl : '';
+    }
+    return _absoluteUrl(baseUrl, trimmed).trim();
+  }
+
+  // 详情页目录链接（tocUrl）固定按 legado 容错：空值回退当前详情页。
+  String _resolveTocUrlLikeLegado({
+    required String rawValue,
+    required String baseUrl,
+  }) {
+    return _resolveUrlFieldWithLegadoSemantics(
+      rawValue: rawValue,
+      baseUrl: baseUrl,
+      fallbackToBaseUrlWhenEmpty: true,
+    );
   }
 
   bool _looksLikeXPath(String rule) {
