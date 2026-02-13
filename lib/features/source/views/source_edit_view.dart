@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
-import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/legado_json.dart';
@@ -37,35 +36,6 @@ class SourceEditView extends StatefulWidget {
     this.initialTab,
     this.initialDebugKey,
   });
-
-  static SourceEditView fromEntity(
-    BookSourceEntity entity, {
-    int? initialTab,
-    String? initialDebugKey,
-  }) {
-    final raw = (entity.rawJson != null && entity.rawJson!.trim().isNotEmpty)
-        ? entity.rawJson!
-        : LegadoJson.encode({
-            'bookSourceUrl': entity.bookSourceUrl,
-            'bookSourceName': entity.bookSourceName,
-            'bookSourceGroup': entity.bookSourceGroup,
-            'bookSourceType': entity.bookSourceType,
-            'customOrder': 0,
-            'enabled': entity.enabled,
-            'enabledExplore': true,
-            'enabledCookieJar': true,
-            'respondTime': 180000,
-            'weight': entity.weight,
-            'header': entity.header,
-            'loginUrl': entity.loginUrl,
-          });
-    return SourceEditView(
-      originalUrl: entity.bookSourceUrl,
-      initialRawJson: raw,
-      initialTab: initialTab,
-      initialDebugKey: initialDebugKey,
-    );
-  }
 
   static SourceEditView fromSource(
     BookSource source, {

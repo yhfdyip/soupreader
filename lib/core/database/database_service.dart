@@ -1,95 +1,103 @@
-import 'package:hive_flutter/hive_flutter.dart';
-import 'drift/source_drift_service.dart';
-import 'entities/book_entity.dart';
-import 'migration/source_hive_to_drift_migrator.dart';
+import 'dart:convert';
 
-/// 数据库服务 - 管理 Hive 初始化和 Box 访问
+import 'package:drift/drift.dart';
+
+import 'drift/source_drift_database.dart';
+import 'drift/source_drift_service.dart';
+
+/// 数据库服务（统一走 Drift）
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   factory DatabaseService() => _instance;
   DatabaseService._internal();
 
-  static const String _booksBoxName = 'books';
-  static const String _chaptersBoxName = 'chapters';
-  static const String _sourcesBoxName = 'sources';
-  static const String _replaceRulesBoxName = 'replace_rules';
-  static const String _settingsBoxName = 'settings';
-
-  late Box<BookEntity> _booksBox;
-  late Box<ChapterEntity> _chaptersBox;
-  late Box<BookSourceEntity> _sourcesBox;
-  late Box<ReplaceRuleEntity> _replaceRulesBox;
-  late Box<dynamic> _settingsBox;
-
+  final SourceDriftService _driftService = SourceDriftService();
   bool _isInitialized = false;
-  bool _isSourceMigrated = false;
 
-  /// 初始化数据库
+  final Map<String, dynamic> _settingsCache = <String, dynamic>{};
+  late final DriftSettingsBox _settingsBox = DriftSettingsBox._(this);
+
   Future<void> init() async {
     if (_isInitialized) return;
-
-    // 初始化 Hive
-    await Hive.initFlutter();
-
-    // 注册适配器
-    if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(BookEntityAdapter());
-    }
-    if (!Hive.isAdapterRegistered(1)) {
-      Hive.registerAdapter(ChapterEntityAdapter());
-    }
-    if (!Hive.isAdapterRegistered(2)) {
-      Hive.registerAdapter(BookSourceEntityAdapter());
-    }
-    if (!Hive.isAdapterRegistered(3)) {
-      Hive.registerAdapter(ReplaceRuleEntityAdapter());
-    }
-
-    // 打开 Box
-    _booksBox = await Hive.openBox<BookEntity>(_booksBoxName);
-    _chaptersBox = await Hive.openBox<ChapterEntity>(_chaptersBoxName);
-    _sourcesBox = await Hive.openBox<BookSourceEntity>(_sourcesBoxName);
-    _replaceRulesBox =
-        await Hive.openBox<ReplaceRuleEntity>(_replaceRulesBoxName);
-    _settingsBox = await Hive.openBox(_settingsBoxName);
-
-    await SourceDriftService().init();
-    if (!_isSourceMigrated) {
-      final migrator = SourceHiveToDriftMigrator(databaseService: this);
-      await migrator.migrateIfNeeded();
-      _isSourceMigrated = true;
-    }
-
+    await _driftService.init();
+    await _reloadSettingsCache();
     _isInitialized = true;
   }
 
-  /// 获取书籍 Box
-  Box<BookEntity> get booksBox {
+  SourceDriftDatabase get driftDb {
     _checkInitialized();
-    return _booksBox;
+    return _driftService.db;
   }
 
-  /// 获取章节 Box
-  Box<ChapterEntity> get chaptersBox {
-    _checkInitialized();
-    return _chaptersBox;
-  }
-
-  /// 获取书源 Box
-  Box<BookSourceEntity> get sourcesBox {
-    _checkInitialized();
-    return _sourcesBox;
-  }
-
-  Box<ReplaceRuleEntity> get replaceRulesBox {
-    _checkInitialized();
-    return _replaceRulesBox;
-  }
-
-  /// 获取设置 Box
-  Box<dynamic> get settingsBox {
+  DriftSettingsBox get settingsBox {
     _checkInitialized();
     return _settingsBox;
+  }
+
+  dynamic getSetting(
+    String key, {
+    dynamic defaultValue,
+  }) {
+    _checkInitialized();
+    if (_settingsCache.containsKey(key)) {
+      final value = _settingsCache[key];
+      return value ?? defaultValue;
+    }
+    return defaultValue;
+  }
+
+  Future<void> putSetting(String key, dynamic value) async {
+    _checkInitialized();
+    final db = _driftService.db;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final encoded = value == null ? null : jsonEncode(value);
+    await db.into(db.appKeyValueRecords).insertOnConflictUpdate(
+          AppKeyValueRecordsCompanion.insert(
+            key: key,
+            value: Value(encoded),
+            updatedAt: Value(now),
+          ),
+        );
+    _settingsCache[key] = value;
+  }
+
+  Future<void> deleteSetting(String key) async {
+    _checkInitialized();
+    final db = _driftService.db;
+    await (db.delete(db.appKeyValueRecords)
+          ..where((tbl) => tbl.key.equals(key)))
+        .go();
+    _settingsCache.remove(key);
+  }
+
+  Future<void> clearAll() async {
+    _checkInitialized();
+    await _driftService.clearAll();
+    _settingsCache.clear();
+  }
+
+  Future<void> close() async {
+    await _driftService.close();
+    _settingsCache.clear();
+    _isInitialized = false;
+  }
+
+  Future<void> _reloadSettingsCache() async {
+    _settingsCache.clear();
+    final db = _driftService.db;
+    final rows = await db.select(db.appKeyValueRecords).get();
+    for (final row in rows) {
+      final raw = row.value?.trim();
+      if (raw == null || raw.isEmpty) {
+        _settingsCache[row.key] = null;
+        continue;
+      }
+      try {
+        _settingsCache[row.key] = jsonDecode(raw);
+      } catch (_) {
+        _settingsCache[row.key] = raw;
+      }
+    }
   }
 
   void _checkInitialized() {
@@ -97,22 +105,23 @@ class DatabaseService {
       throw StateError('DatabaseService 未初始化，请先调用 init()');
     }
   }
+}
 
-  /// 清空所有数据
-  Future<void> clearAll() async {
-    await _booksBox.clear();
-    await _chaptersBox.clear();
-    await _sourcesBox.clear();
-    await _replaceRulesBox.clear();
-    await _settingsBox.clear();
-    await SourceDriftService().clearAll();
+/// 兼容旧调用形态：`settingsBox.get/put/delete`
+class DriftSettingsBox {
+  final DatabaseService _service;
+
+  DriftSettingsBox._(this._service);
+
+  dynamic get(String key, {dynamic defaultValue}) {
+    return _service.getSetting(key, defaultValue: defaultValue);
   }
 
-  /// 关闭数据库
-  Future<void> close() async {
-    await SourceDriftService().close();
-    await Hive.close();
-    _isInitialized = false;
-    _isSourceMigrated = false;
+  Future<void> put(String key, dynamic value) {
+    return _service.putSetting(key, value);
+  }
+
+  Future<void> delete(String key) {
+    return _service.deleteSetting(key);
   }
 }

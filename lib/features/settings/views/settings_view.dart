@@ -64,17 +64,18 @@ class _SettingsViewState extends State<SettingsView> {
 
   Future<void> _refreshStats() async {
     final db = DatabaseService();
+    final bookRepo = BookRepository(db);
     final chapterRepo = ChapterRepository(db);
     final sourceRepo = SourceRepository(db);
 
+    final books = bookRepo.getAllBooks();
     final sourceCount = sourceRepo.getAllSources().length;
-    final readingHistoryCount = db.booksBox.values
+    final readingHistoryCount = books
         .where((b) =>
             b.lastReadTime != null &&
             (b.readProgress > 0 || b.currentChapter > 0))
         .length;
-    final localBookIds =
-        db.booksBox.values.where((b) => b.isLocal).map((b) => b.id).toSet();
+    final localBookIds = books.where((b) => b.isLocal).map((b) => b.id).toSet();
     final cacheInfo =
         chapterRepo.getDownloadedCacheInfo(protectBookIds: localBookIds);
 

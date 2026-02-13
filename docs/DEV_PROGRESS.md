@@ -1,5 +1,69 @@
 # SoupReader 开发进度日志
 
+## 2026-02-13（明确不做历史兼容：移除旧键回退逻辑）
+
+### 已完成
+- 按“无需兼容”要求，移除阅读滚动偏移的旧键兼容逻辑：
+  - `saveScrollOffset` 不再额外写入旧的书籍级偏移键；
+  - `getScrollOffset` 不再回退读取旧键，只读取当前请求键（章节级或书籍级）。
+- 影响文件：`lib/core/services/settings_service.dart`。
+
+### 为什么
+- 需求明确“不用兼容”，因此去掉历史兼容分支，避免双写/回退路径增加维护成本。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 手工路径：
+  - 阅读一本书并滚动到中间位置，退出后重进同章节，确认按章节偏移恢复；
+  - 切换章节后再次进入，确认不会读取旧书籍级偏移。
+
+### 兼容影响
+- 明确不兼容旧滚动偏移键数据；仅使用当前键体系。
+
+## 2026-02-13（存储层重构收口：全面切换 Drift，移除 Hive 依赖）
+
+### 已完成
+- 存储入口统一为 Drift：
+  - `DatabaseService` 保留单例与 `settingsBox.get/put/delete` 兼容接口，但底层改为 Drift `app_key_value_records` 表。
+  - `SourceDriftDatabase` 扩展并统一承载书源、书籍、章节、替换规则、书签、应用键值存储。
+- 主要仓库完成 Drift 化并保留原有对外语义：
+  - `SourceRepository`、`BookRepository`、`ChapterRepository`、`ReplaceRuleRepository`、`BookmarkRepository`。
+  - 其中 `ReplaceRuleRepository` 修复了 `Companion.insert` 的参数类型问题（`id: Value(rule.id)`）。
+- UI/服务侧去除对 Hive Box 的直接监听与读写，改为仓库流或 `DatabaseService` 兼容层：
+  - `reading_history_view.dart`
+  - `replace_rule_list_view.dart`
+  - `settings_view.dart`
+  - `storage_settings_view.dart`
+  - `backup_service.dart`
+  - `source_explore_kinds_service.dart`
+- 启动引导补齐 Drift 仓库预热：
+  - `main.dart` 增加 `BookRepository/ChapterRepository/ReplaceRuleRepository.bootstrap`。
+- 清理 Hive 遗留代码与依赖：
+  - 删除 `source_hive_to_drift_migrator.dart`。
+  - 删除无业务引用的 `book_entity.dart`、`book_entity.g.dart`、`bookmark_entity.g.dart`。
+  - `bookmark_entity.dart` 改为纯 Dart 数据模型，不再依赖 Hive 注解/基类。
+  - `source_edit_view.dart` 移除旧 `BookSourceEntity` 入口。
+  - `pubspec.yaml` 移除 `hive`、`hive_flutter`、`hive_generator`。
+
+### 为什么
+- 当前需求是“所有 Hive 存储改为 Drift”，并且要消除打包后在存储层的混用风险。
+- 之前代码存在“仓库 Drift 化 + 部分 UI/实体仍带 Hive 依赖”的半迁移状态，容易导致维护复杂度和行为不一致。
+
+### 如何验证
+- 执行：`flutter pub get`
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工回归建议：
+  - 书源管理：导入（网络/剪贴板/文件）-> 列表展示 -> 编辑保存；
+  - 阅读链路：打开书籍 -> 目录/正文 -> 添加与删除书签；
+  - 替换规则：列表展示、增删改、启用状态切换；
+  - 设置页：缓存统计、清理缓存、备份入口可正常读取数据。
+
+### 兼容影响
+- 运行时已不再读取 Hive Box，应用存储完全依赖 Drift。
+- 对“旧版本仅保存在 Hive 中但未迁移”的本地数据，升级后不会自动读取；建议通过现有导入/备份路径恢复。
+- 书源解析与五段链路（search/explore/bookInfo/toc/content）语义未做协议级改动，兼容目标仍对齐 legado。
+
 ## 2026-02-12（设置系统 UI/UX 优化第二批：全页密度一致性收口）
 
 ### 已完成

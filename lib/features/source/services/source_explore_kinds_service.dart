@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'package:hive/hive.dart';
-
 import '../../../core/database/database_service.dart';
 import '../../../core/services/js_runtime.dart';
 import '../models/book_source.dart';
@@ -95,7 +93,7 @@ class SourceExploreKindsService {
     if (exploreUrl.isEmpty) return;
     final key = _buildCacheKey(source.bookSourceUrl, exploreUrl);
     _memoryCache.remove(key);
-    _settingsBoxOrNull()?.delete(_cacheStoreKey(key));
+    await _safeDeleteSetting(_cacheStoreKey(key));
   }
 
   bool _isJsRule(String text) {
@@ -217,24 +215,14 @@ class SourceExploreKindsService {
   }
 
   String? _getCachedJsResult(String key) {
-    final box = _settingsBoxOrNull();
-    if (box == null) return null;
-    final value = box.get(_cacheStoreKey(key));
+    final value = _safeGetSetting(_cacheStoreKey(key));
     final text = value?.toString().trim();
     if (text == null || text.isEmpty) return null;
     return text;
   }
 
   void _saveCachedJsResult(String key, String value) {
-    _settingsBoxOrNull()?.put(_cacheStoreKey(key), value);
-  }
-
-  Box<dynamic>? _settingsBoxOrNull() {
-    try {
-      return _db.settingsBox;
-    } catch (_) {
-      return null;
-    }
+    _safePutSetting(_cacheStoreKey(key), value);
   }
 
   String _cacheStoreKey(String key) => '$_cachePrefix$key';
@@ -247,5 +235,29 @@ class SourceExploreKindsService {
       hash = (hash * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
     }
     return hash.toRadixString(16).padLeft(16, '0');
+  }
+
+  dynamic _safeGetSetting(String key) {
+    try {
+      return _db.settingsBox.get(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _safePutSetting(String key, dynamic value) async {
+    try {
+      await _db.settingsBox.put(key, value);
+    } catch (_) {
+      // ignore cache write failures
+    }
+  }
+
+  Future<void> _safeDeleteSetting(String key) async {
+    try {
+      await _db.settingsBox.delete(key);
+    } catch (_) {
+      // ignore cache delete failures
+    }
   }
 }

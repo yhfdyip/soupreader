@@ -25,7 +25,14 @@ class SourceDriftService {
 
   Future<void> clearAll() async {
     if (_db == null) return;
-    await _db!.delete(_db!.sourceRecords).go();
+    await _db!.transaction(() async {
+      await _db!.delete(_db!.sourceRecords).go();
+      await _db!.delete(_db!.bookRecords).go();
+      await _db!.delete(_db!.chapterRecords).go();
+      await _db!.delete(_db!.replaceRuleRecords).go();
+      await _db!.delete(_db!.appKeyValueRecords).go();
+      await _db!.delete(_db!.bookmarkRecords).go();
+    });
   }
 
   Future<void> close() async {

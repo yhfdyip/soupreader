@@ -18,7 +18,7 @@ class StorageSettingsView extends StatefulWidget {
 
 class _StorageSettingsViewState extends State<StorageSettingsView> {
   final SettingsService _settingsService = SettingsService();
-  late final DatabaseService _db;
+  late final BookRepository _bookRepo;
   late final ChapterRepository _chapterRepo;
 
   ChapterCacheInfo _cacheInfo = const ChapterCacheInfo(bytes: 0, chapters: 0);
@@ -26,14 +26,15 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
   @override
   void initState() {
     super.initState();
-    _db = DatabaseService();
-    _chapterRepo = ChapterRepository(_db);
+    final db = DatabaseService();
+    _bookRepo = BookRepository(db);
+    _chapterRepo = ChapterRepository(db);
     _refreshCacheInfo();
   }
 
   void _refreshCacheInfo() {
     final localBookIds =
-        _db.booksBox.values.where((b) => b.isLocal).map((b) => b.id).toSet();
+        _bookRepo.getAllBooks().where((b) => b.isLocal).map((b) => b.id).toSet();
     final info =
         _chapterRepo.getDownloadedCacheInfo(protectBookIds: localBookIds);
     if (!mounted) return;
@@ -135,8 +136,11 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     );
 
     try {
-      final localBookIds =
-          _db.booksBox.values.where((b) => b.isLocal).map((b) => b.id).toSet();
+      final localBookIds = _bookRepo
+          .getAllBooks()
+          .where((b) => b.isLocal)
+          .map((b) => b.id)
+          .toSet();
       final result =
           await _chapterRepo.clearDownloadedCache(protectBookIds: localBookIds);
 

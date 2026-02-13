@@ -1,10 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
-import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/replace_rule.dart';
@@ -19,7 +17,6 @@ class ReplaceRuleListView extends StatefulWidget {
 }
 
 class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
-  late final DatabaseService _db;
   late final ReplaceRuleRepository _repo;
   final ReplaceRuleImportExportService _io = ReplaceRuleImportExportService();
 
@@ -29,8 +26,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   @override
   void initState() {
     super.initState();
-    _db = DatabaseService();
-    _repo = ReplaceRuleRepository(_db);
+    _repo = ReplaceRuleRepository(DatabaseService());
   }
 
   @override
@@ -60,10 +56,10 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
           ),
         ],
       ),
-      child: ValueListenableBuilder<Box<ReplaceRuleEntity>>(
-        valueListenable: _db.replaceRulesBox.listenable(),
-        builder: (context, _, __) {
-          final allRules = _repo.getAllRules();
+      child: StreamBuilder<List<ReplaceRule>>(
+        stream: _repo.watchAllRules(),
+        builder: (context, snapshot) {
+          final allRules = snapshot.data ?? _repo.getAllRules();
           allRules.sort((a, b) => a.order.compareTo(b.order));
 
           final groups = _buildGroups(allRules);
