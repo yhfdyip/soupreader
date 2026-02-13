@@ -142,6 +142,7 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   late Brightness _platformBrightness;
   BootFailure? _bootFailure;
   bool _bootRetrying = false;
+  bool _settingsReady = false;
 
   @override
   void initState() {
@@ -150,15 +151,20 @@ class _SoupReaderAppState extends State<SoupReaderApp>
     WidgetsBinding.instance.addObserver(this);
     _platformBrightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
+    _settingsReady = _bootFailure == null;
+    if (_settingsReady) {
+      _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
+    }
     _applySystemUiOverlayStyle();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _settingsService.appSettingsListenable
-        .removeListener(_onAppSettingsChanged);
+    if (_settingsReady) {
+      _settingsService.appSettingsListenable
+          .removeListener(_onAppSettingsChanged);
+    }
     super.dispose();
   }
 
@@ -181,13 +187,22 @@ class _SoupReaderAppState extends State<SoupReaderApp>
     setState(() => _bootRetrying = true);
     final failure = await _bootstrapApp();
     if (!mounted) return;
+    final retrySuccess = failure == null;
+    if (retrySuccess && !_settingsReady) {
+      _settingsReady = true;
+      _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
+    }
     setState(() {
       _bootFailure = failure;
       _bootRetrying = false;
     });
+    _applySystemUiOverlayStyle();
   }
 
   Brightness get _effectiveBrightness {
+    if (!_settingsReady) {
+      return _platformBrightness;
+    }
     final settings = _settingsService.appSettings;
     switch (settings.appearanceMode) {
       case AppAppearanceMode.followSystem:
