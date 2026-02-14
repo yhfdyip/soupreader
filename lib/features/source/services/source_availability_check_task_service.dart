@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/database/database_service.dart';
@@ -142,6 +143,7 @@ class SourceAvailabilityCheckTaskService {
   final SourceAvailabilityDiagnosisService _diagnosisService =
       const SourceAvailabilityDiagnosisService();
   final SourceRepository _repo = SourceRepository(DatabaseService());
+  CancelToken? _runningCancelToken;
 
   final ValueNotifier<SourceCheckTaskSnapshot?> _notifier =
       ValueNotifier<SourceCheckTaskSnapshot?>(null);
@@ -218,6 +220,10 @@ class SourceAvailabilityCheckTaskService {
     final current = snapshot;
     if (current == null || !current.running || current.stopRequested) return;
     _notifier.value = current.copyWith(stopRequested: true);
+    final token = _runningCancelToken;
+    if (token != null && !token.isCancelled) {
+      token.cancel('source check stopped by user');
+    }
   }
 
   void touch() {
@@ -249,6 +255,7 @@ class SourceAvailabilityCheckTaskService {
       item.message = '检测中…';
       touch();
 
+      CancelToken? requestToken;
       try {
         final hasSearch =
             (source.searchUrl != null && source.searchUrl!.trim().isNotEmpty) &&
@@ -265,7 +272,13 @@ class SourceAvailabilityCheckTaskService {
                   ? source.ruleSearch!.checkKeyWord!.trim()
                   : '我的');
           item.debugKey = keyword;
-          final debug = await _engine.searchDebug(source, keyword);
+          requestToken = CancelToken();
+          _runningCancelToken = requestToken;
+          final debug = await _engine.searchDebug(
+            source,
+            keyword,
+            cancelToken: requestToken,
+          );
           final ok = debug.fetch.body != null;
           final cnt = debug.listCount;
 
@@ -294,7 +307,12 @@ class SourceAvailabilityCheckTaskService {
         if (hasExplore) {
           final url = source.exploreUrl!.trim();
           item.debugKey = '发现::$url';
-          final debug = await _engine.exploreDebug(source);
+          requestToken = CancelToken();
+          _runningCancelToken = requestToken;
+          final debug = await _engine.exploreDebug(
+            source,
+            cancelToken: requestToken,
+          );
           final ok = debug.fetch.body != null;
           final cnt = debug.listCount;
 
@@ -320,13 +338,32 @@ class SourceAvailabilityCheckTaskService {
         item.message = '缺少 searchUrl/ruleSearch 或 exploreUrl/ruleExplore，无法检测';
         item.diagnosis = _diagnosisService.diagnoseMissingRule();
         touch();
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) {
+          item.status = SourceCheckStatus.skipped;
+          item.message = '已停止';
+          item.diagnosis = DiagnosisSummary.noData;
+          touch();
+        } else {
+          item.status = SourceCheckStatus.fail;
+          item.message = '异常：$e';
+          item.diagnosis = _diagnosisService.diagnoseException(e);
+          touch();
+        }
       } catch (e) {
         item.status = SourceCheckStatus.fail;
         item.message = '异常：$e';
         item.diagnosis = _diagnosisService.diagnoseException(e);
         touch();
+      } finally {
+        if (requestToken != null &&
+            identical(_runningCancelToken, requestToken)) {
+          _runningCancelToken = null;
+        }
       }
     }
+
+    _runningCancelToken = null;
 
     final done = snapshot;
     if (done == null) return;

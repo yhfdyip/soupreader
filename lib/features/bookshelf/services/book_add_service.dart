@@ -235,6 +235,9 @@ class BookAddService {
         intro: detail?.intro ?? result.intro,
         sourceId: source.bookSourceUrl,
         sourceUrl: source.bookSourceUrl,
+        bookUrl: detail?.bookUrl.trim().isNotEmpty == true
+            ? detail!.bookUrl.trim()
+            : result.bookUrl.trim(),
         latestChapter: detail?.lastChapter ?? result.lastChapter,
         totalChapters: chapters.length,
         currentChapter: 0,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
@@ -10,6 +11,7 @@ import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../../import/import_service.dart';
 import '../../reader/views/simple_reader_view.dart';
+import '../../search/views/search_book_info_view.dart';
 import '../services/bookshelf_booklist_import_service.dart';
 import '../services/bookshelf_import_export_service.dart';
 import '../views/reading_history_view.dart';
@@ -25,6 +27,8 @@ class BookshelfView extends StatefulWidget {
 
 class _BookshelfViewState extends State<BookshelfView> {
   bool _isGridView = true;
+  // 与 legado 一致：图墙右上角支持“更新中”状态；当前先预留状态集等待任务流接入。
+  final Set<String> _updatingBookIds = <String>{};
   late final BookRepository _bookRepo;
   late final ImportService _importService;
   late final SettingsService _settingsService;
@@ -463,13 +467,13 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Widget _buildGridView() {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
       child: GridView.builder(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          childAspectRatio: 0.58,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 16,
+          childAspectRatio: 0.56,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 6,
         ),
         itemCount: _books.length,
         itemBuilder: (context, index) {
@@ -481,58 +485,121 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Widget _buildBookCard(Book book) {
+    final unreadCount = _unreadCountLikeLegado(book);
+    final isUpdating = _isUpdating(book);
+
     return GestureDetector(
       onTap: () => _openReader(book),
       onLongPress: () => _onBookLongPress(book),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 封面
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey5.resolveFrom(context),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: AppCoverImage(
-                urlOrPath: book.coverUrl,
-                title: book.title,
-                author: book.author,
-                width: double.infinity,
-                height: double.infinity,
-                borderRadius: 8,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemGrey5.resolveFrom(context),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: AppCoverImage(
+                        urlOrPath: book.coverUrl,
+                        title: book.title,
+                        author: book.author,
+                        width: double.infinity,
+                        height: double.infinity,
+                        borderRadius: 8,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: isUpdating
+                        ? _buildGridLoadingBadge()
+                        : _buildGridUnreadBadge(unreadCount),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          // 标题
-          Text(
-            book.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 2),
-          // 作者
-          Text(
-            book.author,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            const SizedBox(height: 6),
+            Text(
+              book.title,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.25,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildGridLoadingBadge() {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: CupertinoColors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      alignment: Alignment.center,
+      child: const CupertinoActivityIndicator(radius: 6),
+    );
+  }
+
+  Widget _buildGridUnreadBadge(int unreadCount) {
+    if (unreadCount <= 0) return const SizedBox.shrink();
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemRed.resolveFrom(context),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _formatUnreadCount(unreadCount),
+        style: const TextStyle(
+          color: CupertinoColors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+
+  String _formatUnreadCount(int unreadCount) {
+    if (unreadCount > 99) return '99+';
+    return '$unreadCount';
+  }
+
+  int _unreadCountLikeLegado(Book book) {
+    final total = book.totalChapters;
+    if (total <= 0) return 0;
+    final current = book.currentChapter.clamp(0, total - 1);
+    return math.max(total - current - 1, 0);
+  }
+
+  bool _isUpdating(Book book) {
+    if (book.isLocal) return false;
+    return _updatingBookIds.contains(book.id);
   }
 
   Widget _buildListView() {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
-    final radius = theme.radius;
 
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -540,50 +607,143 @@ class _BookshelfViewState extends State<BookshelfView> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final book = _books[index];
+        final readAgo = _formatReadAgo(book.lastReadTime);
         return GestureDetector(
           onTap: () => _openReader(book),
           onLongPress: () => _onBookLongPress(book),
           child: ShadCard(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            leading: Container(
-              width: 44,
-              height: 62,
-              decoration: BoxDecoration(
-                color: scheme.muted,
-                borderRadius: radius,
-              ),
-              child: AppCoverImage(
-                urlOrPath: book.coverUrl,
-                title: book.title,
-                author: book.author,
-                width: 44,
-                height: 62,
-                borderRadius: 8,
-              ),
-            ),
-            trailing: Icon(
-              LucideIcons.chevronRight,
-              size: 16,
-              color: scheme.mutedForeground,
-            ),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.p.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: scheme.foreground,
+                AppCoverImage(
+                  urlOrPath: book.coverUrl,
+                  title: book.title,
+                  author: book.author,
+                  width: 66,
+                  height: 90,
+                  borderRadius: 8,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              book.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.p.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: scheme.foreground,
+                              ),
+                            ),
+                          ),
+                          if (book.isReading)
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                book.progressText,
+                                style: theme.textTheme.small.copyWith(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.person,
+                            size: 13,
+                            color: scheme.mutedForeground,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              book.author.trim().isEmpty ? '未知作者' : book.author,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.small.copyWith(
+                                color: scheme.mutedForeground,
+                              ),
+                            ),
+                          ),
+                          if (readAgo != null)
+                            Text(
+                              readAgo,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.small.copyWith(
+                                color: scheme.mutedForeground,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.clock,
+                            size: 13,
+                            color: scheme.mutedForeground,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              _buildReadLine(book),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.small.copyWith(
+                                color: scheme.mutedForeground,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.book,
+                            size: 13,
+                            color: scheme.mutedForeground,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              _buildLatestLine(book),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.small.copyWith(
+                                color: scheme.mutedForeground,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${book.author} · ${book.totalChapters}章',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.small.copyWith(
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    LucideIcons.chevronRight,
+                    size: 16,
                     color: scheme.mutedForeground,
                   ),
                 ),
@@ -593,6 +753,42 @@ class _BookshelfViewState extends State<BookshelfView> {
         );
       },
     );
+  }
+
+  String _buildReadLine(Book book) {
+    final total = book.totalChapters;
+    if (total <= 0) {
+      return book.isReading ? '阅读进度 ${book.progressText}' : '未开始阅读';
+    }
+    final current = (book.currentChapter + 1).clamp(1, total);
+    if (!book.isReading) {
+      return '未开始阅读 · 共 $total 章';
+    }
+    return '阅读：$current/$total 章';
+  }
+
+  String _buildLatestLine(Book book) {
+    final latest = (book.latestChapter ?? '').trim();
+    if (latest.isNotEmpty) {
+      return '最新：$latest';
+    }
+    if (book.isLocal) {
+      return '本地书籍';
+    }
+    return '暂无最新章节';
+  }
+
+  String? _formatReadAgo(DateTime? value) {
+    if (value == null) return null;
+    final now = DateTime.now();
+    final diff = now.difference(value);
+    if (diff.inMinutes < 1) return '刚刚';
+    if (diff.inHours < 1) return '${diff.inMinutes}分钟前';
+    if (diff.inDays < 1) return '${diff.inHours}小时前';
+    if (diff.inDays < 30) return '${diff.inDays}天前';
+
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${value.year}-${two(value.month)}-${two(value.day)}';
   }
 
   void _openReader(Book book) {
@@ -640,20 +836,13 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
-  void _showBookInfo(Book book) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(book.title),
-        content: Text(
-            '\n作者：${book.author}\n章节：${book.totalChapters}章\n${book.isLocal ? '来源：本地导入' : ''}'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('好'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
+  Future<void> _showBookInfo(Book book) async {
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SearchBookInfoView.fromBookshelf(book: book),
       ),
     );
+    if (!mounted) return;
+    _loadBooks();
   }
 }

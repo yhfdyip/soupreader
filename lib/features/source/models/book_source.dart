@@ -226,7 +226,7 @@ class BookSource {
     }
 
     return BookSource(
-      bookSourceUrl: (json['bookSourceUrl'] ?? '').toString(),
+      bookSourceUrl: (json['bookSourceUrl'] ?? '').toString().trim(),
       bookSourceName: (json['bookSourceName'] ?? '').toString(),
       bookSourceGroup: json['bookSourceGroup']?.toString(),
       bookSourceType: parseInt(json['bookSourceType'], 0),

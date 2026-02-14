@@ -1,22 +1,30 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
-import '../../bookshelf/services/book_add_service.dart';
+import '../../search/views/search_view.dart';
 import '../../source/models/book_source.dart';
-import '../../source/services/rule_parser_engine.dart';
-import '../../search/views/search_book_info_view.dart';
+import '../../source/services/source_explore_kinds_service.dart';
+import '../../source/views/source_edit_view.dart';
+import '../../source/views/source_web_verify_view.dart';
 
-/// 发现页（对标 Legado 的 exploreUrl / ruleExplore）
-///
-/// 目标：
-/// - 基于已导入的书源“发现规则”拉取列表
-/// - 展示聚合结果，支持“一键加入书架”
-/// - iOS（Cupertino）优先
+/// 发现页（对标 legado ExploreFragment）：
+/// - 展示支持发现的书源列表
+/// - 点击书源展开/收起发现入口
+/// - 点击入口进入二级发现书单页
 class DiscoveryView extends StatefulWidget {
-  const DiscoveryView({super.key});
+  final ValueListenable<int>? compressSignal;
+
+  const DiscoveryView({
+    super.key,
+    this.compressSignal,
+  });
 
   @override
   State<DiscoveryView> createState() => _DiscoveryViewState();
@@ -24,245 +32,467 @@ class DiscoveryView extends StatefulWidget {
 
 class _DiscoveryViewState extends State<DiscoveryView> {
   late final SourceRepository _sourceRepo;
-  late final BookAddService _addService;
+  late final SourceExploreKindsService _exploreKindsService;
+  StreamSubscription<List<BookSource>>? _sourceSub;
 
-  bool _loading = false;
-  bool _cancelRequested = false;
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
-  String _currentSourceName = '';
-  int _completedSources = 0;
-  int _totalSources = 0;
+  List<BookSource> _allSources = <BookSource>[];
+  int? _lastExternalCompressVersion;
 
-  final List<SearchResult> _results = <SearchResult>[];
-  List<_DiscoveryDisplayItem> _displayResults = <_DiscoveryDisplayItem>[];
-  final List<_SourceRunIssue> _sourceIssues = <_SourceRunIssue>[];
-  String? _lastError;
+  String? _expandedSourceUrl;
+  final Set<String> _loadingKindsSources = <String>{};
+  final Map<String, List<SourceExploreKind>> _sourceKindsCache =
+      <String, List<SourceExploreKind>>{};
 
   @override
   void initState() {
     super.initState();
     final db = DatabaseService();
     _sourceRepo = SourceRepository(db);
-    _addService = BookAddService(database: db);
+    _exploreKindsService = SourceExploreKindsService(databaseService: db);
 
-    // 首次进入自动拉取一次
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+    _allSources = _sourceRepo.getAllSources();
+    _searchController.addListener(_onQueryChanged);
+    _lastExternalCompressVersion = widget.compressSignal?.value;
+    widget.compressSignal?.addListener(_onExternalCompressSignal);
+    _sourceSub = _sourceRepo.watchAllSources().listen((sources) {
+      if (!mounted) return;
+      setState(() {
+        _allSources = sources;
+        if (_expandedSourceUrl != null &&
+            !_allSources.any((s) => s.bookSourceUrl == _expandedSourceUrl)) {
+          _expandedSourceUrl = null;
+        }
+      });
+    });
   }
 
-  List<BookSource> _eligibleSources() {
-    final all = _sourceRepo.getAllSources();
-    final eligible = all.where((s) {
-      final hasExplore =
-          (s.exploreUrl ?? '').trim().isNotEmpty && s.ruleExplore != null;
-      return s.enabled && s.enabledExplore && hasExplore;
+  @override
+  void didUpdateWidget(covariant DiscoveryView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.compressSignal == widget.compressSignal) return;
+    oldWidget.compressSignal?.removeListener(_onExternalCompressSignal);
+    _lastExternalCompressVersion = widget.compressSignal?.value;
+    widget.compressSignal?.addListener(_onExternalCompressSignal);
+  }
+
+  @override
+  void dispose() {
+    _sourceSub?.cancel();
+    widget.compressSignal?.removeListener(_onExternalCompressSignal);
+    _searchController
+      ..removeListener(_onQueryChanged)
+      ..dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onExternalCompressSignal() {
+    final version = widget.compressSignal?.value;
+    if (version == null) return;
+    if (_lastExternalCompressVersion == version) return;
+    _lastExternalCompressVersion = version;
+    _compressExplore();
+  }
+
+  void _onQueryChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  List<BookSource> _eligibleSources(List<BookSource> input) {
+    final eligible = input.where((source) {
+      final hasExplore = (source.exploreUrl ?? '').trim().isNotEmpty &&
+          source.ruleExplore != null;
+      return source.enabled && source.enabledExplore && hasExplore;
     }).toList(growable: false);
+
     eligible.sort((a, b) {
-      if (a.weight != b.weight) return b.weight.compareTo(a.weight);
-      return a.bookSourceName.compareTo(b.bookSourceName);
+      final byOrder = a.customOrder.compareTo(b.customOrder);
+      if (byOrder != 0) return byOrder;
+      final byWeight = b.weight.compareTo(a.weight);
+      if (byWeight != 0) return byWeight;
+      return a.bookSourceName
+          .toLowerCase()
+          .compareTo(b.bookSourceName.toLowerCase());
     });
     return eligible;
   }
 
-  List<SearchResult> _collectUniqueResults(
-    List<SearchResult> incoming,
-    Set<String> seenKeys,
+  List<BookSource> _applyQueryFilter(
+    List<BookSource> input,
+    String query,
   ) {
-    final unique = <SearchResult>[];
-    for (final item in incoming) {
-      final bookUrl = item.bookUrl.trim();
-      if (bookUrl.isEmpty) continue;
-      final key = '${item.sourceUrl.trim()}|$bookUrl';
-      if (!seenKeys.add(key)) continue;
-      unique.add(item);
+    final raw = query.trim();
+    if (raw.isEmpty) return input;
+
+    final q = raw.toLowerCase();
+    if (q.startsWith('group:')) {
+      final key = raw.substring(6).trim();
+      if (key.isEmpty) return input;
+      return input
+          .where((s) => _extractGroups(s.bookSourceGroup).contains(key))
+          .toList(growable: false);
     }
-    return unique;
+
+    return input.where((source) {
+      final name = source.bookSourceName.toLowerCase();
+      final url = source.bookSourceUrl.toLowerCase();
+      final group = (source.bookSourceGroup ?? '').toLowerCase();
+      return name.contains(q) || url.contains(q) || group.contains(q);
+    }).toList(growable: false);
   }
 
-  String _normalizeCompare(String text) {
-    return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  List<String> _extractGroups(String? raw) {
+    final text = raw?.trim();
+    if (text == null || text.isEmpty) return <String>[];
+    return text
+        .split(RegExp(r'[,;，；]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
   }
 
-  void _rebuildDisplayResults() {
-    final grouped = <String, List<SearchResult>>{};
-    for (final item in _results) {
-      final key =
-          '${_normalizeCompare(item.name)}|${_normalizeCompare(item.author)}';
-      grouped.putIfAbsent(key, () => <SearchResult>[]).add(item);
+  List<String> _buildGroups(List<BookSource> sources) {
+    final groups = <String>{};
+    for (final source in sources) {
+      groups.addAll(_extractGroups(source.bookSourceGroup));
     }
-    final built = <_DiscoveryDisplayItem>[];
-    for (final entry in grouped.entries) {
-      final origins = entry.value;
-      if (origins.isEmpty) continue;
-      final primary = origins.first;
-      final inBookshelf = origins.any(_addService.isInBookshelf);
-      built.add(
-        _DiscoveryDisplayItem(
-          primary: primary,
-          origins: origins,
-          inBookshelf: inBookshelf,
-        ),
-      );
-    }
-    _displayResults = built;
+    final sorted = groups.toList()..sort();
+    return sorted;
   }
 
-  Future<void> _refresh() async {
-    if (_loading) return;
+  void _setQuery(String query) {
+    _searchController.text = query;
+    _searchController.selection = TextSelection.fromPosition(
+      TextPosition(offset: query.length),
+    );
+  }
 
-    final sources = _eligibleSources();
-    final seenResultKeys = <String>{};
-    setState(() {
-      _loading = true;
-      _cancelRequested = false;
-      _results.clear();
-      _displayResults.clear();
-      _sourceIssues.clear();
-      _lastError = null;
-      _currentSourceName = '';
-      _completedSources = 0;
-      _totalSources = sources.length;
-    });
-
-    if (sources.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _lastError = '没有可用的发现书源（需要 exploreUrl + ruleExplore 且启用发现）';
-      });
+  Future<void> _showGroupFilterMenu() async {
+    final groups = _buildGroups(_eligibleSources(_allSources));
+    if (groups.isEmpty) {
+      _showMessage('当前没有可用分组');
       return;
     }
 
-    for (final source in sources) {
-      if (_cancelRequested) break;
-
-      if (!mounted) return;
-      setState(() => _currentSourceName = source.bookSourceName);
-
-      try {
-        final debugEngine = RuleParserEngine();
-        final debugResult = await debugEngine.exploreDebug(source);
-        final issue = _buildExploreIssue(source, debugResult);
-        final uniqueResults =
-            _collectUniqueResults(debugResult.results, seenResultKeys);
-        if (!mounted) return;
-        setState(() {
-          _results.addAll(uniqueResults);
-          _rebuildDisplayResults();
-          if (issue != null) {
-            _sourceIssues.add(issue);
-          }
-          _completedSources++;
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _completedSources++;
-          _sourceIssues.add(
-            _SourceRunIssue(
-              sourceName: source.bookSourceName,
-              reason: '发现异常：${_compactReason(e.toString())}',
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('按分组筛选'),
+        actions: [
+          for (final group in groups)
+            CupertinoActionSheetAction(
+              child: Text(group),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _setQuery('group:$group');
+              },
             ),
-          );
-          _lastError = '部分书源拉取失败';
-        });
-      }
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _currentSourceName = '';
-    });
-  }
-
-  _SourceRunIssue? _buildExploreIssue(
-    BookSource source,
-    ExploreDebugResult debugResult,
-  ) {
-    final explicitError = (debugResult.error ?? '').trim();
-    if (explicitError.isNotEmpty) {
-      return _SourceRunIssue(
-        sourceName: source.bookSourceName,
-        reason: _compactReason(explicitError),
-      );
-    }
-
-    final statusCode = debugResult.fetch.statusCode;
-    if (statusCode != null && statusCode >= 400) {
-      final detail =
-          _compactReason(debugResult.fetch.error ?? 'HTTP $statusCode');
-      return _SourceRunIssue(
-        sourceName: source.bookSourceName,
-        reason: '请求失败（HTTP $statusCode）：$detail',
-      );
-    }
-
-    if (debugResult.fetch.body != null &&
-        debugResult.listCount > 0 &&
-        debugResult.results.isEmpty) {
-      return _SourceRunIssue(
-        sourceName: source.bookSourceName,
-        reason: '解析到列表 ${debugResult.listCount} 项，但缺少 name/bookUrl',
-      );
-    }
-
-    return null;
-  }
-
-  String _compactReason(String text, {int maxLength = 96}) {
-    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (normalized.length <= maxLength) {
-      return normalized;
-    }
-    return '${normalized.substring(0, maxLength)}…';
-  }
-
-  void _showIssueDetails() {
-    if (_sourceIssues.isEmpty) return;
-    final lines = <String>['失败书源：${_sourceIssues.length} 条'];
-    final preview = _sourceIssues.take(12).toList(growable: false);
-    for (final issue in preview) {
-      lines.add('• ${issue.sourceName}：${issue.reason}');
-    }
-    final remain = _sourceIssues.length - preview.length;
-    if (remain > 0) {
-      lines.add('…其余 $remain 条省略');
-    }
-    lines.add('可在“书源可用性检测”或“调试”继续定位。');
-    _showMessage(lines.join('\n'));
-  }
-
-  void _stop() {
-    setState(() {
-      _cancelRequested = true;
-      _loading = false;
-      _currentSourceName = '';
-    });
-  }
-
-  Future<void> _openBookInfo(SearchResult result) async {
-    await Navigator.of(context, rootNavigator: true).push(
-      CupertinoPageRoute(
-        builder: (_) => SearchBookInfoView(result: result),
+          CupertinoActionSheetAction(
+            child: const Text('清空筛选'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _setQuery('');
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(ctx),
+        ),
       ),
     );
-    if (!mounted) return;
-    setState(_rebuildDisplayResults);
   }
 
-  void _showMessage(String message) {
+  void _compressExplore() {
+    if (_expandedSourceUrl != null) {
+      setState(() => _expandedSourceUrl = null);
+      return;
+    }
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Future<void> _toggleSource(BookSource source) async {
+    final sourceUrl = source.bookSourceUrl;
+    if (_expandedSourceUrl == sourceUrl) {
+      setState(() => _expandedSourceUrl = null);
+      return;
+    }
+
+    setState(() => _expandedSourceUrl = sourceUrl);
+    await _loadKinds(source, forceRefresh: false);
+  }
+
+  Future<void> _loadKinds(
+    BookSource source, {
+    required bool forceRefresh,
+  }) async {
+    final sourceUrl = source.bookSourceUrl;
+
+    if (!forceRefresh && _sourceKindsCache.containsKey(sourceUrl)) {
+      return;
+    }
+
+    setState(() => _loadingKindsSources.add(sourceUrl));
+    try {
+      final kinds = await _exploreKindsService.exploreKinds(
+        source,
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sourceKindsCache[sourceUrl] = kinds;
+        _loadingKindsSources.remove(sourceUrl);
+      });
+    } catch (e, st) {
+      if (!mounted) return;
+      setState(() {
+        _loadingKindsSources.remove(sourceUrl);
+        _sourceKindsCache[sourceUrl] = <SourceExploreKind>[
+          SourceExploreKind(
+            title: 'ERROR:发现入口解析失败',
+            url: '$e\n$st',
+          ),
+        ];
+      });
+    }
+  }
+
+  Future<void> _openExploreKind(
+    BookSource source,
+    SourceExploreKind kind,
+  ) async {
+    final rawUrl = kind.url?.trim() ?? '';
+    if (rawUrl.isEmpty) return;
+
+    final title = kind.title.trim().isEmpty ? '发现' : kind.title.trim();
+    if (title.startsWith('ERROR:')) {
+      _showMessage(rawUrl, title: 'ERROR');
+      return;
+    }
+
+    // 发现结果二级页已下线时，兜底到源内搜索入口，保持可达性。
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SearchView.scoped(
+          sourceUrls: <String>[source.bookSourceUrl],
+          initialKeyword: title,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSourceActions(BookSource source) async {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text(source.bookSourceName),
+        message: Text(source.bookSourceUrl),
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('编辑书源'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openEditor(source);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('置顶'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _toTop(source);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('源内搜索'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _searchInSource(source);
+            },
+          ),
+          if ((source.loginUrl ?? '').trim().isNotEmpty)
+            CupertinoActionSheetAction(
+              child: const Text('登录'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openSourceLogin(source);
+              },
+            ),
+          CupertinoActionSheetAction(
+            child: const Text('刷新发现缓存'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _refreshSourceKinds(source);
+            },
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            child: const Text('删除书源'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _confirmDeleteSource(source);
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(ctx),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openEditor(BookSource source) async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceEditView.fromSource(
+          source,
+          rawJson: _sourceRepo.getRawJsonByUrl(source.bookSourceUrl),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toTop(BookSource source) async {
+    final all = _sourceRepo.getAllSources();
+    var minOrder = 0;
+    for (final item in all) {
+      minOrder = math.min(minOrder, item.customOrder);
+    }
+    await _sourceRepo.updateSource(
+      source.copyWith(customOrder: minOrder - 1),
+    );
+  }
+
+  Future<void> _openSourceLogin(BookSource source) async {
+    final url = source.loginUrl?.trim() ?? '';
+    if (url.isEmpty) {
+      _showMessage('当前书源未配置 loginUrl');
+      return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      _showMessage('loginUrl 不是有效网页地址');
+      return;
+    }
+
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceWebVerifyView(initialUrl: url),
+      ),
+    );
+  }
+
+  Future<void> _searchInSource(BookSource source) async {
+    final keyword = await _askSearchKeyword(source);
+    if (!mounted || keyword == null || keyword.trim().isEmpty) return;
+
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SearchView.scoped(
+          sourceUrls: <String>[source.bookSourceUrl],
+          initialKeyword: keyword.trim(),
+          autoSearchOnOpen: true,
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _askSearchKeyword(BookSource source) async {
+    final defaultKeyword = source.ruleSearch?.checkKeyWord?.trim();
+    final controller = TextEditingController(
+      text: (defaultKeyword == null || defaultKeyword.isEmpty)
+          ? '我的'
+          : defaultKeyword,
+    );
+
+    final value = await showCupertinoDialog<String>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('单源搜索'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: '输入搜索关键词',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('搜索'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+    return value;
+  }
+
+  Future<void> _refreshSourceKinds(BookSource source) async {
+    await _exploreKindsService.clearExploreKindsCache(source);
+    if (!mounted) return;
+
+    setState(() {
+      _sourceKindsCache.remove(source.bookSourceUrl);
+    });
+
+    if (_expandedSourceUrl == source.bookSourceUrl) {
+      await _loadKinds(source, forceRefresh: true);
+    }
+  }
+
+  Future<void> _confirmDeleteSource(BookSource source) async {
+    final ok = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text('删除书源'),
+            content: Text('\n确定删除 ${source.bookSourceName} ？'),
+            actions: [
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('删除'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('取消'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!ok) return;
+    await _sourceRepo.deleteSource(source.bookSourceUrl);
+  }
+
+  void _showMessage(String message, {String title = '提示'}) {
     showShadDialog<void>(
       context: context,
       builder: (dialogContext) => ShadDialog.alert(
-        title: const Text('提示'),
+        title: Text(title),
         description: Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(message),
         ),
         actions: [
           ShadButton(
-            child: const Text('好'),
             onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('好'),
           ),
         ],
       ),
@@ -271,93 +501,78 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   @override
   Widget build(BuildContext context) {
-    final eligibleCount = _eligibleSources().length;
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
 
+    final eligible = _eligibleSources(_allSources);
+    final visible = _applyQueryFilter(eligible, _searchController.text);
+    final query = _searchController.text.trim();
+
     return AppCupertinoPageScaffold(
       title: '发现',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: _loading ? null : _refresh,
-        child: const Icon(CupertinoIcons.refresh),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(28, 28),
+            onPressed: _showGroupFilterMenu,
+            child: const Icon(CupertinoIcons.square_grid_2x2),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(28, 28),
+            onPressed: _compressExplore,
+            child: const Icon(CupertinoIcons.arrow_up_to_line),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          if (_loading)
-            _buildStatusPanel(
-              borderColor: scheme.border,
-              child: Row(
-                children: [
-                  const CupertinoActivityIndicator(),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _currentSourceName.isEmpty
-                          ? '正在加载…'
-                          : '正在发现: $_currentSourceName ($_completedSources/$_totalSources)',
-                      style: TextStyle(
-                        fontSize: 13,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: Column(
+              children: [
+                ShadInput(
+                  controller: _searchController,
+                  placeholder: const Text('搜索书源 / 输入 group:分组'),
+                  leading: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(LucideIcons.search, size: 16),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      '书源 ${visible.length}',
+                      style: theme.textTheme.small.copyWith(
                         color: scheme.mutedForeground,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  ShadButton.link(
-                    onPressed: _stop,
-                    child: const Text('停止'),
-                  ),
-                ],
-              ),
-            )
-          else if (_sourceIssues.isNotEmpty)
-            _buildStatusPanel(
-              borderColor: scheme.destructive,
-              child: Row(
-                children: [
-                  Icon(LucideIcons.triangleAlert,
-                      size: 16, color: scheme.destructive),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.destructive,
+                    if (query.startsWith('group:')) ...[
+                      const SizedBox(width: 10),
+                      Text(
+                        '分组筛选',
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.primary,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  ShadButton.link(
-                    onPressed: _showIssueDetails,
-                    child: const Text('查看'),
-                  ),
-                ],
-              ),
-            )
-          else if (_lastError != null && _results.isEmpty)
-            _buildStatusPanel(
-              borderColor: scheme.destructive,
-              child: Text(
-                _lastError!,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: scheme.destructive,
+                    ],
+                  ],
                 ),
-              ),
-            )
-          else
-            const SizedBox(height: 6),
+              ],
+            ),
+          ),
           Expanded(
-            child: _displayResults.isEmpty
-                ? _buildEmptyState(context, eligibleCount)
+            child: visible.isEmpty
+                ? _buildEmptyState(eligibleCount: eligible.length, query: query)
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-                    itemCount: _displayResults.length,
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    itemCount: visible.length,
                     itemBuilder: (context, index) =>
-                        _buildResultItem(_displayResults[index]),
+                        _buildSourceItem(visible[index]),
                   ),
           ),
         ],
@@ -365,29 +580,22 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     );
   }
 
-  Widget _buildStatusPanel({
-    required Color borderColor,
-    required Widget child,
+  Widget _buildEmptyState({
+    required int eligibleCount,
+    required String query,
   }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-      child: ShadCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: ShadBorder.all(color: borderColor, width: 1),
-        child: child,
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context, int eligibleCount) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
 
-    final subtitle = eligibleCount == 0
-        ? '没有可用的发现书源\n请先导入带 exploreUrl/ruleExplore 的 Legado 书源'
-        : _sourceIssues.isEmpty
-            ? '点击右上角刷新'
-            : '本次有失败书源，点上方“查看”了解原因';
+    String subtitle;
+    if (eligibleCount == 0) {
+      subtitle = '没有可用的发现书源\n请先导入带 exploreUrl/ruleExplore 的 Legado 书源';
+    } else if (query.isNotEmpty) {
+      subtitle = '当前筛选条件下无书源';
+    } else {
+      subtitle = '暂无发现书源';
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -398,10 +606,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             color: scheme.mutedForeground,
           ),
           const SizedBox(height: 16),
-          Text(
-            '暂无发现内容',
-            style: theme.textTheme.h4,
-          ),
+          Text('暂无发现内容', style: theme.textTheme.h4),
           const SizedBox(height: 8),
           Text(
             subtitle,
@@ -415,152 +620,200 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     );
   }
 
-  Widget _buildResultItem(_DiscoveryDisplayItem item) {
+  Widget _buildSourceItem(BookSource source) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
-    final radius = theme.radius;
-    final coverBg = scheme.muted;
-    final result = item.primary;
-    final sourceCount = item.origins.length;
+
+    final sourceUrl = source.bookSourceUrl;
+    final expanded = _expandedSourceUrl == sourceUrl;
+    final loadingKinds = _loadingKindsSources.contains(sourceUrl);
+    final kinds = _sourceKindsCache[sourceUrl] ?? const <SourceExploreKind>[];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
-        onTap: () => _openBookInfo(result),
-        child: ShadCard(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          leading: Container(
-            width: 40,
-            height: 56,
-            decoration: BoxDecoration(
-              color: coverBg,
-              borderRadius: radius,
-              image: result.coverUrl.isNotEmpty
-                  ? DecorationImage(
-                      image: NetworkImage(result.coverUrl),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
+      child: ShadCard(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _toggleSource(source),
+              onLongPress: () => _showSourceActions(source),
+              child: Row(
+                children: [
+                  Icon(
+                    expanded
+                        ? LucideIcons.chevronDown
+                        : LucideIcons.chevronRight,
+                    size: 16,
+                    color: scheme.mutedForeground,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          source.bookSourceName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.p.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.foreground,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          source.bookSourceUrl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.small.copyWith(
+                            color: scheme.mutedForeground,
+                          ),
+                        ),
+                        if ((source.bookSourceGroup ?? '')
+                            .trim()
+                            .isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '分组: ${source.bookSourceGroup!.trim()}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.small.copyWith(
+                              color: scheme.mutedForeground,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(26, 26),
+                    onPressed: () => _showSourceActions(source),
+                    child: const Icon(CupertinoIcons.ellipsis),
+                  ),
+                ],
+              ),
             ),
-            child: result.coverUrl.isEmpty
-                ? Center(
-                    child: Text(
-                      result.name.isNotEmpty
-                          ? result.name.substring(0, 1)
-                          : '?',
-                      style: theme.textTheme.h4.copyWith(
+            if (expanded) ...[
+              const SizedBox(height: 10),
+              Container(height: 1, color: scheme.border),
+              const SizedBox(height: 10),
+              if (loadingKinds)
+                Row(
+                  children: [
+                    const CupertinoActivityIndicator(),
+                    const SizedBox(width: 8),
+                    Text(
+                      '正在加载发现入口…',
+                      style: theme.textTheme.small.copyWith(
                         color: scheme.mutedForeground,
                       ),
                     ),
-                  )
-                : null,
-          ),
-          trailing: Icon(
-            item.inBookshelf ? LucideIcons.bookCheck : LucideIcons.chevronRight,
-            size: item.inBookshelf ? 17 : 16,
-            color: item.inBookshelf ? scheme.primary : scheme.mutedForeground,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      result.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.p.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: scheme.foreground,
-                      ),
-                    ),
-                  ),
-                  if (sourceCount > 1)
-                    Container(
-                      margin: const EdgeInsets.only(left: 6),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.primary.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '$sourceCount源',
-                        style: theme.textTheme.small.copyWith(
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                result.author.isNotEmpty ? result.author : '未知作者',
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                sourceCount > 1
-                    ? '来源: ${result.sourceName} 等 $sourceCount 个'
-                    : '来源: ${result.sourceName}',
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
-                ),
-              ),
-              if (result.intro.trim().isNotEmpty) ...[
-                const SizedBox(height: 2),
+                  ],
+                )
+              else if (kinds.isEmpty)
                 Text(
-                  result.intro.trim(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  '暂无发现入口',
                   style: theme.textTheme.small.copyWith(
                     color: scheme.mutedForeground,
                   ),
+                )
+              else
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxWidth = constraints.maxWidth;
+                    final chips = <Widget>[];
+                    for (final kind in kinds) {
+                      if (kind.style?.layoutWrapBefore == true) {
+                        chips.add(SizedBox(width: maxWidth, height: 0));
+                      }
+
+                      final width = _kindWidth(kind.style, maxWidth);
+                      final child = _buildKindChip(source, kind);
+                      if (width == null) {
+                        chips.add(child);
+                      } else {
+                        chips.add(
+                          SizedBox(
+                            width: width,
+                            child: child,
+                          ),
+                        );
+                      }
+                    }
+
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: chips,
+                    );
+                  },
                 ),
-              ],
-              if (result.lastChapter.trim().isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '最新: ${result.lastChapter.trim()}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
-                ),
-              ],
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  double? _kindWidth(SourceExploreKindStyle? style, double maxWidth) {
+    if (style == null) return null;
+    var basis = style.layoutFlexBasisPercent;
+    if (basis > 1 && basis <= 100) {
+      basis = basis / 100;
+    }
+    if (basis > 0 && basis <= 1) {
+      return (maxWidth * basis).clamp(64.0, maxWidth).toDouble();
+    }
+    if (style.layoutFlexGrow > 0) {
+      return maxWidth;
+    }
+    return null;
+  }
+
+  Widget _buildKindChip(BookSource source, SourceExploreKind kind) {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+
+    final title = kind.title.trim().isEmpty ? '发现' : kind.title.trim();
+    final url = kind.url?.trim() ?? '';
+    final isEnabled = url.isNotEmpty;
+    final isError = title.startsWith('ERROR:');
+
+    final borderColor = isError
+        ? scheme.destructive
+        : isEnabled
+            ? scheme.primary
+            : scheme.border;
+    final textColor = isError
+        ? scheme.destructive
+        : isEnabled
+            ? scheme.primary
+            : scheme.mutedForeground;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: isEnabled ? () => _openExploreKind(source, kind) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: textColor.withValues(alpha: 0.09),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.small.copyWith(
+            color: textColor,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
     );
   }
-}
-
-class _DiscoveryDisplayItem {
-  final SearchResult primary;
-  final List<SearchResult> origins;
-  final bool inBookshelf;
-
-  const _DiscoveryDisplayItem({
-    required this.primary,
-    required this.origins,
-    required this.inBookshelf,
-  });
-}
-
-class _SourceRunIssue {
-  final String sourceName;
-  final String reason;
-
-  const _SourceRunIssue({
-    required this.sourceName,
-    required this.reason,
-  });
 }

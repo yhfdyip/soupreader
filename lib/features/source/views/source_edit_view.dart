@@ -62,6 +62,7 @@ class SourceEditView extends StatefulWidget {
 class _SourceEditViewState extends State<SourceEditView> {
   late final DatabaseService _db;
   late final SourceRepository _repo;
+  String? _currentOriginalUrl;
   final RuleParserEngine _engine = RuleParserEngine();
   late final SourceDebugOrchestrator _debugOrchestrator;
   final SourceDebugExportService _debugExportService =
@@ -187,6 +188,10 @@ class _SourceEditViewState extends State<SourceEditView> {
     super.initState();
     _db = DatabaseService();
     _repo = SourceRepository(_db);
+    _currentOriginalUrl = (widget.originalUrl ?? '').trim();
+    if (_currentOriginalUrl?.isEmpty == true) {
+      _currentOriginalUrl = null;
+    }
     _debugOrchestrator = SourceDebugOrchestrator(engine: _engine);
 
     _tab = widget.initialTab ?? 0;
@@ -1077,13 +1082,12 @@ class _SourceEditViewState extends State<SourceEditView> {
                   runSpacing: 8,
                   children: [
                     ShadButton.ghost(
-                      onPressed:
-                          (hasLines && !_debugAutoFollowLogs)
-                              ? () => _scrollDebugToBottom(
-                                    forceFollow: true,
-                                    animated: true,
-                                  )
-                              : null,
+                      onPressed: (hasLines && !_debugAutoFollowLogs)
+                          ? () => _scrollDebugToBottom(
+                                forceFollow: true,
+                                animated: true,
+                              )
+                          : null,
                       child: const Text('回到最新日志'),
                     ),
                     ShadButton.ghost(
@@ -1164,9 +1168,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   Widget _buildDebugSecondaryToolsSection() {
     final hasLogs = _debugLinesAll.isNotEmpty;
     final quickToggleTitle = _showDebugQuickHelp ? '收起快捷动作' : '显示快捷动作';
-    final quickToggleDesc = _showDebugQuickHelp
-        ? '减少首屏占用，保留核心输入与结果'
-        : '重新展开“我的/系统/发现候选/++/--”快捷区';
+    final quickToggleDesc =
+        _showDebugQuickHelp ? '减少首屏占用，保留核心输入与结果' : '重新展开“我的/系统/发现候选/++/--”快捷区';
 
     return CupertinoListSection.insetGrouped(
       header: const Text('工具'),
@@ -2122,9 +2125,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       CupertinoListTile.notched(
         title: Text('总 $totalLines 行 · 展示 ${visibleLines.length} 行'),
         subtitle: Text(
-          _debugAutoFollowLogs
-              ? '自动跟随开启'
-              : '自动跟随暂停（可在顶部点击“回到最新日志”恢复）',
+          _debugAutoFollowLogs ? '自动跟随开启' : '自动跟随暂停（可在顶部点击“回到最新日志”恢复）',
         ),
       ),
       if (_debugError != null && _debugError!.trim().isNotEmpty)
@@ -3444,10 +3445,16 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
 
     try {
+      final decoded = _tryDecodeJsonMap(_jsonCtrl.text);
+      final source = decoded != null ? BookSource.fromJson(decoded) : null;
       await _repo.upsertSourceRawJson(
-        originalUrl: widget.originalUrl,
+        originalUrl: _currentOriginalUrl,
         rawJson: _jsonCtrl.text,
       );
+      final savedUrl = source?.bookSourceUrl.trim() ?? '';
+      if (savedUrl.isNotEmpty) {
+        _currentOriginalUrl = savedUrl;
+      }
       await _saveLoginState(showMessage: false);
       if (!mounted) return;
       _showMessage('保存成功');

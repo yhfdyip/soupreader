@@ -152,6 +152,16 @@ class ReaderThemeTokens {
     accent: AppDesignTokens.brandSecondary,
   );
 
+  /// Legado 默认首套主题（微信读书纸色）
+  static const ReaderThemeToken legadoClassic = ReaderThemeToken(
+    name: '经典纸色',
+    background: Color(0xFFC0EDC6),
+    text: Color(0xFF0B0B0B),
+    subText: Color(0xFF3E3D3B),
+    divider: Color(0xFF9FD8AE),
+    accent: Color(0xFF2E7D32),
+  );
+
   static const List<ReaderThemeToken> core = [day, sepia, night];
 
   /// 保持既有主题顺序，避免 `themeIndex` 历史数据失配。
@@ -165,5 +175,6 @@ class ReaderThemeTokens {
     mint,
     rose,
     amoled,
+    legadoClassic,
   ];
 }

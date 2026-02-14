@@ -148,6 +148,7 @@ class BookRepository {
       intro: Value(book.intro),
       sourceId: Value(book.sourceId),
       sourceUrl: Value(book.sourceUrl),
+      bookUrl: Value(book.bookUrl),
       latestChapter: Value(book.latestChapter),
       totalChapters: Value(book.totalChapters),
       currentChapter: Value(book.currentChapter),
@@ -169,12 +170,14 @@ class BookRepository {
       intro: row.intro,
       sourceId: row.sourceId,
       sourceUrl: row.sourceUrl,
+      bookUrl: row.bookUrl,
       latestChapter: row.latestChapter,
       totalChapters: row.totalChapters,
       currentChapter: row.currentChapter,
       readProgress: row.readProgress,
-      lastReadTime:
-          row.lastReadTime == null ? null : DateTime.fromMillisecondsSinceEpoch(row.lastReadTime!),
+      lastReadTime: row.lastReadTime == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(row.lastReadTime!),
       addedTime: row.addedTime == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(row.addedTime!),
@@ -206,8 +209,7 @@ class ChapterRepository {
 
   void _ensureWatchStarted() {
     if (_watchSub != null) return;
-    _watchSub =
-        _driftDb.select(_driftDb.chapterRecords).watch().listen((rows) {
+    _watchSub = _driftDb.select(_driftDb.chapterRecords).watch().listen((rows) {
       _updateCacheFromRows(rows);
     });
   }

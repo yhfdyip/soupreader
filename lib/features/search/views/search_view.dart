@@ -1,6 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -32,15 +34,19 @@ class SearchView extends StatefulWidget {
 
 class _SearchViewState extends State<SearchView> {
   final TextEditingController _searchController = TextEditingController();
+  static const int _maxSearchConcurrency = 6;
   late final SourceRepository _sourceRepo;
   late final BookAddService _addService;
 
   List<SearchResult> _results = <SearchResult>[];
   List<_SearchDisplayItem> _displayResults = <_SearchDisplayItem>[];
   final List<_SourceRunIssue> _sourceIssues = <_SourceRunIssue>[];
+  final Set<CancelToken> _activeCancelTokens = <CancelToken>{};
   bool _isSearching = false;
   String _searchingSource = '';
   int _completedSources = 0;
+  int _searchSessionSeed = 0;
+  int _runningSearchSessionId = 0;
 
   @override
   void initState() {
@@ -66,6 +72,7 @@ class _SearchViewState extends State<SearchView> {
 
   @override
   void dispose() {
+    _cancelOngoingSearch(updateState: false);
     _searchController.dispose();
     super.dispose();
   }
@@ -124,15 +131,67 @@ class _SearchViewState extends State<SearchView> {
       if (origins.isEmpty) continue;
       final primary = origins.first;
       final inBookshelf = origins.any(_addService.isInBookshelf);
+      final displayCoverUrl = _pickDisplayCoverUrl(origins);
       built.add(
         _SearchDisplayItem(
           primary: primary,
           origins: origins,
           inBookshelf: inBookshelf,
+          displayCoverUrl: displayCoverUrl,
         ),
       );
     }
+    built.sort((a, b) {
+      final originsCompare = b.origins.length.compareTo(a.origins.length);
+      if (originsCompare != 0) return originsCompare;
+      final nameCompare = a.primary.name.compareTo(b.primary.name);
+      if (nameCompare != 0) return nameCompare;
+      return a.primary.author.compareTo(b.primary.author);
+    });
     _displayResults = built;
+  }
+
+  String _pickDisplayCoverUrl(List<SearchResult> origins) {
+    for (final item in origins) {
+      final cover = item.coverUrl.trim();
+      if (cover.isNotEmpty) return cover;
+    }
+    return '';
+  }
+
+  bool _isSearchSessionActive(int sessionId) {
+    return mounted && _isSearching && _runningSearchSessionId == sessionId;
+  }
+
+  int _startSearchSession() {
+    _searchSessionSeed++;
+    _runningSearchSessionId = _searchSessionSeed;
+    return _runningSearchSessionId;
+  }
+
+  bool _isCanceledError(Object error) {
+    if (error is DioException) {
+      return error.type == DioExceptionType.cancel;
+    }
+    return false;
+  }
+
+  void _cancelOngoingSearch({bool updateState = true}) {
+    _isSearching = false;
+    _runningSearchSessionId = 0;
+    _searchingSource = '';
+
+    final tokens = _activeCancelTokens.toList(growable: false);
+    _activeCancelTokens.clear();
+    for (final token in tokens) {
+      if (!token.isCancelled) {
+        token.cancel('search canceled');
+      }
+    }
+
+    if (updateState && mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _search() async {
@@ -145,7 +204,13 @@ class _SearchViewState extends State<SearchView> {
       return;
     }
 
+    _cancelOngoingSearch(updateState: false);
     final seenResultKeys = <String>{};
+    final searchSessionId = _startSearchSession();
+    var nextSourceIndex = 0;
+    final workerCount = enabledSources.length < _maxSearchConcurrency
+        ? enabledSources.length
+        : _maxSearchConcurrency;
 
     setState(() {
       _isSearching = true;
@@ -153,45 +218,69 @@ class _SearchViewState extends State<SearchView> {
       _displayResults = <_SearchDisplayItem>[];
       _sourceIssues.clear();
       _completedSources = 0;
+      _searchingSource = '';
     });
 
-    for (final source in enabledSources) {
-      if (!_isSearching) break;
+    Future<void> runWorker() async {
+      while (true) {
+        if (!_isSearchSessionActive(searchSessionId)) return;
+        if (nextSourceIndex >= enabledSources.length) return;
+        final source = enabledSources[nextSourceIndex++];
+        if (!_isSearchSessionActive(searchSessionId)) return;
+        setState(() => _searchingSource = source.bookSourceName);
 
-      setState(() => _searchingSource = source.bookSourceName);
+        final token = CancelToken();
+        _activeCancelTokens.add(token);
 
-      try {
-        final debugEngine = RuleParserEngine();
-        final debugResult = await debugEngine.searchDebug(source, keyword);
-        final issue = _buildSearchIssue(source, debugResult);
-        final uniqueResults =
-            _collectUniqueResults(debugResult.results, seenResultKeys);
-        if (!mounted) return;
-        setState(() {
-          _results.addAll(uniqueResults);
-          _rebuildDisplayResults();
-          if (issue != null) {
-            _sourceIssues.add(issue);
-          }
-          _completedSources++;
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _completedSources++;
-          _sourceIssues.add(
-            _SourceRunIssue(
-              sourceName: source.bookSourceName,
-              reason: '搜索异常：${_compactReason(e.toString())}',
-            ),
+        try {
+          final debugEngine = RuleParserEngine();
+          final debugResult = await debugEngine.searchDebug(
+            source,
+            keyword,
+            cancelToken: token,
           );
-        });
+          if (!_isSearchSessionActive(searchSessionId)) return;
+          final issue = _buildSearchIssue(source, debugResult);
+          final uniqueResults =
+              _collectUniqueResults(debugResult.results, seenResultKeys);
+          if (!_isSearchSessionActive(searchSessionId)) return;
+          setState(() {
+            _results.addAll(uniqueResults);
+            _rebuildDisplayResults();
+            if (issue != null) {
+              _sourceIssues.add(issue);
+            }
+            _completedSources++;
+          });
+        } catch (e) {
+          if (!_isSearchSessionActive(searchSessionId)) return;
+          if (_isCanceledError(e)) {
+            setState(() => _completedSources++);
+            return;
+          }
+          setState(() {
+            _completedSources++;
+            _sourceIssues.add(
+              _SourceRunIssue(
+                sourceName: source.bookSourceName,
+                reason: '搜索异常：${_compactReason(e.toString())}',
+              ),
+            );
+          });
+        } finally {
+          _activeCancelTokens.remove(token);
+        }
       }
     }
 
-    if (!mounted) return;
+    await Future.wait(
+      List<Future<void>>.generate(workerCount, (_) => runWorker()),
+    );
+
+    if (!_isSearchSessionActive(searchSessionId)) return;
     setState(() {
       _isSearching = false;
+      _runningSearchSessionId = 0;
       _searchingSource = '';
     });
   }
@@ -370,7 +459,7 @@ class _SearchViewState extends State<SearchView> {
                     ),
                   ),
                   ShadButton.link(
-                    onPressed: () => setState(() => _isSearching = false),
+                    onPressed: _cancelOngoingSearch,
                     child: const Text('停止'),
                   ),
                 ],
@@ -473,6 +562,16 @@ class _SearchViewState extends State<SearchView> {
         onTap: () => _openBookInfo(result),
         child: ShadCard(
           padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          leading: AppCoverImage(
+            urlOrPath: item.displayCoverUrl,
+            title: result.name,
+            author: result.author,
+            width: 40,
+            height: 56,
+            borderRadius: 6,
+            fit: BoxFit.cover,
+            showTextOnPlaceholder: false,
+          ),
           trailing: Icon(
             item.inBookshelf ? LucideIcons.bookCheck : LucideIcons.chevronRight,
             size: item.inBookshelf ? 17 : 16,
@@ -588,11 +687,13 @@ class _SearchDisplayItem {
   final SearchResult primary;
   final List<SearchResult> origins;
   final bool inBookshelf;
+  final String displayCoverUrl;
 
   const _SearchDisplayItem({
     required this.primary,
     required this.origins,
     required this.inBookshelf,
+    required this.displayCoverUrl,
   });
 }
 

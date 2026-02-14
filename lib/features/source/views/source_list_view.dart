@@ -2710,14 +2710,18 @@ class _SourceListViewState extends State<SourceListView> {
       for (final source in result.sources) {
         final url = source.bookSourceUrl.trim();
         if (url.isEmpty) continue;
+        final existing = localMap[url];
+        // 对齐 legado：默认仅勾选“新增/有更新”的条目，已有且未更新默认不勾选。
+        final shouldSelect =
+            existing == null || source.lastUpdateTime > existing.lastUpdateTime;
         final rawJson = result.rawJsonForSourceUrl(url) ??
             LegadoJson.encode(source.toJson());
         entries.add(
           _ImportEntry(
             incoming: source,
-            existing: localMap[url],
+            existing: existing,
             rawJson: rawJson,
-            selected: true,
+            selected: shouldSelect,
           ),
         );
       }
@@ -2794,6 +2798,8 @@ class _SourceListViewState extends State<SourceListView> {
     final local = entry.existing;
 
     if (local != null) {
+      // 对齐 legado：冲突合并时始终保留本地 customOrder（手动排序）。
+      merged = merged.copyWith(customOrder: local.customOrder);
       if (policy.keepOriginalName) {
         merged = merged.copyWith(bookSourceName: local.bookSourceName);
       }

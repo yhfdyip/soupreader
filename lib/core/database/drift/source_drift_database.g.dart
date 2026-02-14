@@ -847,6 +847,12 @@ class $BookRecordsTable extends BookRecords
   late final GeneratedColumn<String> sourceUrl = GeneratedColumn<String>(
       'source_url', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _bookUrlMeta =
+      const VerificationMeta('bookUrl');
+  @override
+  late final GeneratedColumn<String> bookUrl = GeneratedColumn<String>(
+      'book_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _latestChapterMeta =
       const VerificationMeta('latestChapter');
   @override
@@ -922,6 +928,7 @@ class $BookRecordsTable extends BookRecords
         intro,
         sourceId,
         sourceUrl,
+        bookUrl,
         latestChapter,
         totalChapters,
         currentChapter,
@@ -970,6 +977,10 @@ class $BookRecordsTable extends BookRecords
     if (data.containsKey('source_url')) {
       context.handle(_sourceUrlMeta,
           sourceUrl.isAcceptableOrUnknown(data['source_url']!, _sourceUrlMeta));
+    }
+    if (data.containsKey('book_url')) {
+      context.handle(_bookUrlMeta,
+          bookUrl.isAcceptableOrUnknown(data['book_url']!, _bookUrlMeta));
     }
     if (data.containsKey('latest_chapter')) {
       context.handle(
@@ -1040,6 +1051,8 @@ class $BookRecordsTable extends BookRecords
           .read(DriftSqlType.string, data['${effectivePrefix}source_id']),
       sourceUrl: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}source_url']),
+      bookUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}book_url']),
       latestChapter: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}latest_chapter']),
       totalChapters: attachedDatabase.typeMapping
@@ -1075,6 +1088,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
   final String? intro;
   final String? sourceId;
   final String? sourceUrl;
+  final String? bookUrl;
   final String? latestChapter;
   final int totalChapters;
   final int currentChapter;
@@ -1092,6 +1106,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
       this.intro,
       this.sourceId,
       this.sourceUrl,
+      this.bookUrl,
       this.latestChapter,
       required this.totalChapters,
       required this.currentChapter,
@@ -1118,6 +1133,9 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
     }
     if (!nullToAbsent || sourceUrl != null) {
       map['source_url'] = Variable<String>(sourceUrl);
+    }
+    if (!nullToAbsent || bookUrl != null) {
+      map['book_url'] = Variable<String>(bookUrl);
     }
     if (!nullToAbsent || latestChapter != null) {
       map['latest_chapter'] = Variable<String>(latestChapter);
@@ -1155,6 +1173,9 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
       sourceUrl: sourceUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(sourceUrl),
+      bookUrl: bookUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bookUrl),
       latestChapter: latestChapter == null && nullToAbsent
           ? const Value.absent()
           : Value(latestChapter),
@@ -1186,6 +1207,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
       intro: serializer.fromJson<String?>(json['intro']),
       sourceId: serializer.fromJson<String?>(json['sourceId']),
       sourceUrl: serializer.fromJson<String?>(json['sourceUrl']),
+      bookUrl: serializer.fromJson<String?>(json['bookUrl']),
       latestChapter: serializer.fromJson<String?>(json['latestChapter']),
       totalChapters: serializer.fromJson<int>(json['totalChapters']),
       currentChapter: serializer.fromJson<int>(json['currentChapter']),
@@ -1208,6 +1230,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
       'intro': serializer.toJson<String?>(intro),
       'sourceId': serializer.toJson<String?>(sourceId),
       'sourceUrl': serializer.toJson<String?>(sourceUrl),
+      'bookUrl': serializer.toJson<String?>(bookUrl),
       'latestChapter': serializer.toJson<String?>(latestChapter),
       'totalChapters': serializer.toJson<int>(totalChapters),
       'currentChapter': serializer.toJson<int>(currentChapter),
@@ -1228,6 +1251,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
           Value<String?> intro = const Value.absent(),
           Value<String?> sourceId = const Value.absent(),
           Value<String?> sourceUrl = const Value.absent(),
+          Value<String?> bookUrl = const Value.absent(),
           Value<String?> latestChapter = const Value.absent(),
           int? totalChapters,
           int? currentChapter,
@@ -1245,6 +1269,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
         intro: intro.present ? intro.value : this.intro,
         sourceId: sourceId.present ? sourceId.value : this.sourceId,
         sourceUrl: sourceUrl.present ? sourceUrl.value : this.sourceUrl,
+        bookUrl: bookUrl.present ? bookUrl.value : this.bookUrl,
         latestChapter:
             latestChapter.present ? latestChapter.value : this.latestChapter,
         totalChapters: totalChapters ?? this.totalChapters,
@@ -1266,6 +1291,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
       intro: data.intro.present ? data.intro.value : this.intro,
       sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
       sourceUrl: data.sourceUrl.present ? data.sourceUrl.value : this.sourceUrl,
+      bookUrl: data.bookUrl.present ? data.bookUrl.value : this.bookUrl,
       latestChapter: data.latestChapter.present
           ? data.latestChapter.value
           : this.latestChapter,
@@ -1298,6 +1324,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
           ..write('intro: $intro, ')
           ..write('sourceId: $sourceId, ')
           ..write('sourceUrl: $sourceUrl, ')
+          ..write('bookUrl: $bookUrl, ')
           ..write('latestChapter: $latestChapter, ')
           ..write('totalChapters: $totalChapters, ')
           ..write('currentChapter: $currentChapter, ')
@@ -1320,6 +1347,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
       intro,
       sourceId,
       sourceUrl,
+      bookUrl,
       latestChapter,
       totalChapters,
       currentChapter,
@@ -1340,6 +1368,7 @@ class BookRecord extends DataClass implements Insertable<BookRecord> {
           other.intro == this.intro &&
           other.sourceId == this.sourceId &&
           other.sourceUrl == this.sourceUrl &&
+          other.bookUrl == this.bookUrl &&
           other.latestChapter == this.latestChapter &&
           other.totalChapters == this.totalChapters &&
           other.currentChapter == this.currentChapter &&
@@ -1359,6 +1388,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
   final Value<String?> intro;
   final Value<String?> sourceId;
   final Value<String?> sourceUrl;
+  final Value<String?> bookUrl;
   final Value<String?> latestChapter;
   final Value<int> totalChapters;
   final Value<int> currentChapter;
@@ -1377,6 +1407,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
     this.intro = const Value.absent(),
     this.sourceId = const Value.absent(),
     this.sourceUrl = const Value.absent(),
+    this.bookUrl = const Value.absent(),
     this.latestChapter = const Value.absent(),
     this.totalChapters = const Value.absent(),
     this.currentChapter = const Value.absent(),
@@ -1396,6 +1427,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
     this.intro = const Value.absent(),
     this.sourceId = const Value.absent(),
     this.sourceUrl = const Value.absent(),
+    this.bookUrl = const Value.absent(),
     this.latestChapter = const Value.absent(),
     this.totalChapters = const Value.absent(),
     this.currentChapter = const Value.absent(),
@@ -1415,6 +1447,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
     Expression<String>? intro,
     Expression<String>? sourceId,
     Expression<String>? sourceUrl,
+    Expression<String>? bookUrl,
     Expression<String>? latestChapter,
     Expression<int>? totalChapters,
     Expression<int>? currentChapter,
@@ -1434,6 +1467,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
       if (intro != null) 'intro': intro,
       if (sourceId != null) 'source_id': sourceId,
       if (sourceUrl != null) 'source_url': sourceUrl,
+      if (bookUrl != null) 'book_url': bookUrl,
       if (latestChapter != null) 'latest_chapter': latestChapter,
       if (totalChapters != null) 'total_chapters': totalChapters,
       if (currentChapter != null) 'current_chapter': currentChapter,
@@ -1455,6 +1489,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
       Value<String?>? intro,
       Value<String?>? sourceId,
       Value<String?>? sourceUrl,
+      Value<String?>? bookUrl,
       Value<String?>? latestChapter,
       Value<int>? totalChapters,
       Value<int>? currentChapter,
@@ -1473,6 +1508,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
       intro: intro ?? this.intro,
       sourceId: sourceId ?? this.sourceId,
       sourceUrl: sourceUrl ?? this.sourceUrl,
+      bookUrl: bookUrl ?? this.bookUrl,
       latestChapter: latestChapter ?? this.latestChapter,
       totalChapters: totalChapters ?? this.totalChapters,
       currentChapter: currentChapter ?? this.currentChapter,
@@ -1509,6 +1545,9 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
     }
     if (sourceUrl.present) {
       map['source_url'] = Variable<String>(sourceUrl.value);
+    }
+    if (bookUrl.present) {
+      map['book_url'] = Variable<String>(bookUrl.value);
     }
     if (latestChapter.present) {
       map['latest_chapter'] = Variable<String>(latestChapter.value);
@@ -1553,6 +1592,7 @@ class BookRecordsCompanion extends UpdateCompanion<BookRecord> {
           ..write('intro: $intro, ')
           ..write('sourceId: $sourceId, ')
           ..write('sourceUrl: $sourceUrl, ')
+          ..write('bookUrl: $bookUrl, ')
           ..write('latestChapter: $latestChapter, ')
           ..write('totalChapters: $totalChapters, ')
           ..write('currentChapter: $currentChapter, ')
@@ -3804,6 +3844,7 @@ typedef $$BookRecordsTableCreateCompanionBuilder = BookRecordsCompanion
   Value<String?> intro,
   Value<String?> sourceId,
   Value<String?> sourceUrl,
+  Value<String?> bookUrl,
   Value<String?> latestChapter,
   Value<int> totalChapters,
   Value<int> currentChapter,
@@ -3824,6 +3865,7 @@ typedef $$BookRecordsTableUpdateCompanionBuilder = BookRecordsCompanion
   Value<String?> intro,
   Value<String?> sourceId,
   Value<String?> sourceUrl,
+  Value<String?> bookUrl,
   Value<String?> latestChapter,
   Value<int> totalChapters,
   Value<int> currentChapter,
@@ -3865,6 +3907,9 @@ class $$BookRecordsTableFilterComposer
 
   ColumnFilters<String> get sourceUrl => $composableBuilder(
       column: $table.sourceUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get bookUrl => $composableBuilder(
+      column: $table.bookUrl, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get latestChapter => $composableBuilder(
       column: $table.latestChapter, builder: (column) => ColumnFilters(column));
@@ -3924,6 +3969,9 @@ class $$BookRecordsTableOrderingComposer
 
   ColumnOrderings<String> get sourceUrl => $composableBuilder(
       column: $table.sourceUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get bookUrl => $composableBuilder(
+      column: $table.bookUrl, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get latestChapter => $composableBuilder(
       column: $table.latestChapter,
@@ -3988,6 +4036,9 @@ class $$BookRecordsTableAnnotationComposer
   GeneratedColumn<String> get sourceUrl =>
       $composableBuilder(column: $table.sourceUrl, builder: (column) => column);
 
+  GeneratedColumn<String> get bookUrl =>
+      $composableBuilder(column: $table.bookUrl, builder: (column) => column);
+
   GeneratedColumn<String> get latestChapter => $composableBuilder(
       column: $table.latestChapter, builder: (column) => column);
 
@@ -4050,6 +4101,7 @@ class $$BookRecordsTableTableManager extends RootTableManager<
             Value<String?> intro = const Value.absent(),
             Value<String?> sourceId = const Value.absent(),
             Value<String?> sourceUrl = const Value.absent(),
+            Value<String?> bookUrl = const Value.absent(),
             Value<String?> latestChapter = const Value.absent(),
             Value<int> totalChapters = const Value.absent(),
             Value<int> currentChapter = const Value.absent(),
@@ -4069,6 +4121,7 @@ class $$BookRecordsTableTableManager extends RootTableManager<
             intro: intro,
             sourceId: sourceId,
             sourceUrl: sourceUrl,
+            bookUrl: bookUrl,
             latestChapter: latestChapter,
             totalChapters: totalChapters,
             currentChapter: currentChapter,
@@ -4088,6 +4141,7 @@ class $$BookRecordsTableTableManager extends RootTableManager<
             Value<String?> intro = const Value.absent(),
             Value<String?> sourceId = const Value.absent(),
             Value<String?> sourceUrl = const Value.absent(),
+            Value<String?> bookUrl = const Value.absent(),
             Value<String?> latestChapter = const Value.absent(),
             Value<int> totalChapters = const Value.absent(),
             Value<int> currentChapter = const Value.absent(),
@@ -4107,6 +4161,7 @@ class $$BookRecordsTableTableManager extends RootTableManager<
             intro: intro,
             sourceId: sourceId,
             sourceUrl: sourceUrl,
+            bookUrl: bookUrl,
             latestChapter: latestChapter,
             totalChapters: totalChapters,
             currentChapter: currentChapter,

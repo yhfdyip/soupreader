@@ -56,6 +56,10 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
 
   bool get _isDarkMode => widget.currentTheme.isDark;
 
+  double _safeFinite(double value, {double fallback = 0.0}) {
+    return value.isFinite ? value : fallback;
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = ShadTheme.of(context).colorScheme;
@@ -133,6 +137,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
 
   Widget _buildChapterSlider(ShadColorScheme scheme) {
     final maxPage = (widget.totalPages - 1).clamp(0, 9999);
+    final canSlidePage = maxPage > 0;
+    // CupertinoSlider 在 min==max 时语义层会触发 0 除，导致 NaN 崩溃。
+    final sliderMax = canSlidePage ? maxPage.toDouble() : 1.0;
+    final rawSliderValue = _isDragging
+        ? _safeFinite(_dragValue)
+        : _safeFinite(widget.currentPageIndex.toDouble());
+    final sliderValue = rawSliderValue.clamp(0.0, sliderMax).toDouble();
     final chapterLabel =
         '第${widget.currentChapterIndex + 1}章 / ${widget.totalChapters}章';
     final pageLabel = '${widget.currentPageIndex + 1}/${widget.totalPages}页';
@@ -184,25 +195,27 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             ),
             Expanded(
               child: CupertinoSlider(
-                value: _isDragging
-                    ? _dragValue.clamp(0, maxPage.toDouble())
-                    : widget.currentPageIndex
-                        .toDouble()
-                        .clamp(0, maxPage.toDouble()),
+                value: sliderValue,
                 min: 0,
-                max: maxPage.toDouble(),
+                max: sliderMax,
                 activeColor: accent,
                 thumbColor: _isDarkMode ? CupertinoColors.white : accent,
-                onChanged: (value) {
-                  setState(() {
-                    _isDragging = true;
-                    _dragValue = value;
-                  });
-                },
-                onChangeEnd: (value) {
-                  setState(() => _isDragging = false);
-                  widget.onPageChanged(value.toInt());
-                },
+                onChanged: canSlidePage
+                    ? (value) {
+                        setState(() {
+                          _isDragging = true;
+                          _dragValue = value;
+                        });
+                      }
+                    : null,
+                onChangeEnd: canSlidePage
+                    ? (value) {
+                        setState(() => _isDragging = false);
+                        final target =
+                            value.round().clamp(0, maxPage).toInt();
+                        widget.onPageChanged(target);
+                      }
+                    : null,
               ),
             ),
             ShadButton.ghost(
@@ -244,13 +257,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         Expanded(
           child: IgnorePointer(
             ignoring: widget.settings.useSystemBrightness,
-            child: Opacity(
-              opacity: widget.settings.useSystemBrightness ? 0.35 : 1.0,
-              child: CupertinoSlider(
-                value: widget.settings.brightness.clamp(0.0, 1.0),
-                min: 0.0,
-                max: 1.0,
-                activeColor: accent,
+              child: Opacity(
+                opacity: widget.settings.useSystemBrightness ? 0.35 : 1.0,
+                child: CupertinoSlider(
+                  value: _safeFinite(
+                    widget.settings.brightness,
+                    fallback: 1.0,
+                  ).clamp(0.0, 1.0).toDouble(),
+                  min: 0.0,
+                  max: 1.0,
+                  activeColor: accent,
                 thumbColor: accent,
                 onChanged: (value) {
                   widget.onSettingsChanged(

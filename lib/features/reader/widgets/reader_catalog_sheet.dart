@@ -58,9 +58,11 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final Map<int, GlobalKey> _chapterItemKeys = <int, GlobalKey>{};
 
   late List<Chapter> _chapters;
   late List<BookmarkEntity> _bookmarks;
+  int? _lastAutoScrollTargetChapterIndex;
 
   bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
 
@@ -91,9 +93,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     _chapters = List<Chapter>.from(widget.chapters);
     _bookmarks = List<BookmarkEntity>.from(widget.bookmarks);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToCurrentChapter();
-    });
+    _scheduleScrollToCurrentChapter();
   }
 
   @override
@@ -103,21 +103,57 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     super.dispose();
   }
 
+  GlobalKey _chapterKeyFor(int chapterIndex) {
+    return _chapterItemKeys.putIfAbsent(
+      chapterIndex,
+      () => GlobalKey(debugLabel: 'catalog_chapter_$chapterIndex'),
+    );
+  }
+
+  int? _findCurrentVisibleListIndex() {
+    final chapters = _filteredChapters;
+    for (var i = 0; i < chapters.length; i++) {
+      if (chapters[i].index == widget.currentChapterIndex) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  void _scheduleScrollToCurrentChapter() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scrollToCurrentChapter();
+    });
+  }
+
   void _scrollToCurrentChapter() {
     if (_selectedTab != 0) return;
     if (!_scrollController.hasClients) return;
 
-    final index = _isReversed
-        ? _chapters.length - 1 - widget.currentChapterIndex
-        : widget.currentChapterIndex;
-    if (index <= 0 || index >= _chapters.length) return;
+    final currentVisibleIndex = _findCurrentVisibleListIndex();
+    if (currentVisibleIndex == null) return;
 
-    // 估算每个 item 高度，避免首次打开时找不到当前章节
-    final estimatedItemHeight = 56.0;
-    final target = (index * estimatedItemHeight)
-        .clamp(0.0, _scrollController.position.maxScrollExtent)
-        .toDouble();
-    _scrollController.jumpTo(target);
+    // 对齐 legado：将当前章前一项滚动到可视区顶部，避免当前章贴边显示。
+    final chapters = _filteredChapters;
+    final targetVisibleIndex =
+        currentVisibleIndex > 0 ? currentVisibleIndex - 1 : 0;
+    if (targetVisibleIndex < 0 || targetVisibleIndex >= chapters.length) return;
+
+    final targetChapterIndex = chapters[targetVisibleIndex].index;
+    if (_lastAutoScrollTargetChapterIndex == targetChapterIndex) return;
+
+    final targetContext = _chapterKeyFor(targetChapterIndex).currentContext;
+    if (targetContext == null) return;
+
+    _lastAutoScrollTargetChapterIndex = targetChapterIndex;
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+    );
   }
 
   List<Chapter> get _filteredChapters {
@@ -290,10 +326,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           _selectedTab = index;
           _searchQuery = '';
           _searchController.text = '';
+          _lastAutoScrollTargetChapterIndex = null;
         });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToCurrentChapter();
-        });
+        _scheduleScrollToCurrentChapter();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -359,7 +394,13 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                         color: _textSubtle,
                       ),
                     ),
-                    onChanged: (value) => setState(() => _searchQuery = value),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                        _lastAutoScrollTargetChapterIndex = null;
+                      });
+                      _scheduleScrollToCurrentChapter();
+                    },
                   ),
                 ),
               ),
@@ -367,10 +408,11 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                 CupertinoButton(
                   padding: const EdgeInsets.only(left: 12),
                   onPressed: () {
-                    setState(() => _isReversed = !_isReversed);
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _scrollToCurrentChapter();
+                    setState(() {
+                      _isReversed = !_isReversed;
+                      _lastAutoScrollTargetChapterIndex = null;
                     });
+                    _scheduleScrollToCurrentChapter();
                   },
                   child: Icon(
                     _isReversed
@@ -430,6 +472,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             chapter.isDownloaded && (chapter.content?.isNotEmpty ?? false);
 
         return GestureDetector(
+          key: _chapterKeyFor(originalIndex),
           onTap: () => widget.onChapterSelected(originalIndex),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -741,7 +784,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       if (!mounted) return;
       setState(() {
         _chapters = List<Chapter>.from(updated);
+        _lastAutoScrollTargetChapterIndex = null;
       });
+      _scheduleScrollToCurrentChapter();
 
       final diff = _chapters.length - oldCount;
       if (diff > 0) {

@@ -7,11 +7,37 @@ import '../models/book_source.dart';
 class SourceExploreKind {
   final String title;
   final String? url;
+  final SourceExploreKindStyle? style;
 
   const SourceExploreKind({
     required this.title,
     required this.url,
+    this.style,
   });
+}
+
+class SourceExploreKindStyle {
+  final double layoutFlexGrow;
+  final double layoutFlexShrink;
+  final String layoutAlignSelf;
+  final double layoutFlexBasisPercent;
+  final bool layoutWrapBefore;
+
+  const SourceExploreKindStyle({
+    this.layoutFlexGrow = 0,
+    this.layoutFlexShrink = 1,
+    this.layoutAlignSelf = 'auto',
+    this.layoutFlexBasisPercent = -1,
+    this.layoutWrapBefore = false,
+  });
+
+  bool get isDefault {
+    return layoutFlexGrow == 0 &&
+        layoutFlexShrink == 1 &&
+        layoutAlignSelf.toLowerCase() == 'auto' &&
+        layoutFlexBasisPercent < 0 &&
+        layoutWrapBefore == false;
+  }
 }
 
 /// 对标 legado `BookSource.exploreKinds()`：
@@ -170,10 +196,12 @@ class SourceExploreKindsService {
             final map = item.map((k, v) => MapEntry('$k', v));
             final title = (map['title'] ?? map['name'] ?? '').toString().trim();
             final urlRaw = map['url']?.toString().trim();
+            final style = _parseStyle(map['style']);
             out.add(
               SourceExploreKind(
                 title: title,
                 url: (urlRaw == null || urlRaw.isEmpty) ? null : urlRaw,
+                style: style,
               ),
             );
             continue;
@@ -207,6 +235,46 @@ class SourceExploreKindsService {
       }
     }
     return out;
+  }
+
+  SourceExploreKindStyle? _parseStyle(dynamic raw) {
+    if (raw is! Map) return null;
+    final map = raw.map((k, v) => MapEntry('$k', v));
+    final style = SourceExploreKindStyle(
+      layoutFlexGrow: _parseDouble(map['layout_flexGrow'], fallback: 0),
+      layoutFlexShrink: _parseDouble(map['layout_flexShrink'], fallback: 1),
+      layoutAlignSelf: _parseAlignSelf(map['layout_alignSelf']),
+      layoutFlexBasisPercent:
+          _parseDouble(map['layout_flexBasisPercent'], fallback: -1),
+      layoutWrapBefore: _parseBool(map['layout_wrapBefore'], fallback: false),
+    );
+    if (style.isDefault) return null;
+    return style;
+  }
+
+  double _parseDouble(dynamic raw, {required double fallback}) {
+    if (raw == null) return fallback;
+    if (raw is num) return raw.toDouble();
+    final text = raw.toString().trim();
+    if (text.isEmpty) return fallback;
+    return double.tryParse(text) ?? fallback;
+  }
+
+  bool _parseBool(dynamic raw, {required bool fallback}) {
+    if (raw == null) return fallback;
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    final text = raw.toString().trim().toLowerCase();
+    if (text.isEmpty) return fallback;
+    if (text == 'true' || text == '1' || text == 'yes') return true;
+    if (text == 'false' || text == '0' || text == 'no') return false;
+    return fallback;
+  }
+
+  String _parseAlignSelf(dynamic raw) {
+    final text = raw?.toString().trim();
+    if (text == null || text.isEmpty) return 'auto';
+    return text;
   }
 
   bool _looksLikeJsonArray(String value) {

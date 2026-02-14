@@ -359,6 +359,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _updateBookmarkStatus();
 
     _syncPageFactoryChapters();
+    unawaited(_prefetchNeighborChapters(centerIndex: index));
 
     // 如果是非滚动模式，需要在build后进行分页
     _isRestoringProgress = restoreOffset;
@@ -448,6 +449,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _currentTitle = _pageFactory.currentChapterTitle;
     });
     unawaited(_saveProgress());
+    if (chapterChanged) {
+      unawaited(_prefetchNeighborChapters(centerIndex: factoryChapterIndex));
+    }
 
     if (!chapterChanged || _isHydratingChapterFromPageFactory) return;
 
@@ -471,10 +475,67 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
+  Future<void> _prefetchNeighborChapters({required int centerIndex}) async {
+    if (centerIndex < 0 || centerIndex >= _chapters.length) return;
+
+    final tasks = <Future<void>>[];
+    final prevIndex = centerIndex - 1;
+    if (prevIndex >= 0) {
+      tasks.add(_prefetchChapterIfNeeded(prevIndex));
+    }
+    final nextIndex = centerIndex + 1;
+    if (nextIndex < _chapters.length) {
+      tasks.add(_prefetchChapterIfNeeded(nextIndex));
+    }
+    if (tasks.isEmpty) return;
+
+    await Future.wait(tasks);
+  }
+
+  Future<void> _prefetchChapterIfNeeded(int index) async {
+    if (index < 0 || index >= _chapters.length) return;
+
+    final chapter = _chapters[index];
+    if ((chapter.content ?? '').trim().isNotEmpty) return;
+    if (_chapterContentInFlight.containsKey(chapter.id)) return;
+
+    final book = _bookRepo.getBookById(widget.bookId);
+    final chapterUrl = (chapter.url ?? '').trim();
+    final canFetchFromSource = chapterUrl.isNotEmpty &&
+        (book == null || !book.isLocal) &&
+        _resolveActiveSourceUrl(book).isNotEmpty;
+    if (!canFetchFromSource) return;
+
+    try {
+      final content = await _fetchChapterContent(
+        chapter: chapter,
+        index: index,
+        book: book,
+        showLoading: false,
+      );
+      if (content.trim().isEmpty) return;
+
+      await _computeReplaceStage(
+        chapterId: chapter.id,
+        rawTitle: chapter.title,
+        rawContent: content,
+      );
+
+      if (!mounted) return;
+      _syncPageFactoryChapters(keepPosition: true);
+      if (_settings.pageTurnMode != PageTurnMode.scroll) {
+        _paginateContentLogicOnly();
+      }
+    } catch (_) {
+      // 预加载失败不影响当前阅读流程。
+    }
+  }
+
   Future<String> _fetchChapterContent({
     required Chapter chapter,
     required int index,
     Book? book,
+    bool showLoading = true,
   }) async {
     final inFlight = _chapterContentInFlight[chapter.id];
     if (inFlight != null) {
@@ -484,6 +545,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       chapter: chapter,
       index: index,
       book: book,
+      showLoading: showLoading,
     );
     _chapterContentInFlight[chapter.id] = task;
     try {
@@ -499,6 +561,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required Chapter chapter,
     required int index,
     Book? book,
+    bool showLoading = true,
   }) async {
     final sourceUrl = _resolveActiveSourceUrl(book);
     if (sourceUrl.isEmpty) {
@@ -510,7 +573,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _currentSourceUrl = source.bookSourceUrl;
     _currentSourceName = source.bookSourceName;
 
-    if (mounted) {
+    if (showLoading && mounted) {
       setState(() => _isLoadingChapter = true);
     }
 
@@ -530,7 +593,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             chapter.copyWith(content: content, isDownloaded: true);
       }
     } finally {
-      if (mounted) {
+      if (showLoading && mounted) {
         setState(() => _isLoadingChapter = false);
       }
     }
@@ -1736,6 +1799,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           author: _bookAuthor,
           sourceId: _currentSourceUrl,
           sourceUrl: _currentSourceUrl,
+          bookUrl: null,
           latestChapter: _currentTitle,
           totalChapters: _chapters.length,
           currentChapter: _currentChapterIndex,
@@ -1816,6 +1880,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final result = candidate.book;
     final previousSourceUrl = _currentSourceUrl;
     final previousSourceName = _currentSourceName;
+    final previousBookUrl = _bookRepo.getBookById(widget.bookId)?.bookUrl;
     final previousChapterIndex = _currentChapterIndex;
     final previousTitle = _currentTitle;
     final previousChapters = List<Chapter>.from(_chapters);
@@ -1869,6 +1934,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             oldBook.copyWith(
               sourceId: source.bookSourceUrl,
               sourceUrl: source.bookSourceUrl,
+              bookUrl: result.bookUrl.trim(),
               latestChapter: newChapters.last.title,
               totalChapters: newChapters.length,
               currentChapter: 0,
@@ -1905,6 +1971,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               oldBook.copyWith(
                 sourceId: previousSourceUrl,
                 sourceUrl: previousSourceUrl,
+                bookUrl: previousBookUrl,
                 latestChapter: previousChapters.isEmpty
                     ? oldBook.latestChapter
                     : previousChapters.last.title,
@@ -3335,21 +3402,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       throw StateError('书名为空，无法检查更新');
     }
 
-    // 通过“当前书源搜索”拿回 bookUrl（BookEntity 未持久化 bookUrl，因此只能走该策略）
-    final results = await _ruleEngine.search(source, keyword);
-    final target = _pickBestUpdateTarget(book: book, results: results);
-    if (target == null) {
-      throw StateError('未在当前书源搜索到匹配书籍');
+    var targetBookUrl = (book.bookUrl ?? '').trim();
+    if (targetBookUrl.isEmpty) {
+      final results = await _ruleEngine.search(source, keyword);
+      final target = _pickBestUpdateTarget(book: book, results: results);
+      if (target == null) {
+        throw StateError('未在当前书源搜索到匹配书籍');
+      }
+      targetBookUrl = target.bookUrl.trim();
+    }
+    if (targetBookUrl.isEmpty) {
+      throw StateError('详情链接为空，无法检查更新');
     }
 
     final detail = await _ruleEngine.getBookInfo(
       source,
-      target.bookUrl,
+      targetBookUrl,
       clearRuntimeVariables: true,
     );
     final tocUrl = detail?.tocUrl.trim().isNotEmpty == true
         ? detail!.tocUrl.trim()
-        : target.bookUrl.trim();
+        : targetBookUrl;
     if (tocUrl.isEmpty) {
       throw StateError('目录地址为空（可能详情解析失败）');
     }
@@ -3422,6 +3495,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     await _bookRepo.updateBook(
       book.copyWith(
+        bookUrl: targetBookUrl,
         totalChapters: updated.length,
         latestChapter:
             updated.isNotEmpty ? updated.last.title : book.latestChapter,

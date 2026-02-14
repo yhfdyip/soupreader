@@ -66,57 +66,57 @@ class ReadingSettings {
 
   const ReadingSettings({
     // 安装后默认值：尽量对齐 Legado 的阅读默认体验
-    this.fontSize = 18.0,
-    this.lineHeight = 1.5,
+    this.fontSize = 24.0,
+    this.lineHeight = 1.42,
     this.letterSpacing = 0.0,
-    this.paragraphSpacing = 0.0,
-    this.marginHorizontal = 20.0,
-    this.marginVertical = 16.0,
-    // Legado 常见默认主题更偏“护眼纸色”，对应本项目的 index=2（护眼）
-    this.themeIndex = 2,
+    this.paragraphSpacing = 6.0,
+    this.marginHorizontal = 22.0,
+    this.marginVertical = 5.0,
+    // Legado 默认首套排版的纸色主题（本项目在 AppColors.readingThemes 末尾追加）
+    this.themeIndex = 9,
     this.fontFamilyIndex = 0,
-    // Legado 默认翻页通常为“仿真”
-    this.pageTurnMode = PageTurnMode.simulation,
+    // Legado 默认翻页：覆盖
+    this.pageTurnMode = PageTurnMode.cover,
     this.keepScreenOn = false,
     this.showStatusBar = true,
     this.showBattery = true,
     this.showTime = true,
     this.showProgress = true,
     this.showChapterProgress = true,
-    this.brightness = 0.8,
+    this.brightness = 1.0,
     this.useSystemBrightness = true,
     // 新增字段默认值
     this.textBold = 0,
     this.paragraphIndent = '　　',
     this.titleMode = 0,
-    this.titleSize = 0,
+    this.titleSize = 4,
     this.titleTopSpacing = 0,
     this.titleBottomSpacing = 0,
-    this.textFullJustify = false,
+    this.textFullJustify = true,
     this.underline = false,
-    this.paddingTop = 16.0,
-    this.paddingBottom = 16.0,
-    this.paddingLeft = 20.0,
-    this.paddingRight = 20.0,
+    this.paddingTop = 5.0,
+    this.paddingBottom = 4.0,
+    this.paddingLeft = 22.0,
+    this.paddingRight = 22.0,
     this.clickActions = const {},
-    this.autoReadSpeed = 50,
+    this.autoReadSpeed = 10,
     // 翻页动画增强默认值
     this.pageAnimDuration = 300,
     // 产品约束：除“滚动”以外的翻页模式一律水平；滚动模式由渲染层决定纵向滚动
     this.pageDirection = PageDirection.horizontal,
-    this.pageTouchSlop = 25,
-    this.volumeKeyPage = false,
+    this.pageTouchSlop = 0,
+    this.volumeKeyPage = true,
     // 页眉/页脚配置默认值
     this.hideHeader = false,
     this.hideFooter = false,
-    this.showHeaderLine = false,
-    this.showFooterLine = false,
-    this.headerLeftContent = 0, // 书名
+    this.showHeaderLine = true,
+    this.showFooterLine = true,
+    this.headerLeftContent = 3, // 时间
     this.headerCenterContent = 2, // 无
-    this.headerRightContent = 1, // 章节名
-    this.footerLeftContent = 2, // 时间
-    this.footerCenterContent = 0, // 进度
-    this.footerRightContent = 3, // 电量
+    this.headerRightContent = 4, // 电量
+    this.footerLeftContent = 5, // 章节名
+    this.footerCenterContent = 4, // 无
+    this.footerRightContent = 8, // 页码/总页
     // 其他功能开关
     this.chineseTraditional = false,
     this.cleanChapterTitle = false,
@@ -134,7 +134,7 @@ class ReadingSettings {
         ? rawPageTurnMode
         : rawPageTurnMode is num
             ? rawPageTurnMode.toInt()
-            : PageTurnMode.simulation.index;
+            : PageTurnMode.cover.index;
     final safePageTurnModeIndex =
         pageTurnModeIndex.clamp(0, PageTurnMode.values.length - 1);
     final safePageTurnMode = PageTurnMode.values[safePageTurnModeIndex];
@@ -152,17 +152,17 @@ class ReadingSettings {
         pageDirectionIndex.clamp(0, PageDirection.values.length - 1);
 
     return ReadingSettings(
-      fontSize: (json['fontSize'] as num?)?.toDouble() ?? 18.0,
-      lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.5,
+      fontSize: (json['fontSize'] as num?)?.toDouble() ?? 24.0,
+      lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.42,
       letterSpacing: (json['letterSpacing'] as num?)?.toDouble() ?? 0.0,
-      paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble() ?? 0.0,
+      paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble() ?? 6.0,
       marginHorizontal: (json['marginHorizontal'] as num?)?.toDouble() ??
           (json['paddingH'] as num?)?.toDouble() ??
-          20.0,
+          22.0,
       marginVertical: (json['marginVertical'] as num?)?.toDouble() ??
           (json['paddingV'] as num?)?.toDouble() ??
-          16.0,
-      themeIndex: json['themeIndex'] as int? ?? 2,
+          5.0,
+      themeIndex: json['themeIndex'] as int? ?? 9,
       fontFamilyIndex: json['fontFamilyIndex'] as int? ?? 0,
       pageTurnMode: safePageTurnMode,
       keepScreenOn: json['keepScreenOn'] as bool? ?? false,
@@ -171,42 +171,42 @@ class ReadingSettings {
       showTime: json['showTime'] as bool? ?? true,
       showProgress: json['showProgress'] as bool? ?? true,
       showChapterProgress: json['showChapterProgress'] as bool? ?? true,
-      brightness: (json['brightness'] as num?)?.toDouble() ?? 0.8,
+      brightness: (json['brightness'] as num?)?.toDouble() ?? 1.0,
       useSystemBrightness: json['useSystemBrightness'] as bool? ?? true,
       // 新增字段
       textBold: json['textBold'] as int? ?? 0,
       paragraphIndent: json['paragraphIndent'] as String? ?? '　　',
       titleMode: json['titleMode'] as int? ?? 0,
-      titleSize: json['titleSize'] as int? ?? 0,
+      titleSize: json['titleSize'] as int? ?? 4,
       titleTopSpacing: (json['titleTopSpacing'] as num?)?.toDouble() ?? 0,
       titleBottomSpacing: (json['titleBottomSpacing'] as num?)?.toDouble() ?? 0,
-      textFullJustify: json['textFullJustify'] as bool? ?? false,
+      textFullJustify: json['textFullJustify'] as bool? ?? true,
       underline: json['underline'] as bool? ?? false,
-      paddingTop: (json['paddingTop'] as num?)?.toDouble() ?? 16.0,
-      paddingBottom: (json['paddingBottom'] as num?)?.toDouble() ?? 16.0,
-      paddingLeft: (json['paddingLeft'] as num?)?.toDouble() ?? 20.0,
-      paddingRight: (json['paddingRight'] as num?)?.toDouble() ?? 20.0,
+      paddingTop: (json['paddingTop'] as num?)?.toDouble() ?? 5.0,
+      paddingBottom: (json['paddingBottom'] as num?)?.toDouble() ?? 4.0,
+      paddingLeft: (json['paddingLeft'] as num?)?.toDouble() ?? 22.0,
+      paddingRight: (json['paddingRight'] as num?)?.toDouble() ?? 22.0,
       clickActions: (json['clickActions'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, v as int),
           ) ??
           const {},
-      autoReadSpeed: json['autoReadSpeed'] as int? ?? 50,
+      autoReadSpeed: json['autoReadSpeed'] as int? ?? 10,
       // 翻页动画增强
       pageAnimDuration: json['pageAnimDuration'] as int? ?? 300,
       pageDirection: PageDirection.values[safePageDirectionIndex],
-      pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
-      volumeKeyPage: json['volumeKeyPage'] as bool? ?? false,
+      pageTouchSlop: json['pageTouchSlop'] as int? ?? 0,
+      volumeKeyPage: json['volumeKeyPage'] as bool? ?? true,
       // 页眉/页脚配置
       hideHeader: json['hideHeader'] as bool? ?? false,
       hideFooter: json['hideFooter'] as bool? ?? false,
-      showHeaderLine: json['showHeaderLine'] as bool? ?? false,
-      showFooterLine: json['showFooterLine'] as bool? ?? false,
-      headerLeftContent: json['headerLeftContent'] as int? ?? 0,
+      showHeaderLine: json['showHeaderLine'] as bool? ?? true,
+      showFooterLine: json['showFooterLine'] as bool? ?? true,
+      headerLeftContent: json['headerLeftContent'] as int? ?? 3,
       headerCenterContent: json['headerCenterContent'] as int? ?? 2,
-      headerRightContent: json['headerRightContent'] as int? ?? 1,
-      footerLeftContent: json['footerLeftContent'] as int? ?? 2,
-      footerCenterContent: json['footerCenterContent'] as int? ?? 0,
-      footerRightContent: json['footerRightContent'] as int? ?? 3,
+      headerRightContent: json['headerRightContent'] as int? ?? 4,
+      footerLeftContent: json['footerLeftContent'] as int? ?? 5,
+      footerCenterContent: json['footerCenterContent'] as int? ?? 4,
+      footerRightContent: json['footerRightContent'] as int? ?? 8,
       // 其他功能开关
       chineseTraditional: json['chineseTraditional'] as bool? ?? false,
       cleanChapterTitle: json['cleanChapterTitle'] as bool? ?? false,

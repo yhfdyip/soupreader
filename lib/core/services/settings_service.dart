@@ -11,7 +11,10 @@ class SettingsService {
   SettingsService._internal();
 
   static const String _keyReadingSettings = 'reading_settings';
+  static const String _keyReadingSettingsSchemaVersion =
+      'reading_settings_schema_version';
   static const String _keyAppSettings = 'app_settings';
+  static const int _readingSettingsSchemaVersion = 2;
 
   late SharedPreferences _prefs;
   late ReadingSettings _readingSettings;
@@ -38,9 +41,8 @@ class SettingsService {
       _readingSettings = const ReadingSettings();
     }
 
-    // 迁移：翻页方向对用户隐藏，统一采用“垂直”。
-    // - 防止 UI 隐藏后用户还停留在水平导致体验不一致
-    await _migratePageDirectionToVertical();
+    await _migrateReadingSettingsSchema();
+    await _normalizePageDirectionByMode();
 
     final appJson = _prefs.getString(_keyAppSettings);
     if (appJson != null) {
@@ -55,9 +57,27 @@ class SettingsService {
     _appSettingsNotifier.value = _appSettings;
   }
 
-  Future<void> _migratePageDirectionToVertical() async {
-    const target = PageDirection.vertical;
+  Future<void> _migrateReadingSettingsSchema() async {
+    final currentVersion = _prefs.getInt(_keyReadingSettingsSchemaVersion) ?? 0;
+    if (currentVersion >= _readingSettingsSchemaVersion) {
+      return;
+    }
+    // 对齐 legado：对现网用户做一次性全量阅读设置重置。
+    _readingSettings = const ReadingSettings();
+    await _prefs.setString(
+      _keyReadingSettings,
+      json.encode(_readingSettings.toJson()),
+    );
+    await _prefs.setInt(
+      _keyReadingSettingsSchemaVersion,
+      _readingSettingsSchemaVersion,
+    );
+  }
 
+  Future<void> _normalizePageDirectionByMode() async {
+    final target = _readingSettings.pageTurnMode == PageTurnMode.scroll
+        ? PageDirection.vertical
+        : PageDirection.horizontal;
     if (_readingSettings.pageDirection != target) {
       _readingSettings = _readingSettings.copyWith(pageDirection: target);
       await _prefs.setString(
@@ -102,7 +122,8 @@ class SettingsService {
   }
 
   double getScrollOffset(String bookId, {int? chapterIndex}) {
-    return _prefs.getDouble(_scrollOffsetKey(bookId, chapterIndex: chapterIndex)) ??
+    return _prefs
+            .getDouble(_scrollOffsetKey(bookId, chapterIndex: chapterIndex)) ??
         0.0;
   }
 
@@ -122,7 +143,8 @@ class SettingsService {
     String bookId, {
     required int chapterIndex,
   }) {
-    final value = _prefs.getDouble(_chapterPageProgressKey(bookId, chapterIndex));
+    final value =
+        _prefs.getDouble(_chapterPageProgressKey(bookId, chapterIndex));
     if (value == null) return 0.0;
     return value.clamp(0.0, 1.0).toDouble();
   }

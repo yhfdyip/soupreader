@@ -311,19 +311,48 @@ class _SoupReaderAppState extends State<SoupReaderApp>
 }
 
 /// 主屏幕（带底部导航）
-class MainScreen extends StatelessWidget {
+class MainScreen extends StatefulWidget {
   final Brightness brightness;
 
   const MainScreen({super.key, required this.brightness});
 
   @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  late final CupertinoTabController _tabController;
+  final ValueNotifier<int> _discoveryCompressSignal = ValueNotifier<int>(0);
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = CupertinoTabController();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _discoveryCompressSignal.dispose();
+    super.dispose();
+  }
+
+  void _onTabTap(int index) {
+    if (index == _tabController.index && index == 1) {
+      _discoveryCompressSignal.value++;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
+      controller: _tabController,
       tabBar: CupertinoTabBar(
-        backgroundColor: AppCupertinoTheme.tabBarBackground(brightness),
-        activeColor: AppCupertinoTheme.tabBarActive(brightness),
-        inactiveColor: AppCupertinoTheme.tabBarInactive(brightness),
-        border: AppCupertinoTheme.tabBarBorder(brightness),
+        backgroundColor: AppCupertinoTheme.tabBarBackground(widget.brightness),
+        activeColor: AppCupertinoTheme.tabBarActive(widget.brightness),
+        inactiveColor: AppCupertinoTheme.tabBarInactive(widget.brightness),
+        border: AppCupertinoTheme.tabBarBorder(widget.brightness),
+        onTap: _onTabTap,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.book),
@@ -359,7 +388,9 @@ class MainScreen extends StatelessWidget {
               case 0:
                 return const BookshelfView();
               case 1:
-                return const DiscoveryView();
+                return DiscoveryView(
+                  compressSignal: _discoveryCompressSignal,
+                );
               case 2:
                 return const SearchView();
               case 3:

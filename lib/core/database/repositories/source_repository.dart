@@ -30,6 +30,16 @@ class SourceRepository {
     _ensureWatchStarted();
   }
 
+  static String _normalizeUrlKey(String? raw) {
+    return (raw ?? '').trim();
+  }
+
+  static BookSource _normalizeSource(BookSource source) {
+    final normalizedUrl = _normalizeUrlKey(source.bookSourceUrl);
+    if (normalizedUrl == source.bookSourceUrl) return source;
+    return source.copyWith(bookSourceUrl: normalizedUrl);
+  }
+
   static Future<void> bootstrap(DatabaseService db) async {
     final repo = SourceRepository(db);
     await repo._reloadCacheFromDb();
@@ -91,39 +101,50 @@ class SourceRepository {
     if (!_cacheReady) {
       unawaited(_reloadCacheFromDb());
     }
-    return _cacheByUrl[url];
+    final key = _normalizeUrlKey(url);
+    if (key.isEmpty) return null;
+    return _cacheByUrl[key];
   }
 
   String? getRawJsonByUrl(String url) {
     if (!_cacheReady) {
       unawaited(_reloadCacheFromDb());
     }
-    return _rawJsonByUrl[url];
+    final key = _normalizeUrlKey(url);
+    if (key.isEmpty) return null;
+    return _rawJsonByUrl[key];
   }
 
   Future<void> addSource(BookSource source) async {
+    final normalizedSource = _normalizeSource(source);
+    final url = _normalizeUrlKey(normalizedSource.bookSourceUrl);
+    if (url.isEmpty) {
+      throw const FormatException('bookSourceUrl 不能为空');
+    }
     await _driftDb
         .into(_driftDb.sourceRecords)
-        .insertOnConflictUpdate(_sourceToCompanion(source));
-    _cacheByUrl[source.bookSourceUrl] = source;
-    _rawJsonByUrl[source.bookSourceUrl] = LegadoJson.encode(source.toJson());
+        .insertOnConflictUpdate(_sourceToCompanion(normalizedSource));
+    _cacheByUrl[url] = normalizedSource;
+    _rawJsonByUrl[url] = LegadoJson.encode(normalizedSource.toJson());
     _emitCacheSnapshot();
   }
 
   Future<void> addSources(List<BookSource> sources) async {
     if (sources.isEmpty) return;
-    final companions = sources
-        .where((source) => source.bookSourceUrl.trim().isNotEmpty)
-        .map(_sourceToCompanion)
+    final normalizedSources = sources
+        .map(_normalizeSource)
+        .where((source) => _normalizeUrlKey(source.bookSourceUrl).isNotEmpty)
         .toList(growable: false);
+    final companions =
+        normalizedSources.map(_sourceToCompanion).toList(growable: false);
     if (companions.isEmpty) return;
 
     await _driftDb.batch((batch) {
       batch.insertAllOnConflictUpdate(_driftDb.sourceRecords, companions);
     });
 
-    for (final source in sources) {
-      final url = source.bookSourceUrl.trim();
+    for (final source in normalizedSources) {
+      final url = _normalizeUrlKey(source.bookSourceUrl);
       if (url.isEmpty) continue;
       _cacheByUrl[url] = source;
       _rawJsonByUrl[url] = LegadoJson.encode(source.toJson());
@@ -148,24 +169,24 @@ class SourceRepository {
         ? decoded
         : decoded.map((key, value) => MapEntry('$key', value));
 
-    final source = BookSource.fromJson(map);
-    final url = source.bookSourceUrl.trim();
+    final source = _normalizeSource(BookSource.fromJson(map));
+    final url = _normalizeUrlKey(source.bookSourceUrl);
     if (url.isEmpty) {
       throw const FormatException('bookSourceUrl 不能为空');
     }
 
+    map['bookSourceUrl'] = url;
     final normalizedRawJson = LegadoJson.encode(map);
     final companion = _sourceToCompanion(
       source,
       rawJsonOverride: normalizedRawJson,
     );
+    final normalizedOriginalUrl = _normalizeUrlKey(originalUrl);
 
     await _driftDb.transaction(() async {
-      if (originalUrl != null &&
-          originalUrl.trim().isNotEmpty &&
-          originalUrl.trim() != url) {
+      if (normalizedOriginalUrl.isNotEmpty && normalizedOriginalUrl != url) {
         await (_driftDb.delete(_driftDb.sourceRecords)
-              ..where((tbl) => tbl.bookSourceUrl.equals(originalUrl.trim())))
+              ..where((tbl) => tbl.bookSourceUrl.equals(normalizedOriginalUrl)))
             .go();
       }
       await _driftDb.into(_driftDb.sourceRecords).insertOnConflictUpdate(
@@ -173,11 +194,9 @@ class SourceRepository {
           );
     });
 
-    if (originalUrl != null &&
-        originalUrl.trim().isNotEmpty &&
-        originalUrl.trim() != url) {
-      _cacheByUrl.remove(originalUrl.trim());
-      _rawJsonByUrl.remove(originalUrl.trim());
+    if (normalizedOriginalUrl.isNotEmpty && normalizedOriginalUrl != url) {
+      _cacheByUrl.remove(normalizedOriginalUrl);
+      _rawJsonByUrl.remove(normalizedOriginalUrl);
     }
     _cacheByUrl[url] = source;
     _rawJsonByUrl[url] = normalizedRawJson;
@@ -185,11 +204,13 @@ class SourceRepository {
   }
 
   Future<void> deleteSource(String url) async {
+    final normalizedUrl = _normalizeUrlKey(url);
+    if (normalizedUrl.isEmpty) return;
     await (_driftDb.delete(_driftDb.sourceRecords)
-          ..where((tbl) => tbl.bookSourceUrl.equals(url)))
+          ..where((tbl) => tbl.bookSourceUrl.equals(normalizedUrl)))
         .go();
-    _cacheByUrl.remove(url);
-    _rawJsonByUrl.remove(url);
+    _cacheByUrl.remove(normalizedUrl);
+    _rawJsonByUrl.remove(normalizedUrl);
     _emitCacheSnapshot();
   }
 
@@ -204,24 +225,29 @@ class SourceRepository {
     BookSource source, {
     String? rawJsonOverride,
   }) {
+    final normalizedSource = _normalizeSource(source);
+    final url = _normalizeUrlKey(normalizedSource.bookSourceUrl);
+    if (url.isEmpty) {
+      throw const FormatException('bookSourceUrl 不能为空');
+    }
     final normalizedRawJson =
-        rawJsonOverride ?? LegadoJson.encode(source.toJson());
+        rawJsonOverride ?? LegadoJson.encode(normalizedSource.toJson());
     final now = DateTime.now().millisecondsSinceEpoch;
     return SourceRecordsCompanion.insert(
-      bookSourceUrl: source.bookSourceUrl,
-      bookSourceName: Value(source.bookSourceName),
-      bookSourceGroup: Value(source.bookSourceGroup),
-      bookSourceType: Value(source.bookSourceType),
-      enabled: Value(source.enabled),
-      enabledExplore: Value(source.enabledExplore),
-      enabledCookieJar: Value(source.enabledCookieJar),
-      weight: Value(source.weight),
-      customOrder: Value(source.customOrder),
-      respondTime: Value(source.respondTime),
-      header: Value(source.header),
-      loginUrl: Value(source.loginUrl),
-      bookSourceComment: Value(source.bookSourceComment),
-      lastUpdateTime: Value(source.lastUpdateTime),
+      bookSourceUrl: url,
+      bookSourceName: Value(normalizedSource.bookSourceName),
+      bookSourceGroup: Value(normalizedSource.bookSourceGroup),
+      bookSourceType: Value(normalizedSource.bookSourceType),
+      enabled: Value(normalizedSource.enabled),
+      enabledExplore: Value(normalizedSource.enabledExplore),
+      enabledCookieJar: Value(normalizedSource.enabledCookieJar),
+      weight: Value(normalizedSource.weight),
+      customOrder: Value(normalizedSource.customOrder),
+      respondTime: Value(normalizedSource.respondTime),
+      header: Value(normalizedSource.header),
+      loginUrl: Value(normalizedSource.loginUrl),
+      bookSourceComment: Value(normalizedSource.bookSourceComment),
+      lastUpdateTime: Value(normalizedSource.lastUpdateTime),
       rawJson: Value(normalizedRawJson),
       updatedAt: Value(now),
     );

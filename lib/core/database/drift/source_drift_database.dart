@@ -57,6 +57,8 @@ class BookRecords extends Table {
 
   TextColumn get sourceUrl => text().nullable()();
 
+  TextColumn get bookUrl => text().nullable()();
+
   TextColumn get latestChapter => text().nullable()();
 
   IntColumn get totalChapters => integer().withDefault(const Constant(0))();
@@ -185,7 +187,7 @@ class SourceDriftDatabase extends _$SourceDriftDatabase {
   SourceDriftDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -199,6 +201,9 @@ class SourceDriftDatabase extends _$SourceDriftDatabase {
             await m.createTable(replaceRuleRecords);
             await m.createTable(appKeyValueRecords);
             await m.createTable(bookmarkRecords);
+          }
+          if (from >= 2 && from < 3) {
+            await m.addColumn(bookRecords, bookRecords.bookUrl);
           }
         },
       );

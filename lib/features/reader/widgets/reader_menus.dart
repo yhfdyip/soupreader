@@ -212,6 +212,17 @@ class ReaderBottomMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxChapterIndex = (totalChapters - 1).clamp(0, 9999);
+    final canSlideChapter = maxChapterIndex > 0;
+    // CupertinoSlider 在 min==max 时语义计算会除 0，需保证可渲染范围大于 0。
+    final chapterSliderMax = canSlideChapter ? maxChapterIndex.toDouble() : 1.0;
+    final chapterSliderValue = currentChapterIndex
+        .toDouble()
+        .clamp(0.0, chapterSliderMax)
+        .toDouble();
+    final safeBrightness =
+        settings.brightness.isFinite ? settings.brightness : 1.0;
+
     return Positioned(
       bottom: 0,
       left: 0,
@@ -242,15 +253,19 @@ class ReaderBottomMenu extends StatelessWidget {
                   child: Column(
                     children: [
                       CupertinoSlider(
-                        value: currentChapterIndex.toDouble(),
+                        value: chapterSliderValue,
                         min: 0,
-                        max: (totalChapters - 1).toDouble(),
+                        max: chapterSliderMax,
                         activeColor: AppDesignTokens.brandSecondary,
                         thumbColor: AppDesignTokens.brandSecondary,
-                        onChanged: (value) {
-                          // 实时更新章节（拖动时立即跳转）
-                          onChapterChanged(value.toInt());
-                        },
+                        onChanged: canSlideChapter
+                            ? (value) {
+                                // 实时更新章节（拖动时立即跳转）
+                                onChapterChanged(
+                                  value.round().clamp(0, maxChapterIndex).toInt(),
+                                );
+                              }
+                            : null,
                       ),
                       Text(
                         '${currentChapterIndex + 1} / $totalChapters',
@@ -276,7 +291,7 @@ class ReaderBottomMenu extends StatelessWidget {
                     color: CupertinoColors.systemGrey, size: 20),
                 Expanded(
                   child: CupertinoSlider(
-                    value: settings.brightness,
+                    value: safeBrightness.clamp(0.0, 1.0).toDouble(),
                     min: 0.0,
                     max: 1.0,
                     activeColor: AppDesignTokens.brandSecondary,

@@ -3131,6 +3131,7 @@ class RuleParserEngine {
     required String method,
     required String? body,
     required int retry,
+    CancelToken? cancelToken,
   }) async {
     final maxAttempt = retry < 0 ? 0 : retry;
     Object? lastError;
@@ -3140,6 +3141,7 @@ class RuleParserEngine {
         final response = await dio.request<List<int>>(
           url,
           data: _isBodyMethod(method) ? (body ?? '') : null,
+          cancelToken: cancelToken,
           options: options,
         );
         return (response: response, retryCount: attempt);
@@ -4360,7 +4362,10 @@ class RuleParserEngine {
 
   /// 搜索调试：返回「请求/解析」过程的关键诊断信息
   Future<SearchDebugResult> searchDebug(
-      BookSource source, String keyword) async {
+    BookSource source,
+    String keyword, {
+    CancelToken? cancelToken,
+  }) async {
     final searchRule = source.ruleSearch;
     final searchUrlRule = source.searchUrl;
     if (searchRule == null || searchUrlRule == null || searchUrlRule.isEmpty) {
@@ -4391,6 +4396,7 @@ class RuleParserEngine {
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
       concurrentRate: source.concurrentRate,
+      cancelToken: cancelToken,
     );
     if (fetch.body == null) {
       return SearchDebugResult(
@@ -4564,6 +4570,7 @@ class RuleParserEngine {
   Future<List<SearchResult>> explore(
     BookSource source, {
     String? exploreUrlOverride,
+    int page = 1,
   }) async {
     _clearRuntimeVariables();
     final exploreRule = source.ruleExplore;
@@ -4578,7 +4585,9 @@ class RuleParserEngine {
       final exploreUrl = _buildUrl(
         source.bookSourceUrl,
         exploreUrlRule,
-        const {},
+        <String, String>{
+          'page': '$page',
+        },
         jsLib: source.jsLib,
       );
 
@@ -4703,6 +4712,7 @@ class RuleParserEngine {
   Future<ExploreDebugResult> exploreDebug(
     BookSource source, {
     String? exploreUrlOverride,
+    CancelToken? cancelToken,
   }) async {
     final exploreRule = source.ruleExplore;
     final exploreUrlRule = exploreUrlOverride ?? source.exploreUrl;
@@ -4735,6 +4745,7 @@ class RuleParserEngine {
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
       concurrentRate: source.concurrentRate,
+      cancelToken: cancelToken,
     );
     if (fetch.body == null) {
       return ExploreDebugResult(
@@ -6092,6 +6103,7 @@ class RuleParserEngine {
     bool? enabledCookieJar,
     String? sourceKey,
     String? concurrentRate,
+    CancelToken? cancelToken,
   }) async {
     final sw = Stopwatch()..start();
     final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
@@ -6191,6 +6203,7 @@ class RuleParserEngine {
           method: method,
           body: body,
           retry: retry,
+          cancelToken: cancelToken,
         );
       } finally {
         _releaseConcurrentRatePermit(permit.record);
@@ -6237,6 +6250,10 @@ class RuleParserEngine {
       sw.stop();
       final actualError = e is _RequestRetryFailure ? e.error : e;
       final actualRetryCount = e is _RequestRetryFailure ? e.retryCount : retry;
+      if (actualError is DioException &&
+          actualError.type == DioExceptionType.cancel) {
+        throw actualError;
+      }
       if (actualError is DioException) {
         final response = actualError.response;
         String? bodyText;

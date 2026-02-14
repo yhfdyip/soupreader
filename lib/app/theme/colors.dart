@@ -88,6 +88,13 @@ class AppColors {
     name: ReaderThemeTokens.amoled.name,
   );
 
+  /// Legado 默认首套主题
+  static final ReadingThemeColors legadoClassicTheme = ReadingThemeColors(
+    background: ReaderThemeTokens.legadoClassic.background,
+    text: ReaderThemeTokens.legadoClassic.text,
+    name: ReaderThemeTokens.legadoClassic.name,
+  );
+
   /// 所有阅读主题
   static final List<ReadingThemeColors> readingThemes = [
     dayTheme,
@@ -99,6 +106,7 @@ class AppColors {
     mintTheme,
     roseTheme,
     amoledTheme,
+    legadoClassicTheme,
   ];
 
   // ===== 功能色 =====

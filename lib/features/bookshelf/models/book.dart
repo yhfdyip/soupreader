@@ -7,6 +7,7 @@ class Book {
   final String? intro;
   final String? sourceId;
   final String? sourceUrl;
+  final String? bookUrl;
   final String? latestChapter;
   final int totalChapters;
   final int currentChapter;
@@ -24,6 +25,7 @@ class Book {
     this.intro,
     this.sourceId,
     this.sourceUrl,
+    this.bookUrl,
     this.latestChapter,
     this.totalChapters = 0,
     this.currentChapter = 0,
@@ -44,6 +46,7 @@ class Book {
       intro: json['intro'] as String?,
       sourceId: json['sourceId'] as String?,
       sourceUrl: json['sourceUrl'] as String?,
+      bookUrl: json['bookUrl'] as String?,
       latestChapter: json['latestChapter'] as String?,
       totalChapters: json['totalChapters'] as int? ?? 0,
       currentChapter: json['currentChapter'] as int? ?? 0,
@@ -69,6 +72,7 @@ class Book {
       'intro': intro,
       'sourceId': sourceId,
       'sourceUrl': sourceUrl,
+      'bookUrl': bookUrl,
       'latestChapter': latestChapter,
       'totalChapters': totalChapters,
       'currentChapter': currentChapter,
@@ -89,6 +93,7 @@ class Book {
     String? intro,
     String? sourceId,
     String? sourceUrl,
+    String? bookUrl,
     String? latestChapter,
     int? totalChapters,
     int? currentChapter,
@@ -106,6 +111,7 @@ class Book {
       intro: intro ?? this.intro,
       sourceId: sourceId ?? this.sourceId,
       sourceUrl: sourceUrl ?? this.sourceUrl,
+      bookUrl: bookUrl ?? this.bookUrl,
       latestChapter: latestChapter ?? this.latestChapter,
       totalChapters: totalChapters ?? this.totalChapters,
       currentChapter: currentChapter ?? this.currentChapter,
