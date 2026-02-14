@@ -192,6 +192,30 @@ void main() {
 
       expect(values, ['作者甲', '作者乙']);
     });
+
+    test('single token text/href are treated as current element extractors',
+        () {
+      final doc = html_parser.parse(
+        '<html><body><a id="c" href="/chapter/1">第一章</a></body></html>',
+      );
+      final element = doc.querySelector('a#c');
+      expect(element, isNotNull);
+      final engine = RuleParserEngine();
+
+      final textValue = engine.debugParseRule(
+        element!,
+        'text',
+        'https://example.com',
+      );
+      final hrefValue = engine.debugParseRule(
+        element,
+        'href',
+        'https://example.com',
+      );
+
+      expect(textValue, '第一章');
+      expect(hrefValue, 'https://example.com/chapter/1');
+    });
   });
 
   group('RuleParserEngine legado semantic compat across stages', () {
@@ -217,7 +241,7 @@ void main() {
 
       expect(list.length, 1);
       expect(list.first.name, '书名A');
-      expect(list.first.author, '作者A');
+      expect(list.first.author, '作者A\n1000字');
     });
 
     test('search supports legacy text.xxx selector prefix', () async {
@@ -265,7 +289,7 @@ void main() {
       );
 
       expect(list.length, 1);
-      expect(list.first.author, '作者A');
+      expect(list.first.author, '作者A\n1000字');
     });
 
     test('bookInfo uses @CSS / @@ prefixes', () async {
@@ -289,7 +313,7 @@ void main() {
 
       expect(detail, isNotNull);
       expect(detail!.name, '书名A');
-      expect(detail.author, '作者A');
+      expect(detail.author, '作者A\n1000字');
     });
 
     test('toc stage supports @CSS / @@ and dot index', () async {
@@ -310,6 +334,39 @@ void main() {
             <li><a href="/c1">第一章</a><a href="/ignore-1">x</a></li>
             <li><a href="/c2">第二章</a><a href="/ignore-2">x</a></li>
           </ul>
+        </body></html>
+      ''';
+
+      final toc = await withMockResponses(
+        {'https://example.com/toc': tocHtml},
+        () => engine.getToc(source, '/toc'),
+      );
+
+      expect(toc.map((e) => e.name).toList(), ['第一章', '第二章']);
+      expect(
+        toc.map((e) => e.url).toList(),
+        ['https://example.com/c1', 'https://example.com/c2'],
+      );
+    });
+
+    test('toc stage supports chapterName=text and chapterUrl=href', () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleToc: const TocRule(
+          chapterList: '#list a',
+          chapterName: 'text',
+          chapterUrl: 'href',
+        ),
+      );
+      const tocHtml = '''
+        <html><body>
+          <div id="list">
+            <a href="/c1">第一章</a>
+            <a href="/c2">第二章</a>
+          </div>
         </body></html>
       ''';
 

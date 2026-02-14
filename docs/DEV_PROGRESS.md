@@ -1771,3 +1771,70 @@
 - 行为更接近 legado：可能修正少量“历史上可用但语义不标准”的规则输出。
 - 旧语法兼容增强（`@CSS/@@`、旧式点号索引、`replaceFirst`），对已有标准 CSS 规则无破坏性变更。
 - 五段链路调试可观测性保持不变，仅解析结果语义更贴近 legado。
+
+## 2026-02-14（规则引擎再对齐 legado：单值多节点聚合 + URL 首值语义）
+
+### 已完成
+- `lib/features/source/services/rule_parser_engine.dart`
+  - 修复单值规则在 HTML 节点选择阶段仅取首节点的问题：
+    - `_parseSingleRule` 改为对 selector 命中的全部节点执行提取，再按语义聚合。
+  - 新增单值聚合双语义：
+    - 文本字段：多节点结果按 `\n` 合并（对齐 legado `AnalyzeByJSoup.getString`）。
+    - URL 字段：仅取首个非空值（对齐 legado `AnalyzeByJSoup.getString0`）。
+  - 新增 URL 专用解析辅助：
+    - `_parseRuleAsUrlRawLikeLegado`
+    - `_parseRuleAsUrlLikeLegado`
+  - 将 HTML 路径下的 URL 字段调用统一切换为 URL 专用语义（search/explore/bookInfo/toc 及对应 debug 路径），避免多节点文本拼接后再绝对化导致的 URL 异常。
+- `test/rule_parser_engine_legado_index_compat_test.dart`
+  - 新增 `td[5,4,3]@text` 回归：验证单值文本规则会按顺序换行聚合。
+  - 新增 URL 回归：验证 `td[1,0]@a@href`、`a[0,1]@href` 在 search/bookInfo/toc 场景下均按“首个非空值”取 URL。
+- `test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
+  - 更新既有断言，显式对齐 `td!0:1@text` 在单值文本路径下的多值换行语义。
+
+### 为什么
+- 线上反馈 `td[5,4,3]@text` 及同类多索引规则无法得到 legado 一致结果。
+- 根因是单值规则解析历史上只消费第一个匹配节点，导致多索引/多节点规则丢值。
+- 同时 URL 字段需要与 legado 保持 `getString0 + isUrl=true` 语义，否则在多节点场景会出现 URL 拼接异常。
+
+### 如何验证
+- 执行：`flutter test test/rule_parser_engine_legado_index_compat_test.dart --no-version-check`
+  - 结果：`All tests passed!`
+- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart --no-version-check`
+  - 结果：`All tests passed!`
+- 执行：`flutter analyze --no-version-check`
+  - 结果：`No issues found!`
+
+### 兼容影响
+- 文本单值规则：
+  - 多索引/多节点不再默认截断为首值，改为与 legado 一致的换行聚合；
+  - 部分历史“依赖首值截断”的非标准写法会看到更完整结果。
+- URL 单值规则：
+  - 固定为“首个非空值 + 绝对化”，避免多值拼接 URL；
+  - 与 legado URL 获取路径保持一致，提升旧书源兼容稳定性。
+
+## 2026-02-14（修复目录空结果：单 token `text/href` 提取语义对齐 legado）
+
+### 已完成
+- `lib/features/source/services/rule_parser_engine.dart`
+  - 修复 `_LegadoTextRule.parse` 对单 token 规则的判定：
+    - 当规则仅 1 个 token 且命中 extractor（如 `text`、`href`）时，按“当前元素 extractor”处理，不再误判为 selector。
+  - 直接覆盖了 `ruleToc.chapterName = "text"`、`ruleToc.chapterUrl = "href"` 这类 legado 常见写法在 SoupReader 中章节名/链接为空的问题。
+- `test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
+  - 新增规则级回归：`text` / `href` 单 token 作为当前元素 extractor 的行为验证。
+  - 新增链路级回归：目录规则 `chapterList="#list a" + chapterName="text" + chapterUrl="href"` 可正常产出章节。
+
+### 为什么
+- 最小复现日志显示目录列表命中（`#list a` 列表大小 > 0），但章节名与章节链接均为空，最终 `章节总数:0`。
+- 根因是单 token `text/href` 被当作 selector 解析，导致查不到目标节点；与 legado `getResultLast` 的 extractor 语义不一致。
+
+### 如何验证
+- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart --no-version-check`
+  - 结果：`All tests passed!`
+- 执行：`flutter test test/rule_parser_engine_legado_index_compat_test.dart --no-version-check`
+  - 结果：`All tests passed!`
+- 执行：`flutter analyze --no-version-check`
+  - 结果：`No issues found!`
+
+### 兼容影响
+- 旧书源兼容性提升：`chapterName=text`、`chapterUrl=href`、以及其他单 token extractor 写法恢复 legado 预期行为。
+- 对已有 `selector@extractor`、`text.xxx`、`children.*` 等规则无破坏性变更。

@@ -3342,15 +3342,13 @@ class RuleParserEngine {
         final bookElements = _selectAllElementsByRule(document, bookListRule);
 
         for (final element in bookElements) {
-          var bookUrl = _parseRule(element, searchRule.bookUrl, searchUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(searchUrl, bookUrl);
-          }
-
-          var coverUrl = _parseRule(element, searchRule.coverUrl, searchUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(searchUrl, coverUrl);
-          }
+          final bookUrl =
+              _parseRuleAsUrlLikeLegado(element, searchRule.bookUrl, searchUrl);
+          final coverUrl = _parseRuleAsUrlLikeLegado(
+            element,
+            searchRule.coverUrl,
+            searchUrl,
+          );
 
           final result = SearchResult(
             name: _parseRule(element, searchRule.name, searchUrl),
@@ -3781,17 +3779,13 @@ class RuleParserEngine {
         final el = elements[i];
         final name = _parseRule(el, bookListRule.name, requestUrl);
         final author = _parseRule(el, bookListRule.author, requestUrl);
-        var coverUrl = _parseRule(el, bookListRule.coverUrl, requestUrl);
-        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-          coverUrl = _absoluteUrl(requestUrl, coverUrl);
-        }
+        final coverUrl =
+            _parseRuleAsUrlLikeLegado(el, bookListRule.coverUrl, requestUrl);
         final intro = _parseRule(el, bookListRule.intro, requestUrl);
         final lastChapter =
             _parseRule(el, bookListRule.lastChapter, requestUrl);
-        var bookUrl = _parseRule(el, bookListRule.bookUrl, requestUrl);
-        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-          bookUrl = _absoluteUrl(requestUrl, bookUrl);
-        }
+        final bookUrl =
+            _parseRuleAsUrlLikeLegado(el, bookListRule.bookUrl, requestUrl);
 
         // 对齐 legado：仅输出“一条有效样本”，避免 selector 命中广告/空节点导致样本全空而误导排查。
         if (!loggedSample && name.isNotEmpty && bookUrl.isNotEmpty) {
@@ -3973,7 +3967,11 @@ class RuleParserEngine {
     getField('获取简介', rule.intro);
     getField('获取封面', rule.coverUrl);
     log('┌获取目录链接');
-    final rawTocUrl = _parseRule(root, rule.tocUrl, parseBaseUrl);
+    final rawTocUrl = _parseRuleAsUrlRawLikeLegado(
+      root,
+      rule.tocUrl,
+      parseBaseUrl,
+    );
     if (rawTocUrl.trim().isEmpty) {
       log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
     }
@@ -4104,10 +4102,8 @@ class RuleParserEngine {
         for (var i = 0; i < elements.length; i++) {
           final el = elements[i];
           final name = _parseRule(el, tocRule.chapterName, currentUrl);
-          var url = _parseRule(el, tocRule.chapterUrl, currentUrl);
-          if (url.isNotEmpty && !url.startsWith('http')) {
-            url = _absoluteUrl(currentUrl, url);
-          }
+          final url =
+              _parseRuleAsUrlLikeLegado(el, tocRule.chapterUrl, currentUrl);
           if (toc.isEmpty && i == 0) {
             log('┌获取章节名');
             log('└$name');
@@ -4488,10 +4484,11 @@ class RuleParserEngine {
           final name = _parseRule(element, searchRule.name, requestUrl);
           final author = _parseRule(element, searchRule.author, requestUrl);
           final kind = _parseRule(element, searchRule.kind, requestUrl);
-          var coverUrl = _parseRule(element, searchRule.coverUrl, requestUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(requestUrl, coverUrl);
-          }
+          final coverUrl = _parseRuleAsUrlLikeLegado(
+            element,
+            searchRule.coverUrl,
+            requestUrl,
+          );
           final intro = _parseRule(element, searchRule.intro, requestUrl);
           final lastChapter =
               _parseRule(element, searchRule.lastChapter, requestUrl);
@@ -4499,10 +4496,11 @@ class RuleParserEngine {
               _parseRule(element, searchRule.updateTime, requestUrl);
           final wordCount =
               _parseRule(element, searchRule.wordCount, requestUrl);
-          var bookUrl = _parseRule(element, searchRule.bookUrl, requestUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(requestUrl, bookUrl);
-          }
+          final bookUrl = _parseRuleAsUrlLikeLegado(
+            element,
+            searchRule.bookUrl,
+            requestUrl,
+          );
 
           final result = SearchResult(
             name: name,
@@ -4655,14 +4653,16 @@ class RuleParserEngine {
         final bookElements = _selectAllElementsByRule(document, bookListRule);
 
         for (final element in bookElements) {
-          var bookUrl = _parseRule(element, exploreRule.bookUrl, exploreUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(exploreUrl, bookUrl);
-          }
-          var coverUrl = _parseRule(element, exploreRule.coverUrl, exploreUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(exploreUrl, coverUrl);
-          }
+          final bookUrl = _parseRuleAsUrlLikeLegado(
+            element,
+            exploreRule.bookUrl,
+            exploreUrl,
+          );
+          final coverUrl = _parseRuleAsUrlLikeLegado(
+            element,
+            exploreRule.coverUrl,
+            exploreUrl,
+          );
           final result = SearchResult(
             name: _parseRule(element, exploreRule.name, exploreUrl),
             author: _parseRule(element, exploreRule.author, exploreUrl),
@@ -4830,10 +4830,11 @@ class RuleParserEngine {
           final name = _parseRule(element, exploreRule.name, requestUrl);
           final author = _parseRule(element, exploreRule.author, requestUrl);
           final kind = _parseRule(element, exploreRule.kind, requestUrl);
-          var coverUrl = _parseRule(element, exploreRule.coverUrl, requestUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(requestUrl, coverUrl);
-          }
+          final coverUrl = _parseRuleAsUrlLikeLegado(
+            element,
+            exploreRule.coverUrl,
+            requestUrl,
+          );
           final intro = _parseRule(element, exploreRule.intro, requestUrl);
           final lastChapter =
               _parseRule(element, exploreRule.lastChapter, requestUrl);
@@ -4841,10 +4842,11 @@ class RuleParserEngine {
               _parseRule(element, exploreRule.updateTime, requestUrl);
           final wordCount =
               _parseRule(element, exploreRule.wordCount, requestUrl);
-          var bookUrl = _parseRule(element, exploreRule.bookUrl, requestUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(requestUrl, bookUrl);
-          }
+          final bookUrl = _parseRuleAsUrlLikeLegado(
+            element,
+            exploreRule.bookUrl,
+            requestUrl,
+          );
 
           final result = SearchResult(
             name: name,
@@ -4991,7 +4993,8 @@ class RuleParserEngine {
       if (root == null) return null;
 
       final tocUrl = _resolveTocUrlLikeLegado(
-        rawValue: _parseRule(root, bookInfoRule.tocUrl, parseBaseUrl),
+        rawValue: _parseRuleAsUrlRawLikeLegado(
+            root, bookInfoRule.tocUrl, parseBaseUrl),
         baseUrl: parseBaseUrl,
       );
       if (_normalizeUrlVisitKey(tocUrl) ==
@@ -5002,10 +5005,11 @@ class RuleParserEngine {
         );
       }
 
-      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, parseBaseUrl);
-      if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-        coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
-      }
+      final coverUrl = _parseRuleAsUrlLikeLegado(
+        root,
+        bookInfoRule.coverUrl,
+        parseBaseUrl,
+      );
 
       return BookDetail(
         name: _parseRule(root, bookInfoRule.name, parseBaseUrl),
@@ -5177,10 +5181,11 @@ class RuleParserEngine {
 
       final name = _parseRule(root, bookInfoRule.name, parseBaseUrl);
       final author = _parseRule(root, bookInfoRule.author, parseBaseUrl);
-      var coverUrl = _parseRule(root, bookInfoRule.coverUrl, parseBaseUrl);
-      if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-        coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
-      }
+      final coverUrl = _parseRuleAsUrlLikeLegado(
+        root,
+        bookInfoRule.coverUrl,
+        parseBaseUrl,
+      );
       final intro = _parseRule(root, bookInfoRule.intro, parseBaseUrl);
       final kind = _parseRule(root, bookInfoRule.kind, parseBaseUrl);
       final lastChapter =
@@ -5189,7 +5194,8 @@ class RuleParserEngine {
           _parseRule(root, bookInfoRule.updateTime, parseBaseUrl);
       final wordCount = _parseRule(root, bookInfoRule.wordCount, parseBaseUrl);
       final tocUrl = _resolveTocUrlLikeLegado(
-        rawValue: _parseRule(root, bookInfoRule.tocUrl, parseBaseUrl),
+        rawValue: _parseRuleAsUrlRawLikeLegado(
+            root, bookInfoRule.tocUrl, parseBaseUrl),
         baseUrl: parseBaseUrl,
       );
 
@@ -5326,10 +5332,11 @@ class RuleParserEngine {
 
           for (final element in chapterElements) {
             final name = _parseRule(element, tocRule.chapterName, currentUrl);
-            var url = _parseRule(element, tocRule.chapterUrl, currentUrl);
-            if (url.isNotEmpty && !url.startsWith('http')) {
-              url = _absoluteUrl(currentUrl, url);
-            }
+            final url = _parseRuleAsUrlLikeLegado(
+              element,
+              tocRule.chapterUrl,
+              currentUrl,
+            );
             if (name.isEmpty || url.isEmpty) continue;
             chapters.add(TocItem(index: chapters.length, name: name, url: url));
           }
@@ -5492,10 +5499,8 @@ class RuleParserEngine {
         for (var i = 0; i < chapterElements.length; i++) {
           final element = chapterElements[i];
           final name = _parseRule(element, tocRule.chapterName, fullUrl);
-          var url = _parseRule(element, tocRule.chapterUrl, fullUrl);
-          if (url.isNotEmpty && !url.startsWith('http')) {
-            url = _absoluteUrl(fullUrl, url);
-          }
+          final url =
+              _parseRuleAsUrlLikeLegado(element, tocRule.chapterUrl, fullUrl);
           if (chapters.isEmpty) {
             sample = <String, String>{'name': name, 'url': url};
           }
@@ -6492,6 +6497,33 @@ class RuleParserEngine {
     );
   }
 
+  String _parseRuleAsUrlRawLikeLegado(
+    Element element,
+    String? rule,
+    String baseUrl,
+  ) {
+    return _parseRule(
+      element,
+      rule,
+      baseUrl,
+      urlLikeSingleValue: true,
+    );
+  }
+
+  String _parseRuleAsUrlLikeLegado(
+    Element element,
+    String? rule,
+    String baseUrl, {
+    bool fallbackToBaseUrlWhenEmpty = false,
+  }) {
+    final rawValue = _parseRuleAsUrlRawLikeLegado(element, rule, baseUrl);
+    return _resolveUrlFieldWithLegadoSemantics(
+      rawValue: rawValue,
+      baseUrl: baseUrl,
+      fallbackToBaseUrlWhenEmpty: fallbackToBaseUrlWhenEmpty,
+    );
+  }
+
   bool _looksLikeXPath(String rule) {
     final t = rule.trimLeft();
     return t.startsWith('@XPath:') || t.startsWith('//');
@@ -6713,7 +6745,12 @@ class RuleParserEngine {
   }
 
   /// 解析规则
-  String _parseRule(Element element, String? rule, String baseUrl) {
+  String _parseRule(
+    Element element,
+    String? rule,
+    String baseUrl, {
+    bool urlLikeSingleValue = false,
+  }) {
     if (rule == null || rule.isEmpty) return '';
 
     final extracted = _extractPutRules(rule);
@@ -6749,7 +6786,12 @@ class RuleParserEngine {
       } else if (_looksLikeRegexRule(trimmed)) {
         result = _parseRegexRuleOnText(element.outerHtml, trimmed);
       } else {
-        result = _parseSingleRule(element, trimmed, baseUrl);
+        result = _parseSingleRule(
+          element,
+          trimmed,
+          baseUrl,
+          urlLikeSingleValue: urlLikeSingleValue,
+        );
       }
       if (result.isNotEmpty) {
         results.add(result);
@@ -6808,7 +6850,12 @@ class RuleParserEngine {
   }
 
   /// 解析单个规则（对标 Legado 规则链：selector@selector@index@attr@text + ##replace）
-  String _parseSingleRule(Element element, String rule, String baseUrl) {
+  String _parseSingleRule(
+    Element element,
+    String rule,
+    String baseUrl, {
+    bool urlLikeSingleValue = false,
+  }) {
     if (rule.isEmpty) return '';
 
     final parsed = _LegadoTextRule.parse(
@@ -6816,26 +6863,27 @@ class RuleParserEngine {
       isExtractor: _isExtractorToken,
     );
 
-    final target = parsed.selectors.isEmpty
-        ? element
-        : _selectFirstBySelectors(element, parsed.selectors);
-    if (target == null) return '';
+    final targets = parsed.selectors.isEmpty
+        ? <Element>[element]
+        : _selectAllBySelectors(element, parsed.selectors);
+    if (targets.isEmpty) return '';
 
-    var result = _extractWithFallbacks(
-      target,
-      parsed.extractors,
-      baseUrl: baseUrl,
-    );
-    result = _applyInlineReplacements(result, parsed.replacements);
-    return result.trim();
-  }
-
-  Element? _selectFirstBySelectors(
-    dynamic parent,
-    List<_LegadoSelectorStep> steps,
-  ) {
-    final all = _selectAllBySelectors(parent, steps);
-    return all.isEmpty ? null : all.first;
+    final values = <String>[];
+    for (final target in targets) {
+      var value = _extractWithFallbacks(
+        target,
+        parsed.extractors,
+        baseUrl: baseUrl,
+      );
+      value = _applyInlineReplacements(value, parsed.replacements).trim();
+      if (value.isEmpty) continue;
+      values.add(value);
+    }
+    if (values.isEmpty) return '';
+    if (urlLikeSingleValue) {
+      return values.first;
+    }
+    return values.join('\n').trim();
   }
 
   List<Element> _selectAllBySelectors(
@@ -7822,6 +7870,11 @@ class _LegadoTextRule {
       for (final t in tokens) {
         if (isExtractor(t)) extractors.add(t);
       }
+      cut = 0;
+    } else if (tokens.length == 1 && isExtractor(tokens.first)) {
+      // 对齐 legado：单 token 规则如 text / href 视为“当前元素 extractor”，
+      // 不能当作 selector，否则会出现 chapterName=text / chapterUrl=href 取值为空。
+      extractors.add(tokens.first);
       cut = 0;
     } else if (tokens.length >= 2) {
       while (cut > 0) {
