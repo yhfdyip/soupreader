@@ -105,10 +105,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   bool _precacheScheduled = false;
   int _precacheEpoch = 0;
 
+  // 仿真翻页门闩：启动动画前必须等待关键帧资源就绪
+  bool _isPreparingSimulationTurn = false;
+  int _simulationPrepareToken = 0;
+
   // 电池状态
   final Battery _battery = Battery();
   int _batteryLevel = 100;
   StreamSubscription<BatteryState>? _batteryStateSubscription;
+
+  void _onPageFactoryContentChangedForRender() {
+    if (!mounted) return;
+    _cancelPendingSimulationPreparation();
+    _invalidatePictures();
+    setState(() {});
+    _schedulePrecache();
+  }
 
   @override
   void initState() {
@@ -129,18 +141,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       }
     });
 
-    widget.pageFactory.onContentChanged = () {
-      if (mounted) {
-        _invalidatePictures();
-        setState(() {});
-        _schedulePrecache();
-      }
-    };
+    widget.pageFactory
+        .addContentChangedListener(_onPageFactoryContentChangedForRender);
 
     // 首次进入页面后，利用空闲帧预渲染当前/相邻页，避免首次拖拽翻页卡顿
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _schedulePrecache();
+      _warmupSimulationFrames();
     });
   }
 
@@ -164,26 +172,38 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (oldWidget.animDuration != widget.animDuration) {
       _animController.duration = Duration(milliseconds: widget.animDuration);
     }
+    if (oldWidget.pageFactory != widget.pageFactory) {
+      oldWidget.pageFactory.removeContentChangedListener(
+        _onPageFactoryContentChangedForRender,
+      );
+      widget.pageFactory.addContentChangedListener(
+        _onPageFactoryContentChangedForRender,
+      );
+    }
     if (oldWidget.pageFactory != widget.pageFactory ||
         oldWidget.textStyle != widget.textStyle ||
         oldWidget.backgroundColor != widget.backgroundColor ||
         oldWidget.padding != widget.padding ||
         oldWidget.settings != widget.settings) {
-      widget.pageFactory.onContentChanged = () {
-        if (mounted) {
-          _invalidatePictures();
-          setState(() {});
-          _schedulePrecache();
-        }
-      };
       _invalidatePictures();
       _schedulePrecache();
+    }
+    if (oldWidget.pageTurnMode != widget.pageTurnMode &&
+        widget.pageTurnMode == PageTurnMode.simulation) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _warmupSimulationFrames();
+      });
     }
   }
 
   @override
   void dispose() {
+    _cancelPendingSimulationPreparation();
     _batteryStateSubscription?.cancel();
+    widget.pageFactory.removeContentChangedListener(
+      _onPageFactoryContentChangedForRender,
+    );
     _animController.dispose();
     _invalidatePictures();
     super.dispose();
@@ -493,6 +513,17 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _isTargetImageLoading = false;
   }
 
+  void _cancelPendingSimulationPreparation() {
+    _simulationPrepareToken++;
+    _isPreparingSimulationTurn = false;
+  }
+
+  void _warmupSimulationFrames() {
+    if (!mounted || !_needsShaderImages) return;
+    final size = MediaQuery.of(context).size;
+    _ensureShaderImages(size, allowRecord: true);
+  }
+
   Future<ui.Image> _convertToHighResImage(ui.Picture picture, Size size) async {
     final dpr = MediaQuery.of(context).devicePixelRatio;
     final int w = (size.width * dpr).toInt();
@@ -642,6 +673,87 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return false;
   }
 
+  bool _isSimulationTurnReady(_PageDirection direction) {
+    switch (direction) {
+      case _PageDirection.next:
+        return _curPageImage != null && _nextPagePicture != null;
+      case _PageDirection.prev:
+        return _targetPageImage != null && _curPagePicture != null;
+      case _PageDirection.none:
+        return false;
+    }
+  }
+
+  Future<bool> _prepareSimulationTurnFrames({
+    required Size size,
+    required _PageDirection direction,
+    required int token,
+  }) async {
+    if (direction == _PageDirection.none) return false;
+    if (direction == _PageDirection.next && !_factory.hasNext()) return false;
+    if (direction == _PageDirection.prev && !_factory.hasPrev()) return false;
+
+    _ensureShaderImages(size, allowRecord: true);
+    if (_isSimulationTurnReady(direction)) return true;
+
+    final deadline = DateTime.now().add(const Duration(milliseconds: 1800));
+    while (mounted) {
+      if (token != _simulationPrepareToken) return false;
+      if (_isSimulationTurnReady(direction)) return true;
+      if (DateTime.now().isAfter(deadline)) return false;
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      if (!mounted) return false;
+      _ensureShaderImages(size, allowRecord: true);
+    }
+    return false;
+  }
+
+  void _startTurnAnimation() {
+    if (_direction == _PageDirection.none) return;
+    if (widget.pageTurnMode == PageTurnMode.simulation) {
+      unawaited(_startSimulationTurnWhenReady());
+      return;
+    }
+    _onAnimStart();
+  }
+
+  Future<void> _startSimulationTurnWhenReady() async {
+    if (!mounted || _isPreparingSimulationTurn) return;
+    if (_direction == _PageDirection.none) return;
+
+    final direction = _direction;
+    final token = ++_simulationPrepareToken;
+    _isPreparingSimulationTurn = true;
+    final size = MediaQuery.of(context).size;
+
+    try {
+      final ready = await _prepareSimulationTurnFrames(
+        size: size,
+        direction: direction,
+        token: token,
+      );
+      if (!mounted || token != _simulationPrepareToken) return;
+      if (_direction != direction) return;
+
+      if (!ready) {
+        _isMoved = false;
+        _isRunning = false;
+        _isStarted = false;
+        _isCancel = false;
+        _direction = _PageDirection.none;
+        _touchX = _startX;
+        _touchY = _startY;
+        setState(() {});
+        return;
+      }
+      _onAnimStart();
+    } finally {
+      if (token == _simulationPrepareToken) {
+        _isPreparingSimulationTurn = false;
+      }
+    }
+  }
+
   // === 对标 Legado: setStartPoint ===
   void _setStartPoint(double x, double y) {
     _startX = x;
@@ -708,7 +820,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 修正：先更新坐标，再设置方向，确保角点计算正确
     _setStartPoint(size.width * 0.9, y);
     _setDirection(_PageDirection.next);
-    _onAnimStart();
+    _startTurnAnimation();
   }
 
   // === 对标 Legado: prevPageByAnim ===
@@ -725,7 +837,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 修正：先更新坐标，再设置方向
     _setStartPoint(0, y);
     _setDirection(_PageDirection.prev);
-    _onAnimStart();
+    _startTurnAnimation();
   }
 
   // === 对标 Legado: setDirection ===
@@ -769,6 +881,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado: abortAnim ===
   void _abortAnim() {
+    _cancelPendingSimulationPreparation();
     _isStarted = false;
     _isMoved = false;
     _isRunning = false;
@@ -853,6 +966,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 动画完成回调 ===
   void _onAnimComplete() {
     if (!_isStarted) return;
+    final direction = _direction;
+    final wasCancel = _isCancel;
+    if (!wasCancel) {
+      _fillPage(direction);
+    }
     _stopScroll();
   }
 
@@ -869,32 +987,25 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _stopScroll() {
     _isStarted = false;
     _isRunning = false;
-    // 立即重置状态，确保在 _fillPage 触发 setState 之前 Offset 归零
-    // 从而避免上一页内容消失但新页内容尚未加载的闪烁
+    // 对齐 legado：动画完成后仅做状态收尾，不在此处触发换页。
     if (mounted) {
       _isMoved = false;
-
-      final wasCancel = _isCancel;
       _isCancel = false;
-
-      final direction = _direction;
       _direction = _PageDirection.none;
 
-      // 重置坐标系统，使 offset = 0
-      _touchX = 0;
+      // 重置坐标系统，确保下一次交互从干净状态开始。
+      _touchX = 0.1;
+      _touchY = 0.1;
       _startX = 0;
+      _startY = 0;
       _lastX = 0;
       _scrollDx = 0;
+      _scrollDy = 0;
+      _cornerX = 0;
+      _cornerY = 0;
 
-      _invalidatePictures();
-
-      // 先重置视觉状态，再更新内容
-      if (!wasCancel) {
-        _fillPage(direction); // 更新内容
-      }
-
-      // 强制重绘以立即应用新的状态（offset=0），防止阴影残留
       setState(() {});
+      _schedulePrecache();
     }
   }
 
@@ -1068,11 +1179,20 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 静止状态直接返回当前页面Widget，不使用 CustomPaint
     // 这样避免了状态切换时的闪烁
     final isRunning = _isMoved || _isRunning;
-    if (!isRunning || pageCurlProgram == null || _curPageImage == null) {
+    if (!isRunning || pageCurlProgram == null) {
       return _buildPageWidget(_factory.curPage);
     }
 
     final isNext = _direction == _PageDirection.next;
+    if (_direction == _PageDirection.none) {
+      return _buildPageWidget(_factory.curPage);
+    }
+    if (isNext && _curPageImage == null) {
+      return _buildPageWidget(_factory.curPage);
+    }
+    if (!isNext && _targetPageImage == null) {
+      return _buildPageWidget(_factory.curPage);
+    }
 
     // === P6: 仿真逻辑修正 ===
     // Next: Peel Current(Top) to reveal Next(Bottom). Curl from Right.
@@ -1200,6 +1320,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _onDragStart(DragStartDetails details) {
     if (!widget.enableGestures) return;
     _gestureInProgress = true;
+    _cancelPendingSimulationPreparation();
     // 允许中断正在进行的动画，实现连续翻页
     _abortAnim();
     _setStartPoint(details.localPosition.dx, details.localPosition.dy);
@@ -1293,7 +1414,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     // 开始动画（完成翻页或取消）
-    _onAnimStart();
+    _startTurnAnimation();
   }
 
   Widget _buildPageWidget(String content) {

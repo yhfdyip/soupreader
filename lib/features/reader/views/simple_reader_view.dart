@@ -241,7 +241,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
 
       // 监听章节变化
-      _pageFactory.onContentChanged = _handlePageFactoryContentChanged;
+      _pageFactory.addContentChangedListener(
+        _handlePageFactoryContentChanged,
+      );
 
       await _loadChapter(_currentChapterIndex, restoreOffset: true);
     }
@@ -254,6 +256,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   @override
   void dispose() {
+    _pageFactory.removeContentChangedListener(_handlePageFactoryContentChanged);
     _saveProgress();
     _scrollController.dispose();
     _keyboardFocusNode.dispose();
