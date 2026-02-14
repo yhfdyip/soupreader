@@ -2632,7 +2632,7 @@ class _SourceListViewState extends State<SourceListView> {
           .map((e) => e.toString().trim())
           .where((e) => e.isNotEmpty)
           .toSet()
-          .toList(growable: false);
+          .toList(growable: true);
     }
     if (raw is String) {
       return raw
@@ -2640,7 +2640,7 @@ class _SourceListViewState extends State<SourceListView> {
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toSet()
-          .toList(growable: false);
+          .toList(growable: true);
     }
     return <String>[];
   }
@@ -2650,7 +2650,7 @@ class _SourceListViewState extends State<SourceListView> {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toSet()
-        .toList(growable: false);
+        .toList(growable: true);
     await _settingsPut(_prefImportOnlineHistory, normalized);
   }
 
@@ -2658,7 +2658,7 @@ class _SourceListViewState extends State<SourceListView> {
     final history = _loadOnlineImportHistory();
     history.remove(url);
     history.insert(0, url);
-    final capped = history.take(20).toList(growable: false);
+    final capped = history.take(20).toList(growable: true);
     await _saveOnlineImportHistory(capped);
   }
 

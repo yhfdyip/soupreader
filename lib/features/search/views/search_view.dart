@@ -7,6 +7,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
+import 'search_book_info_view.dart';
 
 /// 搜索页面 - 全局统一视觉风格
 class SearchView extends StatefulWidget {
@@ -31,14 +32,13 @@ class SearchView extends StatefulWidget {
 
 class _SearchViewState extends State<SearchView> {
   final TextEditingController _searchController = TextEditingController();
-  final RuleParserEngine _engine = RuleParserEngine();
   late final SourceRepository _sourceRepo;
   late final BookAddService _addService;
 
   List<SearchResult> _results = <SearchResult>[];
+  List<_SearchDisplayItem> _displayResults = <_SearchDisplayItem>[];
   final List<_SourceRunIssue> _sourceIssues = <_SourceRunIssue>[];
   bool _isSearching = false;
-  bool _isImporting = false;
   String _searchingSource = '';
   int _completedSources = 0;
 
@@ -47,7 +47,7 @@ class _SearchViewState extends State<SearchView> {
     super.initState();
     final db = DatabaseService();
     _sourceRepo = SourceRepository(db);
-    _addService = BookAddService(database: db, engine: _engine);
+    _addService = BookAddService(database: db);
     final initialKeyword = widget.initialKeyword?.trim();
     if (initialKeyword != null && initialKeyword.isNotEmpty) {
       _searchController.text = initialKeyword;
@@ -107,6 +107,34 @@ class _SearchViewState extends State<SearchView> {
     return unique;
   }
 
+  String _normalizeCompare(String text) {
+    return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  }
+
+  void _rebuildDisplayResults() {
+    final grouped = <String, List<SearchResult>>{};
+    for (final item in _results) {
+      final key =
+          '${_normalizeCompare(item.name)}|${_normalizeCompare(item.author)}';
+      grouped.putIfAbsent(key, () => <SearchResult>[]).add(item);
+    }
+    final built = <_SearchDisplayItem>[];
+    for (final entry in grouped.entries) {
+      final origins = entry.value;
+      if (origins.isEmpty) continue;
+      final primary = origins.first;
+      final inBookshelf = origins.any(_addService.isInBookshelf);
+      built.add(
+        _SearchDisplayItem(
+          primary: primary,
+          origins: origins,
+          inBookshelf: inBookshelf,
+        ),
+      );
+    }
+    _displayResults = built;
+  }
+
   Future<void> _search() async {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) return;
@@ -122,6 +150,7 @@ class _SearchViewState extends State<SearchView> {
     setState(() {
       _isSearching = true;
       _results = <SearchResult>[];
+      _displayResults = <_SearchDisplayItem>[];
       _sourceIssues.clear();
       _completedSources = 0;
     });
@@ -140,6 +169,7 @@ class _SearchViewState extends State<SearchView> {
         if (!mounted) return;
         setState(() {
           _results.addAll(uniqueResults);
+          _rebuildDisplayResults();
           if (issue != null) {
             _sourceIssues.add(issue);
           }
@@ -223,18 +253,14 @@ class _SearchViewState extends State<SearchView> {
     _showMessage(lines.join('\n'));
   }
 
-  Future<void> _importBook(SearchResult result) async {
-    if (_isImporting) return;
-
-    setState(() => _isImporting = true);
-    try {
-      final addResult = await _addService.addFromSearchResult(result);
-      _showMessage(addResult.message);
-    } finally {
-      if (mounted) {
-        setState(() => _isImporting = false);
-      }
-    }
+  Future<void> _openBookInfo(SearchResult result) async {
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute(
+        builder: (_) => SearchBookInfoView(result: result),
+      ),
+    );
+    if (!mounted) return;
+    setState(_rebuildDisplayResults);
   }
 
   void _showMessage(String message) {
@@ -346,20 +372,15 @@ class _SearchViewState extends State<SearchView> {
               ),
             ),
           Expanded(
-            child: _results.isEmpty
+            child: _displayResults.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-                    itemCount: _results.length,
+                    itemCount: _displayResults.length,
                     itemBuilder: (context, index) =>
-                        _buildResultItem(_results[index]),
+                        _buildResultItem(_displayResults[index]),
                   ),
           ),
-          if (_isImporting)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: CupertinoActivityIndicator(),
-            ),
         ],
       ),
     );
@@ -409,16 +430,18 @@ class _SearchViewState extends State<SearchView> {
     );
   }
 
-  Widget _buildResultItem(SearchResult result) {
+  Widget _buildResultItem(_SearchDisplayItem item) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
     final radius = theme.radius;
     final coverBg = scheme.muted;
+    final result = item.primary;
+    final sourceCount = item.origins.length;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GestureDetector(
-        onTap: () => _importBook(result),
+        onTap: () => _openBookInfo(result),
         child: ShadCard(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           leading: Container(
@@ -448,21 +471,46 @@ class _SearchViewState extends State<SearchView> {
                 : null,
           ),
           trailing: Icon(
-            LucideIcons.chevronRight,
-            size: 16,
-            color: scheme.mutedForeground,
+            item.inBookshelf ? LucideIcons.bookCheck : LucideIcons.chevronRight,
+            size: item.inBookshelf ? 17 : 16,
+            color: item.inBookshelf ? scheme.primary : scheme.mutedForeground,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                result.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.p.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: scheme.foreground,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      result.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.p.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: scheme.foreground,
+                      ),
+                    ),
+                  ),
+                  if (sourceCount > 1)
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$sourceCount源',
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 2),
               Text(
@@ -471,6 +519,17 @@ class _SearchViewState extends State<SearchView> {
                   color: scheme.mutedForeground,
                 ),
               ),
+              if (result.intro.trim().isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  result.intro.trim(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
+                  ),
+                ),
+              ],
               if ([
                 if (result.kind.trim().isNotEmpty) result.kind.trim(),
                 if (result.wordCount.trim().isNotEmpty)
@@ -507,7 +566,9 @@ class _SearchViewState extends State<SearchView> {
               ],
               const SizedBox(height: 2),
               Text(
-                '来源: ${result.sourceName}',
+                sourceCount > 1
+                    ? '来源: ${result.sourceName} 等 $sourceCount 个'
+                    : '来源: ${result.sourceName}',
                 style: theme.textTheme.small.copyWith(
                   color: scheme.mutedForeground,
                 ),
@@ -518,6 +579,18 @@ class _SearchViewState extends State<SearchView> {
       ),
     );
   }
+}
+
+class _SearchDisplayItem {
+  final SearchResult primary;
+  final List<SearchResult> origins;
+  final bool inBookshelf;
+
+  const _SearchDisplayItem({
+    required this.primary,
+    required this.origins,
+    required this.inBookshelf,
+  });
 }
 
 class _SourceRunIssue {

@@ -82,6 +82,22 @@ class BookAddService {
     return a.trim() == b.trim();
   }
 
+  /// 复用与导入一致的 ID 生成规则，保证“是否已在书架”的判断稳定。
+  String? buildBookId(SearchResult result) {
+    final source = _sourceRepo.getSourceByUrl(result.sourceUrl);
+    if (source == null) return null;
+    return _uuid.v5(
+      Namespace.url.value,
+      '${source.bookSourceUrl}|${result.bookUrl}',
+    );
+  }
+
+  bool isInBookshelf(SearchResult result) {
+    final bookId = buildBookId(result);
+    if (bookId == null) return false;
+    return _bookRepo.hasBook(bookId);
+  }
+
   List<Chapter> _buildChapters(String bookId, List<TocItem> tocItems) {
     final chapters = <Chapter>[];
     final seenUrls = <String>{};
@@ -129,7 +145,9 @@ class BookAddService {
         return '请求失败（HTTP $statusCode）';
       }
 
-      if (debug.fetch.body != null && debug.listCount > 0 && debug.toc.isEmpty) {
+      if (debug.fetch.body != null &&
+          debug.listCount > 0 &&
+          debug.toc.isEmpty) {
         return '解析到目录列表 ${debug.listCount} 项，但章节名或章节链接为空';
       }
     } catch (_) {
@@ -148,10 +166,10 @@ class BookAddService {
         return BookAddResult.error('书源不存在或已被删除');
       }
 
-      final bookId = _uuid.v5(
-        Namespace.url.value,
-        '${source.bookSourceUrl}|${result.bookUrl}',
-      );
+      final bookId = buildBookId(result);
+      if (bookId == null) {
+        return BookAddResult.error('书源不存在或已被删除');
+      }
 
       if (_bookRepo.hasBook(bookId)) {
         return BookAddResult.alreadyExists(bookId);
@@ -231,7 +249,8 @@ class BookAddService {
       persistedBookId = bookId;
       await _chapterRepo.addChapters(chapters);
 
-      final storedChapterCount = await _chapterRepo.countChaptersForBook(bookId);
+      final storedChapterCount =
+          await _chapterRepo.countChaptersForBook(bookId);
       if (storedChapterCount <= 0) {
         await _bookRepo.deleteBook(bookId);
         persistedBookId = null;

@@ -35,13 +35,45 @@ class SimpleReaderView extends StatefulWidget {
   final String bookId;
   final String bookTitle;
   final int initialChapter;
+  final List<Chapter>? initialChapters;
+  final String? initialSourceUrl;
+  final String? initialSourceName;
+  final String? initialBookAuthor;
+  final String? initialBookCoverUrl;
 
   const SimpleReaderView({
     super.key,
     required this.bookId,
     required this.bookTitle,
     this.initialChapter = 0,
+    this.initialChapters,
+    this.initialSourceUrl,
+    this.initialSourceName,
+    this.initialBookAuthor,
+    this.initialBookCoverUrl,
   });
+
+  const SimpleReaderView.ephemeral({
+    super.key,
+    required String sessionId,
+    required this.bookTitle,
+    required this.initialChapters,
+    required this.initialSourceUrl,
+    this.initialSourceName,
+    this.initialBookAuthor,
+    this.initialBookCoverUrl,
+    this.initialChapter = 0,
+  }) : bookId = sessionId;
+
+  bool get isEphemeral => initialChapters != null;
+  String get readingKey => bookId;
+
+  String? get effectiveSourceUrl => initialSourceUrl;
+  String? get effectiveSourceName => initialSourceName;
+  String? get effectiveBookAuthor => initialBookAuthor;
+  String? get effectiveBookCoverUrl => initialBookCoverUrl;
+
+  List<Chapter>? get effectiveInitialChapters => initialChapters;
 
   @override
   State<SimpleReaderView> createState() => _SimpleReaderViewState();
@@ -171,12 +203,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<void> _initReader() async {
     final book = _bookRepo.getBookById(widget.bookId);
-    _bookAuthor = book?.author ?? '';
-    _bookCoverUrl = book?.coverUrl;
-    _currentSourceUrl = book?.sourceUrl ?? book?.sourceId;
+    _bookAuthor = widget.effectiveBookAuthor ?? book?.author ?? _bookAuthor;
+    _bookCoverUrl = widget.effectiveBookCoverUrl ?? book?.coverUrl;
+    _currentSourceUrl =
+        (widget.effectiveSourceUrl ?? book?.sourceUrl ?? book?.sourceId)
+            ?.trim();
+    _currentSourceName = widget.effectiveSourceName?.trim().isNotEmpty == true
+        ? widget.effectiveSourceName!.trim()
+        : null;
     _refreshCurrentSourceName();
 
-    _chapters = _chapterRepo.getChaptersForBook(widget.bookId);
+    if (widget.effectiveInitialChapters != null &&
+        widget.effectiveInitialChapters!.isNotEmpty) {
+      _chapters = widget.effectiveInitialChapters!.toList(growable: false)
+        ..sort((a, b) => a.index.compareTo(b.index));
+    } else {
+      _chapters = _chapterRepo.getChaptersForBook(widget.bookId);
+    }
     if (_chapters.isNotEmpty) {
       if (_currentChapterIndex >= _chapters.length) {
         _currentChapterIndex = 0;
@@ -291,11 +334,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final chapter = _chapters[index];
     String content = chapter.content ?? '';
 
-    if (content.isEmpty &&
-        book != null &&
-        !book.isLocal &&
-        (chapter.url?.isNotEmpty ?? false)) {
-      content = await _fetchChapterContent(book, chapter, index);
+    final chapterUrl = (chapter.url ?? '').trim();
+    final canFetchFromSource = chapterUrl.isNotEmpty &&
+        (book == null || !book.isLocal) &&
+        _resolveActiveSourceUrl(book).isNotEmpty;
+
+    if (content.isEmpty && canFetchFromSource) {
+      content = await _fetchChapterContent(
+        chapter: chapter,
+        index: index,
+        book: book,
+      );
     }
 
     final stage = await _computeReplaceStage(
@@ -387,13 +436,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
-  Future<String> _fetchChapterContent(
-    Book book,
-    Chapter chapter,
-    int index,
-  ) async {
-    final sourceUrl = book.sourceUrl;
-    if (sourceUrl == null || sourceUrl.isEmpty) {
+  Future<String> _fetchChapterContent({
+    required Chapter chapter,
+    required int index,
+    Book? book,
+  }) async {
+    final sourceUrl = _resolveActiveSourceUrl(book);
+    if (sourceUrl.isEmpty) {
       return chapter.content ?? '';
     }
     final source = _sourceRepo.getSourceByUrl(sourceUrl);
@@ -428,6 +477,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
 
     return content;
+  }
+
+  String _resolveActiveSourceUrl(Book? book) {
+    final fromBook = (book?.sourceUrl ?? book?.sourceId ?? '').trim();
+    if (fromBook.isNotEmpty) return fromBook;
+    final fromSession = (widget.effectiveSourceUrl ?? '').trim();
+    if (fromSession.isNotEmpty) return fromSession;
+    return (_currentSourceUrl ?? '').trim();
   }
 
   /// 将内容分页（使用 PageFactory 对标 Legado）
@@ -1595,11 +1652,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _refreshCurrentSourceName() {
     final sourceUrl = _currentSourceUrl;
     if (sourceUrl == null || sourceUrl.trim().isEmpty) {
-      _currentSourceName = null;
+      _currentSourceName = widget.effectiveSourceName ?? _currentSourceName;
       return;
     }
     final source = _sourceRepo.getSourceByUrl(sourceUrl);
-    _currentSourceName = source?.bookSourceName;
+    _currentSourceName = source?.bookSourceName ??
+        widget.effectiveSourceName ??
+        _currentSourceName;
   }
 
   Future<void> _toggleCleanChapterTitleFromTopMenu() async {
@@ -1611,11 +1670,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Future<void> _showSwitchSourceMenu() async {
-    final currentBook = _bookRepo.getBookById(widget.bookId);
-    if (currentBook == null) {
-      _showToast('书籍信息不存在，无法换源');
-      return;
-    }
+    final currentBook = _bookRepo.getBookById(widget.bookId) ??
+        Book(
+          id: widget.bookId,
+          title: widget.bookTitle,
+          author: _bookAuthor,
+          sourceId: _currentSourceUrl,
+          sourceUrl: _currentSourceUrl,
+          latestChapter: _currentTitle,
+          totalChapters: _chapters.length,
+          currentChapter: _currentChapterIndex,
+          readProgress: _getBookProgress(),
+          isLocal: false,
+        );
 
     final keyword = currentBook.title.trim();
     if (keyword.isEmpty) {
@@ -1733,21 +1800,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         return;
       }
 
-      await _chapterRepo.clearChaptersForBook(widget.bookId);
-      await _chapterRepo.addChapters(newChapters);
+      if (!widget.isEphemeral) {
+        await _chapterRepo.clearChaptersForBook(widget.bookId);
+        await _chapterRepo.addChapters(newChapters);
 
-      final oldBook = _bookRepo.getBookById(widget.bookId);
-      if (oldBook != null) {
-        await _bookRepo.updateBook(
-          oldBook.copyWith(
-            sourceId: source.bookSourceUrl,
-            sourceUrl: source.bookSourceUrl,
-            latestChapter: newChapters.last.title,
-            totalChapters: newChapters.length,
-            currentChapter: 0,
-            readProgress: 0,
-          ),
-        );
+        final oldBook = _bookRepo.getBookById(widget.bookId);
+        if (oldBook != null) {
+          await _bookRepo.updateBook(
+            oldBook.copyWith(
+              sourceId: source.bookSourceUrl,
+              sourceUrl: source.bookSourceUrl,
+              latestChapter: newChapters.last.title,
+              totalChapters: newChapters.length,
+              currentChapter: 0,
+              readProgress: 0,
+            ),
+          );
+        }
       }
 
       final targetIndex = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
@@ -1768,24 +1837,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _showToast('已切换到：${source.bookSourceName}');
     } catch (e) {
       try {
-        await _chapterRepo.clearChaptersForBook(widget.bookId);
-        await _chapterRepo.addChapters(previousChapters);
-        final oldBook = _bookRepo.getBookById(widget.bookId);
-        if (oldBook != null && previousSourceUrl != null) {
-          await _bookRepo.updateBook(
-            oldBook.copyWith(
-              sourceId: previousSourceUrl,
-              sourceUrl: previousSourceUrl,
-              latestChapter: previousChapters.isEmpty
-                  ? oldBook.latestChapter
-                  : previousChapters.last.title,
-              totalChapters: previousChapters.length,
-              currentChapter: previousChapterIndex.clamp(
-                0,
-                previousChapters.isEmpty ? 0 : previousChapters.length - 1,
+        if (!widget.isEphemeral) {
+          await _chapterRepo.clearChaptersForBook(widget.bookId);
+          await _chapterRepo.addChapters(previousChapters);
+          final oldBook = _bookRepo.getBookById(widget.bookId);
+          if (oldBook != null && previousSourceUrl != null) {
+            await _bookRepo.updateBook(
+              oldBook.copyWith(
+                sourceId: previousSourceUrl,
+                sourceUrl: previousSourceUrl,
+                latestChapter: previousChapters.isEmpty
+                    ? oldBook.latestChapter
+                    : previousChapters.last.title,
+                totalChapters: previousChapters.length,
+                currentChapter: previousChapterIndex.clamp(
+                  0,
+                  previousChapters.isEmpty ? 0 : previousChapters.length - 1,
+                ),
               ),
-            ),
-          );
+            );
+          }
         }
       } catch (_) {
         // 回滚失败时保留原错误提示，避免吞掉主错误

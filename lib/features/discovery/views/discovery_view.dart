@@ -7,6 +7,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
+import '../../search/views/search_book_info_view.dart';
 
 /// 发现页（对标 Legado 的 exploreUrl / ruleExplore）
 ///
@@ -22,19 +23,18 @@ class DiscoveryView extends StatefulWidget {
 }
 
 class _DiscoveryViewState extends State<DiscoveryView> {
-  final RuleParserEngine _engine = RuleParserEngine();
   late final SourceRepository _sourceRepo;
   late final BookAddService _addService;
 
   bool _loading = false;
   bool _cancelRequested = false;
-  bool _isImporting = false;
 
   String _currentSourceName = '';
   int _completedSources = 0;
   int _totalSources = 0;
 
   final List<SearchResult> _results = <SearchResult>[];
+  List<_DiscoveryDisplayItem> _displayResults = <_DiscoveryDisplayItem>[];
   final List<_SourceRunIssue> _sourceIssues = <_SourceRunIssue>[];
   String? _lastError;
 
@@ -43,7 +43,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     super.initState();
     final db = DatabaseService();
     _sourceRepo = SourceRepository(db);
-    _addService = BookAddService(database: db, engine: _engine);
+    _addService = BookAddService(database: db);
 
     // 首次进入自动拉取一次
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
@@ -78,6 +78,34 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return unique;
   }
 
+  String _normalizeCompare(String text) {
+    return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  }
+
+  void _rebuildDisplayResults() {
+    final grouped = <String, List<SearchResult>>{};
+    for (final item in _results) {
+      final key =
+          '${_normalizeCompare(item.name)}|${_normalizeCompare(item.author)}';
+      grouped.putIfAbsent(key, () => <SearchResult>[]).add(item);
+    }
+    final built = <_DiscoveryDisplayItem>[];
+    for (final entry in grouped.entries) {
+      final origins = entry.value;
+      if (origins.isEmpty) continue;
+      final primary = origins.first;
+      final inBookshelf = origins.any(_addService.isInBookshelf);
+      built.add(
+        _DiscoveryDisplayItem(
+          primary: primary,
+          origins: origins,
+          inBookshelf: inBookshelf,
+        ),
+      );
+    }
+    _displayResults = built;
+  }
+
   Future<void> _refresh() async {
     if (_loading) return;
 
@@ -87,6 +115,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       _loading = true;
       _cancelRequested = false;
       _results.clear();
+      _displayResults.clear();
       _sourceIssues.clear();
       _lastError = null;
       _currentSourceName = '';
@@ -118,6 +147,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         if (!mounted) return;
         setState(() {
           _results.addAll(uniqueResults);
+          _rebuildDisplayResults();
           if (issue != null) {
             _sourceIssues.add(issue);
           }
@@ -210,16 +240,14 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     });
   }
 
-  Future<void> _importBook(SearchResult result) async {
-    if (_isImporting) return;
-    setState(() => _isImporting = true);
-    try {
-      final addResult = await _addService.addFromSearchResult(result);
-      if (!mounted) return;
-      _showMessage(addResult.message);
-    } finally {
-      if (mounted) setState(() => _isImporting = false);
-    }
+  Future<void> _openBookInfo(SearchResult result) async {
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute(
+        builder: (_) => SearchBookInfoView(result: result),
+      ),
+    );
+    if (!mounted) return;
+    setState(_rebuildDisplayResults);
   }
 
   void _showMessage(String message) {
@@ -288,7 +316,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               borderColor: scheme.destructive,
               child: Row(
                 children: [
-                  Icon(LucideIcons.triangleAlert, size: 16, color: scheme.destructive),
+                  Icon(LucideIcons.triangleAlert,
+                      size: 16, color: scheme.destructive),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -322,20 +351,15 @@ class _DiscoveryViewState extends State<DiscoveryView> {
           else
             const SizedBox(height: 6),
           Expanded(
-            child: _results.isEmpty
+            child: _displayResults.isEmpty
                 ? _buildEmptyState(context, eligibleCount)
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-                    itemCount: _results.length,
+                    itemCount: _displayResults.length,
                     itemBuilder: (context, index) =>
-                        _buildResultItem(_results[index]),
+                        _buildResultItem(_displayResults[index]),
                   ),
           ),
-          if (_isImporting)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: CupertinoActivityIndicator(),
-            ),
         ],
       ),
     );
@@ -391,16 +415,18 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     );
   }
 
-  Widget _buildResultItem(SearchResult result) {
+  Widget _buildResultItem(_DiscoveryDisplayItem item) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
     final radius = theme.radius;
     final coverBg = scheme.muted;
+    final result = item.primary;
+    final sourceCount = item.origins.length;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GestureDetector(
-        onTap: () => _importBook(result),
+        onTap: () => _openBookInfo(result),
         child: ShadCard(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           leading: Container(
@@ -419,7 +445,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             child: result.coverUrl.isEmpty
                 ? Center(
                     child: Text(
-                      result.name.isNotEmpty ? result.name.substring(0, 1) : '?',
+                      result.name.isNotEmpty
+                          ? result.name.substring(0, 1)
+                          : '?',
                       style: theme.textTheme.h4.copyWith(
                         color: scheme.mutedForeground,
                       ),
@@ -428,21 +456,46 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 : null,
           ),
           trailing: Icon(
-            LucideIcons.chevronRight,
-            size: 16,
-            color: scheme.mutedForeground,
+            item.inBookshelf ? LucideIcons.bookCheck : LucideIcons.chevronRight,
+            size: item.inBookshelf ? 17 : 16,
+            color: item.inBookshelf ? scheme.primary : scheme.mutedForeground,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                result.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.p.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: scheme.foreground,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      result.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.p.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: scheme.foreground,
+                      ),
+                    ),
+                  ),
+                  if (sourceCount > 1)
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$sourceCount源',
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 2),
               Text(
@@ -453,11 +506,24 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               ),
               const SizedBox(height: 2),
               Text(
-                '来源: ${result.sourceName}',
+                sourceCount > 1
+                    ? '来源: ${result.sourceName} 等 $sourceCount 个'
+                    : '来源: ${result.sourceName}',
                 style: theme.textTheme.small.copyWith(
                   color: scheme.mutedForeground,
                 ),
               ),
+              if (result.intro.trim().isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  result.intro.trim(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
+                  ),
+                ),
+              ],
               if (result.lastChapter.trim().isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
@@ -475,6 +541,18 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       ),
     );
   }
+}
+
+class _DiscoveryDisplayItem {
+  final SearchResult primary;
+  final List<SearchResult> origins;
+  final bool inBookshelf;
+
+  const _DiscoveryDisplayItem({
+    required this.primary,
+    required this.origins,
+    required this.inBookshelf,
+  });
 }
 
 class _SourceRunIssue {
