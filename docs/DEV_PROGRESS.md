@@ -1,5 +1,38 @@
 # SoupReader 开发进度日志
 
+## 2026-02-14（目录解析对齐 legado：按章节 URL 去重）
+
+### 已完成
+- 对齐 legado 的目录去重语义（按章节 URL 去重，保留首个）：
+  - 文件：`lib/features/source/services/rule_parser_engine.dart`
+  - 新增：`_dedupTocByUrlLikeLegado(List<TocItem>)`
+  - 接入：
+    - `getToc(...)` 主链路返回前去重后再重排索引；
+    - `getTocDebug(...)` 调试链路返回前同口径去重，避免与主链路不一致；
+    - `_debugTocThenContent(...)` 调试流程目录结果同样按 URL 去重。
+- 补充 legado 语义回归测试：
+  - 文件：`test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
+  - 新增用例：
+    - `toc stage dedups duplicated chapter urls like legado`
+    - `toc debug output keeps same dedup result as toc stage`
+  - 覆盖“最新章节 + 正文混合目录、同 URL 重复项”的场景。
+
+### 为什么
+- 你反馈同一份书源在 dbss/legado 表现正常，但 SoupReader 目录会多出“最新章节”重复项。
+- 根因是 SoupReader 的 `ruleToc.chapterList` 抓取后未执行 legado 同款 URL 去重，导致同一章节链接在“最新章节”和“正文”区重复出现时被重复保留。
+- 本次按 legado 基准收敛为“抓取不做分段特判，最终按 URL 去重”。
+
+### 如何验证
+- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
+- 结果：`All tests passed!`
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+
+### 兼容影响
+- 与 legado 行为一致：目录项按 URL 去重，重复 URL 的后续条目将被移除。
+- 不引入站点特化的“最新章节/正文”文案过滤，旧书源规则语法不变。
+- 对依赖“同 URL 重复章节也要显示”的非典型书源，目录条目数可能减少（这是语义对齐的预期变化）。
+
 ## 2026-02-13（搜索加入书架失败：章节写入 0 条误判修复）
 
 ### 已完成

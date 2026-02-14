@@ -4163,6 +4163,7 @@ class RuleParserEngine {
 
     var out = toc;
     if (normalized.reverse) out = out.reversed.toList(growable: true);
+    out = _dedupTocByUrlLikeLegado(out);
     out = <TocItem>[
       for (var i = 0; i < out.length; i++)
         TocItem(index: i, name: out[i].name, url: out[i].url),
@@ -5375,9 +5376,10 @@ class RuleParserEngine {
       final ordered = normalized.reverse
           ? chapters.reversed.toList(growable: false)
           : chapters;
+      final deduped = _dedupTocByUrlLikeLegado(ordered);
       final reIndexed = <TocItem>[
-        for (var i = 0; i < ordered.length; i++)
-          TocItem(index: i, name: ordered[i].name, url: ordered[i].url),
+        for (var i = 0; i < deduped.length; i++)
+          TocItem(index: i, name: deduped[i].name, url: deduped[i].url),
       ];
       final formatted = _applyTocFormatJs(
         toc: reIndexed,
@@ -5532,9 +5534,10 @@ class RuleParserEngine {
       final ordered = normalized.reverse
           ? chapters.reversed.toList(growable: false)
           : chapters;
+      final deduped = _dedupTocByUrlLikeLegado(ordered);
       final reIndexed = <TocItem>[
-        for (var i = 0; i < ordered.length; i++)
-          TocItem(index: i, name: ordered[i].name, url: ordered[i].url),
+        for (var i = 0; i < deduped.length; i++)
+          TocItem(index: i, name: deduped[i].name, url: deduped[i].url),
       ];
       final formatted = _applyTocFormatJs(
         toc: reIndexed,
@@ -5583,6 +5586,19 @@ class RuleParserEngine {
       rule = rule.substring(1);
     }
     return _NormalizedListRule(selector: rule.trim(), reverse: reverse);
+  }
+
+  List<TocItem> _dedupTocByUrlLikeLegado(List<TocItem> toc) {
+    if (toc.isEmpty) return const <TocItem>[];
+    final seenUrls = <String>{};
+    final out = <TocItem>[];
+    for (final item in toc) {
+      final url = item.url;
+      if (url.trim().isEmpty) continue;
+      if (!seenUrls.add(url)) continue;
+      out.add(item);
+    }
+    return out;
   }
 
   String _importantResponseHeaders(Map<String, String> headers) {
