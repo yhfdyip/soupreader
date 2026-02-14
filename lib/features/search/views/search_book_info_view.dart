@@ -3,6 +3,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_cover_image.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -45,6 +46,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   bool _loadingToc = false;
   bool _shelfBusy = false;
   bool _switchingSource = false;
+  bool _introExpanded = false;
   String? _error;
   String? _tocError;
 
@@ -138,6 +140,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         _loadingToc = true;
         _error = null;
         _tocError = null;
+        _introExpanded = false;
       });
     }
 
@@ -558,7 +561,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
     final warningColor = CupertinoColors.systemOrange.resolveFrom(context);
-    final radius = theme.radius;
     final coverUrl = _displayCoverUrl;
 
     final kind = _pickFirstNonEmpty([
@@ -631,31 +633,14 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
+                      AppCoverImage(
+                        urlOrPath: coverUrl,
+                        title: _displayName,
+                        author: _displayAuthor,
                         width: 76,
                         height: 106,
-                        decoration: BoxDecoration(
-                          color: scheme.muted,
-                          borderRadius: radius,
-                          image: coverUrl.isNotEmpty
-                              ? DecorationImage(
-                                  image: NetworkImage(coverUrl),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: coverUrl.isEmpty
-                            ? Center(
-                                child: Text(
-                                  _displayName.isNotEmpty
-                                      ? _displayName.substring(0, 1)
-                                      : '?',
-                                  style: theme.textTheme.h4.copyWith(
-                                    color: scheme.mutedForeground,
-                                  ),
-                                ),
-                              )
-                            : null,
+                        borderRadius: 10,
+                        showTextOnPlaceholder: false,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -689,6 +674,17 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                                 color: scheme.mutedForeground,
                               ),
                             ),
+                            if (lastChapter != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '最新：$lastChapter',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.small.copyWith(
+                                  color: scheme.mutedForeground,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             Wrap(
                               spacing: 6,
@@ -792,10 +788,25 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                       const SizedBox(height: 8),
                       Text(
                         _displayIntro,
+                        maxLines: _introExpanded ? null : 4,
+                        overflow: _introExpanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
                         style: theme.textTheme.small.copyWith(
                           color: scheme.foreground,
                         ),
                       ),
+                      if (_displayIntro.trim().length > 90) ...[
+                        const SizedBox(height: 6),
+                        ShadButton.link(
+                          onPressed: () {
+                            setState(() {
+                              _introExpanded = !_introExpanded;
+                            });
+                          },
+                          child: Text(_introExpanded ? '收起简介' : '展开简介'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -877,18 +888,35 @@ class _InfoRow extends StatelessWidget {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
-        '$label：$value',
-        style: theme.textTheme.small.copyWith(
-          color: scheme.mutedForeground,
-        ),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              label,
+              style: theme.textTheme.small.copyWith(
+                color: scheme.mutedForeground,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.small.copyWith(
+                color: scheme.foreground,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SearchBookTocView extends StatelessWidget {
+class _SearchBookTocView extends StatefulWidget {
   final String bookTitle;
   final String sourceName;
   final List<TocItem> toc;
@@ -900,9 +928,39 @@ class _SearchBookTocView extends StatelessWidget {
   });
 
   @override
+  State<_SearchBookTocView> createState() => _SearchBookTocViewState();
+}
+
+class _SearchBookTocViewState extends State<_SearchBookTocView> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _reversed = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<MapEntry<int, TocItem>> get _filtered {
+    final q = _searchQuery.trim().toLowerCase();
+    var entries = widget.toc.asMap().entries.toList(growable: false);
+    if (q.isNotEmpty) {
+      entries = entries
+          .where((e) => e.value.name.toLowerCase().contains(q))
+          .toList(growable: false);
+    }
+    if (_reversed) {
+      entries = entries.reversed.toList(growable: false);
+    }
+    return entries;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
+    final filtered = _filtered;
 
     return AppCupertinoPageScaffold(
       title: '目录',
@@ -913,9 +971,51 @@ class _SearchBookTocView extends StatelessWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '$bookTitle · $sourceName · ${toc.length}章',
+                '${widget.bookTitle} · ${widget.sourceName}',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.small.copyWith(
+                  color: scheme.mutedForeground,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ShadInput(
+                    controller: _searchController,
+                    placeholder: const Text('搜索章节'),
+                    leading: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(LucideIcons.search, size: 14),
+                    ),
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ShadButton.ghost(
+                  onPressed: () => setState(() => _reversed = !_reversed),
+                  child: Icon(
+                    _reversed
+                        ? LucideIcons.arrowDownWideNarrow
+                        : LucideIcons.arrowUpWideNarrow,
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _searchQuery.trim().isEmpty
+                    ? '共 ${widget.toc.length} 章'
+                    : '匹配 ${filtered.length} 章',
                 style: theme.textTheme.small.copyWith(
                   color: scheme.mutedForeground,
                 ),
@@ -925,13 +1025,14 @@ class _SearchBookTocView extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-              itemCount: toc.length,
+              itemCount: filtered.length,
               itemBuilder: (context, index) {
-                final chapter = toc[index];
+                final entry = filtered[index];
+                final chapter = entry.value;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(index),
+                    onTap: () => Navigator.of(context).pop(entry.key),
                     child: ShadCard(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                       trailing: Icon(
@@ -939,13 +1040,28 @@ class _SearchBookTocView extends StatelessWidget {
                         size: 16,
                         color: scheme.mutedForeground,
                       ),
-                      child: Text(
-                        chapter.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.p.copyWith(
-                          color: scheme.foreground,
-                        ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 40,
+                            child: Text(
+                              '${entry.key + 1}',
+                              style: theme.textTheme.small.copyWith(
+                                color: scheme.mutedForeground,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              chapter.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.p.copyWith(
+                                color: scheme.foreground,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

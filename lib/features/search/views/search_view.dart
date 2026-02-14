@@ -294,30 +294,61 @@ class _SearchViewState extends State<SearchView> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: ShadInput(
-                    controller: _searchController,
-                    placeholder: const Text('输入书名或作者'),
-                    textInputAction: TextInputAction.search,
-                    leading: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(LucideIcons.search, size: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ShadInput(
+                        controller: _searchController,
+                        placeholder: const Text('输入书名或作者'),
+                        textInputAction: TextInputAction.search,
+                        leading: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(LucideIcons.search, size: 16),
+                        ),
+                        onSubmitted: (_) => _search(),
+                      ),
                     ),
-                    onSubmitted: (_) => _search(),
-                  ),
+                    const SizedBox(width: 10),
+                    ShadButton(
+                      onPressed: _isSearching ? null : _search,
+                      leading: _isSearching
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CupertinoActivityIndicator(radius: 8),
+                            )
+                          : const Icon(LucideIcons.search),
+                      child: const Text('搜索'),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                ShadButton(
-                  onPressed: _isSearching ? null : _search,
-                  leading: _isSearching
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CupertinoActivityIndicator(radius: 8),
-                        )
-                      : const Icon(LucideIcons.search),
-                  child: const Text('搜索'),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      '书源 $totalSources',
+                      style: theme.textTheme.small.copyWith(
+                        color: scheme.mutedForeground,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '结果 ${_displayResults.length}',
+                      style: theme.textTheme.small.copyWith(
+                        color: scheme.mutedForeground,
+                      ),
+                    ),
+                    if (_sourceIssues.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Text(
+                        '失败 ${_sourceIssues.length}',
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.destructive,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -433,8 +464,6 @@ class _SearchViewState extends State<SearchView> {
   Widget _buildResultItem(_SearchDisplayItem item) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
-    final radius = theme.radius;
-    final coverBg = scheme.muted;
     final result = item.primary;
     final sourceCount = item.origins.length;
 
@@ -443,33 +472,7 @@ class _SearchViewState extends State<SearchView> {
       child: GestureDetector(
         onTap: () => _openBookInfo(result),
         child: ShadCard(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          leading: Container(
-            width: 40,
-            height: 56,
-            decoration: BoxDecoration(
-              color: coverBg,
-              borderRadius: radius,
-              image: result.coverUrl.isNotEmpty
-                  ? DecorationImage(
-                      image: NetworkImage(result.coverUrl),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: result.coverUrl.isEmpty
-                ? Center(
-                    child: Text(
-                      result.name.isNotEmpty
-                          ? result.name.substring(0, 1)
-                          : '?',
-                      style: theme.textTheme.h4.copyWith(
-                        color: scheme.mutedForeground,
-                      ),
-                    ),
-                  )
-                : null,
-          ),
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
           trailing: Icon(
             item.inBookshelf ? LucideIcons.bookCheck : LucideIcons.chevronRight,
             size: item.inBookshelf ? 17 : 16,

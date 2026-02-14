@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_cover_image.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../bookshelf/models/book.dart';
@@ -194,7 +195,6 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           _BookCover(
             title: widget.bookTitle,
             coverUrl: widget.coverUrl,
-            isDark: _isDark,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -332,50 +332,73 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: Container(
-              height: 36,
-              decoration: BoxDecoration(
-                color: _cardMutedBg,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: CupertinoTextField(
-                controller: _searchController,
-                placeholder: placeholder,
-                placeholderStyle: TextStyle(color: _textSubtle, fontSize: 13),
-                style: TextStyle(color: _textStrong, fontSize: 13),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: null,
-                prefix: Padding(
-                  padding: EdgeInsets.only(left: 8),
-                  child: Icon(
-                    CupertinoIcons.search,
-                    size: 16,
-                    color: _textSubtle,
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _cardMutedBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: CupertinoTextField(
+                    controller: _searchController,
+                    placeholder: placeholder,
+                    placeholderStyle:
+                        TextStyle(color: _textSubtle, fontSize: 13),
+                    style: TextStyle(color: _textStrong, fontSize: 13),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: null,
+                    prefix: Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Icon(
+                        CupertinoIcons.search,
+                        size: 16,
+                        color: _textSubtle,
+                      ),
+                    ),
+                    onChanged: (value) => setState(() => _searchQuery = value),
                   ),
                 ),
-                onChanged: (value) => setState(() => _searchQuery = value),
               ),
-            ),
+              if (showSort) ...[
+                CupertinoButton(
+                  padding: const EdgeInsets.only(left: 12),
+                  onPressed: () {
+                    setState(() => _isReversed = !_isReversed);
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _scrollToCurrentChapter();
+                    });
+                  },
+                  child: Icon(
+                    _isReversed
+                        ? CupertinoIcons.sort_up
+                        : CupertinoIcons.sort_down,
+                    size: 22,
+                    color: _textNormal,
+                  ),
+                ),
+              ],
+            ],
           ),
-          if (showSort) ...[
-            CupertinoButton(
-              padding: const EdgeInsets.only(left: 12),
-              onPressed: () {
-                setState(() => _isReversed = !_isReversed);
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _scrollToCurrentChapter();
-                });
-              },
-              child: Icon(
-                _isReversed ? CupertinoIcons.sort_up : CupertinoIcons.sort_down,
-                size: 22,
-                color: _textNormal,
+          if (_selectedTab == 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _searchQuery.trim().isEmpty
+                      ? '共 ${_chapters.length} 章'
+                      : '匹配 ${_filteredChapters.length} 章',
+                  style: TextStyle(
+                    color: _textSubtle,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ),
-          ],
         ],
       ),
     );
@@ -409,14 +432,31 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         return GestureDetector(
           onTap: () => widget.onChapterSelected(originalIndex),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            margin: const EdgeInsets.only(bottom: 4),
             decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: _lineColor),
+              color: isCurrent
+                  ? _accent.withValues(alpha: _isDark ? 0.12 : 0.1)
+                  : const Color(0x00000000),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isCurrent
+                    ? _accent.withValues(alpha: _isDark ? 0.35 : 0.24)
+                    : const Color(0x00000000),
               ),
             ),
             child: Row(
               children: [
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    '${originalIndex + 1}',
+                    style: TextStyle(
+                      color: isCurrent ? _accent : _textSubtle,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: Text(
                     chapter.title,
@@ -433,10 +473,22 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                 if (hasCache)
                   Padding(
                     padding: EdgeInsets.only(right: 8),
-                    child: Icon(
-                      CupertinoIcons.cloud_download_fill,
-                      color: _textSubtle,
-                      size: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _cardMutedBg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '已缓存',
+                        style: TextStyle(
+                          color: _textSubtle,
+                          fontSize: 10,
+                        ),
+                      ),
                     ),
                   ),
                 if (isCurrent)
@@ -709,59 +761,21 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
 class _BookCover extends StatelessWidget {
   final String title;
   final String? coverUrl;
-  final bool isDark;
 
   const _BookCover({
     required this.title,
     required this.coverUrl,
-    required this.isDark,
   });
-
-  bool _isRemote(String value) {
-    final uri = Uri.tryParse(value);
-    final scheme = uri?.scheme.toLowerCase();
-    return scheme == 'http' || scheme == 'https';
-  }
 
   @override
   Widget build(BuildContext context) {
-    final url = (coverUrl ?? '').trim();
-    if (url.isNotEmpty && _isRemote(url)) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: Image.network(
-          url,
-          width: 50,
-          height: 70,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildPlaceholder(),
-        ),
-      );
-    }
-    return _buildPlaceholder();
-  }
-
-  Widget _buildPlaceholder() {
-    final first = title.trim().isNotEmpty ? title.trim().substring(0, 1) : '?';
-    return Container(
+    return AppCoverImage(
+      urlOrPath: coverUrl,
+      title: title,
       width: 50,
       height: 70,
-      decoration: BoxDecoration(
-        color: isDark ? AppDesignTokens.pageBgDark : const Color(0xFFE8E4DF),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: isDark ? AppDesignTokens.borderDark : const Color(0x1F000000),
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        first,
-        style: TextStyle(
-          color: isDark ? AppDesignTokens.textMuted : const Color(0x61000000),
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      borderRadius: 4,
+      showTextOnPlaceholder: false,
     );
   }
 }

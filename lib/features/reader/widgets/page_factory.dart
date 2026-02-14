@@ -32,10 +32,26 @@ class PageFactory {
   bool _underline = false;
   bool _showTitle = true;
 
-  // 回调
+  // 兼容旧调用方：保留单回调入口（建议改用 add/removeContentChangedListener）
   VoidCallback? onContentChanged;
+  final Set<VoidCallback> _contentChangedListeners = <VoidCallback>{};
 
   PageFactory();
+
+  void addContentChangedListener(VoidCallback listener) {
+    _contentChangedListeners.add(listener);
+  }
+
+  void removeContentChangedListener(VoidCallback listener) {
+    _contentChangedListeners.remove(listener);
+  }
+
+  void _notifyContentChanged() {
+    onContentChanged?.call();
+    for (final listener in List<VoidCallback>.from(_contentChangedListeners)) {
+      listener();
+    }
+  }
 
   /// 初始化章节数据
   void setChapters(List<ChapterData> chapters, int initialChapterIndex) {
@@ -174,7 +190,7 @@ class PageFactory {
     if (_currentPageIndex < _currentChapterPages.length - 1) {
       // 章节内下一页
       _currentPageIndex++;
-      onContentChanged?.call();
+      _notifyContentChanged();
       return true;
     } else if (hasNextChapter()) {
       // 跨章节：移动到下一章第一页
@@ -189,7 +205,7 @@ class PageFactory {
     if (_currentPageIndex > 0) {
       // 章节内上一页
       _currentPageIndex--;
-      onContentChanged?.call();
+      _notifyContentChanged();
       return true;
     } else if (hasPrevChapter()) {
       // 跨章节：移动到上一章最后一页
@@ -211,7 +227,7 @@ class PageFactory {
     // 预加载下一章
     _paginateChapter(_currentChapterIndex + 1);
 
-    onContentChanged?.call();
+    _notifyContentChanged();
   }
 
   void _moveToPrevChapter() {
@@ -228,7 +244,7 @@ class PageFactory {
     // 预加载上一章
     _paginateChapter(_currentChapterIndex - 1);
 
-    onContentChanged?.call();
+    _notifyContentChanged();
   }
 
   /// 跳转到指定章节
@@ -248,7 +264,7 @@ class PageFactory {
       _currentPageIndex = _currentChapterPages.length - 1;
     }
 
-    onContentChanged?.call();
+    _notifyContentChanged();
   }
 
   /// 章节内跳转到指定页（不会跨章节）。
@@ -257,11 +273,11 @@ class PageFactory {
   void jumpToPage(int pageIndex) {
     if (_currentChapterPages.isEmpty) {
       _currentPageIndex = 0;
-      onContentChanged?.call();
+      _notifyContentChanged();
       return;
     }
     _currentPageIndex = pageIndex.clamp(0, _currentChapterPages.length - 1);
-    onContentChanged?.call();
+    _notifyContentChanged();
   }
 
   // ============ 获取三个页面内容 ============

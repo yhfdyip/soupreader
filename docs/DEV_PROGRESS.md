@@ -1,5 +1,87 @@
 # SoupReader 开发进度日志
 
+## 2026-02-14（搜索/详情/目录 UI 优化 + 封面加载缓存统一）
+
+### 已完成
+- 新增统一封面组件并引入缓存加载能力：
+  - 文件：`lib/app/widgets/app_cover_image.dart`
+  - 依赖：`pubspec.yaml` 新增 `cached_network_image`
+  - 能力：统一处理远程 URL、本地路径、加载占位、失败回退封面。
+- 书架封面展示入口统一到 `AppCoverImage`：
+  - 文件：`lib/features/bookshelf/views/bookshelf_view.dart`
+  - 文件：`lib/features/bookshelf/widgets/book_cover_card.dart`
+  - 移除分散的 `Image.network/Image.file` 直连逻辑。
+- 阅读器目录抽屉 UI 优化：
+  - 文件：`lib/features/reader/widgets/reader_catalog_sheet.dart`
+  - 调整搜索条与统计提示（总章/匹配章）；
+  - 优化章节行样式（序号、当前章高亮、缓存标记胶囊）；
+  - 抽屉封面改为统一封面组件。
+- 搜索页 UI 优化并按需求去除结果封面图：
+  - 文件：`lib/features/search/views/search_view.dart`
+  - 优化顶部状态信息（书源数/结果数/失败数）；
+  - 搜索结果卡片改为纯文本信息布局；
+  - 满足“搜索结果列表不显示图片”需求。
+- 书籍详情与目录列表 UI 优化：
+  - 文件：`lib/features/search/views/search_book_info_view.dart`
+  - 详情头部封面改为统一封面组件；
+  - 简介支持折叠/展开；
+  - 基础信息行改为标签-值双列布局；
+  - `_SearchBookTocView` 升级为可搜索、可倒序的目录列表，并保留章节索引显示。
+
+### 为什么
+- 你要求统一优化搜索、书籍详情和目录列表体验，并明确“搜索结果不显示图片”。
+- 同时要求核对 legado 书架封面逻辑。legado 实际是“URL 加载 + 图片库缓存 + 默认封面回退”，本次在 SoupReader 侧用统一组件和缓存加载能力对齐该语义。
+
+### 如何验证
+- 执行：`flutter pub get`
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 搜索页执行搜索，确认结果列表不再显示封面图；
+  - 点进书籍详情，确认封面、基础信息、简介折叠与目录入口展示正常；
+  - 打开目录（搜索详情目录页 + 阅读器目录抽屉），确认搜索与倒序交互可用。
+
+### 兼容影响
+- 搜索结果列表视觉行为变更为“无封面”，属于产品交互调整。
+- 其余页面封面改为统一组件，网络封面加载更稳定，失败回退更一致。
+- 不涉及书源规则与五段链路（search/bookInfo/toc/content）解析语义变更。
+
+## 2026-02-14（翻页跨章回调链路修复：解决“下一章仅标题无正文”）
+
+### 已完成
+- 修复 `PageFactory` 内容变更回调被覆盖的问题：
+  - 文件：`lib/features/reader/widgets/page_factory.dart`
+  - 新增多监听器机制：
+    - `addContentChangedListener(VoidCallback listener)`
+    - `removeContentChangedListener(VoidCallback listener)`
+    - `_notifyContentChanged()`
+  - 将翻页相关通知点统一改为 `_notifyContentChanged()`，避免仅单一回调生效。
+  - 保留 `onContentChanged` 兼容入口，确保旧调用路径不被破坏。
+- 阅读页改为监听器注册（不再依赖单回调赋值）：
+  - 文件：`lib/features/reader/views/simple_reader_view.dart`
+  - `_initReader()` 中改为注册 `_handlePageFactoryContentChanged` 监听；
+  - `dispose()` 中移除监听，避免泄漏。
+- 翻页组件改为监听器注册，避免覆盖阅读页逻辑：
+  - 文件：`lib/features/reader/widgets/paged_reader_widget.dart`
+  - 新增 `_onPageFactoryContentChangedForRender()` 作为渲染回调；
+  - `initState/didUpdateWidget/dispose` 完成监听注册、切换与解绑。
+- 新增回归测试：
+  - 文件：`test/page_factory_listener_test.dart`
+  - 覆盖多监听器通知、移除监听生效、兼容 `onContentChanged` 三个场景。
+
+### 为什么
+- 现象是“从目录点进章节有正文，但翻页到下一章只剩标题”。
+- 根因是 `SimpleReaderView` 注册的章节补加载回调被 `PagedReaderWidget` 重写，跨章后未触发自动补拉正文。
+- 本次将 `PageFactory` 回调模型改为可并存监听，确保“阅读状态同步”与“渲染刷新”两条链路同时生效。
+
+### 如何验证
+- 执行：`flutter test test/page_factory_listener_test.dart`
+- 执行：`flutter analyze`
+
+### 兼容影响
+- 对外书源规则与五段链路协议无变更。
+- 阅读页翻页事件分发从“单回调”升级为“多监听器 + 兼容单回调”，可避免后续同类覆盖问题。
+
 ## 2026-02-14（目录顺序再次对齐 legado：修复“最新章节倒序 + 正文重启”）
 
 ### 已完成
@@ -1936,3 +2018,32 @@
 ### 兼容影响
 - 旧书源兼容性提升：`chapterName=text`、`chapterUrl=href`、以及其他单 token extractor 写法恢复 legado 预期行为。
 - 对已有 `selector@extractor`、`text.xxx`、`children.*` 等规则无破坏性变更。
+
+## 2026-02-14（阅读器仿真翻页首翻空白修复：仅 Simulation，对齐 legado 状态机）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 新增仿真翻页启动门闩：`_prepareSimulationTurnFrames` + `_startSimulationTurnWhenReady`。
+    - 在 `PageTurnMode.simulation` 下，翻页动画启动前先确保关键帧资源就绪（当前页/目标页）。
+    - 资源未就绪时不再硬进动画，避免首翻出现空白页。
+  - 调整动画结束状态机，行为对齐 legado：
+    - `onAnimComplete` 改为先 `fillPage`（非取消场景）再 `stopScroll`。
+    - `stopScroll` 仅负责状态收尾，不再触发换页。
+  - 移除 `stopScroll` 中的提前 `_invalidatePictures()`，避免换页瞬间出现渲染空窗。
+  - 增加仿真模式首次进入预热：首帧后主动 `_warmupSimulationFrames()`，提前生成 shader 所需图像。
+  - 增加准备任务取消逻辑：内容变化/手势中断/组件销毁时取消待执行的仿真准备任务，避免竞态。
+  - 修正仿真绘制前置判断：按方向分别检查必要资源（next 依赖 `curPageImage`，prev 依赖 `targetPageImage`）。
+
+### 为什么
+- 用户反馈仿真翻页首次进入后第一次翻页会出现空白页面。
+- 根因是动画与图像转换存在竞态，且结束阶段状态切换顺序与 legado 不一致，导致短暂掉入空白兜底路径。
+
+### 如何验证
+- 命令：`flutter analyze --no-version-check`
+  - 结果：`No issues found!`
+- 手工路径（建议）：
+  - 仿真翻页模式首次进入阅读页，连续进行“首次翻页/取消翻页/跨章节翻页”验证，确认不再出现首翻空白。
+
+### 兼容影响
+- 仅影响 `PageTurnMode.simulation` 的内部时序与资源准备策略。
+- 不引入 `simulation2` 回退路径；其他翻页模式（slide/cover/none/scroll）行为不变。

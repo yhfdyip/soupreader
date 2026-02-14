@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_cover_image.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/models/app_settings.dart';
@@ -496,24 +495,14 @@ class _BookshelfViewState extends State<BookshelfView> {
                 color: CupertinoColors.systemGrey5.resolveFrom(context),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: book.coverUrl != null && book.coverUrl!.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: _buildCoverImage(book),
-                    )
-                  : Center(
-                      child: Text(
-                        book.title.isNotEmpty
-                            ? book.title.substring(0, 1)
-                            : '?',
-                        style: TextStyle(
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
-                          fontSize: 28,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+              child: AppCoverImage(
+                urlOrPath: book.coverUrl,
+                title: book.title,
+                author: book.author,
+                width: double.infinity,
+                height: double.infinity,
+                borderRadius: 8,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -540,50 +529,6 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
-  Widget _buildCoverImage(Book book) {
-    final coverUrl = book.coverUrl ?? '';
-    if (coverUrl.isEmpty) {
-      return _buildCoverFallback(book);
-    }
-
-    if (_isRemoteCover(coverUrl)) {
-      return Image.network(
-        coverUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildCoverFallback(book),
-      );
-    }
-
-    if (kIsWeb) {
-      return _buildCoverFallback(book);
-    }
-
-    return Image.file(
-      File(coverUrl),
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => _buildCoverFallback(book),
-    );
-  }
-
-  Widget _buildCoverFallback(Book book) {
-    return Center(
-      child: Text(
-        book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
-        style: TextStyle(
-          color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          fontSize: 28,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  bool _isRemoteCover(String value) {
-    final uri = Uri.tryParse(value);
-    final scheme = uri?.scheme.toLowerCase();
-    return scheme == 'http' || scheme == 'https';
-  }
-
   Widget _buildListView() {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
@@ -607,13 +552,13 @@ class _BookshelfViewState extends State<BookshelfView> {
                 color: scheme.muted,
                 borderRadius: radius,
               ),
-              child: Center(
-                child: Text(
-                  book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
-                  style: theme.textTheme.h4.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
-                ),
+              child: AppCoverImage(
+                urlOrPath: book.coverUrl,
+                title: book.title,
+                author: book.author,
+                width: 44,
+                height: 62,
+                borderRadius: 8,
               ),
             ),
             trailing: Icon(
