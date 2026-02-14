@@ -48,14 +48,15 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
   @override
   void initState() {
     super.initState();
-    _settings = widget.settings;
+    _settings = widget.settings.sanitize();
   }
 
   void _updateSettings(ReadingSettings newSettings) {
+    final safeSettings = newSettings.sanitize();
     setState(() {
-      _settings = newSettings;
+      _settings = safeSettings;
     });
-    widget.onSettingsChanged(newSettings);
+    widget.onSettingsChanged(safeSettings);
   }
 
   @override
@@ -293,6 +294,13 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
     ValueChanged<double> onChanged, {
     required String displayValue,
   }) {
+    final safeMin = min.isFinite ? min : 0.0;
+    final safeMax = max.isFinite && max > safeMin ? max : safeMin + 1.0;
+    final safeValue = (value.isFinite ? value : safeMin)
+        .clamp(safeMin, safeMax)
+        .toDouble();
+    final canSlide = min.isFinite && max.isFinite && max > min;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -310,26 +318,26 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
           _buildCircleButton(
             CupertinoIcons.minus,
             () {
-              if (value > min) {
-                onChanged((value - 1).clamp(min, max));
+              if (safeValue > safeMin) {
+                onChanged((safeValue - 1).clamp(safeMin, safeMax));
               }
             },
           ),
           Expanded(
             child: CupertinoSlider(
-              value: value.clamp(min, max),
-              min: min,
-              max: max,
+              value: safeValue,
+              min: safeMin,
+              max: safeMax,
               activeColor: _accent,
               thumbColor: _accent,
-              onChanged: onChanged,
+              onChanged: canSlide ? onChanged : null,
             ),
           ),
           _buildCircleButton(
             CupertinoIcons.plus,
             () {
-              if (value < max) {
-                onChanged((value + 1).clamp(min, max));
+              if (safeValue < safeMax) {
+                onChanged((safeValue + 1).clamp(safeMin, safeMax));
               }
             },
           ),

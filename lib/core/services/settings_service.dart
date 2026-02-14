@@ -88,8 +88,12 @@ class SettingsService {
   }
 
   Future<void> saveReadingSettings(ReadingSettings settings) async {
-    _readingSettings = settings;
-    await _prefs.setString(_keyReadingSettings, json.encode(settings.toJson()));
+    final safeSettings = settings.sanitize();
+    _readingSettings = safeSettings;
+    await _prefs.setString(
+      _keyReadingSettings,
+      json.encode(safeSettings.toJson()),
+    );
   }
 
   Future<void> saveAppSettings(AppSettings settings) async {

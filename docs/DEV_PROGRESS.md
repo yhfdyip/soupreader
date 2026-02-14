@@ -1,5 +1,34 @@
 # SoupReader 开发进度日志
 
+## 2026-02-15（发现入口链路恢复：对齐 legado 二级发现页）
+
+### 已完成
+- `lib/features/discovery/views/discovery_view.dart`
+  - 恢复发现入口点击后的目标页面：
+    - 从 `SearchView.scoped` 兜底跳转改回 `DiscoveryExploreResultsView`；
+    - 保持原有边界语义：`url` 为空不跳转、`ERROR:` 标题弹错误信息。
+  - 恢复对二级发现页的 import：
+    - `import 'discovery_explore_results_view.dart';`
+- `lib/features/discovery/views/discovery_explore_results_view.dart`
+  - 将二级发现结果页重新纳入仓库跟踪（此前被当作未跟踪文件移出）；
+  - 页面能力包括：单书源发现结果加载、分页加载、失败重试、点击进入书籍详情。
+
+### 为什么
+- 你要求“检查 legado 逻辑并保持一致”。
+- legado 在发现页点击入口后会进入二级发现列表（`ExploreShowActivity`），而不是直接转到搜索页。
+- 上一轮为满足“删除未跟踪文件并保证编译”临时切到搜索兜底，语义上不等价于 legado，本次已恢复。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 手工路径：
+  - 进入发现页，展开任一书源入口，点击有效入口；
+  - 确认进入二级发现结果页（不是搜索页）；
+  - 滚动到底触发下一页加载，点击书籍进入详情页。
+
+### 兼容影响
+- 发现入口行为回到 legado 语义：入口点击走二级发现结果页。
+- 不涉及数据库 schema 与书源规则字段变更。
+
 ## 2026-02-14（书源管理导入/编辑对齐 legado：默认勾选、排序保留、URL 连续保存）
 
 ### 已完成
@@ -2529,3 +2558,150 @@
 ### 兼容影响
 - `searchDebug` 新增可选参数，属于向后兼容扩展，旧调用不受影响。
 - 搜索结果展示顺序会更稳定（来源数优先），属于 UI 行为优化，不影响书源解析语义。
+
+## 2026-02-14（阅读页眉分割线延时下移修复：对齐 legado 稳定布局语义）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 新增“稳定系统安全区基线”机制：
+    - 引入 `_resolveStableSystemPadding(...)`，在同一视口尺寸下固定使用首次采样的 `MediaQuery.padding`；
+    - 仅在视口尺寸变化或页眉/页脚显隐配置变化时刷新基线。
+  - 页眉/页脚绘制与正文顶部偏移统一改为使用稳定基线，不再每次重绘直接跟随瞬时 `padding.top`。
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 收敛系统 UI 模式切换触发：
+    - 新增 `_applySystemUiMode(...)`，仅在目标模式变化时调用 `SystemChrome.setEnabledSystemUIMode`；
+    - 菜单显隐统一走 `_setReaderMenuVisible(...)` / `_toggleReaderMenuVisible()`，避免重复触发沉浸模式切换导致的二次 metrics 抖动。
+
+### 为什么
+- 用户反馈翻页后约 1 秒页眉分割线会下移一小段。
+- 排查发现分割线位置依赖即时安全区，系统栏 inset 延迟变化会触发二次重绘，导致可见位移。
+- legado 的页眉分割线绑定在固定布局层级上，语义是“稳定布局”，不是“实时跟随瞬时 inset”，本次按该语义对齐。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 翻页模式进入章节后翻到下一页，静置 2~3 秒，确认页眉分割线不再延时下移；
+  - 打开/关闭菜单后返回阅读，页眉分割线位置保持稳定；
+  - 切换横竖屏后分割线仍与页眉区域对齐。
+
+### 兼容影响
+- 仅调整阅读器页眉/页脚坐标计算与系统 UI 切换时机，不涉及数据库与书源解析逻辑。
+- 不改变现有阅读交互语义（菜单开关、翻页动作、章节加载流程保持不变）。
+
+## 2026-02-15（正文排版对齐 legado：逐行两端对齐替代 Flutter 默认 justify）
+
+### 已完成
+- `lib/features/reader/widgets/legacy_justified_text.dart`
+  - 新增 legado 风格逐行排版组件与算法：
+    - `LegacyJustifiedTextBlock`：按段落拆分并逐行渲染；
+    - `LegacyJustifyComposer.composeParagraph(...)`：逐行判定“末行自然排版 / 中间行扩展间距”；
+    - `LegacyJustifyComposer.paintContentOnCanvas(...)`：用于翻页预渲染（PictureRecorder）与屏幕渲染同算法。
+  - 对齐规则：
+    - 非末行才执行两端拉伸；
+    - 有多个空格优先扩展空格间距；
+    - 否则按字符间隙均分剩余宽度；
+    - 首行缩进与正文扩展间距分离处理，避免缩进字符被二次拉伸。
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 翻页正文静态渲染由 `TextAlign.justify` 改为 `LegacyJustifiedTextBlock`。
+  - 翻页预渲染 `_recordPage(...)` 同步改为调用 `LegacyJustifyComposer.paintContentOnCanvas(...)`，确保动画前后排版一致。
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 滚动模式正文段落渲染接入 `LegacyJustifiedTextBlock`，不再依赖 Flutter 默认 `justify`。
+  - 移除旧的 `WidgetSpan + TextAlign.justify` 段首缩进实现与宽度测量函数。
+
+### 为什么
+- 用户反馈默认设置下正文存在“有些行字距被拉开、有些行不拉开”的割裂感。
+- 根因是原实现依赖 Flutter `TextAlign.justify` 的黑盒行为；而 legado 使用自定义逐行分配算法，行级控制更稳定。
+- 本次将滚动与翻页统一到同一行级排版策略，按 legado 语义收敛。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 默认设置进入阅读（滚动/翻页各验证），观察正文多行段落中间行字距分配更稳定；
+  - 切换“两端对齐”开关，确认关闭后回退自然排版；
+  - 翻页动画前后同页文字排版一致，不出现切换瞬间样式跳变。
+
+### 兼容影响
+- 仅调整正文排版/绘制策略，不改数据库与书源解析规则。
+- 由于两端对齐由“系统默认行为”改为“显式逐行算法”，个别章节断行位置可能与旧版本存在细微差异，但整体语义与 legado 一致性更高。
+
+## 2026-02-15（翻页时页眉页脚延迟更新修复：对齐 legado 目标页上下文）
+
+### 已完成
+- `lib/features/reader/widgets/page_factory.dart`
+  - 新增渲染位置信息模型：
+    - `PageRenderSlot`（`prev/current/next`）
+    - `PageRenderPosition`（`chapterIndex/pageIndex/totalPages/chapterTitle`）
+  - 新增 `resolveRenderPosition(PageRenderSlot slot)`，用于在不改动当前阅读状态的前提下，获取“目标页”应显示的章节/页码信息（含跨章场景）。
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - `Picture` 预渲染接入页上下文：
+    - `_recordPage(...)` 新增 `slot` 参数；
+    - `cur/prev/next` 预渲染分别传入 `current/prev/next` 渲染位置信息。
+  - 页眉页脚文本计算改为基于渲染上下文：
+    - `_tipText*`、`_pageText`、章节进度/全书进度计算不再直接依赖 `_factory.currentPageIndex`；
+    - 静止页、滑动页、覆盖页、无动画页均按“当前渲染页”显示对应页眉页脚。
+  - `_buildRecordedPage` / `_buildPageWidget` / `_buildOverlay` 增加 `slot` 传递，确保 fallback 渲染路径也使用正确上下文。
+
+### 为什么
+- 用户反馈翻页时页眉页脚信息（页码/章节）会晚一拍更新。
+- 根因是目标页正文已切换到 `prev/next`，但页眉页脚仍按“当前页索引”计算，直到动画完成后才同步。
+- legado 的页眉页脚是按当前绘制页上下文显示，本次按该语义对齐。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 同章翻页：动画中页码应即时显示目标页（例如 `10/20` -> 动画中显示 `11/20`）；
+  - 跨章翻页：动画中页眉章节名应显示目标章节；
+  - 在 slide/cover/none/simulation/simulation2 模式下分别验证一次页眉页脚同步性。
+
+### 兼容影响
+- 仅调整翻页渲染期页眉页脚上下文来源，不影响章节解析、目录、正文内容或数据库结构。
+- 展示行为更接近 legado：翻页过程中页眉页脚与当前可见正文保持一致。
+
+## 2026-02-15（阅读设置数值归一化 + Slider 防 NaN 崩溃收口）
+
+### 已完成
+- `lib/features/reader/models/reading_settings.dart`
+  - 为阅读设置补充统一安全解析与归一化能力：
+    - 新增 `_toDouble/_toInt/_toBool` 安全解析；
+    - 新增 `sanitize()`，对亮度、排版参数、翻页参数、页眉页脚枚举等进行有界归一化；
+    - `fromJson(...)` 改为安全解析并在返回前执行 `.sanitize()`；
+    - `copyWith(...)` 返回值改为 `.sanitize()`，防止运行期脏值继续扩散。
+  - 修复高风险点：`pageTurnMode/pageDirection` 读取 `NaN/Infinity` 时不再直接 `toInt()` 崩溃。
+- `lib/core/services/settings_service.dart`
+  - `saveReadingSettings(...)` 改为先 `sanitize()` 再落盘，保证持久化层不再写入非法数值。
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 新增 `_safeBrightnessValue(...)`、`_safeSliderValue(...)`；
+  - 亮度同步到系统前强制归一化（`0.0..1.0`）；
+  - 亮度遮罩与亮度滑条改为安全值渲染；
+  - 通用 `_buildSliderSetting(...)` 统一加入 `isFinite + clamp + min/max 兜底`，并在无有效范围时禁用拖动；
+  - 初始读取设置改为 `sanitize()`。
+- `lib/features/settings/views/reading_preferences_view.dart`
+  - 初始设置和 `_update(...)` 全量改为 `sanitize()`；
+  - 手动亮度百分比展示改为安全值计算；
+  - `_SliderTile` 增加安全 `min/max/value` 计算与 `canSlide` 防护。
+- `lib/features/reader/widgets/reader_quick_settings_sheet.dart`
+  - `_SliderRow` 统一加入 `isFinite + clamp + min/max 兜底`，并将显示值改为基于安全值计算。
+- `lib/features/reader/widgets/typography_settings_dialog.dart`
+  - 初始设置与回调设置统一 `sanitize()`；
+  - `_buildSliderRow` 加入安全 `min/max/value` 逻辑，`+/-` 按钮与滑条都使用安全值。
+
+### 为什么
+- 用户现场日志显示 Flutter 语义层在 `CupertinoSlider` 报错：
+  - `Unsupported operation: Infinity or NaN toInt`
+- 根因是阅读设置存在历史脏值（`NaN/Infinity`）时，滑条渲染/语义计算可能直接触发异常。
+- legado 在对应场景下采用“稳定可用优先”的策略（亮度与进度均通过有界数值路径处理）；本次按该语义对齐，确保脏值自动回落到可渲染范围。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 进入阅读器设置面板，连续调节亮度/字号/行距/边距，确认滑条可正常拖动且无崩溃；
+  - 切换“跟随系统亮度”后再次进入阅读页，确认不报错；
+  - 翻页过程中页眉页脚即时更新行为保持不变（上轮修复不回退）。
+
+### 兼容影响
+- 旧版本遗留的非法阅读设置值会在读取/保存/交互时被自动归一化，属于向前兼容修复。
+- 不改变书源解析、目录、正文抓取逻辑，仅提升阅读设置与 UI 渲染稳定性。

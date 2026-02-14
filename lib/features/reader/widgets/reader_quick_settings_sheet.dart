@@ -331,6 +331,20 @@ class _SliderRow extends StatelessWidget {
     required this.onChanged,
   });
 
+  double _safeMin() => min.isFinite ? min : 0.0;
+
+  double _safeMax() {
+    final safeMin = _safeMin();
+    return max.isFinite && max > safeMin ? max : safeMin + 1.0;
+  }
+
+  double _safeValue() {
+    final safeMin = _safeMin();
+    final safeMax = _safeMax();
+    final safeRaw = value.isFinite ? value : safeMin;
+    return safeRaw.clamp(safeMin, safeMax).toDouble();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
@@ -340,6 +354,10 @@ class _SliderRow extends StatelessWidget {
         isDark ? CupertinoColors.white : AppDesignTokens.textNormal;
     final activeColor =
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final safeMin = _safeMin();
+    final safeMax = _safeMax();
+    final safeValue = _safeValue();
+    final canSlide = min.isFinite && max.isFinite && max > min;
     return Row(
       children: [
         SizedBox(
@@ -351,17 +369,17 @@ class _SliderRow extends StatelessWidget {
         ),
         Expanded(
           child: CupertinoSlider(
-            value: value.clamp(min, max),
-            min: min,
-            max: max,
+            value: safeValue,
+            min: safeMin,
+            max: safeMax,
             activeColor: activeColor,
-            onChanged: onChanged,
+            onChanged: canSlide ? onChanged : null,
           ),
         ),
         SizedBox(
           width: 46,
           child: Text(
-            format(value),
+            format(safeValue),
             textAlign: TextAlign.end,
             style: TextStyle(color: valueColor, fontSize: 12),
           ),
