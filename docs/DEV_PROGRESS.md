@@ -1615,3 +1615,159 @@
 ### 兼容影响
 - 仅 UI/交互层优化，不变更调试引擎、数据结构、书源解析语义；
 - 与 legado 的调试 key 规则和链路语义保持一致。
+
+## 2026-02-13（搜索/发现点击行为对齐 legado：先进入书籍详情）
+
+### 已完成
+- `lib/features/search/views/search_view.dart`
+  - 结果项点击从“直接加入书架”改为“打开书籍详情页”。
+  - 移除页面内导入中状态展示，避免与新详情页动作重复。
+- `lib/features/discovery/views/discovery_view.dart`
+  - 结果项点击同样改为“打开书籍详情页”，与搜索页一致。
+  - 保持发现列表拉取、失败书源提示与停止逻辑不变。
+- `lib/features/search/views/search_book_info_view.dart`（新增）
+  - 新增 `Shadcn + Cupertino` 书籍详情页，承接搜索/发现点击后的主流程。
+  - 展示封面、作者、来源、简介、基础字段（分类/字数/更新时间/最新章节/详情链接/目录链接）。
+  - 首屏异步拉取 `ruleBookInfo` 详情，并支持手动刷新详情。
+  - 提供“加入书架”主操作；加入后按钮切换为“开始阅读”，可直接进入阅读页。
+  - 已在书架时展示状态标签“已在书架中”。
+- `lib/features/bookshelf/services/book_add_service.dart`
+  - 新增 `buildBookId` / `isInBookshelf`，复用与导入一致的 ID 规则，供详情页判定书架状态。
+  - `addFromSearchResult` 内改为复用 `buildBookId`，避免 ID 规则分叉。
+
+### 为什么
+- 当前实现与 legado 不一致：点击搜索/发现结果会直接加入书架。
+- legado 语义是“点击结果进入书籍详情页，再由详情页决定加入书架或阅读”。
+- 本次改动将主交互恢复为 legado 同款流程，减少误触导入并提升可解释性。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 搜索任意关键词，点击结果项，应进入“书籍详情”而不是直接加入书架；
+  - 在详情页点击“加入书架”，应提示加入结果；
+  - 加入成功后按钮应切换为“开始阅读”，点击可进入阅读页；
+  - 发现页点击结果项行为与搜索页一致。
+
+### 兼容影响
+- 交互入口有变化：搜索/发现主点击从“直接导入”改为“先看详情再导入”（对齐 legado）。
+- 不改变书源解析链路与导入实现，仅调整入口行为与状态呈现。
+
+## 2026-02-13（主流程继续对齐 legado：列表细节 + 详情三主操作 + 未入架直读 + 详情换源）
+
+### 已完成
+- `lib/features/search/views/search_view.dart`
+  - 搜索结果改为“同名同作者聚合展示”（按 `name+author` 归并），对齐 legado 的多来源合并语义。
+  - 列表新增来源数量徽标（`N源`）与在架标识（书本勾选图标）。
+  - 列表信息层级调整：书名/作者/简介/元信息/来源，点击仍是“进详情”。
+- `lib/features/discovery/views/discovery_view.dart`
+  - 发现列表同步实现聚合展示、来源数量徽标、在架标识，交互与搜索页一致。
+- `lib/features/search/views/search_book_info_view.dart`
+  - 详情页重构为 legado 主动作模型：`阅读`、`目录`、`加入/移出书架`。
+  - 进入详情后同时拉取 `ruleBookInfo` 与目录（`ruleToc`），并提供失败原因可见提示。
+  - 新增详情页换源（按“书名匹配 + 作者优先”筛候选），切源后重载详情与目录。
+  - 目录页改为独立列表页，点击章节可直接进入阅读指定章节。
+  - 未入书架时支持直接阅读（不再强制先加入书架）。
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 新增临时阅读构造 `SimpleReaderView.ephemeral(...)`，支持“未入架直读”会话。
+  - 阅读器内容拉取从“必须依赖书架 Book”改为“可使用会话 sourceUrl”，保证临时会话可正常请求正文。
+  - 阅读器换源逻辑兼容临时会话（不将临时章节写回数据库）。
+
+### 为什么
+- 你反馈要按主流程逐项对齐 legado；之前虽修复了“点击搜索结果先进入详情”，但仍缺少列表细节（来源聚合/在架状态）与详情页完整动作语义。
+- legado 关键体验是：列表看状态 -> 进详情 -> 可直接阅读/看目录/加书架，并支持详情换源；本次就是对这条链路做完整补齐。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 搜索同一本书（多源可命中）后，确认列表出现 `N源` 徽标与在架标识；
+  - 点击结果进入详情，确认存在 `阅读/目录/加入或移出书架` 三主按钮；
+  - 未加入书架时直接点“阅读”可进入正文；
+  - 点“目录”进入目录页，选任一章节可跳转对应章节阅读；
+  - 点“换源”后可切换候选源，详情与目录刷新为新源结果；
+  - 加入书架后返回搜索/发现列表，在架标识能同步更新。
+
+### 兼容影响
+- 详情页行为从“偏导入页”升级为“主流程操作页”，与 legado 更一致；
+- 引入临时阅读会话后，未入架也可阅读，但不改变已在书架书籍的阅读与持久化行为；
+- 仅涉及主流程交互与状态展示，不改书源规则语义与解析引擎核心规则。
+
+## 2026-02-13（修复在线导入历史崩溃：Cannot remove from a fixed-length list）
+
+### 已完成
+- `lib/features/source/views/source_list_view.dart`
+  - 对齐 legado 在线导入历史的可变列表语义，修复历史列表为 fixed-length 时执行 `remove/insert/clear` 崩溃。
+  - `_loadOnlineImportHistory()` 改为返回可变列表（`toList(growable: true)`）。
+  - `_saveOnlineImportHistory()` 与 `_pushImportHistory()` 内部中间列表改为可变列表，保证后续删除、置顶、截断逻辑稳定。
+
+### 为什么
+- 异常日志显示：
+  - `Unsupported operation: Cannot remove from a fixed-length list`
+  - 堆栈定位到 `_pushImportHistory` 的 `history.remove(url)`。
+- 根因是在线导入历史在读取后被构造成了 fixed-length 列表，而导入流程和历史管理都需要可变操作。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 手工路径：
+  - 书源管理 -> 在线导入，输入 URL 导入；
+  - 重复导入同 URL（触发历史置顶）；
+  - 在历史中删除单条、清空历史；
+  - 以上操作不再出现 fixed-length list 异常。
+
+### 兼容影响
+- 仅修复历史记录容器可变性，不改变导入协议、书源解析与导入结果语义；
+- 与 legado 的在线导入历史交互（可删、可清空、可复用）保持一致。
+
+## 2026-02-14（规则引擎继续对齐 legado：前缀语义 + 旧式点号索引 + 提取器 + replaceFirst）
+
+### 已完成
+- `lib/features/source/services/rule_parser_engine.dart`
+  - 新增 `@CSS:` / `@@` 前缀标准化（`_normalizeCssRulePrefix`），并接入三处入口：
+    - 单值规则解析（`_parseRule`）
+    - 列表元素选择（`_selectAllElementsByRule`）
+    - HTML 字符串列表提取（`_parseStringListFromHtmlSingle`）
+  - 旧式点号索引语法扩展，对齐 legado：
+    - 继续支持 `selector.2`
+    - 新增支持 `selector.-1:10:2`（旧式“冒号索引列表”）
+    - 新增支持 `selector!0:3`（排除模式）
+    - 复用统一 `indexSpec` 执行路径，避免双套索引逻辑漂移。
+  - 继续补齐 legacy selector 前缀语义：
+    - `children` / `children.*`：按“仅当前节点直接子元素”选择；
+    - `text.xxx`：按“元素 ownText 包含 xxx”选择（兼容 legado `getElementsContainingOwnText`）。
+  - 提取器语义对齐 legado：
+    - `textNodes` 改为逐 text node 清洗后按 `\n` 拼接；
+    - `ownText` 改为仅提取当前节点直系文本；
+    - `html` 改为在副本中移除 `script/style` 后输出 HTML；
+    - 新增 `all` extractor 支持。
+  - 替换语义增强：
+    - 新增 legado 风格 `replaceFirst` 处理（`##regex##replacement###`）；
+    - 内联替换与正文 `replaceRegex` 共用同一替换函数，保持行为一致。
+- `test/rule_parser_engine_legado_rule_semantic_compat_test.dart`（新增）
+  - 覆盖上述差异点的规则级与五段链路级回归：
+    - `@CSS:` / `@@`
+    - 旧式点号索引与排除
+    - `textNodes/ownText/html/all`
+    - `replaceFirst`
+    - `children` / `text.xxx`
+    - search / explore / bookInfo / toc / content 全链路验证。
+- `test/rule_parser_engine_legado_index_compat_test.dart`
+  - 保持并复用此前 `[]` 索引兼容回归测试，作为本次对齐的基线保护。
+
+### 为什么
+- 在修复 `td[0]@text` 后，仍存在多项 legado 规则语义差异会导致旧书源出现“能导入但字段异常/调试值不一致”的问题。
+- 本次按 legado 核心实现继续补齐高频差异，降低后续书源兼容维护成本。
+
+### 如何验证
+- 执行：`flutter analyze --no-version-check`
+- 结果：`No issues found!`
+- 执行：`flutter test test/rule_parser_engine_legado_index_compat_test.dart test/rule_parser_engine_legado_rule_semantic_compat_test.dart --no-version-check`
+- 结果：`All tests passed!`
+- 关键回归用例（已新增）：
+  - `rule_parser_engine_legado_rule_semantic_compat_test.dart`
+  - `rule_parser_engine_legado_index_compat_test.dart`
+
+### 兼容影响
+- 行为更接近 legado：可能修正少量“历史上可用但语义不标准”的规则输出。
+- 旧语法兼容增强（`@CSS/@@`、旧式点号索引、`replaceFirst`），对已有标准 CSS 规则无破坏性变更。
+- 五段链路调试可观测性保持不变，仅解析结果语义更贴近 legado。

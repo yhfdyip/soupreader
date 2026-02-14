@@ -1796,6 +1796,8 @@ class RuleParserEngine {
       resolvedRule,
       baseUrl: baseUrl,
     );
+    resolvedRule = _normalizeCssRulePrefix(resolvedRule).trim();
+    if (resolvedRule.isEmpty) return const <String>[];
 
     if (_isLiteralRuleCandidate(one)) {
       final values = _splitPossibleListValues(resolvedRule);
@@ -3879,9 +3881,10 @@ class RuleParserEngine {
       log('︽详情页解析失败', state: -1);
       return null;
     }
-    final parseBaseUrl = (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
-        ? fullUrl
-        : fetch.finalUrl!.trim();
+    final parseBaseUrl =
+        (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
+            ? fullUrl
+            : fetch.finalUrl!.trim();
     if (parseBaseUrl != fullUrl) {
       log('≡详情页重定向至:$parseBaseUrl', showTime: false);
     }
@@ -3917,7 +3920,8 @@ class RuleParserEngine {
         baseUrl: parseBaseUrl,
       );
       log('└$tocUrl');
-      if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(parseBaseUrl)) {
+      if (_normalizeUrlVisitKey(tocUrl) ==
+          _normalizeUrlVisitKey(parseBaseUrl)) {
         _cacheBookInfoTocHtml(
           tocUrl: tocUrl,
           html: body,
@@ -4966,8 +4970,8 @@ class RuleParserEngine {
           kind: _parseValueOnNode(jsonRoot, bookInfoRule.kind, parseBaseUrl),
           lastChapter: _parseValueOnNode(
               jsonRoot, bookInfoRule.lastChapter, parseBaseUrl),
-          updateTime:
-              _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, parseBaseUrl),
+          updateTime: _parseValueOnNode(
+              jsonRoot, bookInfoRule.updateTime, parseBaseUrl),
           wordCount:
               _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl),
           tocUrl: tocUrl,
@@ -5072,9 +5076,10 @@ class RuleParserEngine {
         error: fetch.error ?? '请求失败',
       );
     }
-    final parseBaseUrl = (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
-        ? fullUrl
-        : fetch.finalUrl!.trim();
+    final parseBaseUrl =
+        (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
+            ? fullUrl
+            : fetch.finalUrl!.trim();
 
     try {
       final body = fetch.body!;
@@ -5099,11 +5104,12 @@ class RuleParserEngine {
         }
         final intro =
             _parseValueOnNode(jsonRoot, bookInfoRule.intro, parseBaseUrl);
-        final kind = _parseValueOnNode(jsonRoot, bookInfoRule.kind, parseBaseUrl);
-        final lastChapter = _parseValueOnNode(
-            jsonRoot, bookInfoRule.lastChapter, parseBaseUrl);
-        final updateTime = _parseValueOnNode(
-            jsonRoot, bookInfoRule.updateTime, parseBaseUrl);
+        final kind =
+            _parseValueOnNode(jsonRoot, bookInfoRule.kind, parseBaseUrl);
+        final lastChapter =
+            _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, parseBaseUrl);
+        final updateTime =
+            _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, parseBaseUrl);
         final wordCount =
             _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl);
         final tocUrl = _resolveTocUrlLikeLegado(
@@ -5179,7 +5185,8 @@ class RuleParserEngine {
       final kind = _parseRule(root, bookInfoRule.kind, parseBaseUrl);
       final lastChapter =
           _parseRule(root, bookInfoRule.lastChapter, parseBaseUrl);
-      final updateTime = _parseRule(root, bookInfoRule.updateTime, parseBaseUrl);
+      final updateTime =
+          _parseRule(root, bookInfoRule.updateTime, parseBaseUrl);
       final wordCount = _parseRule(root, bookInfoRule.wordCount, parseBaseUrl);
       final tocUrl = _resolveTocUrlLikeLegado(
         rawValue: _parseRule(root, bookInfoRule.tocUrl, parseBaseUrl),
@@ -6504,6 +6511,17 @@ class RuleParserEngine {
     return t.startsWith(':');
   }
 
+  String _normalizeCssRulePrefix(String rule) {
+    final t = rule.trimLeft();
+    if (t.toLowerCase().startsWith('@css:')) {
+      return t.substring('@css:'.length).trimLeft();
+    }
+    if (t.startsWith('@@')) {
+      return t.substring(2).trimLeft();
+    }
+    return rule;
+  }
+
   ({String expr, List<_LegadoReplacePair> replacements})
       _splitExprAndReplacements(
     String raw,
@@ -6720,6 +6738,7 @@ class RuleParserEngine {
         trimmed,
         baseUrl: baseUrl,
       ).trim();
+      trimmed = _normalizeCssRulePrefix(trimmed).trim();
       if (trimmed.isEmpty) continue;
 
       String result = '';
@@ -6748,6 +6767,7 @@ class RuleParserEngine {
     'html',
     'innerhtml',
     'outerhtml',
+    'all',
   };
 
   static const Set<String> _commonAttrExtractors = {
@@ -6830,23 +6850,172 @@ class RuleParserEngine {
 
       final matched = <Element>[];
       for (final ctx in contexts) {
+        if (step.ownTextContains != null) {
+          matched.addAll(
+            _queryElementsContainingOwnText(ctx, step.ownTextContains!),
+          );
+          continue;
+        }
+        if (step.childrenOnly) {
+          matched.addAll(_queryChildElements(ctx, css));
+          continue;
+        }
         matched.addAll(_queryAllElements(ctx, css));
       }
 
-      final idx = step.index;
-      if (idx != null) {
-        if (matched.isEmpty) return const <Element>[];
-        var effective = idx >= 0 ? idx : matched.length + idx;
-        if (effective < 0 || effective >= matched.length) {
-          return const <Element>[];
-        }
-        contexts = <dynamic>[matched[effective]];
-      } else {
-        contexts = matched;
+      final indexSpec = step.indexSpec;
+      if (indexSpec != null) {
+        final filtered = _applyLegadoIndexSpec(matched, indexSpec);
+        if (filtered.isEmpty) return const <Element>[];
+        contexts = filtered;
+        continue;
       }
+      contexts = matched;
     }
 
     return contexts.whereType<Element>().toList(growable: false);
+  }
+
+  List<Element> _queryElementsContainingOwnText(dynamic ctx, String keyword) {
+    final needle = keyword.trim().toLowerCase();
+    if (needle.isEmpty) return const <Element>[];
+
+    Element? root;
+    if (ctx is Document) {
+      root = ctx.documentElement;
+    } else if (ctx is Element) {
+      root = ctx;
+    }
+    if (root == null) return const <Element>[];
+
+    final out = <Element>[];
+    final stack = <Element>[root];
+    while (stack.isNotEmpty) {
+      final current = stack.removeLast();
+      final ownText = current.nodes
+          .whereType<Text>()
+          .map((t) => t.text)
+          .join()
+          .toLowerCase();
+      if (ownText.contains(needle)) {
+        out.add(current);
+      }
+      for (var i = current.children.length - 1; i >= 0; i--) {
+        stack.add(current.children[i]);
+      }
+    }
+    return out;
+  }
+
+  List<Element> _queryChildElements(dynamic ctx, String css) {
+    List<Element> children;
+    if (ctx is Document) {
+      final root = ctx.documentElement;
+      if (root == null) return const <Element>[];
+      children = root.children.toList(growable: false);
+    } else if (ctx is Element) {
+      children = ctx.children.toList(growable: false);
+    } else {
+      return const <Element>[];
+    }
+
+    final trimmed = css.trim();
+    if (trimmed.isEmpty || trimmed == '*') return children;
+    final allowed = _queryAllElements(ctx, css).toSet();
+    return children.where(allowed.contains).toList(growable: false);
+  }
+
+  List<Element> _applyLegadoIndexSpec(
+    List<Element> elements,
+    _LegadoIndexSpec spec,
+  ) {
+    if (elements.isEmpty) return const <Element>[];
+    final len = elements.length;
+
+    final indexSet = <int>{};
+    for (final term in spec.terms) {
+      if (!term.isRange) {
+        final normalized = _normalizeLegadoIndex(term.value!, len);
+        if (normalized != null) {
+          indexSet.add(normalized);
+        }
+        continue;
+      }
+      indexSet.addAll(_expandLegadoRange(term, len));
+    }
+
+    if (indexSet.isEmpty) {
+      return spec.exclude ? elements : const <Element>[];
+    }
+
+    if (spec.exclude) {
+      final out = <Element>[];
+      for (var i = 0; i < len; i++) {
+        if (!indexSet.contains(i)) {
+          out.add(elements[i]);
+        }
+      }
+      return out;
+    }
+
+    final out = <Element>[];
+    for (final idx in indexSet) {
+      out.add(elements[idx]);
+    }
+    return out;
+  }
+
+  int? _normalizeLegadoIndex(int index, int len) {
+    if (index >= 0) {
+      return index < len ? index : null;
+    }
+    return len >= -index ? (index + len) : null;
+  }
+
+  Iterable<int> _expandLegadoRange(_LegadoIndexTerm range, int len) sync* {
+    var start = range.start ?? 0;
+    if (start < 0) start += len;
+
+    var end = range.end ?? (len - 1);
+    if (end < 0) end += len;
+
+    if ((start < 0 && end < 0) || (start >= len && end >= len)) {
+      return;
+    }
+
+    if (start >= len) {
+      start = len - 1;
+    } else if (start < 0) {
+      start = 0;
+    }
+
+    if (end >= len) {
+      end = len - 1;
+    } else if (end < 0) {
+      end = 0;
+    }
+
+    final rawStep = range.step;
+    if (start == end || rawStep >= len) {
+      yield start;
+      return;
+    }
+
+    final step = rawStep > 0 ? rawStep : ((-rawStep) < len ? rawStep + len : 1);
+    if (step <= 0) {
+      yield start;
+      return;
+    }
+
+    if (end > start) {
+      for (var i = start; i <= end; i += step) {
+        yield i;
+      }
+      return;
+    }
+    for (var i = start; i >= end; i -= step) {
+      yield i;
+    }
   }
 
   List<Element> _queryAllElements(dynamic ctx, String css) {
@@ -7342,7 +7511,7 @@ class RuleParserEngine {
     String selectorRule, {
     String? rawHtml,
   }) {
-    final raw = selectorRule.trim();
+    final raw = _normalizeCssRulePrefix(selectorRule).trim();
     if (raw.isEmpty) return const <Element>[];
 
     if (_looksLikeXPath(raw)) {
@@ -7429,11 +7598,13 @@ class RuleParserEngine {
       String value;
       if (lower == 'text') {
         value = target.text;
-      } else if (lower == 'textnodes' || lower == 'owntext') {
-        value = target.nodes.whereType<Text>().map((t) => t.text).join('');
+      } else if (lower == 'textnodes') {
+        value = _extractTextNodesLikeLegado(target);
+      } else if (lower == 'owntext') {
+        value = _extractOwnTextLikeLegado(target);
       } else if (lower == 'html' || lower == 'innerhtml') {
-        value = target.innerHtml;
-      } else if (lower == 'outerhtml') {
+        value = _extractHtmlLikeLegado(target);
+      } else if (lower == 'outerhtml' || lower == 'all') {
         value = target.outerHtml;
       } else {
         value = target.attributes[token] ??
@@ -7454,6 +7625,39 @@ class RuleParserEngine {
     return '';
   }
 
+  String _extractTextNodesLikeLegado(Element target) {
+    final lines = <String>[];
+    for (final node in target.nodes.whereType<Text>()) {
+      final text = node.text.trim();
+      if (text.isEmpty) continue;
+      lines.add(text);
+    }
+    return lines.join('\n');
+  }
+
+  String _extractOwnTextLikeLegado(Element target) {
+    final buf = StringBuffer();
+    for (final node in target.nodes.whereType<Text>()) {
+      buf.write(node.text);
+    }
+    return buf.toString();
+  }
+
+  String _extractHtmlLikeLegado(Element target) {
+    final fragment = html_parser.parseFragment(target.outerHtml);
+    for (final node in fragment.querySelectorAll('script')) {
+      node.remove();
+    }
+    for (final node in fragment.querySelectorAll('style')) {
+      node.remove();
+    }
+    return fragment.nodes.map((node) {
+      if (node is Element) return node.outerHtml;
+      if (node is Text) return node.text;
+      return node.toString();
+    }).join();
+  }
+
   String _applyInlineReplacements(
     String input,
     List<_LegadoReplacePair> replacements,
@@ -7463,13 +7667,41 @@ class RuleParserEngine {
       final pattern = r.pattern;
       final replacement = r.replacement;
       if (pattern.isEmpty) continue;
-      try {
-        result = result.replaceAll(RegExp(pattern), replacement);
-      } catch (_) {
-        result = result.replaceAll(pattern, replacement);
-      }
+      result = _applyLegacyReplaceRegex(
+        content: result,
+        pattern: pattern,
+        replacement: replacement,
+        firstOnly: r.firstOnly,
+      );
     }
     return result;
+  }
+
+  String _applyLegacyReplaceRegex({
+    required String content,
+    required String pattern,
+    required String replacement,
+    required bool firstOnly,
+  }) {
+    if (pattern.isEmpty) return content;
+
+    if (firstOnly) {
+      try {
+        final regex = RegExp(pattern);
+        final matcher = regex.firstMatch(content);
+        if (matcher == null) return '';
+        final matchedText = matcher.group(0) ?? '';
+        return matchedText.replaceFirst(regex, replacement);
+      } catch (_) {
+        return replacement;
+      }
+    }
+
+    try {
+      return content.replaceAll(RegExp(pattern), replacement);
+    } catch (_) {
+      return content.replaceAll(pattern, replacement);
+    }
   }
 
   /// 应用替换正则
@@ -7478,21 +7710,32 @@ class RuleParserEngine {
     final parts = replaceRegex.split('##');
     if (parts.isEmpty) return content;
 
-    for (int i = 0; i < parts.length - 1; i += 2) {
+    var start = 0;
+    // 对齐 legado：`##regex##replacement###` 触发 replaceFirst 语义。
+    if (parts.length >= 3 && parts.length.isOdd) {
+      final pattern = parts[0];
+      if (pattern.isNotEmpty) {
+        final replacement = parts[1];
+        content = _applyLegacyReplaceRegex(
+          content: content,
+          pattern: pattern,
+          replacement: replacement,
+          firstOnly: true,
+        );
+      }
+      start = 3;
+    }
+
+    for (int i = start; i < parts.length - 1; i += 2) {
       final pattern = parts[i];
       if (pattern.isEmpty) continue;
       final replacement = parts.length > i + 1 ? parts[i + 1] : '';
-
-      try {
-        content = content.replaceAll(RegExp(pattern), replacement);
-      } catch (e) {
-        // 兼容兜底：单条正则异常时按字面量替换，且不中断后续 replaceRegex 链。
-        try {
-          content = content.replaceAll(pattern, replacement);
-        } catch (_) {
-          debugPrint('替换正则失败(第${(i ~/ 2) + 1}条): $e');
-        }
-      }
+      content = _applyLegacyReplaceRegex(
+        content: content,
+        pattern: pattern,
+        replacement: replacement,
+        firstOnly: false,
+      );
     }
 
     return content;
@@ -7534,13 +7777,32 @@ class _LegadoTextRule {
 
     final replacements = <_LegadoReplacePair>[];
     if (parts.length > 1) {
-      final rep = parts.sublist(1).map((e) => e).toList(growable: false);
-      for (var i = 0; i < rep.length; i += 2) {
+      final rep = parts.sublist(1).toList(growable: false);
+      var start = 0;
+      // 对齐 legado：当 replace 段为奇数时，首段按 replaceFirst 处理（如 `##a##b###`）。
+      if (rep.length >= 3 && rep.length.isOdd) {
+        final firstPattern = rep[0].trim();
+        if (firstPattern.isNotEmpty) {
+          replacements.add(
+            _LegadoReplacePair(
+              pattern: firstPattern,
+              replacement: rep[1],
+              firstOnly: true,
+            ),
+          );
+        }
+        start = 3;
+      }
+
+      for (var i = start; i < rep.length; i += 2) {
         final pattern = rep[i].trim();
         final replacement = (i + 1) < rep.length ? rep[i + 1] : '';
         if (pattern.isEmpty) continue;
         replacements.add(
-          _LegadoReplacePair(pattern: pattern, replacement: replacement),
+          _LegadoReplacePair(
+            pattern: pattern,
+            replacement: replacement,
+          ),
         );
       }
     }
@@ -7586,32 +7848,262 @@ class _LegadoTextRule {
 
 class _LegadoSelectorStep {
   final String cssSelector;
-  final int? index;
+  final _LegadoIndexSpec? indexSpec;
+  final bool childrenOnly;
+  final String? ownTextContains;
 
   const _LegadoSelectorStep({
     required this.cssSelector,
-    required this.index,
+    required this.indexSpec,
+    this.childrenOnly = false,
+    this.ownTextContains,
   });
 
   static _LegadoSelectorStep? tryParse(String token) {
     final t = token.trim();
     if (t.isEmpty) return null;
 
-    int? index;
     var base = t;
-    final lastDot = t.lastIndexOf('.');
-    if (lastDot > 0 && lastDot < t.length - 1) {
-      final maybeIndex = t.substring(lastDot + 1);
-      final parsed = int.tryParse(maybeIndex);
-      if (parsed != null) {
-        index = parsed;
-        base = t.substring(0, lastDot);
+    _LegadoIndexSpec? indexSpec;
+
+    final bracketParsed = _tryParseBracketIndex(t);
+    if (bracketParsed != null) {
+      base = bracketParsed.base;
+      indexSpec = bracketParsed.spec;
+    } else {
+      final dotParsed = _tryParseDotIndex(t);
+      if (dotParsed != null) {
+        base = dotParsed.base;
+        indexSpec = dotParsed.spec;
       }
     }
 
+    final selectorBase = _parseLegacySelectorBase(base);
+    if (selectorBase.textSelector &&
+        (selectorBase.ownTextContains == null ||
+            selectorBase.ownTextContains!.isEmpty)) {
+      return null;
+    }
+
+    base = selectorBase.cssBase;
     final css = _toCssSelector(base);
-    if (css.trim().isEmpty) return null;
-    return _LegadoSelectorStep(cssSelector: css, index: index);
+    if (css.trim().isEmpty) {
+      // 对齐 legado：允许仅写索引（如 [0]），语义等价于当前节点 children。
+      if (indexSpec != null && base.trim().isEmpty) {
+        return _LegadoSelectorStep(
+          cssSelector: '*',
+          indexSpec: indexSpec,
+          childrenOnly: true,
+          ownTextContains: null,
+        );
+      }
+      return null;
+    }
+    return _LegadoSelectorStep(
+      cssSelector: css,
+      indexSpec: indexSpec,
+      childrenOnly: selectorBase.childrenOnly,
+      ownTextContains: selectorBase.ownTextContains,
+    );
+  }
+
+  static ({
+    String cssBase,
+    bool childrenOnly,
+    bool textSelector,
+    String? ownTextContains,
+  }) _parseLegacySelectorBase(String raw) {
+    final t = raw.trim();
+    if (t == 'children' || t.startsWith('children.')) {
+      return (
+        cssBase: '*',
+        childrenOnly: true,
+        textSelector: false,
+        ownTextContains: null,
+      );
+    }
+
+    if (t.startsWith('text.')) {
+      var keyword = t.substring('text.'.length);
+      final nextDot = keyword.indexOf('.');
+      if (nextDot >= 0) {
+        keyword = keyword.substring(0, nextDot);
+      }
+      keyword = keyword.trim();
+      return (
+        cssBase: '*',
+        childrenOnly: false,
+        textSelector: true,
+        ownTextContains: keyword.isEmpty ? null : keyword,
+      );
+    }
+
+    return (
+      cssBase: t,
+      childrenOnly: false,
+      textSelector: false,
+      ownTextContains: null,
+    );
+  }
+
+  static ({String base, _LegadoIndexSpec spec})? _tryParseDotIndex(
+    String token,
+  ) {
+    ({String base, _LegadoIndexSpec spec})? parseBySplit(
+      int splitPos, {
+      required bool exclude,
+    }) {
+      if (splitPos < 0 || splitPos >= token.length - 1) return null;
+      final body = token.substring(splitPos + 1).trim();
+      final values = _parseLegacyColonIndexes(body);
+      if (values == null || values.isEmpty) return null;
+      final base = token.substring(0, splitPos).trimRight();
+      return (
+        base: base,
+        spec: _LegadoIndexSpec(
+          exclude: exclude,
+          terms: values
+              .map((v) => _LegadoIndexTerm.value(v))
+              .toList(growable: false),
+        ),
+      );
+    }
+
+    // 旧语法：selector!0:3（排除）
+    final bangPos = token.lastIndexOf('!');
+    if (bangPos >= 0) {
+      final parsed = parseBySplit(bangPos, exclude: true);
+      if (parsed != null) return parsed;
+    }
+
+    // 旧语法：selector.-1:10:2（选择）
+    for (var pos = token.length - 1; pos >= 0; pos--) {
+      if (token[pos] != '.') continue;
+      final parsed = parseBySplit(pos, exclude: false);
+      if (parsed != null) return parsed;
+    }
+
+    return null;
+  }
+
+  static List<int>? _parseLegacyColonIndexes(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return null;
+    final out = <int>[];
+    for (final part in t.split(':')) {
+      final v = int.tryParse(part.trim());
+      if (v == null) return null;
+      out.add(v);
+    }
+    return out;
+  }
+
+  static ({String base, _LegadoIndexSpec spec})? _tryParseBracketIndex(
+    String token,
+  ) {
+    if (!token.endsWith(']')) return null;
+    final start = _findTrailingBracketStart(token);
+    if (start < 0) return null;
+
+    final body = token.substring(start + 1, token.length - 1).trim();
+    if (body.isEmpty) return null;
+
+    // 只接受 legado 索引语法字符，避免把 CSS 属性选择器误判为索引列表。
+    for (final rune in body.runes) {
+      final ch = String.fromCharCode(rune);
+      final isDigit = rune >= 0x30 && rune <= 0x39;
+      final isAllowed = isDigit ||
+          ch == '-' ||
+          ch == ':' ||
+          ch == ',' ||
+          ch == '!' ||
+          ch == ' ';
+      if (!isAllowed) return null;
+    }
+
+    var includeBody = body;
+    var exclude = false;
+    if (includeBody.startsWith('!')) {
+      exclude = true;
+      includeBody = includeBody.substring(1).trimLeft();
+      if (includeBody.isEmpty) return null;
+    }
+
+    final terms = <_LegadoIndexTerm>[];
+    final segments = includeBody.split(',');
+    for (final segment in segments) {
+      final raw = segment.trim();
+      if (raw.isEmpty) return null;
+
+      final colonCount = ':'.allMatches(raw).length;
+      if (colonCount == 0) {
+        final value = int.tryParse(raw);
+        if (value == null) return null;
+        terms.add(_LegadoIndexTerm.value(value));
+        continue;
+      }
+
+      if (colonCount > 2) return null;
+      final parts = raw.split(':');
+      if (parts.length < 2 || parts.length > 3) return null;
+
+      int? parseNullableInt(String s) {
+        final t = s.trim();
+        if (t.isEmpty) return null;
+        return int.tryParse(t);
+      }
+
+      final startRaw = parts[0].trim();
+      final endRaw = parts[1].trim();
+      final stepRaw = parts.length == 3 ? parts[2].trim() : '';
+
+      final startVal = parseNullableInt(parts[0]);
+      final endVal = parseNullableInt(parts[1]);
+      if (startRaw.isNotEmpty && startVal == null) return null;
+      if (endRaw.isNotEmpty && endVal == null) return null;
+
+      var stepVal = 1;
+      if (parts.length == 3) {
+        final parsedStep = parseNullableInt(parts[2]);
+        if (stepRaw.isNotEmpty && parsedStep == null) return null;
+        stepVal = parsedStep ?? 1;
+      }
+      if (stepVal == 0) stepVal = 1;
+
+      terms.add(
+        _LegadoIndexTerm.range(
+          start: startVal,
+          end: endVal,
+          step: stepVal,
+        ),
+      );
+    }
+
+    if (terms.isEmpty) return null;
+    final base = token.substring(0, start).trimRight();
+    return (
+      base: base,
+      spec: _LegadoIndexSpec(
+        exclude: exclude,
+        terms: terms,
+      ),
+    );
+  }
+
+  static int _findTrailingBracketStart(String token) {
+    var depth = 0;
+    for (var i = token.length - 1; i >= 0; i--) {
+      final ch = token[i];
+      if (ch == ']') {
+        depth++;
+        continue;
+      }
+      if (ch != '[') continue;
+      depth--;
+      if (depth == 0) return i;
+      if (depth < 0) return -1;
+    }
+    return -1;
   }
 
   static String _toCssSelector(String raw) {
@@ -7632,13 +8124,60 @@ class _LegadoSelectorStep {
   }
 }
 
+class _LegadoIndexSpec {
+  final bool exclude;
+  final List<_LegadoIndexTerm> terms;
+
+  const _LegadoIndexSpec({
+    this.exclude = false,
+    required this.terms,
+  });
+}
+
+class _LegadoIndexTerm {
+  final int? value;
+  final int? start;
+  final int? end;
+  final int step;
+
+  const _LegadoIndexTerm.value(int value)
+      : this._(
+          value: value,
+          start: null,
+          end: null,
+          step: 1,
+        );
+
+  const _LegadoIndexTerm.range({
+    required int? start,
+    required int? end,
+    required int step,
+  }) : this._(
+          value: null,
+          start: start,
+          end: end,
+          step: step,
+        );
+
+  const _LegadoIndexTerm._({
+    required this.value,
+    required this.start,
+    required this.end,
+    required this.step,
+  });
+
+  bool get isRange => value == null;
+}
+
 class _LegadoReplacePair {
   final String pattern;
   final String replacement;
+  final bool firstOnly;
 
   const _LegadoReplacePair({
     required this.pattern,
     required this.replacement,
+    this.firstOnly = false,
   });
 }
 
