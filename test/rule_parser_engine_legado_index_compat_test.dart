@@ -128,6 +128,19 @@ void main() {
       expect(values, ['新书《捞尸人》', '已发布！', '9190K', '24-09-01', '连载']);
     });
 
+    test('single-value text rule merges multi-index results with newline', () {
+      final doc = html_parser.parse(bookRowHtml);
+      final engine = RuleParserEngine();
+
+      final merged = engine.debugParseRule(
+        doc,
+        'tr#nr@td[5,4,3]@text',
+        'https://www.blxs.info',
+      );
+
+      expect(merged, '连载\n24-09-01\n9190K');
+    });
+
     test('supports css attr selector with trailing index', () {
       final doc = html_parser.parse(bookRowHtml);
       final engine = RuleParserEngine();
@@ -183,6 +196,31 @@ void main() {
       expect(result.first.bookUrl, 'https://example.com/42/42506/');
     });
 
+    test('search stage url keeps first candidate for td[1,0]@a@href', () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        searchUrl: 'https://example.com/search',
+        ruleSearch: const SearchRule(
+          bookList: 'tr#nr',
+          name: 'td[0]@text',
+          author: 'td[2]@text',
+          bookUrl: 'td[1,0]@a@href',
+        ),
+      );
+
+      final result = await withMockResponses(
+        {'https://example.com/search': bookRowHtml},
+        () => engine.search(source, '明克街'),
+      );
+
+      expect(result.length, 1);
+      expect(
+          result.first.bookUrl, 'https://example.com/42/42506/32968665.html');
+    });
+
     test('explore stage supports td[2] author rule', () async {
       final engine = RuleParserEngine();
       final source = BookSource(
@@ -232,6 +270,30 @@ void main() {
       expect(detail.tocUrl, 'https://example.com/42/42506/');
     });
 
+    test('bookInfo stage tocUrl keeps first candidate for td[1,0]@a@href',
+        () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleBookInfo: const BookInfoRule(
+          init: 'tr#nr',
+          name: 'td[0]@text',
+          author: 'td[2]@text',
+          tocUrl: 'td[1,0]@a@href',
+        ),
+      );
+
+      final detail = await withMockResponses(
+        {'https://example.com/book/1': bookRowHtml},
+        () => engine.getBookInfo(source, '/book/1'),
+      );
+
+      expect(detail, isNotNull);
+      expect(detail!.tocUrl, 'https://example.com/42/42506/32968665.html');
+    });
+
     test('toc stage supports a[0] rules', () async {
       final engine = RuleParserEngine();
       final source = BookSource(
@@ -249,6 +311,39 @@ void main() {
           <ul id="toc">
             <li><a href="/c1">第一章</a><a href="/ignore-1">忽略</a></li>
             <li><a href="/c2">第二章</a><a href="/ignore-2">忽略</a></li>
+          </ul>
+        </body></html>
+      ''';
+
+      final toc = await withMockResponses(
+        {'https://example.com/toc': tocHtml},
+        () => engine.getToc(source, '/toc'),
+      );
+
+      expect(toc.map((e) => e.name).toList(), ['第一章', '第二章']);
+      expect(
+        toc.map((e) => e.url).toList(),
+        ['https://example.com/c1', 'https://example.com/c2'],
+      );
+    });
+
+    test('toc stage chapterUrl keeps first non-empty candidate', () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleToc: const TocRule(
+          chapterList: 'ul#toc li',
+          chapterName: 'a[1]@text',
+          chapterUrl: 'a[0,1]@href',
+        ),
+      );
+      const tocHtml = '''
+        <html><body>
+          <ul id="toc">
+            <li><a href="">忽略</a><a href="/c1">第一章</a></li>
+            <li><a>空链接</a><a href="/c2">第二章</a></li>
           </ul>
         </body></html>
       ''';
