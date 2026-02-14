@@ -4161,13 +4161,10 @@ class RuleParserEngine {
       page++;
     }
 
-    var out = toc;
-    if (normalized.reverse) out = out.reversed.toList(growable: true);
-    out = _dedupTocByUrlLikeLegado(out);
-    out = <TocItem>[
-      for (var i = 0; i < out.length; i++)
-        TocItem(index: i, name: out[i].name, url: out[i].url),
-    ];
+    var out = _postProcessTocLikeLegado(
+      chapters: toc,
+      listRuleReverse: normalized.reverse,
+    );
     out = _applyTocFormatJs(
       toc: out,
       formatJs: tocRule.formatJs,
@@ -5373,14 +5370,10 @@ class RuleParserEngine {
         page++;
       }
 
-      final ordered = normalized.reverse
-          ? chapters.reversed.toList(growable: false)
-          : chapters;
-      final deduped = _dedupTocByUrlLikeLegado(ordered);
-      final reIndexed = <TocItem>[
-        for (var i = 0; i < deduped.length; i++)
-          TocItem(index: i, name: deduped[i].name, url: deduped[i].url),
-      ];
+      final reIndexed = _postProcessTocLikeLegado(
+        chapters: chapters,
+        listRuleReverse: normalized.reverse,
+      );
       final formatted = _applyTocFormatJs(
         toc: reIndexed,
         formatJs: tocRule.formatJs,
@@ -5531,14 +5524,10 @@ class RuleParserEngine {
         }
       }
 
-      final ordered = normalized.reverse
-          ? chapters.reversed.toList(growable: false)
-          : chapters;
-      final deduped = _dedupTocByUrlLikeLegado(ordered);
-      final reIndexed = <TocItem>[
-        for (var i = 0; i < deduped.length; i++)
-          TocItem(index: i, name: deduped[i].name, url: deduped[i].url),
-      ];
+      final reIndexed = _postProcessTocLikeLegado(
+        chapters: chapters,
+        listRuleReverse: normalized.reverse,
+      );
       final formatted = _applyTocFormatJs(
         toc: reIndexed,
         formatJs: tocRule.formatJs,
@@ -5586,6 +5575,28 @@ class RuleParserEngine {
       rule = rule.substring(1);
     }
     return _NormalizedListRule(selector: rule.trim(), reverse: reverse);
+  }
+
+  List<TocItem> _postProcessTocLikeLegado({
+    required List<TocItem> chapters,
+    required bool listRuleReverse,
+  }) {
+    if (chapters.isEmpty) return const <TocItem>[];
+
+    var working = chapters;
+    if (!listRuleReverse) {
+      working = working.reversed.toList(growable: false);
+    }
+
+    var deduped = _dedupTocByUrlLikeLegado(working);
+
+    // legado 默认 reverseToc=false，目录输出前会再次反转回阅读顺序。
+    deduped = deduped.reversed.toList(growable: false);
+
+    return <TocItem>[
+      for (var i = 0; i < deduped.length; i++)
+        TocItem(index: i, name: deduped[i].name, url: deduped[i].url),
+    ];
   }
 
   List<TocItem> _dedupTocByUrlLikeLegado(List<TocItem> toc) {

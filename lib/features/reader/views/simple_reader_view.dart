@@ -152,6 +152,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   // 章节加载锁（用于翻页模式）
   bool _isLoadingChapter = false;
   bool _isRestoringProgress = false;
+  bool _isHydratingChapterFromPageFactory = false;
+  final Map<String, Future<String>> _chapterContentInFlight =
+      <String, Future<String>>{};
 
   @override
   void initState() {
@@ -238,15 +241,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
 
       // 监听章节变化
-      _pageFactory.onContentChanged = () {
-        if (mounted) {
-          setState(() {
-            _currentChapterIndex = _pageFactory.currentChapterIndex;
-            _currentTitle = _pageFactory.currentChapterTitle;
-          });
-          _saveProgress();
-        }
-      };
+      _pageFactory.onContentChanged = _handlePageFactoryContentChanged;
 
       await _loadChapter(_currentChapterIndex, restoreOffset: true);
     }
@@ -436,7 +431,68 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
+  void _handlePageFactoryContentChanged() {
+    if (!mounted || _chapters.isEmpty) return;
+
+    final factoryChapterIndex = _pageFactory.currentChapterIndex;
+    if (factoryChapterIndex < 0 || factoryChapterIndex >= _chapters.length) {
+      return;
+    }
+
+    final chapterChanged = factoryChapterIndex != _currentChapterIndex;
+    setState(() {
+      _currentChapterIndex = factoryChapterIndex;
+      _currentTitle = _pageFactory.currentChapterTitle;
+    });
+    unawaited(_saveProgress());
+
+    if (!chapterChanged || _isHydratingChapterFromPageFactory) return;
+
+    final chapter = _chapters[factoryChapterIndex];
+    final hasContent = (chapter.content ?? '').trim().isNotEmpty;
+    if (hasContent) return;
+    if (_chapterContentInFlight.containsKey(chapter.id)) return;
+
+    unawaited(_hydrateCurrentFactoryChapter(factoryChapterIndex));
+  }
+
+  Future<void> _hydrateCurrentFactoryChapter(int index) async {
+    if (_isHydratingChapterFromPageFactory) return;
+    if (index < 0 || index >= _chapters.length) return;
+
+    _isHydratingChapterFromPageFactory = true;
+    try {
+      await _loadChapter(index);
+    } finally {
+      _isHydratingChapterFromPageFactory = false;
+    }
+  }
+
   Future<String> _fetchChapterContent({
+    required Chapter chapter,
+    required int index,
+    Book? book,
+  }) async {
+    final inFlight = _chapterContentInFlight[chapter.id];
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final task = _fetchChapterContentInternal(
+      chapter: chapter,
+      index: index,
+      book: book,
+    );
+    _chapterContentInFlight[chapter.id] = task;
+    try {
+      return await task;
+    } finally {
+      if (identical(_chapterContentInFlight[chapter.id], task)) {
+        _chapterContentInFlight.remove(chapter.id);
+      }
+    }
+  }
+
+  Future<String> _fetchChapterContentInternal({
     required Chapter chapter,
     required int index,
     Book? book,
