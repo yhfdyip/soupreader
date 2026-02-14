@@ -1,5 +1,70 @@
 # SoupReader 开发进度日志
 
+## 2026-02-14（目录顺序再次对齐 legado：修复“最新章节倒序 + 正文重启”）
+
+### 已完成
+- 修复目录“去重后顺序不对”的问题，统一目录后处理逻辑为 legado 流程：
+  - 文件：`lib/features/source/services/rule_parser_engine.dart`
+  - 新增：`_postProcessTocLikeLegado(...)`
+  - 统一接入：
+    - `_debugTocThenContent(...)`
+    - `getToc(...)`
+    - `getTocDebug(...)`
+- 目录后处理规则改为与 legado 一致（默认 `reverseToc=false` 语义）：
+  - `!listRuleReverse` 时先反转列表；
+  - 按章节 URL 去重（保留首个）；
+  - 去重后再反转回阅读顺序并重排索引。
+- 更新回归测试：
+  - 文件：`test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
+  - 调整 `toc stage dedups duplicated chapter urls like legado` 断言为正序结果；
+  - 新增 `toc stage with -chapterList keeps legado reverse/dedup order` 用例；
+  - 调整 `toc debug output keeps same dedup result as toc stage` 断言，确保 debug 与主链路口径一致。
+
+### 为什么
+- 你反馈“目录前面是最新章节倒序，后面从第一章又开始，末尾没有最新章节”。
+- 根因是 SoupReader 之前仅做了“单次 reverse + 去重”，未完整复刻 legado 的“双反转 + 去重”时序，导致命中“最新章节块 + 正文块”混合目录时保留了错误顺序。
+
+### 如何验证
+- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
+- 结果：`All tests passed!`
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+
+### 兼容影响
+- 目录输出顺序向 legado 默认行为收敛：从第一章到最新章。
+- 对依赖“保留顶部最新章节区标题版本”的非典型书源，重复 URL 项会继续被去重，且标题将遵循 legado 对最终保留项的选择结果。
+
+## 2026-02-14（阅读翻章对齐 legado：跨章节自动补加载正文）
+
+### 已完成
+- 修复“翻页模式连续阅读到下一章只显示标题、正文为空”的问题：
+  - 文件：`lib/features/reader/views/simple_reader_view.dart`
+  - 变更：
+    - `PageFactory.onContentChanged` 改为统一走 `_handlePageFactoryContentChanged`；
+    - 当翻页跨章且目标章节正文为空时，自动触发 `_loadChapter(index)` 补加载正文；
+    - 新增 `_isHydratingChapterFromPageFactory` 防重入，避免跨章加载回调递归。
+- 补充章节正文请求并发去重（对齐 legado loading lock 思路）：
+  - 文件：`lib/features/reader/views/simple_reader_view.dart`
+  - 新增 `_chapterContentInFlight`，同章节并发请求复用同一个 `Future`，避免重复请求与状态抖动。
+  - ` _fetchChapterContent(...)` 改为包装器，实际网络拉取下沉到 `_fetchChapterContentInternal(...)`。
+
+### 为什么
+- 现象是“从目录单独点章节有正文，但连续翻到下一章只剩标题”。
+- 根因是翻页模式跨章时只更新章节索引与标题，未像 legado 一样在跨章后确保当前章正文已加载。
+- 本次将阅读层行为收敛到 legado：跨章若内容未就绪则立即补加载，同时控制并发请求。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 结果：`No issues found!`
+- 手工路径：
+  - 阅读器（翻页模式）从目录进入某章；
+  - 连续翻到下一章；
+  - 验证不再出现“只有标题无正文”。
+
+### 兼容影响
+- 仅调整阅读器翻页跨章时的正文加载时机，不修改书源规则语义（`ruleContent`/`nextContentUrl` 行为保持不变）。
+- 对网络章节切换会更及时触发加载；同章节重复请求将被合并，减少无效并发。
+
 ## 2026-02-14（目录解析对齐 legado：按章节 URL 去重）
 
 ### 已完成

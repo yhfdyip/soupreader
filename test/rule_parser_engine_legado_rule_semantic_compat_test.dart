@@ -413,13 +413,60 @@ void main() {
         () => engine.getToc(source, '/toc'),
       );
 
-      expect(toc.map((e) => e.name).toList(), ['第三章', '第二章', '第一章']);
+      expect(
+        toc.map((e) => e.name).toList(),
+        ['第一章', '第二章（正文）', '第三章（正文）'],
+      );
       expect(
         toc.map((e) => e.url).toList(),
         [
-          'https://example.com/c3',
-          'https://example.com/c2',
           'https://example.com/c1',
+          'https://example.com/c2',
+          'https://example.com/c3',
+        ],
+      );
+      expect(toc.map((e) => e.index).toList(), [0, 1, 2]);
+    });
+
+    test('toc stage with -chapterList keeps legado reverse/dedup order',
+        () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleToc: const TocRule(
+          chapterList: '-#list a',
+          chapterName: 'text',
+          chapterUrl: 'href',
+        ),
+      );
+      const tocHtml = '''
+        <html><body>
+          <div id="list">
+            <dt>《测试书》最新章节</dt>
+            <dd><a href="/c3">第三章</a></dd>
+            <dd><a href="/c2">第二章</a></dd>
+            <dt>《测试书》正文</dt>
+            <dd><a href="/c1">第一章</a></dd>
+            <dd><a href="/c2">第二章（正文）</a></dd>
+            <dd><a href="/c3">第三章（正文）</a></dd>
+          </div>
+        </body></html>
+      ''';
+
+      final toc = await withMockResponses(
+        {'https://example.com/toc': tocHtml},
+        () => engine.getToc(source, '/toc'),
+      );
+
+      expect(toc.map((e) => e.name).toList(), ['第一章', '第二章', '第三章']);
+      expect(
+        toc.map((e) => e.url).toList(),
+        [
+          'https://example.com/c1',
+          'https://example.com/c2',
+          'https://example.com/c3',
         ],
       );
       expect(toc.map((e) => e.index).toList(), [0, 1, 2]);
@@ -459,9 +506,9 @@ void main() {
       expect(
         debug.toc.map((e) => e.url).toList(),
         [
-          'https://example.com/c3',
-          'https://example.com/c2',
           'https://example.com/c1',
+          'https://example.com/c2',
+          'https://example.com/c3',
         ],
       );
       expect(debug.toc.map((e) => e.index).toList(), [0, 1, 2]);
