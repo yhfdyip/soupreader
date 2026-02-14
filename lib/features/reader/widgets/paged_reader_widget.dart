@@ -1151,10 +1151,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     switch (widget.pageTurnMode) {
       case PageTurnMode.slide:
         if (!isRunning) {
-          return _buildPageWidget(
-            _factory.curPage,
-            slot: PageRenderSlot.current,
-          );
+          return _buildStaticRecordedPage(size);
         }
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
@@ -1162,10 +1159,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         return _buildSlideAnimation(screenWidth, offset);
       case PageTurnMode.cover:
         if (!isRunning) {
-          return _buildPageWidget(
-            _factory.curPage,
-            slot: PageRenderSlot.current,
-          );
+          return _buildStaticRecordedPage(size);
         }
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
@@ -1183,10 +1177,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         return _buildSimulation2Animation(size);
       case PageTurnMode.none:
         if (!isRunning) {
-          return _buildPageWidget(
-            _factory.curPage,
-            slot: PageRenderSlot.current,
-          );
+          return _buildStaticRecordedPage(size);
         }
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
@@ -1212,6 +1203,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           isComplex: true,
         ),
       ),
+    );
+  }
+
+  Widget _buildStaticRecordedPage(Size size) {
+    if (_needsPictureCache) {
+      // 静止态强制确保当前页 Picture 可用，避免 Picture/Widget 两套渲染切换导致视觉跳变。
+      _ensurePagePictures(size, allowRecord: true);
+    }
+    return _buildRecordedPage(
+      _curPagePicture,
+      _factory.curPage,
+      slot: PageRenderSlot.current,
     );
   }
 
@@ -1267,11 +1270,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       );
     }
     final clamped = offset.clamp(-screenWidth, screenWidth);
-    final shadowOpacity = (clamped.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
-
-    // 如果偏移量极小，不渲染阴影层，直接显示当前页内容（无阴影容器）
-    // 这解决了动画结束后阴影可能残留 1 秒的问题
-    final showShadow = clamped.abs() > 1.0;
 
     return Stack(
       children: [
@@ -1293,30 +1291,55 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           ),
         Transform.translate(
           offset: Offset(clamped, 0),
-          child: showShadow
-              ? Container(
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF000000)
-                            .withValues(alpha: shadowOpacity),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                        offset: Offset(clamped > 0 ? -8 : 8, 0),
-                      ),
-                    ],
-                  ),
-                  child: _buildRecordedPage(
-                    _curPagePicture,
-                    _factory.curPage,
-                    slot: PageRenderSlot.current,
-                  ),
-                )
-              : _buildRecordedPage(
-                  _curPagePicture,
-                  _factory.curPage,
-                  slot: PageRenderSlot.current,
-                ),
+          child: _buildCoverPageWithEdgeShadow(
+            clamped: clamped,
+            screenWidth: screenWidth,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCoverPageWithEdgeShadow({
+    required double clamped,
+    required double screenWidth,
+  }) {
+    final page = _buildRecordedPage(
+      _curPagePicture,
+      _factory.curPage,
+      slot: PageRenderSlot.current,
+    );
+    final progress = (clamped.abs() / screenWidth).clamp(0.0, 1.0);
+    final shadowAlpha = (progress * 0.35).clamp(0.0, 0.35);
+    if (shadowAlpha <= 0.01 || clamped.abs() <= 0.5) {
+      return page;
+    }
+
+    const shadowWidth = 28.0;
+    final colorStrong = const Color(0xFF111111).withValues(alpha: shadowAlpha);
+    final colorWeak = const Color(0xFF000000).withValues(alpha: 0);
+
+    final shadow = Container(
+      width: shadowWidth,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: clamped < 0 ? Alignment.centerLeft : Alignment.centerRight,
+          end: clamped < 0 ? Alignment.centerRight : Alignment.centerLeft,
+          colors: [colorStrong, colorWeak],
+        ),
+      ),
+    );
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        page,
+        Positioned(
+          top: 0,
+          bottom: 0,
+          left: clamped > 0 ? 0 : null,
+          right: clamped < 0 ? 0 : null,
+          child: shadow,
         ),
       ],
     );

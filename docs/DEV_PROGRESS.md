@@ -2705,3 +2705,33 @@
 ### 兼容影响
 - 旧版本遗留的非法阅读设置值会在读取/保存/交互时被自动归一化，属于向前兼容修复。
 - 不改变书源解析、目录、正文抓取逻辑，仅提升阅读设置与 UI 渲染稳定性。
+
+## 2026-02-15（翻页后页眉线/正文突变与阴影残留修复：渲染链路对齐 legado）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 为 `slide/cover/none` 三种模式新增静止态统一入口 `_buildStaticRecordedPage(...)`：
+    - 静止态优先使用 `Picture`（`_buildRecordedPage`）渲染当前页；
+    - 进入静止态时主动 `ensure` 当前页 Picture，避免“动画态用 Picture，静止态回退 Widget”导致的视觉切换。
+  - 将 `slide/cover/none` 的 `!isRunning` 分支统一切到 `_buildStaticRecordedPage(...)`。
+  - 覆盖翻页阴影改为 legado 风格窄边缘梯度：
+    - 移除原 `BoxShadow(blurRadius/spreadRadius)` 全页模糊阴影；
+    - 新增 `_buildCoverPageWithEdgeShadow(...)`，按翻页方向在移动页边缘绘制窄条渐变阴影；
+    - 阴影仅在有效位移区间显示，动画结束立即消失。
+
+### 为什么
+- 用户反馈翻页完成后约 1 秒出现“页眉分割线下移、正文字体像被重绘、左右阴影残留后消失”的二次变化。
+- 根因是静止态与动画态存在两套渲染路径（Widget vs Picture）以及覆盖模式使用了大范围模糊阴影。
+- legado 的覆盖翻页是页快照 + 窄梯度边缘阴影，本次按该语义收敛，减少翻页收尾阶段视觉跳变。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - `cover` 模式连续翻下页/翻上页，确认阴影只在翻页中存在，结束即消失；
+  - `slide/none` 模式翻页后静置 1~2 秒，确认页眉分割线与正文不再“二次突变”；
+  - 跨章翻页时页眉/页脚与正文仍保持同步。
+
+### 兼容影响
+- 仅调整阅读器翻页渲染实现，不影响书源解析、目录/正文抓取与数据库结构。
+- 展示语义更贴近 legado：静止态与动画态视觉一致性更高，覆盖阴影更克制。
