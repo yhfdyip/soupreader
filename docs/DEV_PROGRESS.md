@@ -2735,3 +2735,36 @@
 ### 兼容影响
 - 仅调整阅读器翻页渲染实现，不影响书源解析、目录/正文抓取与数据库结构。
 - 展示语义更贴近 legado：静止态与动画态视觉一致性更高，覆盖阴影更克制。
+
+## 2026-02-15（翻页收尾二次重绘修复：动画期延迟失效并锁定快照渲染）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 新增交互状态判定与延迟失效门闩：
+    - 增加 `_pendingPictureInvalidation`；
+    - 增加 `_isInteractionRunning`（统一识别拖拽/动画进行中）；
+    - `PageFactory` 内容变化回调在交互期不再立即 `_invalidatePictures()`，改为仅标记 pending。
+  - 新增 `_flushPendingPictureInvalidationIfIdle(...)`：
+    - 在 `_stopScroll()` 收尾阶段统一提交 pending 失效；
+    - 在“按下后未触发有效拖拽”的 `onDragEnd` 路径补充提交，避免遗留脏状态。
+  - 调整 `_stopScroll()`：
+    - 收尾阶段先重置交互状态，再统一处理 pending 失效，再 `setState + _schedulePrecache`。
+  - 调整 `_buildRecordedPage(...)` 的缓存 miss 策略：
+    - 动画/拖拽期间若目标 `Picture` 缺失，优先回退到可用快照 `Picture`（`prev/current/next` 兜底）；
+    - 仅在确无快照可用时回退到 Widget 渲染，降低 “Picture -> Widget -> Picture” 的切换概率。
+
+### 为什么
+- 用户反馈翻页后约 1 秒出现页眉分割线位置变化、正文观感变化、边缘阴影延后消失，表现为“二次重绘”。
+- 根因是换页回调在动画收尾阶段立即清空缓存，导致渲染路径瞬时回退并在后续预渲染后再次切回。
+- legado 的翻页语义是动画期间保持稳定快照路径，本次按该语义收敛缓存失效时机。
+
+### 如何验证
+- 命令：`flutter analyze`
+- 手工路径：
+  - 同章连续翻页（`slide/cover/none`），确认翻页完成后不再出现 1 秒后二次变化；
+  - 翻上页/翻下页各测试一次，确认左右边缘无延迟残影突变；
+  - 跨章翻页确认无“仅标题无正文”回归。
+
+### 兼容影响
+- 仅调整阅读器渲染时序与缓存回退策略，不改书源解析、章节数据、目录结构与数据库。
+- 视觉行为更接近 legado：动画与静止态之间的渲染连续性更高。

@@ -112,6 +112,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // 预渲染调度（拆分为多帧，避免一次性卡住 UI）
   bool _precacheScheduled = false;
   int _precacheEpoch = 0;
+  // 动画/拖拽期间延迟执行 Picture 失效，避免收尾阶段出现二次重绘。
+  bool _pendingPictureInvalidation = false;
 
   // 仿真翻页门闩：启动动画前必须等待关键帧资源就绪
   bool _isPreparingSimulationTurn = false;
@@ -122,12 +124,30 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   int _batteryLevel = 100;
   StreamSubscription<BatteryState>? _batteryStateSubscription;
 
+  bool get _isInteractionRunning =>
+      _gestureInProgress || _isMoved || _isRunning || _isStarted;
+
   void _onPageFactoryContentChangedForRender() {
     if (!mounted) return;
     _cancelPendingSimulationPreparation();
+    if (_isInteractionRunning) {
+      _pendingPictureInvalidation = true;
+      return;
+    }
+    _pendingPictureInvalidation = false;
     _invalidatePictures();
     setState(() {});
     _schedulePrecache();
+  }
+
+  void _flushPendingPictureInvalidationIfIdle({bool rebuild = true}) {
+    if (!_pendingPictureInvalidation) return;
+    if (_isInteractionRunning) return;
+    _pendingPictureInvalidation = false;
+    _invalidatePictures();
+    if (rebuild && mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -1082,6 +1102,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _isRunning = false;
     // 对齐 legado：动画完成后仅做状态收尾，不在此处触发换页。
     if (mounted) {
+      _gestureInProgress = false;
       _isMoved = false;
       _isCancel = false;
       _direction = _PageDirection.none;
@@ -1097,6 +1118,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _cornerX = 0;
       _cornerY = 0;
 
+      _flushPendingPictureInvalidationIfIdle(rebuild: false);
       setState(() {});
       _schedulePrecache();
     }
@@ -1193,17 +1215,33 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     String fallbackContent, {
     required PageRenderSlot slot,
   }) {
-    if (picture == null) {
+    // 对齐 legado：动画期间保持快照渲染路径稳定，避免因单帧缓存 miss 回退到 Widget
+    // 引发页眉/正文二次重排。
+    final resolvedPicture =
+        picture ?? _resolveFallbackPictureForAnimation(slot);
+    if (resolvedPicture == null) {
       return _buildPageWidget(fallbackContent, slot: slot);
     }
     return RepaintBoundary(
       child: SizedBox.expand(
         child: CustomPaint(
-          painter: _PagePicturePainter(picture),
+          painter: _PagePicturePainter(resolvedPicture),
           isComplex: true,
         ),
       ),
     );
+  }
+
+  ui.Picture? _resolveFallbackPictureForAnimation(PageRenderSlot slot) {
+    if (!_isInteractionRunning) return null;
+    switch (slot) {
+      case PageRenderSlot.prev:
+        return _prevPagePicture ?? _curPagePicture ?? _nextPagePicture;
+      case PageRenderSlot.current:
+        return _curPagePicture ?? _nextPagePicture ?? _prevPagePicture;
+      case PageRenderSlot.next:
+        return _nextPagePicture ?? _curPagePicture ?? _prevPagePicture;
+    }
   }
 
   Widget _buildStaticRecordedPage(Size size) {
@@ -1595,6 +1633,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _gestureInProgress = false;
     if (!_isMoved) {
       _direction = _PageDirection.none;
+      _flushPendingPictureInvalidationIfIdle();
+      _schedulePrecache();
       return;
     }
 
