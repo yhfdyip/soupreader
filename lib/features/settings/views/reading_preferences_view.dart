@@ -33,12 +33,13 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   @override
   void initState() {
     super.initState();
-    _settings = _settingsService.readingSettings;
+    _settings = _settingsService.readingSettings.sanitize();
   }
 
   void _update(ReadingSettings newSettings) {
-    setState(() => _settings = newSettings);
-    unawaited(_settingsService.saveReadingSettings(newSettings));
+    final safeSettings = newSettings.sanitize();
+    setState(() => _settings = safeSettings);
+    unawaited(_settingsService.saveReadingSettings(safeSettings));
   }
 
   String get _themeLabel {
@@ -167,6 +168,13 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
 
   @override
   Widget build(BuildContext context) {
+    final brightnessPercent =
+        ((_settings.brightness.isFinite
+                    ? _settings.brightness.clamp(0.0, 1.0)
+                    : 1.0) *
+                100)
+            .round();
+
     return AppCupertinoPageScaffold(
       title: '样式与排版',
       child: ListView(
@@ -263,7 +271,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 value: _settings.brightness,
                 min: 0.0,
                 max: 1.0,
-                display: '${(_settings.brightness * 100).toInt()}%',
+                display: '$brightnessPercent%',
                 onChanged: (v) => _update(_settings.copyWith(brightness: v)),
               ),
             ],
@@ -308,17 +316,36 @@ class _SliderTile extends StatelessWidget {
     required this.onChanged,
   });
 
+  double _safeSliderValue() {
+    final safeMin = min.isFinite ? min : 0.0;
+    final safeMax = max.isFinite && max > safeMin ? max : safeMin + 1.0;
+    final safeRaw = value.isFinite ? value : safeMin;
+    return safeRaw.clamp(safeMin, safeMax).toDouble();
+  }
+
+  double _safeMin() => min.isFinite ? min : 0.0;
+
+  double _safeMax() {
+    final safeMin = _safeMin();
+    return max.isFinite && max > safeMin ? max : safeMin + 1.0;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final safeMin = _safeMin();
+    final safeMax = _safeMax();
+    final safeValue = _safeSliderValue();
+    final canSlide = min.isFinite && max.isFinite && max > min;
+
     return CupertinoListTile(
       title: Text(title),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 10),
         child: CupertinoSlider(
-          value: value.clamp(min, max),
-          min: min,
-          max: max,
-          onChanged: onChanged,
+          value: safeValue,
+          min: safeMin,
+          max: safeMax,
+          onChanged: canSlide ? onChanged : null,
         ),
       ),
       additionalInfo: Text(display),

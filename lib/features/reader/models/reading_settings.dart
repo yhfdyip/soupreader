@@ -128,13 +128,72 @@ class ReadingSettings {
         vertical: marginVertical,
       );
 
+  static double _toDouble(dynamic raw, double fallback) {
+    if (raw is num && raw.isFinite) return raw.toDouble();
+    if (raw is String) {
+      final parsed = double.tryParse(raw);
+      if (parsed != null && parsed.isFinite) return parsed;
+    }
+    return fallback;
+  }
+
+  static int _toInt(dynamic raw, int fallback) {
+    if (raw is int) return raw;
+    if (raw is num && raw.isFinite) return raw.toInt();
+    if (raw is String) {
+      final parsed = int.tryParse(raw);
+      if (parsed != null) return parsed;
+    }
+    return fallback;
+  }
+
+  static bool _toBool(dynamic raw, bool fallback) {
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    if (raw is String) {
+      if (raw == '1' || raw.toLowerCase() == 'true') return true;
+      if (raw == '0' || raw.toLowerCase() == 'false') return false;
+    }
+    return fallback;
+  }
+
+  static double _safeDouble(
+    double raw, {
+    required double min,
+    required double max,
+    required double fallback,
+  }) {
+    final safeRaw = raw.isFinite ? raw : fallback;
+    final safeMin = min.isFinite ? min : 0.0;
+    final safeMax = max.isFinite && max >= safeMin ? max : safeMin;
+    return safeRaw.clamp(safeMin, safeMax).toDouble();
+  }
+
+  static int _safeInt(
+    int raw, {
+    required int min,
+    required int max,
+    required int fallback,
+  }) {
+    final safeMin = min <= max ? min : max;
+    final safeMax = max >= min ? max : min;
+    final safeRaw = (raw < safeMin || raw > safeMax) ? fallback : raw;
+    return safeRaw.clamp(safeMin, safeMax).toInt();
+  }
+
+  static Map<String, int> _parseClickActions(dynamic raw) {
+    if (raw is! Map) return const {};
+    final parsed = <String, int>{};
+    for (final entry in raw.entries) {
+      parsed[entry.key.toString()] = _toInt(entry.value, ClickAction.showMenu);
+    }
+    return parsed;
+  }
+
   factory ReadingSettings.fromJson(Map<String, dynamic> json) {
     final rawPageTurnMode = json['pageTurnMode'];
-    final pageTurnModeIndex = rawPageTurnMode is int
-        ? rawPageTurnMode
-        : rawPageTurnMode is num
-            ? rawPageTurnMode.toInt()
-            : PageTurnMode.cover.index;
+    final pageTurnModeIndex =
+        _toInt(rawPageTurnMode, PageTurnMode.cover.index);
     final safePageTurnModeIndex =
         pageTurnModeIndex.clamp(0, PageTurnMode.values.length - 1);
     final safePageTurnMode = PageTurnMode.values[safePageTurnModeIndex];
@@ -143,74 +202,67 @@ class ReadingSettings {
         ? PageDirection.vertical.index
         : PageDirection.horizontal.index;
     final rawPageDirection = json['pageDirection'];
-    final pageDirectionIndex = rawPageDirection is int
-        ? rawPageDirection
-        : rawPageDirection is num
-            ? rawPageDirection.toInt()
-            : defaultPageDirectionIndex;
+    final pageDirectionIndex = _toInt(rawPageDirection, defaultPageDirectionIndex);
     final safePageDirectionIndex =
         pageDirectionIndex.clamp(0, PageDirection.values.length - 1);
 
     return ReadingSettings(
-      fontSize: (json['fontSize'] as num?)?.toDouble() ?? 24.0,
-      lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.42,
-      letterSpacing: (json['letterSpacing'] as num?)?.toDouble() ?? 0.0,
-      paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble() ?? 6.0,
-      marginHorizontal: (json['marginHorizontal'] as num?)?.toDouble() ??
-          (json['paddingH'] as num?)?.toDouble() ??
-          22.0,
-      marginVertical: (json['marginVertical'] as num?)?.toDouble() ??
-          (json['paddingV'] as num?)?.toDouble() ??
-          5.0,
-      themeIndex: json['themeIndex'] as int? ?? 9,
-      fontFamilyIndex: json['fontFamilyIndex'] as int? ?? 0,
+      fontSize: _toDouble(json['fontSize'], 24.0),
+      lineHeight: _toDouble(json['lineHeight'], 1.42),
+      letterSpacing: _toDouble(json['letterSpacing'], 0.0),
+      paragraphSpacing: _toDouble(json['paragraphSpacing'], 6.0),
+      marginHorizontal: json.containsKey('marginHorizontal')
+          ? _toDouble(json['marginHorizontal'], 22.0)
+          : _toDouble(json['paddingH'], 22.0),
+      marginVertical: json.containsKey('marginVertical')
+          ? _toDouble(json['marginVertical'], 5.0)
+          : _toDouble(json['paddingV'], 5.0),
+      themeIndex: _toInt(json['themeIndex'], 9),
+      fontFamilyIndex: _toInt(json['fontFamilyIndex'], 0),
       pageTurnMode: safePageTurnMode,
-      keepScreenOn: json['keepScreenOn'] as bool? ?? false,
-      showStatusBar: json['showStatusBar'] as bool? ?? true,
-      showBattery: json['showBattery'] as bool? ?? true,
-      showTime: json['showTime'] as bool? ?? true,
-      showProgress: json['showProgress'] as bool? ?? true,
-      showChapterProgress: json['showChapterProgress'] as bool? ?? true,
-      brightness: (json['brightness'] as num?)?.toDouble() ?? 1.0,
-      useSystemBrightness: json['useSystemBrightness'] as bool? ?? true,
+      keepScreenOn: _toBool(json['keepScreenOn'], false),
+      showStatusBar: _toBool(json['showStatusBar'], true),
+      showBattery: _toBool(json['showBattery'], true),
+      showTime: _toBool(json['showTime'], true),
+      showProgress: _toBool(json['showProgress'], true),
+      showChapterProgress: _toBool(json['showChapterProgress'], true),
+      brightness: _toDouble(json['brightness'], 1.0),
+      useSystemBrightness: _toBool(json['useSystemBrightness'], true),
       // 新增字段
-      textBold: json['textBold'] as int? ?? 0,
+      textBold: _toInt(json['textBold'], 0),
       paragraphIndent: json['paragraphIndent'] as String? ?? '　　',
-      titleMode: json['titleMode'] as int? ?? 0,
-      titleSize: json['titleSize'] as int? ?? 4,
-      titleTopSpacing: (json['titleTopSpacing'] as num?)?.toDouble() ?? 0,
-      titleBottomSpacing: (json['titleBottomSpacing'] as num?)?.toDouble() ?? 0,
-      textFullJustify: json['textFullJustify'] as bool? ?? true,
-      underline: json['underline'] as bool? ?? false,
-      paddingTop: (json['paddingTop'] as num?)?.toDouble() ?? 5.0,
-      paddingBottom: (json['paddingBottom'] as num?)?.toDouble() ?? 4.0,
-      paddingLeft: (json['paddingLeft'] as num?)?.toDouble() ?? 22.0,
-      paddingRight: (json['paddingRight'] as num?)?.toDouble() ?? 22.0,
-      clickActions: (json['clickActions'] as Map<String, dynamic>?)?.map(
-            (k, v) => MapEntry(k, v as int),
-          ) ??
-          const {},
-      autoReadSpeed: json['autoReadSpeed'] as int? ?? 10,
+      titleMode: _toInt(json['titleMode'], 0),
+      titleSize: _toInt(json['titleSize'], 4),
+      titleTopSpacing: _toDouble(json['titleTopSpacing'], 0),
+      titleBottomSpacing: _toDouble(json['titleBottomSpacing'], 0),
+      textFullJustify: _toBool(json['textFullJustify'], true),
+      underline: _toBool(json['underline'], false),
+      paddingTop: _toDouble(json['paddingTop'], 5.0),
+      paddingBottom: _toDouble(json['paddingBottom'], 4.0),
+      paddingLeft: _toDouble(json['paddingLeft'], 22.0),
+      paddingRight: _toDouble(json['paddingRight'], 22.0),
+      clickActions: _parseClickActions(json['clickActions']),
+      autoReadSpeed: _toInt(json['autoReadSpeed'], 10),
       // 翻页动画增强
-      pageAnimDuration: json['pageAnimDuration'] as int? ?? 300,
+      pageAnimDuration: _toInt(json['pageAnimDuration'], 300),
       pageDirection: PageDirection.values[safePageDirectionIndex],
-      pageTouchSlop: json['pageTouchSlop'] as int? ?? 0,
-      volumeKeyPage: json['volumeKeyPage'] as bool? ?? true,
+      pageTouchSlop: _toInt(json['pageTouchSlop'], 0),
+      volumeKeyPage: _toBool(json['volumeKeyPage'], true),
       // 页眉/页脚配置
-      hideHeader: json['hideHeader'] as bool? ?? false,
-      hideFooter: json['hideFooter'] as bool? ?? false,
-      showHeaderLine: json['showHeaderLine'] as bool? ?? true,
-      showFooterLine: json['showFooterLine'] as bool? ?? true,
-      headerLeftContent: json['headerLeftContent'] as int? ?? 3,
-      headerCenterContent: json['headerCenterContent'] as int? ?? 2,
-      headerRightContent: json['headerRightContent'] as int? ?? 4,
-      footerLeftContent: json['footerLeftContent'] as int? ?? 5,
-      footerCenterContent: json['footerCenterContent'] as int? ?? 4,
-      footerRightContent: json['footerRightContent'] as int? ?? 8,
+      hideHeader: _toBool(json['hideHeader'], false),
+      hideFooter: _toBool(json['hideFooter'], false),
+      showHeaderLine: _toBool(json['showHeaderLine'], true),
+      showFooterLine: _toBool(json['showFooterLine'], true),
+      headerLeftContent: _toInt(json['headerLeftContent'], 3),
+      headerCenterContent: _toInt(json['headerCenterContent'], 2),
+      headerRightContent: _toInt(json['headerRightContent'], 4),
+      footerLeftContent: _toInt(json['footerLeftContent'], 5),
+      footerCenterContent: _toInt(json['footerCenterContent'], 4),
+      footerRightContent: _toInt(json['footerRightContent'], 8),
       // 其他功能开关
-      chineseTraditional: json['chineseTraditional'] as bool? ?? false,
-      cleanChapterTitle: json['cleanChapterTitle'] as bool? ?? false,
-    );
+      chineseTraditional: _toBool(json['chineseTraditional'], false),
+      cleanChapterTitle: _toBool(json['cleanChapterTitle'], false),
+    ).sanitize();
   }
 
   Map<String, dynamic> toJson() {
@@ -267,6 +319,130 @@ class ReadingSettings {
       'chineseTraditional': chineseTraditional,
       'cleanChapterTitle': cleanChapterTitle,
     };
+  }
+
+  ReadingSettings sanitize() {
+    return ReadingSettings(
+      fontSize: _safeDouble(
+        fontSize,
+        min: 10.0,
+        max: 60.0,
+        fallback: 24.0,
+      ),
+      lineHeight: _safeDouble(
+        lineHeight,
+        min: 1.0,
+        max: 4.0,
+        fallback: 1.42,
+      ),
+      letterSpacing: _safeDouble(
+        letterSpacing,
+        min: -2.0,
+        max: 5.0,
+        fallback: 0.0,
+      ),
+      paragraphSpacing: _safeDouble(
+        paragraphSpacing,
+        min: 0.0,
+        max: 80.0,
+        fallback: 6.0,
+      ),
+      marginHorizontal: _safeDouble(
+        marginHorizontal,
+        min: 0.0,
+        max: 120.0,
+        fallback: 22.0,
+      ),
+      marginVertical: _safeDouble(
+        marginVertical,
+        min: 0.0,
+        max: 120.0,
+        fallback: 5.0,
+      ),
+      themeIndex: themeIndex < 0 ? 0 : themeIndex,
+      fontFamilyIndex: fontFamilyIndex < 0 ? 0 : fontFamilyIndex,
+      pageTurnMode: pageTurnMode,
+      keepScreenOn: keepScreenOn,
+      showStatusBar: showStatusBar,
+      showBattery: showBattery,
+      showTime: showTime,
+      showProgress: showProgress,
+      showChapterProgress: showChapterProgress,
+      brightness: _safeDouble(
+        brightness,
+        min: 0.0,
+        max: 1.0,
+        fallback: 1.0,
+      ),
+      useSystemBrightness: useSystemBrightness,
+      textBold: _safeInt(textBold, min: 0, max: 2, fallback: 0),
+      paragraphIndent: paragraphIndent,
+      titleMode: _safeInt(titleMode, min: 0, max: 2, fallback: 0),
+      titleSize: _safeInt(titleSize, min: -20, max: 20, fallback: 4),
+      titleTopSpacing: _safeDouble(
+        titleTopSpacing,
+        min: 0.0,
+        max: 120.0,
+        fallback: 0.0,
+      ),
+      titleBottomSpacing: _safeDouble(
+        titleBottomSpacing,
+        min: 0.0,
+        max: 120.0,
+        fallback: 0.0,
+      ),
+      textFullJustify: textFullJustify,
+      underline: underline,
+      paddingTop: _safeDouble(
+        paddingTop,
+        min: 0.0,
+        max: 120.0,
+        fallback: 5.0,
+      ),
+      paddingBottom: _safeDouble(
+        paddingBottom,
+        min: 0.0,
+        max: 120.0,
+        fallback: 4.0,
+      ),
+      paddingLeft: _safeDouble(
+        paddingLeft,
+        min: 0.0,
+        max: 120.0,
+        fallback: 22.0,
+      ),
+      paddingRight: _safeDouble(
+        paddingRight,
+        min: 0.0,
+        max: 120.0,
+        fallback: 22.0,
+      ),
+      clickActions: Map<String, int>.from(clickActions),
+      autoReadSpeed: _safeInt(autoReadSpeed, min: 1, max: 100, fallback: 10),
+      pageAnimDuration:
+          _safeInt(pageAnimDuration, min: 100, max: 600, fallback: 300),
+      pageDirection: pageDirection,
+      pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 100, fallback: 0),
+      volumeKeyPage: volumeKeyPage,
+      hideHeader: hideHeader,
+      hideFooter: hideFooter,
+      showHeaderLine: showHeaderLine,
+      showFooterLine: showFooterLine,
+      headerLeftContent:
+          _safeInt(headerLeftContent, min: 0, max: 9, fallback: 3),
+      headerCenterContent:
+          _safeInt(headerCenterContent, min: 0, max: 9, fallback: 2),
+      headerRightContent:
+          _safeInt(headerRightContent, min: 0, max: 9, fallback: 4),
+      footerLeftContent:
+          _safeInt(footerLeftContent, min: 0, max: 9, fallback: 5),
+      footerCenterContent:
+          _safeInt(footerCenterContent, min: 0, max: 9, fallback: 4),
+      footerRightContent:
+          _safeInt(footerRightContent, min: 0, max: 9, fallback: 8),
+      chineseTraditional: chineseTraditional,
+      cleanChapterTitle: cleanChapterTitle,
+    );
   }
 
   ReadingSettings copyWith({
@@ -374,7 +550,7 @@ class ReadingSettings {
       // 其他功能开关
       chineseTraditional: chineseTraditional ?? this.chineseTraditional,
       cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
-    );
+    ).sanitize();
   }
 }
 

@@ -1,6 +1,22 @@
 import 'package:flutter/widgets.dart';
 import 'reader_page_agent.dart';
 
+enum PageRenderSlot { prev, current, next }
+
+class PageRenderPosition {
+  final int chapterIndex;
+  final int pageIndex;
+  final int totalPages;
+  final String chapterTitle;
+
+  const PageRenderPosition({
+    required this.chapterIndex,
+    required this.pageIndex,
+    required this.totalPages,
+    required this.chapterTitle,
+  });
+}
+
 /// 页面工厂（对标 Legado TextPageFactory）
 /// 管理三章节页面数据，支持跨章节翻页
 class PageFactory {
@@ -319,6 +335,94 @@ class PageFactory {
       _chapters.isNotEmpty && _currentChapterIndex < _chapters.length
           ? _chapters[_currentChapterIndex].title
           : '';
+
+  PageRenderPosition resolveRenderPosition(PageRenderSlot slot) {
+    switch (slot) {
+      case PageRenderSlot.current:
+        return _resolveCurrentRenderPosition();
+      case PageRenderSlot.prev:
+        return _resolvePrevRenderPosition();
+      case PageRenderSlot.next:
+        return _resolveNextRenderPosition();
+    }
+  }
+
+  PageRenderPosition _resolveCurrentRenderPosition() {
+    final total = _currentChapterPages.length;
+    final safePage = total <= 0 ? 0 : _currentPageIndex.clamp(0, total - 1);
+    final safeChapter = _chapters.isEmpty
+        ? 0
+        : _currentChapterIndex.clamp(0, _chapters.length - 1);
+    return PageRenderPosition(
+      chapterIndex: safeChapter,
+      pageIndex: safePage,
+      totalPages: total,
+      chapterTitle: currentChapterTitle,
+    );
+  }
+
+  PageRenderPosition _resolvePrevRenderPosition() {
+    if (_currentPageIndex > 0 && _currentChapterPages.isNotEmpty) {
+      final safeChapter = _chapters.isEmpty
+          ? 0
+          : _currentChapterIndex.clamp(0, _chapters.length - 1);
+      return PageRenderPosition(
+        chapterIndex: safeChapter,
+        pageIndex: _currentPageIndex - 1,
+        totalPages: _currentChapterPages.length,
+        chapterTitle: currentChapterTitle,
+      );
+    }
+
+    if (_prevChapterPages.isNotEmpty) {
+      final chapterIndex = _chapters.isEmpty
+          ? 0
+          : (_currentChapterIndex - 1).clamp(0, _chapters.length - 1);
+      final title = _chapters.isNotEmpty
+          ? _chapters[chapterIndex].title
+          : currentChapterTitle;
+      return PageRenderPosition(
+        chapterIndex: chapterIndex,
+        pageIndex: _prevChapterPages.length - 1,
+        totalPages: _prevChapterPages.length,
+        chapterTitle: title,
+      );
+    }
+
+    return _resolveCurrentRenderPosition();
+  }
+
+  PageRenderPosition _resolveNextRenderPosition() {
+    if (_currentPageIndex < _currentChapterPages.length - 1 &&
+        _currentChapterPages.isNotEmpty) {
+      final safeChapter = _chapters.isEmpty
+          ? 0
+          : _currentChapterIndex.clamp(0, _chapters.length - 1);
+      return PageRenderPosition(
+        chapterIndex: safeChapter,
+        pageIndex: _currentPageIndex + 1,
+        totalPages: _currentChapterPages.length,
+        chapterTitle: currentChapterTitle,
+      );
+    }
+
+    if (_nextChapterPages.isNotEmpty) {
+      final chapterIndex = _chapters.isEmpty
+          ? 0
+          : (_currentChapterIndex + 1).clamp(0, _chapters.length - 1);
+      final title = _chapters.isNotEmpty
+          ? _chapters[chapterIndex].title
+          : currentChapterTitle;
+      return PageRenderPosition(
+        chapterIndex: chapterIndex,
+        pageIndex: 0,
+        totalPages: _nextChapterPages.length,
+        chapterTitle: title,
+      );
+    }
+
+    return _resolveCurrentRenderPosition();
+  }
 
   List<String> get currentPages => _currentChapterPages;
 }

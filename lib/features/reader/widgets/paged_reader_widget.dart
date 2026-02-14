@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'legacy_justified_text.dart';
 import 'page_factory.dart';
 import 'simulation_page_painter.dart';
 import 'simulation_page_painter2.dart';
@@ -90,6 +91,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   ui.Picture? _prevPagePicture;
   ui.Picture? _nextPagePicture;
   Size? _lastSize;
+
+  // 页眉/页脚坐标使用稳定系统安全区，避免系统栏 inset 延迟变化导致分割线抖动
+  EdgeInsets? _stableSystemPadding;
+  Size? _stablePaddingViewportSize;
+  bool? _stableShowStatusBar;
+  bool? _stableHideHeader;
+  bool? _stableHideFooter;
 
   // Shader Program
   static ui.FragmentProgram? pageCurlProgram;
@@ -247,13 +255,36 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           ? 0.0
           : PagedReaderWidget.bottomOffset;
 
+  EdgeInsets _resolveStableSystemPadding(Size viewportSize) {
+    final mediaPadding = MediaQuery.of(context).padding;
+    final shouldRefresh = _stableSystemPadding == null ||
+        _stablePaddingViewportSize != viewportSize ||
+        _stableShowStatusBar != widget.showStatusBar ||
+        _stableHideHeader != widget.settings.hideHeader ||
+        _stableHideFooter != widget.settings.hideFooter;
+    if (shouldRefresh) {
+      _stableSystemPadding = mediaPadding;
+      _stablePaddingViewportSize = viewportSize;
+      _stableShowStatusBar = widget.showStatusBar;
+      _stableHideHeader = widget.settings.hideHeader;
+      _stableHideFooter = widget.settings.hideFooter;
+    }
+    return _stableSystemPadding!;
+  }
+
   /// 使用 PictureRecorder 预渲染页面内容
-  ui.Picture _recordPage(String content, Size size) {
+  ui.Picture _recordPage(
+    String content,
+    Size size, {
+    required PageRenderSlot slot,
+  }) {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    final topSafe = MediaQuery.of(context).padding.top;
-    final bottomSafe = MediaQuery.of(context).padding.bottom;
+    final systemPadding = _resolveStableSystemPadding(size);
+    final topSafe = systemPadding.top;
+    final bottomSafe = systemPadding.bottom;
+    final renderPosition = _factory.resolveRenderPosition(slot);
 
     // 绘制背景
     canvas.drawRect(
@@ -262,38 +293,49 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
 
     if (content.isNotEmpty) {
-      // 绘制文本
-      final textPainter = TextPainter(
-        text: TextSpan(text: content, style: widget.textStyle),
-        textDirection: ui.TextDirection.ltr,
-        textAlign: widget.settings.textFullJustify
-            ? TextAlign.justify
-            : TextAlign.left,
-      );
-
       final contentWidth =
           size.width - widget.padding.left - widget.padding.right;
-      textPainter.layout(maxWidth: contentWidth);
-
-      textPainter.paint(
-        canvas,
-        Offset(
+      final contentHeight = size.height -
+          (topSafe + _topOffset + widget.padding.top) -
+          (bottomSafe + _bottomOffset + widget.padding.bottom);
+      LegacyJustifyComposer.paintContentOnCanvas(
+        canvas: canvas,
+        origin: Offset(
           widget.padding.left,
           topSafe + _topOffset + widget.padding.top,
         ),
+        content: content,
+        style: widget.textStyle,
+        maxWidth: contentWidth,
+        justify: widget.settings.textFullJustify,
+        paragraphIndent: widget.settings.paragraphIndent,
+        applyParagraphIndent: false,
+        preserveEmptyLines: true,
+        maxHeight: contentHeight,
       );
     }
 
     // 绘制状态栏
     if (widget.showStatusBar) {
-      _paintHeaderFooter(canvas, size, topSafe, bottomSafe);
+      _paintHeaderFooter(
+        canvas,
+        size,
+        topSafe,
+        bottomSafe,
+        renderPosition: renderPosition,
+      );
     }
 
     return recorder.endRecording();
   }
 
   void _paintHeaderFooter(
-      Canvas canvas, Size size, double topSafe, double bottomSafe) {
+    Canvas canvas,
+    Size size,
+    double topSafe,
+    double bottomSafe, {
+    required PageRenderPosition renderPosition,
+  }) {
     final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
         const Color(0xff8B7961);
     final headerStyle =
@@ -308,9 +350,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         y,
         headerStyle,
-        _tipTextForHeader(widget.settings.headerLeftContent),
-        _tipTextForHeader(widget.settings.headerCenterContent),
-        _tipTextForHeader(widget.settings.headerRightContent),
+        _tipTextForHeader(
+          widget.settings.headerLeftContent,
+          renderPosition: renderPosition,
+        ),
+        _tipTextForHeader(
+          widget.settings.headerCenterContent,
+          renderPosition: renderPosition,
+        ),
+        _tipTextForHeader(
+          widget.settings.headerRightContent,
+          renderPosition: renderPosition,
+        ),
       );
       if (widget.settings.showHeaderLine) {
         final lineY = y + headerStyle.fontSize!.toDouble() + 6;
@@ -326,9 +377,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (!widget.settings.hideFooter) {
-      final sample = _tipTextForFooter(widget.settings.footerLeftContent) ??
-          _tipTextForFooter(widget.settings.footerCenterContent) ??
-          _tipTextForFooter(widget.settings.footerRightContent) ??
+      final sample = _tipTextForFooter(
+            widget.settings.footerLeftContent,
+            renderPosition: renderPosition,
+          ) ??
+          _tipTextForFooter(
+            widget.settings.footerCenterContent,
+            renderPosition: renderPosition,
+          ) ??
+          _tipTextForFooter(
+            widget.settings.footerRightContent,
+            renderPosition: renderPosition,
+          ) ??
           '';
       final samplePainter = TextPainter(
         text: TextSpan(text: sample, style: footerStyle),
@@ -340,9 +400,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         y,
         footerStyle,
-        _tipTextForFooter(widget.settings.footerLeftContent),
-        _tipTextForFooter(widget.settings.footerCenterContent),
-        _tipTextForFooter(widget.settings.footerRightContent),
+        _tipTextForFooter(
+          widget.settings.footerLeftContent,
+          renderPosition: renderPosition,
+        ),
+        _tipTextForFooter(
+          widget.settings.footerCenterContent,
+          renderPosition: renderPosition,
+        ),
+        _tipTextForFooter(
+          widget.settings.footerRightContent,
+          renderPosition: renderPosition,
+        ),
       );
       if (widget.settings.showFooterLine) {
         final lineY = y - 6;
@@ -397,24 +466,36 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
-  String? _tipTextForHeader(int type) {
+  String? _tipTextForHeader(
+    int type, {
+    required PageRenderPosition renderPosition,
+  }) {
     return _tipText(
       type,
       isHeader: true,
+      renderPosition: renderPosition,
     );
   }
 
-  String? _tipTextForFooter(int type) {
+  String? _tipTextForFooter(
+    int type, {
+    required PageRenderPosition renderPosition,
+  }) {
     return _tipText(
       type,
       isHeader: false,
+      renderPosition: renderPosition,
     );
   }
 
-  String? _tipText(int type, {required bool isHeader}) {
+  String? _tipText(
+    int type, {
+    required bool isHeader,
+    required PageRenderPosition renderPosition,
+  }) {
     final time = DateFormat('HH:mm').format(DateTime.now());
-    final bookProgress = _bookProgress;
-    final chapterProgress = _chapterProgress;
+    final bookProgress = _bookProgress(renderPosition);
+    final chapterProgress = _chapterProgress(renderPosition);
     switch (type) {
       case 0:
         return isHeader
@@ -423,8 +504,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 enabled: widget.settings.showProgress);
       case 1:
         return isHeader
-            ? _factory.currentChapterTitle
-            : _pageText(includeTotal: true);
+            ? renderPosition.chapterTitle
+            : _pageText(renderPosition, includeTotal: true);
       case 2:
         return isHeader ? '' : _timeText(time);
       case 3:
@@ -434,14 +515,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       case 5:
         return isHeader
             ? _progressText(bookProgress, enabled: widget.settings.showProgress)
-            : _factory.currentChapterTitle;
+            : renderPosition.chapterTitle;
       case 6:
-        return isHeader ? _pageText(includeTotal: true) : widget.bookTitle;
+        return isHeader
+            ? _pageText(renderPosition, includeTotal: true)
+            : widget.bookTitle;
       case 7:
         return _progressText(chapterProgress,
             enabled: widget.settings.showChapterProgress);
       case 8:
-        return _pageText(includeTotal: true);
+        return _pageText(renderPosition, includeTotal: true);
       case 9:
         return _timeBatteryText(time);
       default:
@@ -449,9 +532,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
-  String _pageText({bool includeTotal = true}) {
-    final current = _factory.currentPageIndex + 1;
-    final total = _factory.totalPages.clamp(1, 9999);
+  String _pageText(
+    PageRenderPosition renderPosition, {
+    bool includeTotal = true,
+  }) {
+    final current = renderPosition.pageIndex + 1;
+    final total = renderPosition.totalPages.clamp(1, 9999);
     return includeTotal ? '$current/$total' : '$current';
   }
 
@@ -477,16 +563,17 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return parts.join(' ');
   }
 
-  double get _chapterProgress {
-    final total = _factory.totalPages;
+  double _chapterProgress(PageRenderPosition renderPosition) {
+    final total = renderPosition.totalPages;
     if (total <= 0) return 0;
-    return ((_factory.currentPageIndex + 1) / total).clamp(0.0, 1.0);
+    return ((renderPosition.pageIndex + 1) / total).clamp(0.0, 1.0);
   }
 
-  double get _bookProgress {
+  double _bookProgress(PageRenderPosition renderPosition) {
     final totalChapters = _factory.totalChapters;
     if (totalChapters <= 0) return 0;
-    return ((_factory.currentChapterIndex + _chapterProgress) / totalChapters)
+    final chapterProgress = _chapterProgress(renderPosition);
+    return ((renderPosition.chapterIndex + chapterProgress) / totalChapters)
         .clamp(0.0, 1.0);
   }
 
@@ -551,18 +638,21 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!allowRecord) return;
 
     // 当前页
-    _curPagePicture ??= _recordPage(_factory.curPage, size);
+    _curPagePicture ??=
+        _recordPage(_factory.curPage, size, slot: PageRenderSlot.current);
 
     // 相邻页：预渲染上一页/下一页，避免拖拽时临时生成导致卡顿
     if (_factory.hasPrev()) {
-      _prevPagePicture ??= _recordPage(_factory.prevPage, size);
+      _prevPagePicture ??=
+          _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
     } else {
       _prevPagePicture?.dispose();
       _prevPagePicture = null;
     }
 
     if (_factory.hasNext()) {
-      _nextPagePicture ??= _recordPage(_factory.nextPage, size);
+      _nextPagePicture ??=
+          _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
     } else {
       _nextPagePicture?.dispose();
       _nextPagePicture = null;
@@ -656,17 +746,20 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (_curPagePicture == null) {
-      _curPagePicture = _recordPage(_factory.curPage, size);
+      _curPagePicture =
+          _recordPage(_factory.curPage, size, slot: PageRenderSlot.current);
       return true;
     }
 
     if (_factory.hasPrev() && _prevPagePicture == null) {
-      _prevPagePicture = _recordPage(_factory.prevPage, size);
+      _prevPagePicture =
+          _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
       return true;
     }
 
     if (_factory.hasNext() && _nextPagePicture == null) {
-      _nextPagePicture = _recordPage(_factory.nextPage, size);
+      _nextPagePicture =
+          _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
       return true;
     }
 
@@ -1057,13 +1150,23 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     switch (widget.pageTurnMode) {
       case PageTurnMode.slide:
-        if (!isRunning) return _buildPageWidget(_factory.curPage);
+        if (!isRunning) {
+          return _buildPageWidget(
+            _factory.curPage,
+            slot: PageRenderSlot.current,
+          );
+        }
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
         }
         return _buildSlideAnimation(screenWidth, offset);
       case PageTurnMode.cover:
-        if (!isRunning) return _buildPageWidget(_factory.curPage);
+        if (!isRunning) {
+          return _buildPageWidget(
+            _factory.curPage,
+            slot: PageRenderSlot.current,
+          );
+        }
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
         }
@@ -1079,7 +1182,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         }
         return _buildSimulation2Animation(size);
       case PageTurnMode.none:
-        if (!isRunning) return _buildPageWidget(_factory.curPage);
+        if (!isRunning) {
+          return _buildPageWidget(
+            _factory.curPage,
+            slot: PageRenderSlot.current,
+          );
+        }
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
         }
@@ -1089,8 +1197,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
-  Widget _buildRecordedPage(ui.Picture? picture, String fallbackContent) {
-    if (picture == null) return _buildPageWidget(fallbackContent);
+  Widget _buildRecordedPage(
+    ui.Picture? picture,
+    String fallbackContent, {
+    required PageRenderSlot slot,
+  }) {
+    if (picture == null) {
+      return _buildPageWidget(fallbackContent, slot: slot);
+    }
     return RepaintBoundary(
       child: SizedBox.expand(
         child: CustomPaint(
@@ -1104,7 +1218,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   /// 水平滑动模式
   Widget _buildSlideAnimation(double screenWidth, double offset) {
     if (_direction == _PageDirection.none) {
-      return _buildRecordedPage(_curPagePicture, _factory.curPage);
+      return _buildRecordedPage(
+        _curPagePicture,
+        _factory.curPage,
+        slot: PageRenderSlot.current,
+      );
     }
     final clamped = offset.clamp(-screenWidth, screenWidth);
     return Stack(
@@ -1112,16 +1230,28 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         if (_direction == _PageDirection.next)
           Transform.translate(
             offset: Offset(screenWidth + clamped, 0),
-            child: _buildRecordedPage(_nextPagePicture, _factory.nextPage),
+            child: _buildRecordedPage(
+              _nextPagePicture,
+              _factory.nextPage,
+              slot: PageRenderSlot.next,
+            ),
           ),
         if (_direction == _PageDirection.prev)
           Transform.translate(
             offset: Offset(clamped - screenWidth, 0),
-            child: _buildRecordedPage(_prevPagePicture, _factory.prevPage),
+            child: _buildRecordedPage(
+              _prevPagePicture,
+              _factory.prevPage,
+              slot: PageRenderSlot.prev,
+            ),
           ),
         Transform.translate(
           offset: Offset(clamped, 0),
-          child: _buildRecordedPage(_curPagePicture, _factory.curPage),
+          child: _buildRecordedPage(
+            _curPagePicture,
+            _factory.curPage,
+            slot: PageRenderSlot.current,
+          ),
         ),
       ],
     );
@@ -1130,7 +1260,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   /// 覆盖模式
   Widget _buildCoverAnimation(double screenWidth, double offset) {
     if (_direction == _PageDirection.none) {
-      return _buildRecordedPage(_curPagePicture, _factory.curPage);
+      return _buildRecordedPage(
+        _curPagePicture,
+        _factory.curPage,
+        slot: PageRenderSlot.current,
+      );
     }
     final clamped = offset.clamp(-screenWidth, screenWidth);
     final shadowOpacity = (clamped.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
@@ -1143,11 +1277,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       children: [
         if (_direction == _PageDirection.next)
           Positioned.fill(
-            child: _buildRecordedPage(_nextPagePicture, _factory.nextPage),
+            child: _buildRecordedPage(
+              _nextPagePicture,
+              _factory.nextPage,
+              slot: PageRenderSlot.next,
+            ),
           ),
         if (_direction == _PageDirection.prev)
           Positioned.fill(
-            child: _buildRecordedPage(_prevPagePicture, _factory.prevPage),
+            child: _buildRecordedPage(
+              _prevPagePicture,
+              _factory.prevPage,
+              slot: PageRenderSlot.prev,
+            ),
           ),
         Transform.translate(
           offset: Offset(clamped, 0),
@@ -1164,9 +1306,17 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                       ),
                     ],
                   ),
-                  child: _buildRecordedPage(_curPagePicture, _factory.curPage),
+                  child: _buildRecordedPage(
+                    _curPagePicture,
+                    _factory.curPage,
+                    slot: PageRenderSlot.current,
+                  ),
                 )
-              : _buildRecordedPage(_curPagePicture, _factory.curPage),
+              : _buildRecordedPage(
+                  _curPagePicture,
+                  _factory.curPage,
+                  slot: PageRenderSlot.current,
+                ),
         ),
       ],
     );
@@ -1180,18 +1330,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 这样避免了状态切换时的闪烁
     final isRunning = _isMoved || _isRunning;
     if (!isRunning || pageCurlProgram == null) {
-      return _buildPageWidget(_factory.curPage);
+      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
     }
 
     final isNext = _direction == _PageDirection.next;
     if (_direction == _PageDirection.none) {
-      return _buildPageWidget(_factory.curPage);
+      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
     }
     if (isNext && _curPageImage == null) {
-      return _buildPageWidget(_factory.curPage);
+      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
     }
     if (!isNext && _targetPageImage == null) {
-      return _buildPageWidget(_factory.curPage);
+      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
     }
 
     // === P6: 仿真逻辑修正 ===
@@ -1215,7 +1365,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (imageToCurl == null) {
-      return _buildPageWidget(_factory.curPage);
+      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
     }
 
     double simulationTouchX = _touchX;
@@ -1253,7 +1403,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   Widget _buildSimulation2Animation(Size size) {
     final isRunning = _isMoved || _isRunning;
     if (!isRunning) {
-      return _buildPageWidget(_factory.curPage);
+      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
     }
 
     final isNext = _direction == _PageDirection.next;
@@ -1276,7 +1426,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (pictureToCurl == null) {
-      return _buildPageWidget(_factory.curPage);
+      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
     }
 
     double simulationTouchX = _touchX;
@@ -1306,14 +1456,26 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (_direction == _PageDirection.next &&
         clamped.abs() > screenWidth * 0.2 &&
         _factory.hasNext()) {
-      return _buildRecordedPage(_nextPagePicture, _factory.nextPage);
+      return _buildRecordedPage(
+        _nextPagePicture,
+        _factory.nextPage,
+        slot: PageRenderSlot.next,
+      );
     }
     if (_direction == _PageDirection.prev &&
         clamped.abs() > screenWidth * 0.2 &&
         _factory.hasPrev()) {
-      return _buildRecordedPage(_prevPagePicture, _factory.prevPage);
+      return _buildRecordedPage(
+        _prevPagePicture,
+        _factory.prevPage,
+        slot: PageRenderSlot.prev,
+      );
     }
-    return _buildRecordedPage(_curPagePicture, _factory.curPage);
+    return _buildRecordedPage(
+      _curPagePicture,
+      _factory.curPage,
+      slot: PageRenderSlot.current,
+    );
   }
 
   // === 对标 Legado HorizontalPageDelegate.onTouch ===
@@ -1417,13 +1579,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _startTurnAnimation();
   }
 
-  Widget _buildPageWidget(String content) {
+  Widget _buildPageWidget(
+    String content, {
+    required PageRenderSlot slot,
+  }) {
     if (content.isEmpty) {
       return Container(color: widget.backgroundColor);
     }
 
-    final topSafe = MediaQuery.of(context).padding.top;
-    final bottomSafe = MediaQuery.of(context).padding.bottom;
+    final viewportSize = MediaQuery.of(context).size;
+    final systemPadding = _resolveStableSystemPadding(viewportSize);
+    final topSafe = systemPadding.top;
+    final bottomSafe = systemPadding.bottom;
 
     return Container(
       color: widget.backgroundColor,
@@ -1437,26 +1604,38 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 widget.padding.right,
                 bottomSafe + _bottomOffset + widget.padding.bottom,
               ),
-              child: Text.rich(
-                TextSpan(text: content, style: widget.textStyle),
-                textAlign: widget.settings.textFullJustify
-                    ? TextAlign.justify
-                    : TextAlign.left,
+              child: LegacyJustifiedTextBlock(
+                content: content,
+                style: widget.textStyle,
+                justify: widget.settings.textFullJustify,
+                paragraphIndent: widget.settings.paragraphIndent,
+                applyParagraphIndent: false,
+                preserveEmptyLines: true,
               ),
             ),
           ),
-          if (widget.showStatusBar) _buildOverlay(topSafe, bottomSafe),
+          if (widget.showStatusBar)
+            _buildOverlay(
+              topSafe,
+              bottomSafe,
+              slot: slot,
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildOverlay(double topSafe, double bottomSafe) {
+  Widget _buildOverlay(
+    double topSafe,
+    double bottomSafe, {
+    required PageRenderSlot slot,
+  }) {
     if (widget.settings.hideHeader && widget.settings.hideFooter) {
       return const SizedBox.shrink();
     }
     final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
         const Color(0xff8B7961);
+    final renderPosition = _factory.resolveRenderPosition(slot);
 
     return IgnorePointer(
       child: Container(
@@ -1471,9 +1650,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           children: [
             if (!widget.settings.hideHeader)
               _buildTipRowWidget(
-                _tipTextForHeader(widget.settings.headerLeftContent),
-                _tipTextForHeader(widget.settings.headerCenterContent),
-                _tipTextForHeader(widget.settings.headerRightContent),
+                _tipTextForHeader(
+                  widget.settings.headerLeftContent,
+                  renderPosition: renderPosition,
+                ),
+                _tipTextForHeader(
+                  widget.settings.headerCenterContent,
+                  renderPosition: renderPosition,
+                ),
+                _tipTextForHeader(
+                  widget.settings.headerRightContent,
+                  renderPosition: renderPosition,
+                ),
                 widget.textStyle.copyWith(fontSize: 12, color: statusColor),
               ),
             if (!widget.settings.hideHeader && widget.settings.showHeaderLine)
@@ -1495,9 +1683,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
               ),
             if (!widget.settings.hideFooter)
               _buildTipRowWidget(
-                _tipTextForFooter(widget.settings.footerLeftContent),
-                _tipTextForFooter(widget.settings.footerCenterContent),
-                _tipTextForFooter(widget.settings.footerRightContent),
+                _tipTextForFooter(
+                  widget.settings.footerLeftContent,
+                  renderPosition: renderPosition,
+                ),
+                _tipTextForFooter(
+                  widget.settings.footerCenterContent,
+                  renderPosition: renderPosition,
+                ),
+                _tipTextForFooter(
+                  widget.settings.footerRightContent,
+                  renderPosition: renderPosition,
+                ),
                 widget.textStyle.copyWith(fontSize: 11, color: statusColor),
               ),
           ],

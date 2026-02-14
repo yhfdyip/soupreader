@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +21,7 @@ import '../services/reader_source_switch_helper.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/click_action_config_dialog.dart';
+import '../widgets/legacy_justified_text.dart';
 import '../widgets/paged_reader_widget.dart';
 import '../widgets/page_factory.dart';
 import '../widgets/reader_menus.dart';
@@ -100,6 +100,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // UI 状态
   bool _showMenu = false;
+  SystemUiMode? _appliedSystemUiMode;
   final ScrollController _scrollController = ScrollController();
   bool _isInitialized = false;
   final FocusNode _keyboardFocusNode = FocusNode();
@@ -166,7 +167,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _replaceService = ReplaceRuleService(db);
     _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
-    _settings = _settingsService.readingSettings;
+    _settings = _settingsService.readingSettings.sanitize();
     _autoPager.setSpeed(_settings.autoReadSpeed);
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
@@ -201,7 +202,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     });
 
     // 全屏沉浸
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _applySystemUiMode(SystemUiMode.immersiveSticky, force: true);
   }
 
   Future<void> _initReader() async {
@@ -264,8 +265,47 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 离开阅读器时恢复系统亮度（iOS 还原原始亮度；Android 还原窗口亮度为跟随系统）
     unawaited(_brightnessService.resetToSystem());
     unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _applySystemUiMode(SystemUiMode.edgeToEdge, force: true);
     super.dispose();
+  }
+
+  void _applySystemUiMode(SystemUiMode mode, {bool force = false}) {
+    if (!force && _appliedSystemUiMode == mode) return;
+    _appliedSystemUiMode = mode;
+    SystemChrome.setEnabledSystemUIMode(mode);
+  }
+
+  void _setReaderMenuVisible(bool visible) {
+    final targetMode =
+        visible ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky;
+    if (_showMenu == visible) {
+      _applySystemUiMode(targetMode);
+      return;
+    }
+    setState(() => _showMenu = visible);
+    _applySystemUiMode(targetMode);
+  }
+
+  void _toggleReaderMenuVisible() {
+    _setReaderMenuVisible(!_showMenu);
+  }
+
+  double _safeBrightnessValue(double value, {double fallback = 1.0}) {
+    final safeRaw = value.isFinite ? value : fallback;
+    return safeRaw.clamp(0.0, 1.0).toDouble();
+  }
+
+  double _safeSliderValue(
+    double value, {
+    required double min,
+    required double max,
+    double? fallback,
+  }) {
+    final safeMin = min.isFinite ? min : 0.0;
+    final safeMax = max.isFinite && max > safeMin ? max : safeMin + 1.0;
+    final safeFallback = fallback ?? safeMin;
+    final safeRaw = value.isFinite ? value : safeFallback;
+    return safeRaw.clamp(safeMin, safeMax).toDouble();
   }
 
   void _syncNativeBrightnessForSettings(
@@ -287,7 +327,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
 
     // 手动亮度：仅在关闭“跟随系统”时生效
-    unawaited(_brightnessService.setBrightness(newSettings.brightness));
+    unawaited(
+      _brightnessService.setBrightness(
+        _safeBrightnessValue(newSettings.brightness),
+      ),
+    );
   }
 
   Future<void> _syncNativeKeepScreenOn(ReadingSettings settings) async {
@@ -671,6 +715,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 更新设置
   void _updateSettings(ReadingSettings newSettings) {
+    newSettings = newSettings.sanitize();
+
     // 产品约束：除“滚动”外一律水平翻页；滚动模式固定纵向滚动。
     if (newSettings.pageTurnMode == PageTurnMode.scroll) {
       if (newSettings.pageDirection != PageDirection.vertical) {
@@ -884,8 +930,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   /// 左右点击翻页处理
   void _handleTap(TapUpDetails details) {
     if (_showMenu) {
-      setState(() => _showMenu = false);
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      _setReaderMenuVisible(false);
       return;
     }
     final action = _resolveClickAction(details.globalPosition);
@@ -948,8 +993,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _handleClickAction(int action) {
     switch (action) {
       case ClickAction.showMenu:
-        setState(() => _showMenu = true);
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        _setReaderMenuVisible(true);
         break;
       case ClickAction.nextPage:
         _handlePageStep(next: true);
@@ -970,8 +1014,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _showChapterList();
         break;
       default:
-        setState(() => _showMenu = true);
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        _setReaderMenuVisible(true);
     }
   }
 
@@ -1205,9 +1248,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && !_showMenu) {
           // 如果阻止了 pop 且菜单未显示，则显示菜单
-          setState(() {
-            _showMenu = true;
-          });
+          _setReaderMenuVisible(true);
         }
       },
       child: CupertinoPageScaffold(
@@ -1377,7 +1418,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (_settings.useSystemBrightness) return const SizedBox.shrink();
     // Android/iOS 使用原生亮度调节；仅在 Web/桌面端用遮罩模拟降低亮度。
     if (_brightnessService.supportsNative) return const SizedBox.shrink();
-    final opacity = (1.0 - _settings.brightness).clamp(0.0, 1.0);
+    final opacity = 1.0 - _safeBrightnessValue(_settings.brightness);
     if (opacity <= 0) return const SizedBox.shrink();
     return IgnorePointer(
       child: Container(
@@ -1404,12 +1445,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       padding: _contentPadding,
       enableGestures: !_showMenu, // 菜单显示时禁止翻页手势
       onTap: () {
-        setState(() {
-          _showMenu = !_showMenu;
-        });
-        SystemChrome.setEnabledSystemUIMode(
-          _showMenu ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
-        );
+        _toggleReaderMenuVisible();
       },
       showStatusBar: _settings.showStatusBar,
       settings: _settings,
@@ -1456,9 +1492,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       fontWeight: _currentFontWeight,
       decoration: _currentTextDecoration,
     );
-    final indent = _settings.paragraphIndent;
-    final indentWidth =
-        indent.isEmpty ? 0.0 : _measureTextWidth(indent, paragraphStyle);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -1501,8 +1534,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               child: _buildParagraphWithFirstLineIndent(
                 paragraphText,
                 style: paragraphStyle,
-                textAlign: _bodyTextAlign,
-                indentWidth: indentWidth,
               ),
             );
           }),
@@ -1543,49 +1574,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  double _measureTextWidth(String text, TextStyle style) {
-    if (text.isEmpty) return 0;
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: ui.TextDirection.ltr,
-      maxLines: 1,
-    );
-    painter.layout();
-    return painter.width;
-  }
-
   /// 段落渲染（首行缩进，对标 legado 的 `paragraphIndent` 体验）
-  ///
-  /// 说明：
-  /// - 不依赖段首前导空格，避免在 `TextAlign.justify` 下出现“看起来不缩进”
-  /// - 通过 `WidgetSpan(SizedBox(width))` 做首行缩进，后续换行仍顶格
   Widget _buildParagraphWithFirstLineIndent(
     String paragraph, {
     required TextStyle style,
-    required TextAlign textAlign,
-    required double indentWidth,
   }) {
-    if (indentWidth <= 0) {
-      return Text(
-        paragraph,
-        textAlign: textAlign,
-        style: style,
-      );
-    }
-
-    return RichText(
-      textAlign: textAlign,
-      text: TextSpan(
-        style: style,
-        children: [
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: SizedBox(width: indentWidth),
-          ),
-          TextSpan(text: paragraph),
-        ],
-      ),
+    return LegacyJustifiedTextBlock(
+      content: paragraph,
+      style: style,
+      justify: _settings.textFullJustify,
+      paragraphIndent: _settings.paragraphIndent,
+      applyParagraphIndent: true,
+      preserveEmptyLines: false,
     );
   }
 
@@ -1617,8 +1617,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _closeReaderMenuOverlay() {
     if (!_showMenu) return;
-    setState(() => _showMenu = false);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _setReaderMenuVisible(false);
   }
 
   void _openChapterListFromMenu() {
@@ -2506,7 +2505,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             color: _uiTextSubtle, size: 20),
                         Expanded(
                           child: CupertinoSlider(
-                            value: _settings.brightness,
+                            value: _safeBrightnessValue(_settings.brightness),
                             min: 0.0,
                             max: 1.0,
                             activeColor: _uiAccent,
@@ -3138,6 +3137,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Widget _buildSliderSetting(String label, double value, double min, double max,
       ValueChanged<double> onChanged,
       {String Function(double)? displayFormat}) {
+    final safeMin = min.isFinite ? min : 0.0;
+    final safeMax = max.isFinite && max > safeMin ? max : safeMin + 1.0;
+    final safeValue = _safeSliderValue(
+      value,
+      min: safeMin,
+      max: safeMax,
+      fallback: safeMin,
+    );
+    final canSlide = max.isFinite && min.isFinite && max > min;
+
     return Row(
       children: [
         SizedBox(
@@ -3146,17 +3155,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 style: TextStyle(color: _uiTextNormal, fontSize: 13))),
         Expanded(
           child: CupertinoSlider(
-            value: value,
-            min: min,
-            max: max,
+            value: safeValue,
+            min: safeMin,
+            max: safeMax,
             activeColor: _uiAccent,
-            onChanged: onChanged,
+            onChanged: canSlide ? onChanged : null,
           ),
         ),
         SizedBox(
             width: 30,
             child: Text(
-              displayFormat?.call(value) ?? value.toStringAsFixed(1),
+              displayFormat?.call(safeValue) ?? safeValue.toStringAsFixed(1),
               style: TextStyle(color: _uiTextNormal, fontSize: 13),
               textAlign: TextAlign.end,
             )),

@@ -13,6 +13,7 @@ import '../../source/models/book_source.dart';
 import '../../source/services/source_explore_kinds_service.dart';
 import '../../source/views/source_edit_view.dart';
 import '../../source/views/source_web_verify_view.dart';
+import 'discovery_explore_results_view.dart';
 
 /// 发现页（对标 legado ExploreFragment）：
 /// - 展示支持发现的书源列表
@@ -280,12 +281,12 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       return;
     }
 
-    // 发现结果二级页已下线时，兜底到源内搜索入口，保持可达性。
     await Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SearchView.scoped(
-          sourceUrls: <String>[source.bookSourceUrl],
-          initialKeyword: title,
+        builder: (_) => DiscoveryExploreResultsView(
+          source: source,
+          exploreName: title,
+          exploreUrl: rawUrl,
         ),
       ),
     );
