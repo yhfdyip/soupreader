@@ -173,11 +173,11 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
           ),
           ReaderQuickSettingsTab.page: Padding(
             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text('设置'),
+            child: Text('翻页'),
           ),
           ReaderQuickSettingsTab.more: Padding(
             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text('更多'),
+            child: Text('其他'),
           ),
         },
       ),
@@ -427,6 +427,17 @@ class _TypographyTab extends StatelessWidget {
                 format: (v) => v.toStringAsFixed(1),
                 onChanged: (v) => onSettingsChanged(
                   settings.copyWith(lineHeight: v),
+                ),
+              ),
+              const SizedBox(height: 6),
+              _SliderRow(
+                label: '字距',
+                value: settings.letterSpacing,
+                min: -2.0,
+                max: 5.0,
+                format: (v) => v.toStringAsFixed(1),
+                onChanged: (v) => onSettingsChanged(
+                  settings.copyWith(letterSpacing: v),
                 ),
               ),
               const SizedBox(height: 6),

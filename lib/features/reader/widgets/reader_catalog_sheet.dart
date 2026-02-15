@@ -52,6 +52,9 @@ class ReaderCatalogSheet extends StatefulWidget {
 }
 
 class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
+  static const double _chapterListItemExtent = 60;
+  static const double _currentChapterAlignment = 0.08;
+
   int _selectedTab = 0; // 0=目录, 1=书签, 2=笔记
   bool _isReversed = false;
   bool _busy = false;
@@ -63,6 +66,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   late List<Chapter> _chapters;
   late List<BookmarkEntity> _bookmarks;
   int? _lastAutoScrollTargetChapterIndex;
+  bool _pendingPreciseScroll = false;
 
   bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
 
@@ -103,6 +107,21 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant ReaderCatalogSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!identical(oldWidget.chapters, widget.chapters) ||
+        oldWidget.currentChapterIndex != widget.currentChapterIndex) {
+      _chapters = List<Chapter>.from(widget.chapters);
+      _resetAutoScrollState();
+      _scheduleScrollToCurrentChapter();
+    }
+    if (!identical(oldWidget.bookmarks, widget.bookmarks)) {
+      _bookmarks = List<BookmarkEntity>.from(widget.bookmarks);
+    }
+  }
+
   GlobalKey _chapterKeyFor(int chapterIndex) {
     return _chapterItemKeys.putIfAbsent(
       chapterIndex,
@@ -120,6 +139,18 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     return null;
   }
 
+  void _resetAutoScrollState() {
+    _lastAutoScrollTargetChapterIndex = null;
+    _pendingPreciseScroll = false;
+  }
+
+  double _clampTargetOffset(double rawOffset) {
+    final position = _scrollController.position;
+    return rawOffset
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+  }
+
   void _scheduleScrollToCurrentChapter() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -131,29 +162,41 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     if (_selectedTab != 0) return;
     if (!_scrollController.hasClients) return;
 
+    final chapters = _filteredChapters;
+    if (chapters.isEmpty) return;
+
     final currentVisibleIndex = _findCurrentVisibleListIndex();
     if (currentVisibleIndex == null) return;
 
     // 对齐 legado：将当前章前一项滚动到可视区顶部，避免当前章贴边显示。
-    final chapters = _filteredChapters;
     final targetVisibleIndex =
         currentVisibleIndex > 0 ? currentVisibleIndex - 1 : 0;
     if (targetVisibleIndex < 0 || targetVisibleIndex >= chapters.length) return;
 
     final targetChapterIndex = chapters[targetVisibleIndex].index;
-    if (_lastAutoScrollTargetChapterIndex == targetChapterIndex) return;
+    if (_lastAutoScrollTargetChapterIndex != targetChapterIndex) {
+      final estimatedOffset = targetVisibleIndex * _chapterListItemExtent;
+      _scrollController.jumpTo(_clampTargetOffset(estimatedOffset));
+      _lastAutoScrollTargetChapterIndex = targetChapterIndex;
+    }
+    if (_pendingPreciseScroll) return;
 
-    final targetContext = _chapterKeyFor(targetChapterIndex).currentContext;
-    if (targetContext == null) return;
-
-    _lastAutoScrollTargetChapterIndex = targetChapterIndex;
-    Scrollable.ensureVisible(
-      targetContext,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      alignment: 0.08,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-    );
+    _pendingPreciseScroll = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pendingPreciseScroll = false;
+      if (!mounted || _selectedTab != 0 || !_scrollController.hasClients) {
+        return;
+      }
+      final targetContext = _chapterKeyFor(targetChapterIndex).currentContext;
+      if (targetContext == null) return;
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        alignment: _currentChapterAlignment,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      );
+    });
   }
 
   List<Chapter> get _filteredChapters {
@@ -326,7 +369,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           _selectedTab = index;
           _searchQuery = '';
           _searchController.text = '';
-          _lastAutoScrollTargetChapterIndex = null;
+          _resetAutoScrollState();
         });
         _scheduleScrollToCurrentChapter();
       },
@@ -397,7 +440,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                     onChanged: (value) {
                       setState(() {
                         _searchQuery = value;
-                        _lastAutoScrollTargetChapterIndex = null;
+                        _resetAutoScrollState();
                       });
                       _scheduleScrollToCurrentChapter();
                     },
@@ -410,7 +453,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                   onPressed: () {
                     setState(() {
                       _isReversed = !_isReversed;
-                      _lastAutoScrollTargetChapterIndex = null;
+                      _resetAutoScrollState();
                     });
                     _scheduleScrollToCurrentChapter();
                   },
@@ -475,6 +518,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           key: _chapterKeyFor(originalIndex),
           onTap: () => widget.onChapterSelected(originalIndex),
           child: Container(
+            constraints:
+                const BoxConstraints(minHeight: _chapterListItemExtent),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             margin: const EdgeInsets.only(bottom: 4),
             decoration: BoxDecoration(
@@ -784,7 +829,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       if (!mounted) return;
       setState(() {
         _chapters = List<Chapter>.from(updated);
-        _lastAutoScrollTargetChapterIndex = null;
+        _resetAutoScrollState();
       });
       _scheduleScrollToCurrentChapter();
 

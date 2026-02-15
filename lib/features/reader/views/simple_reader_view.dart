@@ -1629,7 +1629,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _closeReaderMenuOverlay();
     _showReadingSettingsSheet(
       title: '界面',
-      initialTab: 0,
+      initialTab: 1,
       allowedTabs: const [0, 1],
     );
   }
@@ -2012,7 +2012,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setPopupState) => Container(
-          height: MediaQuery.of(context).size.height * 0.7,
+          height: MediaQuery.of(context).size.height * 0.78,
           decoration: BoxDecoration(
             color: _uiPanelBg,
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -2043,7 +2043,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                           title,
                           style: TextStyle(
                             color: _uiTextStrong,
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -2199,6 +2199,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   ),
                   displayFormat: (v) => v.toInt().toString(),
                 ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '字距',
+                  _settings.letterSpacing,
+                  -2,
+                  5,
+                  (val) => _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(letterSpacing: val),
+                  ),
+                  displayFormat: (v) => v.toStringAsFixed(1),
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -2326,9 +2338,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildToggleBtn(
-                        label: '字距',
+                        label: '字距归零',
                         isActive: _settings.letterSpacing.abs() >= 0.1,
-                        onTap: () => _showLetterSpacingPicker(setPopupState),
+                        onTap: () => _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(letterSpacing: 0),
+                        ),
                       ),
                     ),
                   ],
@@ -2401,8 +2416,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('高级排版与边距',
-                            style: TextStyle(color: CupertinoColors.white)),
+                        Text('高级排版与边距', style: TextStyle(color: _uiTextStrong)),
                         Icon(CupertinoIcons.chevron_right,
                             color: _uiTextSubtle, size: 16),
                       ],
@@ -2436,44 +2450,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Future<void> _showLetterSpacingPicker(StateSetter setPopupState) async {
-    final controller =
-        TextEditingController(text: _settings.letterSpacing.toStringAsFixed(1));
-    final result = await showCupertinoDialog<double>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('字距'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            placeholder: '-2.0 ~ 5.0',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('取消'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: const Text('确定'),
-            onPressed: () {
-              final raw = double.tryParse(controller.text.trim());
-              Navigator.pop(context, raw);
-            },
-          ),
-        ],
-      ),
-    );
-    if (result == null) return;
-    _updateSettingsFromSheet(
-      setPopupState,
-      _settings.copyWith(letterSpacing: result.clamp(-2.0, 5.0)),
-    );
-  }
-
   Widget _buildThemeSettingsTab(StateSetter setPopupState) {
     return SingleChildScrollView(
       key: const ValueKey('theme'),
@@ -2482,7 +2458,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSettingsCard(
-            title: '界面设置（常用）',
+            title: '界面设置',
             child: Column(
               children: [
                 _buildSwitchRow(
@@ -2519,6 +2495,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         ),
                         Icon(CupertinoIcons.sun_max,
                             color: _uiTextSubtle, size: 20),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 42,
+                          child: Text(
+                            '${(_safeBrightnessValue(_settings.brightness) * 100).round()}%',
+                            textAlign: TextAlign.end,
+                            style:
+                                TextStyle(color: _uiTextNormal, fontSize: 12),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2583,77 +2569,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   );
                 },
               ),
-            ),
-          ),
-          _buildSettingsCard(
-            title: '翻页动画',
-            child: Column(
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      PageTurnModeUi.values(current: _settings.pageTurnMode)
-                          .map((mode) {
-                    final isSelected = _settings.pageTurnMode == mode;
-                    final isHiddenMode = PageTurnModeUi.isHidden(mode);
-                    return Opacity(
-                      opacity: isHiddenMode ? 0.5 : 1,
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        onPressed: isHiddenMode
-                            ? null
-                            : () {
-                                _updateSettingsFromSheet(
-                                  setPopupState,
-                                  _settings.copyWith(pageTurnMode: mode),
-                                );
-                              },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? _uiAccent.withValues(alpha: 0.2)
-                                : _uiCardBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected ? _uiAccent : _uiBorder,
-                            ),
-                          ),
-                          child: Text(
-                            isHiddenMode ? '${mode.name}（隐藏）' : mode.name,
-                            style: TextStyle(
-                              color: isSelected ? _uiAccent : _uiTextNormal,
-                              fontSize: 13,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                _buildSliderSetting(
-                  '动画',
-                  _settings.pageAnimDuration.toDouble(),
-                  100,
-                  600,
-                  (val) {
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(pageAnimDuration: val.toInt()),
-                    );
-                  },
-                  displayFormat: (v) => '${v.toInt()}ms',
-                ),
-              ],
             ),
           ),
           _buildSettingsCard(
@@ -2878,6 +2793,77 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSettingsCard(
+            title: '翻页模式与动画',
+            child: Column(
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      PageTurnModeUi.values(current: _settings.pageTurnMode)
+                          .map((mode) {
+                    final isSelected = _settings.pageTurnMode == mode;
+                    final isHiddenMode = PageTurnModeUi.isHidden(mode);
+                    return Opacity(
+                      opacity: isHiddenMode ? 0.5 : 1,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        onPressed: isHiddenMode
+                            ? null
+                            : () {
+                                _updateSettingsFromSheet(
+                                  setPopupState,
+                                  _settings.copyWith(pageTurnMode: mode),
+                                );
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _uiAccent.withValues(alpha: 0.2)
+                                : _uiCardBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected ? _uiAccent : _uiBorder,
+                            ),
+                          ),
+                          child: Text(
+                            isHiddenMode ? '${mode.name}（隐藏）' : mode.name,
+                            style: TextStyle(
+                              color: isSelected ? _uiAccent : _uiTextNormal,
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                _buildSliderSetting(
+                  '动画',
+                  _settings.pageAnimDuration.toDouble(),
+                  100,
+                  600,
+                  (val) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(pageAnimDuration: val.toInt()),
+                    );
+                  },
+                  displayFormat: (v) => '${v.toInt()}ms',
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
             title: '翻页操作',
             child: Column(
               children: [
@@ -3018,10 +3004,49 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               ],
             ),
           ),
+          _buildSettingsCard(
+            title: '恢复默认',
+            child: SizedBox(
+              width: double.infinity,
+              child: CupertinoButton(
+                color: CupertinoColors.destructiveRed.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(10),
+                onPressed: () => _confirmResetReadingSettings(setPopupState),
+                child: const Text(
+                  '恢复为默认阅读配置',
+                  style: TextStyle(color: CupertinoColors.destructiveRed),
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmResetReadingSettings(StateSetter setPopupState) async {
+    final shouldReset = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('恢复默认阅读配置'),
+            content: const Text('\n将恢复为 legado 风格默认值，当前修改会立即生效。'),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('恢复'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!shouldReset) return;
+    _updateSettingsFromSheet(setPopupState, const ReadingSettings());
   }
 
   void _updateSettingsFromSheet(
@@ -3163,7 +3188,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
         ),
         SizedBox(
-            width: 30,
+            width: 56,
             child: Text(
               displayFormat?.call(safeValue) ?? safeValue.toStringAsFixed(1),
               style: TextStyle(color: _uiTextNormal, fontSize: 13),
