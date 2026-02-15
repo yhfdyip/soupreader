@@ -172,20 +172,88 @@ class _SearchViewState extends State<SearchView> {
         .toList(growable: false);
   }
 
-  List<SearchResult> _collectUniqueResults(
+  String _resultKey(SearchResult item) {
+    return '${item.sourceUrl.trim()}|${item.bookUrl.trim()}';
+  }
+
+  String _preferNonEmpty(String preferred, String fallback) {
+    return preferred.trim().isNotEmpty ? preferred : fallback;
+  }
+
+  SearchResult _mergeSearchResult(SearchResult oldItem, SearchResult newItem) {
+    return SearchResult(
+      name: _preferNonEmpty(newItem.name, oldItem.name),
+      author: _preferNonEmpty(newItem.author, oldItem.author),
+      coverUrl: _preferNonEmpty(newItem.coverUrl, oldItem.coverUrl),
+      intro: _preferNonEmpty(newItem.intro, oldItem.intro),
+      kind: _preferNonEmpty(newItem.kind, oldItem.kind),
+      lastChapter: _preferNonEmpty(newItem.lastChapter, oldItem.lastChapter),
+      updateTime: _preferNonEmpty(newItem.updateTime, oldItem.updateTime),
+      wordCount: _preferNonEmpty(newItem.wordCount, oldItem.wordCount),
+      bookUrl: _preferNonEmpty(newItem.bookUrl, oldItem.bookUrl),
+      sourceUrl: _preferNonEmpty(newItem.sourceUrl, oldItem.sourceUrl),
+      sourceName: _preferNonEmpty(newItem.sourceName, oldItem.sourceName),
+    );
+  }
+
+  bool _searchResultEquals(SearchResult a, SearchResult b) {
+    return a.name == b.name &&
+        a.author == b.author &&
+        a.coverUrl == b.coverUrl &&
+        a.intro == b.intro &&
+        a.kind == b.kind &&
+        a.lastChapter == b.lastChapter &&
+        a.updateTime == b.updateTime &&
+        a.wordCount == b.wordCount &&
+        a.bookUrl == b.bookUrl &&
+        a.sourceUrl == b.sourceUrl &&
+        a.sourceName == b.sourceName;
+  }
+
+  _SearchUpsertStat _upsertResults(
     List<SearchResult> incoming,
-    Set<String> seenKeys,
+    List<SearchResult> target,
+    Map<String, int> keyToIndex,
   ) {
-    final unique = <SearchResult>[];
+    var added = 0;
+    var updated = 0;
     for (final item in incoming) {
       final bookUrl = item.bookUrl.trim();
       final sourceUrl = item.sourceUrl.trim();
       if (bookUrl.isEmpty || sourceUrl.isEmpty) continue;
-      final key = '$sourceUrl|$bookUrl';
-      if (!seenKeys.add(key)) continue;
-      unique.add(item);
+
+      final normalizedItem = SearchResult(
+        name: item.name,
+        author: item.author,
+        coverUrl: item.coverUrl,
+        intro: item.intro,
+        kind: item.kind,
+        lastChapter: item.lastChapter,
+        updateTime: item.updateTime,
+        wordCount: item.wordCount,
+        bookUrl: bookUrl,
+        sourceUrl: sourceUrl,
+        sourceName:
+            item.sourceName.trim().isNotEmpty ? item.sourceName : sourceUrl,
+      );
+
+      final key = _resultKey(normalizedItem);
+      final index = keyToIndex[key];
+      if (index == null) {
+        keyToIndex[key] = target.length;
+        target.add(normalizedItem);
+        added++;
+        continue;
+      }
+
+      final merged = _mergeSearchResult(target[index], normalizedItem);
+      if (_searchResultEquals(merged, target[index])) {
+        continue;
+      }
+      target[index] = merged;
+      updated++;
     }
-    return unique;
+    return _SearchUpsertStat(added: added, updated: updated);
   }
 
   String _normalizeCompare(String text) {
@@ -374,13 +442,9 @@ class _SearchViewState extends State<SearchView> {
     final cachedResults = cached?.results ?? const <SearchResult>[];
 
     _cancelOngoingSearch(updateState: false);
-    final seenResultKeys = <String>{};
-    for (final item in cachedResults) {
-      final sourceUrl = item.sourceUrl.trim();
-      final bookUrl = item.bookUrl.trim();
-      if (sourceUrl.isEmpty || bookUrl.isEmpty) continue;
-      seenResultKeys.add('$sourceUrl|$bookUrl');
-    }
+    final keyToIndex = <String, int>{};
+    final initialResults = <SearchResult>[];
+    _upsertResults(cachedResults, initialResults, keyToIndex);
 
     final searchSessionId = _startSearchSession();
     var nextSourceIndex = 0;
@@ -390,7 +454,7 @@ class _SearchViewState extends State<SearchView> {
 
     setState(() {
       _isSearching = true;
-      _results = cachedResults.toList(growable: true);
+      _results = initialResults;
       _sourceIssues.clear();
       _completedSources = 0;
       _searchingSource = '';
@@ -420,12 +484,13 @@ class _SearchViewState extends State<SearchView> {
           final issue = _buildSearchIssue(source, debugResult);
           final filtered =
               _filterResultsByMode(debugResult.results, keyword.trim());
-          final uniqueResults = _collectUniqueResults(filtered, seenResultKeys);
+          final upsertStat = _upsertResults(filtered, _results, keyToIndex);
           if (!_isSearchSessionActive(searchSessionId)) return;
 
           setState(() {
-            _results.addAll(uniqueResults);
-            _rebuildDisplayResults(keyword: keyword);
+            if (upsertStat.added > 0 || upsertStat.updated > 0) {
+              _rebuildDisplayResults(keyword: keyword);
+            }
             if (issue != null) {
               _sourceIssues.add(issue);
             }
@@ -1479,6 +1544,16 @@ class _DisplayCover {
   const _DisplayCover({
     required this.url,
     required this.sourceUrl,
+  });
+}
+
+class _SearchUpsertStat {
+  final int added;
+  final int updated;
+
+  const _SearchUpsertStat({
+    required this.added,
+    required this.updated,
   });
 }
 

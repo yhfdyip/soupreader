@@ -28,6 +28,7 @@ import '../widgets/reader_menus.dart';
 import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
 import '../widgets/reader_catalog_sheet.dart';
+import '../widgets/scroll_page_step_calculator.dart';
 import '../widgets/typography_settings_dialog.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
@@ -156,6 +157,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _isHydratingChapterFromPageFactory = false;
   final Map<String, Future<String>> _chapterContentInFlight =
       <String, Future<String>>{};
+  ScrollLayoutSnapshot? _scrollLayoutSnapshot;
+  int? _scrollLayoutChapterIndex;
+  int _scrollLayoutFingerprint = 0;
 
   @override
   void initState() {
@@ -399,6 +403,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _currentChapterIndex = index;
       _currentTitle = stage.title;
       _currentContent = processedContent;
+      _invalidateScrollLayoutSnapshot();
     });
     _updateBookmarkStatus();
 
@@ -811,6 +816,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       if (needRepaginate) {
         _paginateContentLogicOnly();
       }
+      _invalidateScrollLayoutSnapshot();
     });
     if (oldSettings.autoReadSpeed != newSettings.autoReadSpeed) {
       _autoPager.setSpeed(newSettings.autoReadSpeed);
@@ -956,14 +962,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (_showMenu || _showAutoReadPanel) return;
-    if (_settings.pageTurnMode == PageTurnMode.scroll) return;
-    if (event is PointerScrollEvent) {
-      if (event.scrollDelta.dy > 0) {
+    if (event is! PointerScrollEvent) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
+      final scrollEvent = resolved as PointerScrollEvent;
+      final dy = scrollEvent.scrollDelta.dy;
+      if (dy > 0) {
         _handlePageStep(next: true);
-      } else if (event.scrollDelta.dy < 0) {
+      } else if (dy < 0) {
         _handlePageStep(next: false);
       }
-    }
+    });
   }
 
   void _handlePageStep({required bool next}) {
@@ -1032,19 +1040,135 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
-  void _scrollPage({required bool up}) {
+  void _invalidateScrollLayoutSnapshot() {
+    _scrollLayoutSnapshot = null;
+    _scrollLayoutChapterIndex = null;
+    _scrollLayoutFingerprint = 0;
+  }
+
+  int _buildScrollLayoutFingerprint(double contentWidth) {
+    return Object.hashAll([
+      _currentChapterIndex,
+      _currentTitle.hashCode,
+      _currentContent.hashCode,
+      contentWidth.toStringAsFixed(2),
+      _settings.fontSize,
+      _settings.lineHeight,
+      _settings.letterSpacing,
+      _settings.paragraphSpacing,
+      _settings.paragraphIndent,
+      _settings.titleMode,
+      _settings.titleSize,
+      _settings.titleTopSpacing,
+      _settings.titleBottomSpacing,
+      _settings.paddingTop,
+      _settings.paddingBottom,
+      _settings.textBold,
+      _settings.underline,
+      _settings.fontFamilyIndex,
+      _settings.textFullJustify,
+      _settings.showStatusBar,
+    ]);
+  }
+
+  ScrollLayoutSnapshot _ensureScrollLayoutSnapshot(double contentWidth) {
+    if (contentWidth <= 1) {
+      return const ScrollLayoutSnapshot.empty();
+    }
+    final fingerprint = _buildScrollLayoutFingerprint(contentWidth);
+    final cached = _scrollLayoutSnapshot;
+    if (cached != null &&
+        _scrollLayoutChapterIndex == _currentChapterIndex &&
+        _scrollLayoutFingerprint == fingerprint) {
+      return cached;
+    }
+
+    final titleTopSpacing =
+        _settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20.0;
+    final titleBottomSpacing = _settings.titleBottomSpacing > 0
+        ? _settings.titleBottomSpacing
+        : _settings.paragraphSpacing * 1.5;
+
+    final snapshot = ScrollPageStepCalculator.buildLayoutSnapshot(
+      title: _currentTitle,
+      content: _currentContent,
+      showTitle: _settings.titleMode != 2,
+      maxWidth: contentWidth,
+      paddingTop: _settings.paddingTop,
+      paddingBottom:
+          _settings.showStatusBar ? 30.0 : _settings.paddingBottom.toDouble(),
+      paragraphSpacing: _settings.paragraphSpacing,
+      titleTopSpacing: titleTopSpacing,
+      titleBottomSpacing: titleBottomSpacing,
+      // 对齐滚动正文尾部结构（章节导航与留白）
+      trailingSpacing: 192.0,
+      paragraphStyle: TextStyle(
+        fontSize: _settings.fontSize,
+        height: _settings.lineHeight,
+        color: _currentTheme.text,
+        letterSpacing: _settings.letterSpacing,
+        fontFamily: _currentFontFamily,
+        fontWeight: _currentFontWeight,
+        decoration: _currentTextDecoration,
+      ),
+      titleStyle: TextStyle(
+        fontSize: _settings.fontSize + _settings.titleSize,
+        fontWeight: FontWeight.w600,
+        color: _currentTheme.text,
+        fontFamily: _currentFontFamily,
+      ),
+      paragraphTextAlign: _bodyTextAlign,
+      titleTextAlign: _titleTextAlign,
+    );
+
+    _scrollLayoutSnapshot = snapshot;
+    _scrollLayoutChapterIndex = _currentChapterIndex;
+    _scrollLayoutFingerprint = fingerprint;
+    return snapshot;
+  }
+
+  Future<void> _scrollPage({required bool up}) async {
     if (!_scrollController.hasClients) return;
 
     final viewportHeight = _scrollController.position.viewportDimension;
+    if (viewportHeight <= 1) return;
     final currentOffset = _scrollController.offset;
-    final targetOffset = up
-        ? currentOffset - viewportHeight + 40
-        : currentOffset + viewportHeight - 40;
+    final maxOffset = _scrollController.position.maxScrollExtent;
+
+    final screenSize = MediaQuery.of(context).size;
+    final safePadding = MediaQuery.of(context).padding;
+    final contentWidth = screenSize.width -
+        safePadding.left -
+        safePadding.right -
+        _settings.paddingLeft -
+        _settings.paddingRight;
+    final snapshot = _ensureScrollLayoutSnapshot(contentWidth);
+    final stepResult = up
+        ? ScrollPageStepCalculator.computePrevStep(
+            snapshot: snapshot,
+            visibleTop: currentOffset,
+            viewportHeight: viewportHeight,
+          )
+        : ScrollPageStepCalculator.computeNextStep(
+            snapshot: snapshot,
+            visibleTop: currentOffset,
+            viewportHeight: viewportHeight,
+          );
+    final step = stepResult.step.clamp(1.0, viewportHeight).toDouble();
+    final targetOffset = up ? currentOffset - step : currentOffset + step;
+
+    final autoPagingRunning = _autoPager.isRunning;
+    if (autoPagingRunning) {
+      _autoPager.pause();
+    }
 
     // 如果到底了尝试下一章
-    if (!up && targetOffset >= _scrollController.position.maxScrollExtent) {
+    if (!up && targetOffset >= maxOffset) {
       if (_currentChapterIndex < _chapters.length - 1) {
-        _loadChapter(_currentChapterIndex + 1);
+        await _loadChapter(_currentChapterIndex + 1);
+        if (autoPagingRunning && mounted) {
+          _autoPager.start();
+        }
         return;
       }
     }
@@ -1052,19 +1176,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 如果到顶了尝试前一章
     if (up && currentOffset <= 0) {
       if (_currentChapterIndex > 0) {
-        _loadChapter(_currentChapterIndex - 1);
+        await _loadChapter(_currentChapterIndex - 1, goToLastPage: true);
+        if (autoPagingRunning && mounted) {
+          _autoPager.start();
+        }
         return;
       }
     }
 
-    final clampedOffset = targetOffset
-        .clamp(0.0, _scrollController.position.maxScrollExtent)
-        .toDouble();
-    _scrollController.animateTo(
+    final clampedOffset = targetOffset.clamp(0.0, maxOffset).toDouble();
+    await _scrollController.animateTo(
       clampedOffset,
-      duration: const Duration(milliseconds: 250),
+      duration: Duration(
+        milliseconds: _settings.pageAnimDuration.clamp(100, 600),
+      ),
       curve: Curves.easeOut,
     );
+
+    if (mounted) {
+      setState(() {});
+      unawaited(_saveProgress());
+    }
+    if (autoPagingRunning && mounted) {
+      _autoPager.start();
+    }
   }
 
   /// 获取当前时间字符串
