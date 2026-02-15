@@ -101,6 +101,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // UI 状态
   bool _showMenu = false;
+  bool _showSearchMenu = false;
   SystemUiMode? _appliedSystemUiMode;
   final ScrollController _scrollController = ScrollController();
   bool _isInitialized = false;
@@ -155,11 +156,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _isLoadingChapter = false;
   bool _isRestoringProgress = false;
   bool _isHydratingChapterFromPageFactory = false;
+  bool _chapterSeekConfirmed = false;
   final Map<String, Future<String>> _chapterContentInFlight =
       <String, Future<String>>{};
   ScrollLayoutSnapshot? _scrollLayoutSnapshot;
   int? _scrollLayoutChapterIndex;
   int _scrollLayoutFingerprint = 0;
+  String _contentSearchQuery = '';
+  List<_ReaderSearchHit> _contentSearchHits = <_ReaderSearchHit>[];
+  int _currentSearchHitIndex = -1;
+  final List<_ScrollSegment> _scrollSegments = <_ScrollSegment>[];
+  final Map<int, GlobalKey> _scrollSegmentKeys = <int, GlobalKey>{};
+  final Map<int, double> _scrollSegmentHeights = <int, double>{};
+  bool _scrollAppending = false;
+  bool _scrollPrepending = false;
+  bool _syncingScrollVisibleChapter = false;
+  int? _pendingScrollTargetChapterIndex;
+  double? _pendingScrollTargetChapterProgress;
+  bool _pendingScrollJumpToEnd = false;
+  int _pendingScrollJumpRetry = 0;
+  double _currentScrollChapterProgress = 0.0;
+  DateTime _lastScrollProgressSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
@@ -200,6 +217,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 初始化自动翻页器
     _autoPager.setScrollController(_scrollController);
     _autoPager.setOnNextPage(() {
+      if (_settings.pageTurnMode == PageTurnMode.scroll) {
+        unawaited(_scrollPage(up: false));
+        return;
+      }
       if (_currentChapterIndex < _chapters.length - 1) {
         _loadChapter(_currentChapterIndex + 1);
       }
@@ -279,15 +300,39 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     SystemChrome.setEnabledSystemUIMode(mode);
   }
 
+  void _syncSystemUiForOverlay() {
+    final hasOverlay = _showMenu || _showSearchMenu;
+    _applySystemUiMode(
+      hasOverlay ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
+    );
+  }
+
   void _setReaderMenuVisible(bool visible) {
-    final targetMode =
-        visible ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky;
     if (_showMenu == visible) {
-      _applySystemUiMode(targetMode);
+      _syncSystemUiForOverlay();
       return;
     }
-    setState(() => _showMenu = visible);
-    _applySystemUiMode(targetMode);
+    setState(() {
+      _showMenu = visible;
+      if (visible) {
+        _showSearchMenu = false;
+      }
+    });
+    _syncSystemUiForOverlay();
+  }
+
+  void _setSearchMenuVisible(bool visible) {
+    if (_showSearchMenu == visible) {
+      _syncSystemUiForOverlay();
+      return;
+    }
+    setState(() {
+      _showSearchMenu = visible;
+      if (visible) {
+        _showMenu = false;
+      }
+    });
+    _syncSystemUiForOverlay();
   }
 
   void _toggleReaderMenuVisible() {
@@ -372,9 +417,382 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  GlobalKey _scrollSegmentKeyFor(int chapterIndex) {
+    return _scrollSegmentKeys.putIfAbsent(
+      chapterIndex,
+      () => GlobalKey(debugLabel: 'scroll_segment_$chapterIndex'),
+    );
+  }
+
+  Future<_ScrollSegment> _loadScrollSegment(
+    int chapterIndex, {
+    bool showLoading = false,
+  }) async {
+    final chapter = _chapters[chapterIndex];
+    final book = _bookRepo.getBookById(widget.bookId);
+    String content = chapter.content ?? '';
+
+    final chapterUrl = (chapter.url ?? '').trim();
+    final canFetchFromSource = chapterUrl.isNotEmpty &&
+        (book == null || !book.isLocal) &&
+        _resolveActiveSourceUrl(book).isNotEmpty;
+    if (content.isEmpty && canFetchFromSource) {
+      content = await _fetchChapterContent(
+        chapter: chapter,
+        index: chapterIndex,
+        book: book,
+        showLoading: showLoading,
+      );
+    }
+
+    final stage = await _computeReplaceStage(
+      chapterId: chapter.id,
+      rawTitle: chapter.title,
+      rawContent: content,
+    );
+    final processedContent = _postProcessContent(stage.content, stage.title);
+
+    return _ScrollSegment(
+      chapterIndex: chapterIndex,
+      chapterId: chapter.id,
+      title: stage.title,
+      content: processedContent,
+    );
+  }
+
+  Future<void> _initializeScrollSegments({
+    required int centerIndex,
+    required bool restoreOffset,
+    required bool goToLastPage,
+    double? targetChapterProgress,
+  }) async {
+    if (_chapters.isEmpty) return;
+    final start = (centerIndex - 1).clamp(0, _chapters.length - 1);
+    final end = (centerIndex + 1).clamp(0, _chapters.length - 1);
+    final segments = <_ScrollSegment>[];
+    for (var i = start; i <= end; i++) {
+      segments.add(
+        await _loadScrollSegment(
+          i,
+          showLoading: i == centerIndex,
+        ),
+      );
+    }
+    if (!mounted) return;
+    final centerSegment = segments.firstWhere(
+      (segment) => segment.chapterIndex == centerIndex,
+      orElse: () => segments.first,
+    );
+
+    setState(() {
+      _scrollSegments
+        ..clear()
+        ..addAll(segments);
+      _currentChapterIndex = centerSegment.chapterIndex;
+      _currentTitle = centerSegment.title;
+      _currentContent = centerSegment.content;
+      _currentScrollChapterProgress = 0.0;
+      _invalidateScrollLayoutSnapshot();
+    });
+
+    final savedProgress = _settingsService.getChapterPageProgress(
+      widget.bookId,
+      chapterIndex: centerIndex,
+    );
+    final preferredProgress = targetChapterProgress ??
+        (restoreOffset ? savedProgress : (goToLastPage ? null : 0.0));
+
+    _pendingScrollTargetChapterIndex = centerIndex;
+    _pendingScrollTargetChapterProgress =
+        preferredProgress?.clamp(0.0, 1.0).toDouble();
+    _pendingScrollJumpToEnd = goToLastPage;
+    _pendingScrollJumpRetry = 0;
+    _scheduleApplyPendingScrollTarget();
+  }
+
+  void _scheduleApplyPendingScrollTarget() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyPendingScrollTarget();
+    });
+  }
+
+  void _applyPendingScrollTarget() {
+    final targetChapterIndex = _pendingScrollTargetChapterIndex;
+    if (targetChapterIndex == null) return;
+    if (!_scrollController.hasClients) {
+      if (_pendingScrollJumpRetry++ < 8) {
+        _scheduleApplyPendingScrollTarget();
+      }
+      return;
+    }
+
+    final targetContext =
+        _scrollSegmentKeyFor(targetChapterIndex).currentContext;
+    if (targetContext == null) {
+      if (_pendingScrollJumpRetry++ < 8) {
+        _scheduleApplyPendingScrollTarget();
+      }
+      return;
+    }
+
+    final progress =
+        (_pendingScrollTargetChapterProgress ?? 0.0).clamp(0.0, 1.0).toDouble();
+    final jumpToEnd = _pendingScrollJumpToEnd;
+
+    if (jumpToEnd) {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: Duration.zero,
+        alignment: 1.0,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      );
+    } else {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: Duration.zero,
+        alignment: 0.0,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      );
+      if (progress > 0) {
+        final renderObject = targetContext.findRenderObject();
+        if (renderObject is RenderBox) {
+          final viewport = _scrollController.position.viewportDimension;
+          final movable =
+              (renderObject.size.height - viewport).clamp(0.0, double.infinity);
+          if (movable > 0) {
+            final target = (_scrollController.offset + movable * progress)
+                .clamp(
+                  _scrollController.position.minScrollExtent,
+                  _scrollController.position.maxScrollExtent,
+                )
+                .toDouble();
+            _scrollController.jumpTo(target);
+          }
+        }
+      }
+    }
+
+    _pendingScrollTargetChapterIndex = null;
+    _pendingScrollTargetChapterProgress = null;
+    _pendingScrollJumpToEnd = false;
+    _pendingScrollJumpRetry = 0;
+    _refreshScrollSegmentHeights();
+    _syncCurrentChapterFromScroll(saveProgress: true);
+  }
+
+  void _refreshScrollSegmentHeights() {
+    for (final segment in _scrollSegments) {
+      final context = _scrollSegmentKeyFor(segment.chapterIndex).currentContext;
+      final renderObject = context?.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        _scrollSegmentHeights[segment.chapterIndex] = renderObject.size.height;
+      }
+    }
+  }
+
+  void _syncCurrentChapterFromScroll({bool saveProgress = false}) {
+    if (!mounted || _scrollSegments.isEmpty || _syncingScrollVisibleChapter) {
+      return;
+    }
+    _syncingScrollVisibleChapter = true;
+    try {
+      final topInset = MediaQuery.of(context).padding.top;
+      final anchorY = topInset + 110.0;
+
+      _ScrollSegment? chosen;
+      double chosenProgress = _currentScrollChapterProgress;
+      double bestDistance = double.infinity;
+
+      for (final segment in _scrollSegments) {
+        final segmentContext =
+            _scrollSegmentKeyFor(segment.chapterIndex).currentContext;
+        final renderObject = segmentContext?.findRenderObject();
+        if (renderObject is! RenderBox || !renderObject.hasSize) continue;
+        final top = renderObject.localToGlobal(Offset.zero).dy;
+        final height = renderObject.size.height;
+        final bottom = top + height;
+        if (height <= 1) continue;
+
+        if (top <= anchorY && bottom >= anchorY) {
+          chosen = segment;
+          chosenProgress =
+              ((anchorY - top) / height).clamp(0.0, 1.0).toDouble();
+          break;
+        }
+
+        final distance = (top - anchorY).abs();
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          chosen = segment;
+          chosenProgress =
+              ((anchorY - top) / height).clamp(0.0, 1.0).toDouble();
+        }
+      }
+
+      if (chosen == null) return;
+
+      final chapterChanged = chosen.chapterIndex != _currentChapterIndex;
+      final progressChanged =
+          (chosenProgress - _currentScrollChapterProgress).abs() > 0.02;
+      if (!chapterChanged && !progressChanged) return;
+
+      setState(() {
+        _currentChapterIndex = chosen!.chapterIndex;
+        _currentTitle = chosen.title;
+        _currentContent = chosen.content;
+        _currentScrollChapterProgress = chosenProgress;
+      });
+      if (chapterChanged) {
+        _updateBookmarkStatus();
+      }
+
+      if (saveProgress) {
+        final now = DateTime.now();
+        if (now.difference(_lastScrollProgressSyncAt).inMilliseconds >= 350) {
+          _lastScrollProgressSyncAt = now;
+          unawaited(_saveProgress());
+        }
+      }
+    } finally {
+      _syncingScrollVisibleChapter = false;
+    }
+  }
+
+  Future<void> _appendNextScrollSegmentIfNeeded() async {
+    if (_scrollAppending || _scrollSegments.isEmpty) return;
+    final lastIndex = _scrollSegments.last.chapterIndex;
+    if (lastIndex >= _chapters.length - 1) return;
+    _scrollAppending = true;
+    try {
+      final nextIndex = lastIndex + 1;
+      final exists =
+          _scrollSegments.any((segment) => segment.chapterIndex == nextIndex);
+      if (exists) return;
+
+      final segment = await _loadScrollSegment(nextIndex);
+      if (!mounted) return;
+
+      setState(() {
+        _scrollSegments.add(segment);
+      });
+      _schedulePostScrollFlowAdjustments();
+    } finally {
+      _scrollAppending = false;
+    }
+  }
+
+  Future<void> _prependPrevScrollSegmentIfNeeded() async {
+    if (_scrollPrepending || _scrollSegments.isEmpty) return;
+    final firstIndex = _scrollSegments.first.chapterIndex;
+    if (firstIndex <= 0) return;
+    final hasClients = _scrollController.hasClients;
+    final oldOffset = hasClients ? _scrollController.offset : 0.0;
+    final oldMax =
+        hasClients ? _scrollController.position.maxScrollExtent : 0.0;
+
+    _scrollPrepending = true;
+    try {
+      final prevIndex = firstIndex - 1;
+      final exists =
+          _scrollSegments.any((segment) => segment.chapterIndex == prevIndex);
+      if (exists) return;
+
+      final segment = await _loadScrollSegment(prevIndex);
+      if (!mounted) return;
+
+      setState(() {
+        _scrollSegments.insert(0, segment);
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final newMax = _scrollController.position.maxScrollExtent;
+        final delta = (newMax - oldMax).clamp(0.0, double.infinity).toDouble();
+        final target = (oldOffset + delta)
+            .clamp(
+              _scrollController.position.minScrollExtent,
+              _scrollController.position.maxScrollExtent,
+            )
+            .toDouble();
+        _scrollController.jumpTo(target);
+        _schedulePostScrollFlowAdjustments();
+      });
+    } finally {
+      _scrollPrepending = false;
+    }
+  }
+
+  void _schedulePostScrollFlowAdjustments() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshScrollSegmentHeights();
+      _trimScrollSegmentsWindow();
+      _syncCurrentChapterFromScroll(saveProgress: true);
+    });
+  }
+
+  void _trimScrollSegmentsWindow() {
+    if (_scrollSegments.length <= 9) return;
+    if (!_scrollController.hasClients) return;
+    var changed = false;
+    while (_scrollSegments.length > 9) {
+      final first = _scrollSegments.first.chapterIndex;
+      final last = _scrollSegments.last.chapterIndex;
+      final removeFromStart =
+          (_currentChapterIndex - first) > (last - _currentChapterIndex);
+      if (removeFromStart) {
+        final removed = _scrollSegments.removeAt(0);
+        final removedHeight =
+            _scrollSegmentHeights.remove(removed.chapterIndex) ?? 0.0;
+        _scrollSegmentKeys.remove(removed.chapterIndex);
+        if (removedHeight > 0 && _scrollController.hasClients) {
+          final target = (_scrollController.offset - removedHeight)
+              .clamp(
+                _scrollController.position.minScrollExtent,
+                _scrollController.position.maxScrollExtent,
+              )
+              .toDouble();
+          _scrollController.jumpTo(target);
+        }
+      } else {
+        final removed = _scrollSegments.removeLast();
+        _scrollSegmentHeights.remove(removed.chapterIndex);
+        _scrollSegmentKeys.remove(removed.chapterIndex);
+      }
+      changed = true;
+    }
+    if (changed && mounted) {
+      setState(() {});
+    }
+  }
+
   Future<void> _loadChapter(int index,
-      {bool restoreOffset = false, bool goToLastPage = false}) async {
+      {bool restoreOffset = false,
+      bool goToLastPage = false,
+      double? targetChapterProgress}) async {
     if (index < 0 || index >= _chapters.length) return;
+
+    if (_settings.pageTurnMode == PageTurnMode.scroll) {
+      _isRestoringProgress = restoreOffset;
+      try {
+        await _initializeScrollSegments(
+          centerIndex: index,
+          restoreOffset: restoreOffset,
+          goToLastPage: goToLastPage,
+          targetChapterProgress: targetChapterProgress,
+        );
+        if (!mounted) return;
+        _updateBookmarkStatus();
+        _syncPageFactoryChapters();
+        unawaited(_prefetchNeighborChapters(centerIndex: index));
+      } finally {
+        _isRestoringProgress = false;
+      }
+      if (!restoreOffset) {
+        await _saveProgress();
+      }
+      return;
+    }
 
     final book = _bookRepo.getBookById(widget.bookId);
     final chapter = _chapters[index];
@@ -743,13 +1161,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     double? desiredChapterProgress;
     if (modeChanged) {
       if (oldMode == PageTurnMode.scroll) {
-        if (_scrollController.hasClients) {
-          final max = _scrollController.position.maxScrollExtent;
-          desiredChapterProgress =
-              max <= 0 ? 0.0 : (_scrollController.offset / max).clamp(0.0, 1.0);
-        } else {
-          desiredChapterProgress = 0.0;
-        }
+        desiredChapterProgress =
+            _currentScrollChapterProgress.clamp(0.0, 1.0).toDouble();
       } else {
         final total = _pageFactory.totalPages;
         desiredChapterProgress = ChapterProgressUtils.pageProgressFromIndex(
@@ -831,17 +1244,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       unawaited(_syncNativeKeepScreenOn(newSettings));
     }
     unawaited(_settingsService.saveReadingSettings(newSettings));
+    if (!modeChanged && contentTransformChanged) {
+      _syncScrollSegmentsAfterTransformChange();
+    }
 
     if (modeChanged) {
       final progress = desiredChapterProgress ?? 0.0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (newMode == PageTurnMode.scroll) {
-          if (!_scrollController.hasClients) return;
-          final max = _scrollController.position.maxScrollExtent;
-          if (max <= 0) return;
-          final target = (progress * max).clamp(0.0, max).toDouble();
-          _scrollController.jumpTo(target);
+          unawaited(
+            _loadChapter(
+              _currentChapterIndex,
+              restoreOffset: false,
+              targetChapterProgress: progress,
+            ),
+          );
           return;
         }
 
@@ -935,6 +1353,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 左右点击翻页处理
   void _handleTap(TapUpDetails details) {
+    if (_showSearchMenu) {
+      _setSearchMenuVisible(false);
+      return;
+    }
     if (_showMenu) {
       _setReaderMenuVisible(false);
       return;
@@ -945,7 +1367,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _handleKeyEvent(KeyEvent event) {
     if (!_settings.volumeKeyPage) return;
-    if (_showMenu || _showAutoReadPanel) return;
+    if (_showMenu || _showSearchMenu || _showAutoReadPanel) return;
     if (event is! KeyDownEvent) return;
 
     final key = event.logicalKey;
@@ -961,7 +1383,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
-    if (_showMenu || _showAutoReadPanel) return;
+    if (_showMenu || _showSearchMenu || _showAutoReadPanel) return;
     if (event is! PointerScrollEvent) return;
     GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
       final scrollEvent = resolved as PointerScrollEvent;
@@ -1162,29 +1584,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _autoPager.pause();
     }
 
-    // 如果到底了尝试下一章
-    if (!up && targetOffset >= maxOffset) {
-      if (_currentChapterIndex < _chapters.length - 1) {
-        await _loadChapter(_currentChapterIndex + 1);
-        if (autoPagingRunning && mounted) {
-          _autoPager.start();
-        }
-        return;
-      }
+    if (!up && targetOffset >= maxOffset - 1) {
+      await _appendNextScrollSegmentIfNeeded();
+    } else if (up && targetOffset <= 1) {
+      await _prependPrevScrollSegmentIfNeeded();
     }
 
-    // 如果到顶了尝试前一章
-    if (up && currentOffset <= 0) {
-      if (_currentChapterIndex > 0) {
-        await _loadChapter(_currentChapterIndex - 1, goToLastPage: true);
-        if (autoPagingRunning && mounted) {
-          _autoPager.start();
-        }
-        return;
+    if (!_scrollController.hasClients) {
+      if (autoPagingRunning && mounted) {
+        _autoPager.start();
       }
+      return;
     }
 
-    final clampedOffset = targetOffset.clamp(0.0, maxOffset).toDouble();
+    final minOffset = _scrollController.position.minScrollExtent;
+    final latestMaxOffset = _scrollController.position.maxScrollExtent;
+    final clampedOffset =
+        targetOffset.clamp(minOffset, latestMaxOffset).toDouble();
     await _scrollController.animateTo(
       clampedOffset,
       duration: Duration(
@@ -1194,8 +1610,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
 
     if (mounted) {
-      setState(() {});
-      unawaited(_saveProgress());
+      _syncCurrentChapterFromScroll(saveProgress: true);
     }
     if (autoPagingRunning && mounted) {
       _autoPager.start();
@@ -1351,10 +1766,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       );
     }
 
-    if (!_scrollController.hasClients) return 0.0;
-    final max = _scrollController.position.maxScrollExtent;
-    if (max <= 0) return 1.0;
-    return (_scrollController.offset / max).clamp(0.0, 1.0);
+    return _currentScrollChapterProgress.clamp(0.0, 1.0).toDouble();
   }
 
   double _getBookProgress() {
@@ -1379,9 +1791,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     // 阅读模式时阻止 iOS 边缘滑动返回（菜单显示时允许返回）
     return PopScope(
-      canPop: _showMenu,
+      canPop: _showMenu || _showSearchMenu,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && !_showMenu) {
+        if (didPop) return;
+        if (_showSearchMenu) {
+          _setSearchMenuVisible(false);
+          return;
+        }
+        if (!_showMenu) {
           // 如果阻止了 pop 且菜单未显示，则显示菜单
           _setReaderMenuVisible(true);
         }
@@ -1408,11 +1825,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     ),
 
                     // 菜单打开时添加轻遮罩，提升层级感并支持点击空白关闭。
-                    if (_showMenu)
+                    if (_showMenu || _showSearchMenu)
                       Positioned.fill(
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTap: _closeReaderMenuOverlay,
+                          onTap: _showSearchMenu
+                              ? () => _setSearchMenuVisible(false)
+                              : _closeReaderMenuOverlay,
                           child: Container(
                             color:
                                 const Color(0xFF000000).withValues(alpha: 0.14),
@@ -1423,6 +1842,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
                     if (_settings.showStatusBar &&
                         !_showMenu &&
+                        !_showSearchMenu &&
                         !_showAutoReadPanel &&
                         isScrollMode)
                       ReaderStatusBar(
@@ -1440,6 +1860,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     // 顶部状态栏（滚动模式）
                     if (_settings.showStatusBar &&
                         !_showMenu &&
+                        !_showSearchMenu &&
                         !_showAutoReadPanel &&
                         isScrollMode)
                       ReaderHeaderBar(
@@ -1461,10 +1882,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         chapterTitle: _currentTitle,
                         sourceName: _currentSourceName,
                         onShowChapterList: _showChapterList,
+                        onSearchContent: _showContentSearchDialog,
                         onSwitchSource: _showSwitchSourceMenu,
                         onToggleCleanChapterTitle:
                             _toggleCleanChapterTitleFromTopMenu,
                         onRefreshChapter: _refreshChapter,
+                        onShowMoreMenu: _showReaderActionsMenu,
                         cleanChapterTitleEnabled: _settings.cleanChapterTitle,
                       ),
 
@@ -1491,6 +1914,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             }
                           });
                         },
+                        onSeekChapterProgress: _seekByChapterProgress,
                         onSettingsChanged: (settings) =>
                             _updateSettings(settings),
                         onShowChapterList: _openChapterListFromMenu,
@@ -1498,6 +1922,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
                         onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
                       ),
+
+                    if (_showSearchMenu) _buildSearchMenuOverlay(),
 
                     if (_isLoadingChapter)
                       Positioned(
@@ -1578,8 +2004,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ),
       backgroundColor: _currentTheme.background,
       padding: _contentPadding,
-      enableGestures: !_showMenu, // 菜单显示时禁止翻页手势
+      enableGestures: !_showMenu && !_showSearchMenu, // 菜单显示时禁止翻页手势
       onTap: () {
+        if (_showSearchMenu) {
+          _setSearchMenuVisible(false);
+          return;
+        }
         _toggleReaderMenuVisible();
       },
       showStatusBar: _settings.showStatusBar,
@@ -1594,30 +2024,67 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  /// 滚动模式内容（按当前章节滚动）
+  /// 滚动模式内容（跨章节连续滚动，对齐 legado）
   Widget _buildScrollContent() {
+    if (_scrollSegments.isEmpty) {
+      return const SafeArea(
+        bottom: false,
+        child: Center(
+          child: CupertinoActivityIndicator(),
+        ),
+      );
+    }
+
     return SafeArea(
       bottom: false,
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
-          // 滚动结束时保存进度
+          if (notification.metrics.axis != Axis.vertical) {
+            return false;
+          }
+
+          if (notification is ScrollUpdateNotification ||
+              notification is OverscrollNotification) {
+            _syncCurrentChapterFromScroll(saveProgress: true);
+            const preloadExtent = 280.0;
+            final metrics = notification.metrics;
+            if (metrics.maxScrollExtent - metrics.pixels <= preloadExtent) {
+              unawaited(_appendNextScrollSegmentIfNeeded());
+            }
+            if (metrics.pixels - metrics.minScrollExtent <= preloadExtent) {
+              unawaited(_prependPrevScrollSegmentIfNeeded());
+            }
+          }
+
           if (notification is ScrollEndNotification && !_isRestoringProgress) {
-            _saveProgress();
-            setState(() {}); // 更新进度显示
+            _syncCurrentChapterFromScroll(saveProgress: true);
+            unawaited(_saveProgress());
           }
           return false;
         },
         child: SingleChildScrollView(
           controller: _scrollController,
           physics: const BouncingScrollPhysics(),
-          child: _buildScrollChapterBody(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < _scrollSegments.length; i++)
+                _buildScrollSegmentBody(
+                  _scrollSegments[i],
+                  isTailSegment: i == _scrollSegments.length - 1,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildScrollChapterBody() {
-    final paragraphs = _currentContent.split(RegExp(r'\n\s*\n|\n'));
+  Widget _buildScrollSegmentBody(
+    _ScrollSegment segment, {
+    required bool isTailSegment,
+  }) {
+    final paragraphs = segment.content.split(RegExp(r'\n\s*\n|\n'));
     final paragraphStyle = TextStyle(
       fontSize: _settings.fontSize,
       height: _settings.lineHeight,
@@ -1628,54 +2095,71 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       decoration: _currentTextDecoration,
     );
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: _settings.paddingLeft,
-        right: _settings.paddingRight,
-        top: _settings.paddingTop,
-        bottom: _settings.showStatusBar ? 30 : _settings.paddingBottom,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_settings.titleMode != 2) ...[
-            SizedBox(
-              height: _settings.titleTopSpacing > 0
-                  ? _settings.titleTopSpacing
-                  : 20,
-            ),
-            Text(
-              _currentTitle,
-              textAlign: _titleTextAlign,
-              style: TextStyle(
-                fontSize: _settings.fontSize + _settings.titleSize,
-                fontWeight: FontWeight.w600,
-                color: _currentTheme.text,
-                fontFamily: _currentFontFamily,
+    return KeyedSubtree(
+      key: _scrollSegmentKeyFor(segment.chapterIndex),
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: _settings.paddingLeft,
+          right: _settings.paddingRight,
+          top: _settings.paddingTop,
+          bottom: isTailSegment
+              ? (_settings.showStatusBar ? 30 : _settings.paddingBottom)
+              : _settings.paddingBottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_settings.titleMode != 2) ...[
+              SizedBox(
+                height: _settings.titleTopSpacing > 0
+                    ? _settings.titleTopSpacing
+                    : 20,
               ),
-            ),
-            SizedBox(
-              height: _settings.titleBottomSpacing > 0
-                  ? _settings.titleBottomSpacing
-                  : _settings.paragraphSpacing * 1.5,
-            ),
-          ],
-          ...paragraphs.map((paragraph) {
-            final paragraphText = paragraph.trimRight();
-            if (paragraphText.trim().isEmpty) return const SizedBox.shrink();
+              Text(
+                segment.title,
+                textAlign: _titleTextAlign,
+                style: TextStyle(
+                  fontSize: _settings.fontSize + _settings.titleSize,
+                  fontWeight: FontWeight.w600,
+                  color: _currentTheme.text,
+                  fontFamily: _currentFontFamily,
+                ),
+              ),
+              SizedBox(
+                height: _settings.titleBottomSpacing > 0
+                    ? _settings.titleBottomSpacing
+                    : _settings.paragraphSpacing * 1.5,
+              ),
+            ],
+            ...paragraphs.map((paragraph) {
+              final paragraphText = paragraph.trimRight();
+              if (paragraphText.trim().isEmpty) return const SizedBox.shrink();
 
-            return Padding(
-              padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
-              child: _buildParagraphWithFirstLineIndent(
-                paragraphText,
-                style: paragraphStyle,
-              ),
-            );
-          }),
-          const SizedBox(height: 60),
-          _buildChapterNav(_currentTheme.text),
-          const SizedBox(height: 100),
-        ],
+              return Padding(
+                padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
+                child: _buildParagraphWithFirstLineIndent(
+                  paragraphText,
+                  style: paragraphStyle,
+                ),
+              );
+            }),
+            SizedBox(height: isTailSegment ? 80 : 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _syncScrollSegmentsAfterTransformChange() {
+    if (_settings.pageTurnMode != PageTurnMode.scroll ||
+        _scrollSegments.isEmpty) {
+      return;
+    }
+    unawaited(
+      _loadChapter(
+        _currentChapterIndex,
+        restoreOffset: false,
+        targetChapterProgress: _currentScrollChapterProgress,
       ),
     );
   }
@@ -1724,32 +2208,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Widget _buildChapterNav(Color textColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        if (_currentChapterIndex > 0)
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => _loadChapter(_currentChapterIndex - 1),
-            child: Text('← 上一章',
-                style: TextStyle(color: textColor.withValues(alpha: 0.6))),
-          )
-        else
-          const SizedBox(),
-        if (_currentChapterIndex < _chapters.length - 1)
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => _loadChapter(_currentChapterIndex + 1),
-            child: Text('下一章 →',
-                style: TextStyle(color: textColor.withValues(alpha: 0.6))),
-          )
-        else
-          const SizedBox(),
-      ],
-    );
-  }
-
   void _closeReaderMenuOverlay() {
     if (!_showMenu) return;
     _setReaderMenuVisible(false);
@@ -1789,6 +2247,473 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _showToast('语音朗读即将上线');
   }
 
+  Future<void> _seekByChapterProgress(int targetChapterIndex) async {
+    if (_chapters.isEmpty) return;
+    if (targetChapterIndex < 0 || targetChapterIndex >= _chapters.length) {
+      return;
+    }
+    if (targetChapterIndex == _currentChapterIndex) return;
+
+    if (_settings.progressBarBehavior == ProgressBarBehavior.chapter &&
+        _settings.confirmSkipChapter &&
+        !_chapterSeekConfirmed) {
+      final confirmed = await showCupertinoDialog<bool>(
+            context: context,
+            builder: (dialogContext) => CupertinoAlertDialog(
+              title: const Text('章节跳转确认'),
+              content: const Text('\n确定要跳转章节吗？'),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('取消'),
+                ),
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('跳转'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!confirmed) return;
+      _chapterSeekConfirmed = true;
+    }
+    await _loadChapter(targetChapterIndex);
+  }
+
+  void _showReaderActionsMenu() {
+    _closeReaderMenuOverlay();
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('阅读操作'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _showContentSearchDialog();
+            },
+            child: const Text('搜索正文'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              setState(() {
+                _showAutoReadPanel = true;
+              });
+              _autoPager.toggle();
+            },
+            child: Text(_autoPager.isRunning ? '停止自动翻页' : '开始自动翻页'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              unawaited(_toggleBookmark());
+            },
+            child: Text(_hasBookmarkAtCurrent ? '移除书签' : '添加书签'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _refreshChapter();
+            },
+            child: const Text('刷新当前章节'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _showSwitchSourceMenu();
+            },
+            child: const Text('换源'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              try {
+                final updated = await _refreshCatalogFromSource();
+                if (!mounted) return;
+                _showToast('目录已更新，共 ${updated.length} 章');
+              } catch (e) {
+                if (!mounted) return;
+                _showToast('更新目录失败：$e');
+              }
+            },
+            child: const Text('更新目录'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  void _showContentSearchDialog() {
+    if (_showMenu) {
+      _closeReaderMenuOverlay();
+    }
+    final controller = TextEditingController(text: _contentSearchQuery);
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('搜索正文'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            autofocus: true,
+            placeholder: '输入关键词',
+            clearButtonMode: OverlayVisibilityMode.editing,
+            onSubmitted: (_) {
+              final query = controller.text.trim();
+              Navigator.pop(dialogContext);
+              _applyContentSearch(query);
+            },
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              final query = controller.text.trim();
+              Navigator.pop(dialogContext);
+              _applyContentSearch(query);
+            },
+            child: const Text('搜索'),
+          ),
+        ],
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
+  void _applyContentSearch(String query) {
+    final normalized = query.trim();
+    if (normalized.isEmpty) {
+      _showToast('请输入搜索关键词');
+      return;
+    }
+
+    final hits = _collectContentSearchHits(normalized);
+    if (hits.isEmpty) {
+      _showToast('当前章节未找到匹配内容');
+      return;
+    }
+
+    setState(() {
+      _contentSearchQuery = normalized;
+      _contentSearchHits = hits;
+      _currentSearchHitIndex = 0;
+    });
+    _setSearchMenuVisible(true);
+    _jumpToSearchHit(hits.first);
+  }
+
+  List<_ReaderSearchHit> _collectContentSearchHits(String query) {
+    final content = _currentContent;
+    final lowerContent = content.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    if (lowerContent.isEmpty || lowerQuery.isEmpty) return const [];
+
+    final hits = <_ReaderSearchHit>[];
+    var from = 0;
+    while (from < lowerContent.length) {
+      final found = lowerContent.indexOf(lowerQuery, from);
+      if (found == -1) break;
+      final end = found + lowerQuery.length;
+      final previewStart = (found - 16).clamp(0, content.length).toInt();
+      final previewEnd = (end + 18).clamp(0, content.length).toInt();
+      final preview =
+          content.substring(previewStart, previewEnd).replaceAll('\n', ' ');
+      final pageIndex = _settings.pageTurnMode == PageTurnMode.scroll
+          ? null
+          : _resolveSearchHitPageIndex(found);
+      hits.add(
+        _ReaderSearchHit(
+          start: found,
+          end: end,
+          preview: preview,
+          pageIndex: pageIndex,
+        ),
+      );
+      from = end;
+    }
+    return hits;
+  }
+
+  int? _resolveSearchHitPageIndex(int contentOffset) {
+    final pages = _pageFactory.currentPages;
+    if (pages.isEmpty) return null;
+
+    var cursor = 0;
+    for (var i = 0; i < pages.length; i++) {
+      final page = pages[i];
+      final nextCursor = cursor + page.length;
+      if (contentOffset < nextCursor) {
+        return i;
+      }
+      cursor = nextCursor;
+    }
+    return pages.length - 1;
+  }
+
+  void _jumpToSearchHit(_ReaderSearchHit hit) {
+    if (_settings.pageTurnMode == PageTurnMode.scroll) {
+      if (!_scrollController.hasClients) return;
+      final maxOffset = _scrollController.position.maxScrollExtent;
+      if (maxOffset <= 0 || _currentContent.isEmpty) return;
+      final ratio = (hit.start / _currentContent.length).clamp(0.0, 1.0);
+      final target = (maxOffset * ratio).clamp(0.0, maxOffset).toDouble();
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+      return;
+    }
+
+    final totalPages = _pageFactory.totalPages;
+    if (totalPages <= 0) return;
+    final targetPage = (hit.pageIndex ?? 0).clamp(0, totalPages - 1);
+    _pageFactory.jumpToPage(targetPage);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _navigateSearchHit(int delta) {
+    if (_contentSearchHits.isEmpty) return;
+    final size = _contentSearchHits.length;
+    var nextIndex = _currentSearchHitIndex + delta;
+    while (nextIndex < 0) {
+      nextIndex += size;
+    }
+    nextIndex %= size;
+    setState(() {
+      _currentSearchHitIndex = nextIndex;
+    });
+    _jumpToSearchHit(_contentSearchHits[nextIndex]);
+  }
+
+  void _exitSearchMenu() {
+    setState(() {
+      _showSearchMenu = false;
+      _contentSearchHits = <_ReaderSearchHit>[];
+      _currentSearchHitIndex = -1;
+      _contentSearchQuery = '';
+    });
+    _syncSystemUiForOverlay();
+  }
+
+  Widget _buildSearchMenuOverlay() {
+    final currentHit = (_currentSearchHitIndex >= 0 &&
+            _currentSearchHitIndex < _contentSearchHits.length)
+        ? _contentSearchHits[_currentSearchHitIndex]
+        : null;
+    final info = _contentSearchHits.isEmpty
+        ? '未找到结果'
+        : '结果 ${_currentSearchHitIndex + 1}/${_contentSearchHits.length} · 章节：$_currentTitle';
+    final preview = currentHit?.preview.trim();
+    final accent = _isUiDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+
+    return Stack(
+      children: [
+        Positioned(
+          left: 16,
+          top: MediaQuery.of(context).size.height * 0.45,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _contentSearchHits.isEmpty
+                ? null
+                : () => _navigateSearchHit(-1),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _uiCardBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _uiBorder),
+              ),
+              child: Icon(CupertinoIcons.chevron_left, color: _uiTextStrong),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 16,
+          top: MediaQuery.of(context).size.height * 0.45,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed:
+                _contentSearchHits.isEmpty ? null : () => _navigateSearchHit(1),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _uiCardBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _uiBorder),
+              ),
+              child: Icon(CupertinoIcons.chevron_right, color: _uiTextStrong),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            child: Container(
+              decoration: BoxDecoration(
+                color: _uiPanelBg.withValues(alpha: 0.98),
+                border: Border(top: BorderSide(color: _uiBorder)),
+              ),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      info,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _uiTextNormal,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  if (preview != null && preview.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '...$preview...',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _uiTextSubtle,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSearchMenuAction(
+                          icon: CupertinoIcons.search,
+                          label: '结果',
+                          onTap: _showContentSearchDialog,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSearchMenuAction(
+                          icon: CupertinoIcons.square_grid_2x2,
+                          label: '主菜单',
+                          onTap: () {
+                            _setSearchMenuVisible(false);
+                            _setReaderMenuVisible(true);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSearchMenuAction(
+                          icon: CupertinoIcons.clear_circled,
+                          label: '退出',
+                          onTap: _exitSearchMenu,
+                          activeColor: CupertinoColors.destructiveRed,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSearchMenuAction(
+                          icon: CupertinoIcons.chevron_up,
+                          label: '上一个',
+                          onTap: _contentSearchHits.isEmpty
+                              ? null
+                              : () => _navigateSearchHit(-1),
+                          activeColor: accent,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSearchMenuAction(
+                          icon: CupertinoIcons.chevron_down,
+                          label: '下一个',
+                          onTap: _contentSearchHits.isEmpty
+                              ? null
+                              : () => _navigateSearchHit(1),
+                          activeColor: accent,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(child: SizedBox.shrink()),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchMenuAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    Color? activeColor,
+  }) {
+    final enabled = onTap != null;
+    final color = activeColor ?? _uiTextStrong;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        decoration: BoxDecoration(
+          color: _uiCardBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _uiBorder),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 17,
+              color: enabled ? color : _uiTextSubtle,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: enabled ? color : _uiTextSubtle,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFloatingActionRail() {
     final topOffset = MediaQuery.of(context).padding.top + 86;
     return Positioned(
@@ -1811,6 +2736,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         ),
         child: Column(
           children: [
+            _buildFloatingActionButton(
+              icon: CupertinoIcons.search,
+              onTap: _showContentSearchDialog,
+            ),
+            const SizedBox(height: 8),
             _buildFloatingActionButton(
               icon: _hasBookmarkAtCurrent
                   ? CupertinoIcons.bookmark_solid
@@ -2378,6 +3308,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         },
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '底部对齐',
+                        isActive: _settings.textBottomJustify,
+                        onTap: () => _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(
+                            textBottomJustify: !_settings.textBottomJustify,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(child: SizedBox.shrink()),
                   ],
                 ),
               ],
@@ -3002,6 +3951,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             title: '翻页操作',
             child: Column(
               children: [
+                _buildOptionRow(
+                  '进度条',
+                  _settings.progressBarBehavior.label,
+                  () {
+                    final next = _settings.progressBarBehavior ==
+                            ProgressBarBehavior.page
+                        ? ProgressBarBehavior.chapter
+                        : ProgressBarBehavior.page;
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(progressBarBehavior: next),
+                    );
+                  },
+                ),
+                _buildSwitchRow('章节跳转确认', _settings.confirmSkipChapter,
+                    (value) {
+                  if (!value) {
+                    _chapterSeekConfirmed = false;
+                  }
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(confirmSkipChapter: value),
+                  );
+                }),
                 _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
@@ -3083,6 +4056,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   _updateSettingsFromSheet(
                     setPopupState,
                     _settings.copyWith(showBattery: value),
+                  );
+                }),
+                _buildSwitchRow('显示亮度条', _settings.showBrightnessView, (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(showBrightnessView: value),
                   );
                 }),
               ],
@@ -3684,6 +4663,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showChapterList() {
+    if (_showSearchMenu) {
+      _setSearchMenuVisible(false);
+    }
+    if (_showMenu) {
+      _setReaderMenuVisible(false);
+    }
     showCupertinoModalPopup(
       context: context,
       builder: (popupContext) => ReaderCatalogSheet(
@@ -3739,6 +4724,34 @@ class _ReplaceStageCache {
   const _ReplaceStageCache({
     required this.rawTitle,
     required this.rawContent,
+    required this.title,
+    required this.content,
+  });
+}
+
+class _ReaderSearchHit {
+  final int start;
+  final int end;
+  final String preview;
+  final int? pageIndex;
+
+  const _ReaderSearchHit({
+    required this.start,
+    required this.end,
+    required this.preview,
+    required this.pageIndex,
+  });
+}
+
+class _ScrollSegment {
+  final int chapterIndex;
+  final String chapterId;
+  final String title;
+  final String content;
+
+  const _ScrollSegment({
+    required this.chapterIndex,
+    required this.chapterId,
     required this.title,
     required this.content,
   });
