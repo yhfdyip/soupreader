@@ -2768,3 +2768,41 @@
 ### 兼容影响
 - 仅调整阅读器渲染时序与缓存回退策略，不改书源解析、章节数据、目录结构与数据库。
 - 视觉行为更接近 legado：动画与静止态之间的渲染连续性更高。
+
+## 2026-02-15（覆盖翻页收尾稳定性二次修复：快照前移复用与目标页预热）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 新增快照缓存粒度控制：
+    - `_ensurePictureCacheSize(...)`
+    - `_syncAdjacentPictureAvailability(...)`
+    - `_ensureCurrentPagePicture(...)`
+    - `_ensureDirectionTargetPicture(...)`
+  - 调整 `slide/cover/none` 动画中的快照策略：
+    - 动画帧仅确保“当前页 + 翻页目标页”快照，不再每帧尝试全量 `prev/cur/next`。
+    - `startTurnAnimation` 前强制预热目标快照，避免首帧回退渲染路径。
+  - 调整静止态快照策略：
+    - `_buildStaticRecordedPage(...)` 仅同步确保当前页快照；
+    - 相邻页交给 `_schedulePrecache()` 分帧补齐，减少收尾同步重录抖动。
+  - 新增翻页完成后的快照前移复用：
+    - `_promoteCachedPicturesOnPageFilled(...)`
+    - `_flushPendingPictureInvalidationAfterSettle(...)`
+    - 在 `_stopScroll(...)` 收尾阶段优先将目标快照提升为当前页快照（next->cur / prev->cur），仅在无法提升时才全量失效重录。
+  - `_onAnimComplete(...)` 与 `_stopScroll(...)` 调整为传递 `direction + wasCancel`，确保收尾按真实翻页结果执行。
+
+### 为什么
+- 用户反馈覆盖翻页后仍存在“短延迟后页眉线/正文观感变化、边缘阴影延迟消失”的二次重绘感。
+- 根因之一是收尾阶段仍可能走“全量失效 + 同步重录”路径，与 legado 的“目标快照前移复用”语义不一致。
+- 本次改为优先复用动画期目标快照，避免 `Picture -> 重录/回退 -> Picture` 的额外切换。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 覆盖模式连续翻下页/翻上页，观察翻页完成后 1~2 秒内是否仍出现二次突变；
+  - 首次进入章节后立即翻页，确认不出现“先有阴影残留再整体重绘”；
+  - 同章与跨章各验证一次，确认页眉页脚/正文同步且无空白回归。
+
+### 兼容影响
+- 仅调整阅读器翻页渲染时序与快照复用逻辑，不影响书源解析、目录抓取、正文抓取和数据库。
+- 行为进一步贴近 legado：覆盖翻页收尾更稳定，减少延迟重绘体感。
