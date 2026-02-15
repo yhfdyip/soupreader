@@ -94,10 +94,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // 页眉/页脚坐标使用稳定系统安全区，避免系统栏 inset 延迟变化导致分割线抖动
   EdgeInsets? _stableSystemPadding;
-  Size? _stablePaddingViewportSize;
+  Orientation? _stablePaddingOrientation;
   bool? _stableShowStatusBar;
   bool? _stableHideHeader;
   bool? _stableHideFooter;
+  bool _pendingSystemPaddingRefresh = false;
 
   // Shader Program
   static ui.FragmentProgram? pageCurlProgram;
@@ -126,6 +127,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   bool get _isInteractionRunning =>
       _gestureInProgress || _isMoved || _isRunning || _isStarted;
+
+  void _debugTrace(String message) {
+    assert(() {
+      debugPrint('[PagedReaderWidget] $message');
+      return true;
+    }());
+  }
 
   void _onPageFactoryContentChangedForRender() {
     if (!mounted) return;
@@ -239,21 +247,40 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   Future<void> _initBattery() async {
     try {
-      _batteryLevel = await _battery.batteryLevel;
+      _applyBatteryLevel(await _battery.batteryLevel, forceRebuild: true);
       _batteryStateSubscription =
           _battery.onBatteryStateChanged.listen((state) {
-        setState(() {});
-        _updateBatteryLevel();
+        unawaited(_updateBatteryLevel());
       });
-      if (mounted) setState(() {});
     } catch (_) {}
   }
 
   Future<void> _updateBatteryLevel() async {
     try {
-      _batteryLevel = await _battery.batteryLevel;
-      if (mounted) setState(() {});
+      _applyBatteryLevel(await _battery.batteryLevel);
     } catch (_) {}
+  }
+
+  void _applyBatteryLevel(int rawLevel, {bool forceRebuild = false}) {
+    final nextLevel = rawLevel.clamp(0, 100).toInt();
+    final changed = _batteryLevel != nextLevel;
+    _batteryLevel = nextLevel;
+    if (!mounted) return;
+    if (!changed && !forceRebuild) return;
+    if (_isInteractionRunning && !forceRebuild) {
+      if (_needsPictureCache) {
+        _pendingPictureInvalidation = true;
+      }
+      return;
+    }
+    if (_needsPictureCache &&
+        widget.showStatusBar &&
+        widget.settings.showBattery) {
+      _pendingPictureInvalidation = false;
+      _invalidatePictures();
+      _schedulePrecache();
+    }
+    setState(() {});
   }
 
   PageFactory get _factory => widget.pageFactory;
@@ -275,21 +302,54 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           ? 0.0
           : PagedReaderWidget.bottomOffset;
 
-  EdgeInsets _resolveStableSystemPadding(Size viewportSize) {
-    final mediaPadding = MediaQuery.of(context).padding;
+  void _applyStableSystemPadding({
+    required EdgeInsets padding,
+    required Orientation orientation,
+  }) {
+    _stableSystemPadding = padding;
+    _stablePaddingOrientation = orientation;
+    _stableShowStatusBar = widget.showStatusBar;
+    _stableHideHeader = widget.settings.hideHeader;
+    _stableHideFooter = widget.settings.hideFooter;
+    _pendingSystemPaddingRefresh = false;
+    _debugTrace(
+      'apply_stable_padding top=${padding.top.toStringAsFixed(1)} bottom=${padding.bottom.toStringAsFixed(1)} orientation=$orientation',
+    );
+  }
+
+  bool _flushPendingSystemPaddingRefresh() {
+    if (!_pendingSystemPaddingRefresh) return false;
+    if (!mounted || _isInteractionRunning) return false;
+    final mediaQuery = MediaQuery.of(context);
+    _applyStableSystemPadding(
+      padding: mediaQuery.padding,
+      orientation: mediaQuery.orientation,
+    );
+    _debugTrace('flush_pending_padding_refresh');
+    return true;
+  }
+
+  EdgeInsets _resolveStableSystemPadding() {
+    final mediaQuery = MediaQuery.of(context);
+    final mediaPadding = mediaQuery.padding;
+    final orientation = mediaQuery.orientation;
     final shouldRefresh = _stableSystemPadding == null ||
-        _stablePaddingViewportSize != viewportSize ||
+        _stablePaddingOrientation != orientation ||
         _stableShowStatusBar != widget.showStatusBar ||
         _stableHideHeader != widget.settings.hideHeader ||
         _stableHideFooter != widget.settings.hideFooter;
     if (shouldRefresh) {
-      _stableSystemPadding = mediaPadding;
-      _stablePaddingViewportSize = viewportSize;
-      _stableShowStatusBar = widget.showStatusBar;
-      _stableHideHeader = widget.settings.hideHeader;
-      _stableHideFooter = widget.settings.hideFooter;
+      if (_isInteractionRunning && _stableSystemPadding != null) {
+        _pendingSystemPaddingRefresh = true;
+        _debugTrace('defer_padding_refresh_during_interaction');
+      } else {
+        _applyStableSystemPadding(
+          padding: mediaPadding,
+          orientation: orientation,
+        );
+      }
     }
-    return _stableSystemPadding!;
+    return _stableSystemPadding ?? mediaPadding;
   }
 
   /// 使用 PictureRecorder 预渲染页面内容
@@ -301,7 +361,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    final systemPadding = _resolveStableSystemPadding(size);
+    final systemPadding = _resolveStableSystemPadding();
     final topSafe = systemPadding.top;
     final bottomSafe = systemPadding.bottom;
     final renderPosition = _factory.resolveRenderPosition(slot);
@@ -628,7 +688,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void _warmupSimulationFrames() {
     if (!mounted || !_needsShaderImages) return;
     final size = MediaQuery.of(context).size;
-    _ensureShaderImages(size, allowRecord: true);
+    _ensureShaderImages(
+      size,
+      allowRecord: true,
+      requestVisualUpdate: false,
+    );
   }
 
   Future<ui.Image> _convertToHighResImage(ui.Picture picture, Size size) async {
@@ -717,7 +781,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
-  void _ensureShaderImages(Size size, {bool allowRecord = true}) {
+  bool _shouldRebuildForShaderImageUpdate({
+    required bool requestVisualUpdate,
+  }) {
+    if (requestVisualUpdate &&
+        !_isInteractionRunning &&
+        !_isPreparingSimulationTurn) {
+      _debugTrace('skip_shader_setstate_when_idle');
+    }
+    return _isInteractionRunning || _isPreparingSimulationTurn;
+  }
+
+  void _ensureShaderImages(
+    Size size, {
+    bool allowRecord = true,
+    bool requestVisualUpdate = false,
+  }) {
     _ensurePagePictures(size, allowRecord: allowRecord);
     if (!_needsShaderImages) return;
 
@@ -732,11 +811,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           _isCurImageLoading = false;
           return;
         }
-        setState(() {
-          _curPageImage?.dispose();
-          _curPageImage = img;
+        if (!_needsShaderImages) {
+          img.dispose();
           _isCurImageLoading = false;
-        });
+          return;
+        }
+        _curPageImage?.dispose();
+        _curPageImage = img;
+        _isCurImageLoading = false;
+        if (_shouldRebuildForShaderImageUpdate(
+          requestVisualUpdate: requestVisualUpdate,
+        )) {
+          setState(() {});
+        }
       }).catchError((_) {
         _isCurImageLoading = false;
       });
@@ -759,11 +846,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           _isTargetImageLoading = false;
           return;
         }
-        setState(() {
-          _targetPageImage?.dispose();
-          _targetPageImage = img;
+        if (!_needsShaderImages) {
+          img.dispose();
           _isTargetImageLoading = false;
-        });
+          return;
+        }
+        _targetPageImage?.dispose();
+        _targetPageImage = img;
+        _isTargetImageLoading = false;
+        if (_shouldRebuildForShaderImageUpdate(
+          requestVisualUpdate: requestVisualUpdate,
+        )) {
+          setState(() {});
+        }
       }).catchError((_) {
         _isTargetImageLoading = false;
       });
@@ -790,6 +885,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
       final size = MediaQuery.of(context).size;
       final didWork = _precacheOnePicture(size);
+      if (_needsShaderImages) {
+        _ensureShaderImages(
+          size,
+          allowRecord: true,
+          requestVisualUpdate: false,
+        );
+      }
       if (didWork) {
         // 仍有缺口，继续调度下一帧
         _schedulePrecache();
@@ -842,7 +944,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (direction == _PageDirection.next && !_factory.hasNext()) return false;
     if (direction == _PageDirection.prev && !_factory.hasPrev()) return false;
 
-    _ensureShaderImages(size, allowRecord: true);
+    _ensureShaderImages(
+      size,
+      allowRecord: true,
+      requestVisualUpdate: true,
+    );
     if (_isSimulationTurnReady(direction)) return true;
 
     final deadline = DateTime.now().add(const Duration(milliseconds: 1800));
@@ -852,7 +958,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       if (DateTime.now().isAfter(deadline)) return false;
       await Future<void>.delayed(const Duration(milliseconds: 16));
       if (!mounted) return false;
-      _ensureShaderImages(size, allowRecord: true);
+      _ensureShaderImages(
+        size,
+        allowRecord: !_gestureInProgress,
+        requestVisualUpdate: true,
+      );
     }
     return false;
   }
@@ -1023,8 +1133,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     _invalidateTargetCache();
     if (_needsShaderImages) {
-      // 方向变化时目标页 Image 需要更新；拖拽期间避免同步生成 Picture
-      _ensureShaderImages(size, allowRecord: !_gestureInProgress);
+      // 方向变化时立即准备目标帧，避免仿真模式在翻页完成后再异步补帧触发二次重绘。
+      _ensureShaderImages(
+        size,
+        allowRecord: true,
+        requestVisualUpdate: true,
+      );
     }
     _schedulePrecache();
   }
@@ -1215,6 +1329,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         settledDirection: direction,
         wasCancel: wasCancel,
       );
+      _flushPendingSystemPaddingRefresh();
       setState(() {});
       _schedulePrecache();
     }
@@ -1292,13 +1407,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         }
         return _buildCoverAnimation(screenWidth, offset);
       case PageTurnMode.simulation:
-        // 仿真模式使用 touchX/touchY (Shader)
-        if (_needsShaderImages) _ensureShaderImages(size);
+        if (!isRunning) {
+          return _buildStaticRecordedPage(size);
+        }
         return _buildSimulationAnimation(size);
       case PageTurnMode.simulation2:
-        // 仿真模式2 使用贝塞尔曲线
-        if (_needsPictureCache) {
-          _ensurePagePictures(size, allowRecord: !_gestureInProgress);
+        if (!isRunning) {
+          return _buildStaticRecordedPage(size);
         }
         return _buildSimulation2Animation(size);
       case PageTurnMode.none:
@@ -1328,6 +1443,25 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final resolvedPicture =
         picture ?? _resolveFallbackPictureForAnimation(slot);
     if (resolvedPicture == null) {
+      final isCoverRunning =
+          widget.pageTurnMode == PageTurnMode.cover && _isInteractionRunning;
+      if (isCoverRunning) {
+        final emergencyPicture =
+            _curPagePicture ?? _nextPagePicture ?? _prevPagePicture;
+        if (emergencyPicture != null) {
+          _debugTrace('cover_running_emergency_picture slot=$slot');
+          return RepaintBoundary(
+            child: SizedBox.expand(
+              child: CustomPaint(
+                painter: _PagePicturePainter(emergencyPicture),
+                isComplex: true,
+              ),
+            ),
+          );
+        }
+        _debugTrace('cover_running_block_widget_fallback slot=$slot');
+        return Container(color: widget.backgroundColor);
+      }
       return _buildPageWidget(fallbackContent, slot: slot);
     }
     return RepaintBoundary(
@@ -1408,86 +1542,92 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   /// 覆盖模式
   Widget _buildCoverAnimation(double screenWidth, double offset) {
-    if (_direction == _PageDirection.none) {
-      return _buildRecordedPage(
-        _curPagePicture,
-        _factory.curPage,
-        slot: PageRenderSlot.current,
-      );
-    }
-    final clamped = offset.clamp(-screenWidth, screenWidth);
-
-    return Stack(
-      children: [
-        if (_direction == _PageDirection.next)
-          Positioned.fill(
-            child: _buildRecordedPage(
-              _nextPagePicture,
-              _factory.nextPage,
-              slot: PageRenderSlot.next,
-            ),
-          ),
-        if (_direction == _PageDirection.prev)
-          Positioned.fill(
-            child: _buildRecordedPage(
-              _prevPagePicture,
-              _factory.prevPage,
-              slot: PageRenderSlot.prev,
-            ),
-          ),
-        Transform.translate(
-          offset: Offset(clamped, 0),
-          child: _buildCoverPageWithEdgeShadow(
-            clamped: clamped,
-            screenWidth: screenWidth,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCoverPageWithEdgeShadow({
-    required double clamped,
-    required double screenWidth,
-  }) {
-    final page = _buildRecordedPage(
+    final currentPage = _buildRecordedPage(
       _curPagePicture,
       _factory.curPage,
       slot: PageRenderSlot.current,
     );
-    final progress = (clamped.abs() / screenWidth).clamp(0.0, 1.0);
-    final shadowAlpha = (progress * 0.35).clamp(0.0, 0.35);
-    if (shadowAlpha <= 0.01 || clamped.abs() <= 0.5) {
-      return page;
+    if (_direction == _PageDirection.none) {
+      return currentPage;
+    }
+    final clamped = offset.clamp(-screenWidth, screenWidth).toDouble();
+
+    if ((_direction == _PageDirection.next && clamped > 0) ||
+        (_direction == _PageDirection.prev && clamped < 0)) {
+      return currentPage;
     }
 
-    const shadowWidth = 28.0;
-    final colorStrong = const Color(0xFF111111).withValues(alpha: shadowAlpha);
-    final colorWeak = const Color(0xFF000000).withValues(alpha: 0);
+    if (_direction == _PageDirection.next) {
+      final seamX = (screenWidth + clamped).clamp(0.0, screenWidth);
+      return Stack(
+        children: [
+          currentPage,
+          Positioned.fill(
+            child: ClipRect(
+              clipper: _CoverNextRevealClipper(left: seamX),
+              child: _buildRecordedPage(
+                _nextPagePicture,
+                _factory.nextPage,
+                slot: PageRenderSlot.next,
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(clamped, 0),
+            child: _buildRecordedPage(
+              _curPagePicture,
+              _factory.curPage,
+              slot: PageRenderSlot.current,
+            ),
+          ),
+          _buildLegacyCoverShadow(seamX: seamX, screenWidth: screenWidth),
+        ],
+      );
+    }
 
-    final shadow = Container(
-      width: shadowWidth,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: clamped < 0 ? Alignment.centerLeft : Alignment.centerRight,
-          end: clamped < 0 ? Alignment.centerRight : Alignment.centerLeft,
-          colors: [colorStrong, colorWeak],
+    // PREV: 对齐 legado 覆盖逻辑，底层保持当前页，上一页从左侧平移进入。
+    final distanceX = clamped - screenWidth;
+    final seamX = clamped.clamp(0.0, screenWidth);
+    return Stack(
+      children: [
+        currentPage,
+        Transform.translate(
+          offset: Offset(distanceX, 0),
+          child: _buildRecordedPage(
+            _prevPagePicture,
+            _factory.prevPage,
+            slot: PageRenderSlot.prev,
+          ),
+        ),
+        _buildLegacyCoverShadow(seamX: seamX, screenWidth: screenWidth),
+      ],
+    );
+  }
+
+  Widget _buildLegacyCoverShadow({
+    required double seamX,
+    required double screenWidth,
+  }) {
+    final x = seamX.clamp(0.0, screenWidth);
+    if (x <= 0.5 || x >= screenWidth - 0.5) {
+      return const SizedBox.shrink();
+    }
+    return Positioned(
+      left: x,
+      top: 0,
+      bottom: 0,
+      child: IgnorePointer(
+        child: Container(
+          width: 30,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0x66111111), Color(0x00000000)],
+            ),
+          ),
         ),
       ),
-    );
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        page,
-        Positioned(
-          top: 0,
-          bottom: 0,
-          left: clamped > 0 ? 0 : null,
-          right: clamped < 0 ? 0 : null,
-          child: shadow,
-        ),
-      ],
     );
   }
 
@@ -1497,20 +1637,28 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // === 对标 Legado: if (!isRunning) return ===
     // 静止状态直接返回当前页面Widget，不使用 CustomPaint
     // 这样避免了状态切换时的闪烁
-    final isRunning = _isMoved || _isRunning;
+    final isRunning = _isMoved || _isRunning || _isStarted;
     if (!isRunning || pageCurlProgram == null) {
-      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
+      return _buildStaticRecordedPage(size);
     }
 
     final isNext = _direction == _PageDirection.next;
     if (_direction == _PageDirection.none) {
-      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
+      return _buildStaticRecordedPage(size);
     }
     if (isNext && _curPageImage == null) {
-      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
+      return _buildRecordedPage(
+        _curPagePicture,
+        _factory.curPage,
+        slot: PageRenderSlot.current,
+      );
     }
     if (!isNext && _targetPageImage == null) {
-      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
+      return _buildRecordedPage(
+        _curPagePicture,
+        _factory.curPage,
+        slot: PageRenderSlot.current,
+      );
     }
 
     // === P6: 仿真逻辑修正 ===
@@ -1534,7 +1682,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (imageToCurl == null) {
-      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
+      return _buildRecordedPage(
+        _curPagePicture,
+        _factory.curPage,
+        slot: PageRenderSlot.current,
+      );
     }
 
     double simulationTouchX = _touchX;
@@ -1570,9 +1722,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   /// 仿真模式2 - 使用贝塞尔曲线（参考 flutter_novel）
   Widget _buildSimulation2Animation(Size size) {
-    final isRunning = _isMoved || _isRunning;
+    final isRunning = _isMoved || _isRunning || _isStarted;
     if (!isRunning) {
-      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
+      return _buildStaticRecordedPage(size);
     }
 
     final isNext = _direction == _PageDirection.next;
@@ -1595,7 +1747,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (pictureToCurl == null) {
-      return _buildPageWidget(_factory.curPage, slot: PageRenderSlot.current);
+      return _buildRecordedPage(
+        _curPagePicture,
+        _factory.curPage,
+        slot: PageRenderSlot.current,
+      );
     }
 
     double simulationTouchX = _touchX;
@@ -1658,6 +1814,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _isMoved = false;
     _isCancel = false;
     _direction = _PageDirection.none;
+    if (_needsShaderImages) {
+      final size = MediaQuery.of(context).size;
+      _ensureShaderImages(
+        size,
+        allowRecord: true,
+        requestVisualUpdate: false,
+      );
+    }
   }
 
   // === 对标 Legado HorizontalPageDelegate.onScroll ===
@@ -1742,6 +1906,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!_isMoved) {
       _direction = _PageDirection.none;
       _flushPendingPictureInvalidationIfIdle();
+      final refreshedPadding = _flushPendingSystemPaddingRefresh();
+      if (refreshedPadding) {
+        setState(() {});
+      }
       _schedulePrecache();
       return;
     }
@@ -1758,8 +1926,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       return Container(color: widget.backgroundColor);
     }
 
-    final viewportSize = MediaQuery.of(context).size;
-    final systemPadding = _resolveStableSystemPadding(viewportSize);
+    final systemPadding = _resolveStableSystemPadding();
     final topSafe = systemPadding.top;
     final bottomSafe = systemPadding.bottom;
 
@@ -1922,6 +2089,24 @@ class _PagePicturePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PagePicturePainter oldDelegate) {
     return oldDelegate.picture != picture;
+  }
+}
+
+class _CoverNextRevealClipper extends CustomClipper<Rect> {
+  final double left;
+
+  const _CoverNextRevealClipper({required this.left});
+
+  @override
+  Rect getClip(Size size) {
+    final safeLeft = left.clamp(0.0, size.width).toDouble();
+    final width = (size.width - safeLeft).clamp(0.0, size.width).toDouble();
+    return Rect.fromLTWH(safeLeft, 0, width, size.height);
+  }
+
+  @override
+  bool shouldReclip(covariant _CoverNextRevealClipper oldClipper) {
+    return oldClipper.left != left;
   }
 }
 

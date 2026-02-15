@@ -2806,3 +2806,113 @@
 ### 兼容影响
 - 仅调整阅读器翻页渲染时序与快照复用逻辑，不影响书源解析、目录抓取、正文抓取和数据库。
 - 行为进一步贴近 legado：覆盖翻页收尾更稳定，减少延迟重绘体感。
+
+## 2026-02-15（iOS 覆盖翻页稳定性三次修复：系统安全区锁定 + 覆盖动画禁 Widget 回退）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 新增会话级系统安全区控制：
+    - 新增 `_stablePaddingOrientation`、`_pendingSystemPaddingRefresh`；
+    - 新增 `_applyStableSystemPadding(...)` 与 `_flushPendingSystemPaddingRefresh()`；
+    - `_resolveStableSystemPadding(...)` 改为：
+      - 默认按“方向变化 + 页眉页脚显示配置变化”刷新；
+      - 交互进行中（拖拽/动画）若需要刷新则延后，避免翻页中途受 iOS 系统栏 inset 波动影响。
+  - 覆盖动画渲染路径收敛：
+    - `_buildRecordedPage(...)` 在 `cover + running` 场景下禁止回退到 `_buildPageWidget(...)`；
+    - 当目标快照缺失时优先用现有快照兜底绘制，彻底降低 `Picture -> Widget -> Picture` 切换概率。
+  - 收尾阶段补强：
+    - `_stopScroll(...)` 在 pending 处理后，先尝试刷新延迟的系统安全区，再同步确保当前页快照，然后统一 `setState`。
+  - 电量更新异步回调去抖：
+    - 新增 `_applyBatteryLevel(...)`（值变化判定 + 交互期间抑制重建）；
+    - `battery` 监听去掉“先 `setState` 再异步更新”的双重重建，仅在实际变化时刷新。
+  - Shader 异步回调门控：
+    - `_ensureShaderImages(...)` 的异步 `then` 中增加 `_needsShaderImages` 再检查，模式切换后不再触发无关重绘。
+
+### 为什么
+- 用户在 iOS 覆盖翻页下反馈“页眉分割线延迟下移 + 正文二次重绘感”仍存在。
+- 该现象与两类抖动叠加相关：
+  - 交互后系统安全区（含 Home 指示条区域）变化带来的延迟布局刷新；
+  - 覆盖动画阶段快照缺失时回退到 Widget 渲染导致的渲染基底切换。
+- 本次将两条链路同时收敛，进一步对齐 legado 的“动画期稳定快照优先”语义。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - iOS 设备覆盖模式连续翻页（上/下各多次），确认翻页后 1~2 秒内页眉线与正文不再二次变化；
+  - 首次进入章节后立即翻页，确认无“短延迟后整体重绘”；
+  - 同章/跨章翻页各验证一次，确认正文不回退为空白、页眉页脚与正文同步。
+
+### 兼容影响
+- 仅影响阅读器翻页渲染时序与 UI 刷新策略，不影响书源、目录、正文解析与数据库结构。
+- iOS 下系统栏 inset 波动对阅读排版的影响被显著收敛，行为更贴近 legado 稳定表现。
+
+## 2026-02-15（覆盖翻页对齐 legado 三次收敛：方向绘制语义 + 收尾轻量化）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 覆盖翻页绘制改为按 legado 方向语义拆分：
+    - `NEXT`：使用目标页右侧裁剪暴露（`ClipRect`）+ 当前页平移 + seam 阴影；
+    - `PREV`：保持当前页为底，上一页从左侧平移进入 + seam 阴影。
+  - 新增 `_CoverNextRevealClipper`，用于对齐 legado 的 `nextRecorder` 裁剪显示行为。
+  - 覆盖阴影改为 legado 同向线性梯度（`0x66111111 -> transparent`），并按 seam 位置绘制。
+  - 收尾时序收敛：
+    - `_stopScroll(...)` 移除收尾阶段“同步刷新安全区 + 同步 ensure 当前页快照”的重工作，仅保留状态复位、pending 处理、`setState + _schedulePrecache`。
+  - 电量更新与快照一致性补齐：
+    - `_applyBatteryLevel(...)` 在显示电量且需要快照缓存时，触发快照失效与预渲染调度；
+    - 交互进行中仅标记 pending，避免中途强刷。
+  - 系统安全区接口简化：
+    - `_resolveStableSystemPadding(...)` 改为无参读取，消除无效参数与分支噪音。
+
+### 为什么
+- 用户要求与 legado 保持一致，且覆盖翻页仍有“延迟重绘感”。
+- 核查发现 `soupreader` 的 cover 路径此前是统一底图策略，与 legado 的 `NEXT/PREV` 差异较大；同时收尾阶段存在额外同步操作，增加了“下一拍变化”的概率。
+- 本次优先回归 legado 的方向绘制语义，并把收尾降到轻量化路径，减少二次变化触发面。
+
+### 如何验证
+- 命令：`flutter analyze --no-pub`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 覆盖模式同章连续翻下页/翻上页，观察 seam 阴影与页面暴露方向是否与 legado 一致；
+  - 翻页完成后静置 1~2 秒，确认页眉分割线与正文不再额外跳变；
+  - 跨章翻页确认无“仅标题无正文”回归。
+
+### 兼容影响
+- 仅调整阅读器覆盖翻页渲染与收尾策略，不影响书源解析、目录/正文抓取和数据库结构。
+- 展示行为更靠近 legado：`NEXT/PREV` 页面暴露顺序和阴影位置更一致。
+
+## 2026-02-15（翻页后延迟变动回归修复：仿真资源时序与静止态渲染路径收敛）
+
+### 已完成
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 仿真资源加载时序收敛：
+    - `_ensureShaderImages(...)` 新增 `requestVisualUpdate` 参数；
+    - 异步图片转换完成后默认仅更新缓存，不在交互结束后强制 `setState`；
+    - 仅在交互进行中或仿真翻页准备阶段触发可见重建，避免翻页完成后“下一拍”二次刷新。
+  - 仿真模式静止态统一快照渲染：
+    - `PageTurnMode.simulation` / `PageTurnMode.simulation2` 在静止态统一走 `_buildStaticRecordedPage(...)`；
+    - 不再回落到 `_buildPageWidget(...)` 造成渲染基线切换。
+  - 去除 build 阶段的仿真异步触发：
+    - 移除 `simulation` 分支中每帧 `_ensureShaderImages(...)` 的 build 内触发；
+    - 改为在交互生命周期（`_onDragStart`、`_setDirection`、`_prepareSimulationTurnFrames`、空闲预渲染）进行准备。
+  - 收尾同帧刷新补齐：
+    - `_stopScroll(...)` 在最终 `setState` 前执行 `_flushPendingSystemPaddingRefresh()`，降低页眉分割线延迟位移。
+  - 空闲预渲染补齐仿真缓存：
+    - `_schedulePrecache(...)` 在空闲帧补齐 `Shader` 依赖图片，但默认不触发可见重建。
+
+### 为什么
+- 用户反馈“以前所有模式都没有翻页后延迟变动”，当前行为属于回归。
+- 根因链路是：翻页结束后仍有异步资源回调触发 `setState`，并叠加仿真静止态渲染路径切换，导致页眉/页脚与正文出现延迟变化体感。
+- 本次按 legado 的收尾语义收敛到“翻页完成即稳定”，减少交互完成后的额外重绘。
+
+### 如何验证
+- 命令：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 覆盖/滑动/仿真/仿真2/无动画分别连续翻页，观察翻页后 1~2 秒内无页眉线与正文二次跳变；
+  - 首次进入章节立即翻页，确认不出现“先稳定后再变化”；
+  - 上下翻页各验证一次，确认无阴影残留延迟消失问题。
+
+### 兼容影响
+- 仅调整阅读器翻页渲染时序与缓存更新策略，不影响书源解析、目录/正文抓取、数据库结构。
+- 行为与 legado 更一致：翻页收尾后界面稳定性更高，减少异步补帧导致的可见抖动。
