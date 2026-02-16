@@ -513,3 +513,22 @@
 
 ### 兼容影响
 - 仅影响版本控制，不影响运行时功能与书源兼容性。
+
+## 2026-02-16 - Git 历史图片清理（IMG_*.PNG / IMG_*.IMG）
+
+### 做了什么
+- 使用 `git filter-branch` 重写全历史提交，移除根目录匹配 `IMG_*.PNG`、`IMG_*.IMG` 的文件对象。
+- 清理 `filter-branch` 生成的备份引用（`refs/original/*`），并执行 `reflog expire + gc --prune=now`。
+- 将重写后的 `main` 强制更新到远端，并清理镜像推送过程中误生成的远端分支 `origin/main`、`origin/HEAD`。
+
+### 为什么
+- 虽然最新提交已删除图片并补了 ignore 规则，但旧提交仍保留图片二进制对象，仓库历史体积与泄漏风险仍在。
+- 本次目标是“历史级彻底清理”，确保旧提交不再包含这批图片文件。
+
+### 如何验证
+- `git rev-list main --objects | rg 'IMG_[0-9]+\\.(PNG|IMG)$'` 无结果。
+- `git ls-remote --heads origin` 仅保留 `refs/heads/main`（无误推的 `origin/*` 分支）。
+- `git rev-list origin/main --objects | rg 'IMG_[0-9]+\\.(PNG|IMG)$'` 无结果。
+
+### 兼容影响
+- **有兼容影响**：历史提交哈希已整体变更，依赖旧 commit hash 的本地分支/PR 需要 rebase 或重拉。
