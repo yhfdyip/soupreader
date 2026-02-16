@@ -8,9 +8,11 @@ class ReaderTopMenu extends StatelessWidget {
   final String chapterTitle;
   final String? sourceName;
   final VoidCallback onShowChapterList;
+  final VoidCallback onSearchContent;
   final VoidCallback onSwitchSource;
   final VoidCallback onToggleCleanChapterTitle;
   final VoidCallback onRefreshChapter;
+  final VoidCallback onShowMoreMenu;
   final bool cleanChapterTitleEnabled;
 
   const ReaderTopMenu({
@@ -19,9 +21,11 @@ class ReaderTopMenu extends StatelessWidget {
     required this.chapterTitle,
     this.sourceName,
     required this.onShowChapterList,
+    required this.onSearchContent,
     required this.onSwitchSource,
     required this.onToggleCleanChapterTitle,
     required this.onRefreshChapter,
+    required this.onShowMoreMenu,
     required this.cleanChapterTitleEnabled,
   });
 
@@ -117,8 +121,18 @@ class ReaderTopMenu extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             _buildRoundIcon(
+              icon: CupertinoIcons.search,
+              onTap: onSearchContent,
+            ),
+            const SizedBox(width: 6),
+            _buildRoundIcon(
               icon: CupertinoIcons.list_bullet,
               onTap: onShowChapterList,
+            ),
+            const SizedBox(width: 6),
+            _buildRoundIcon(
+              icon: CupertinoIcons.ellipsis,
+              onTap: onShowMoreMenu,
             ),
           ],
         ),
@@ -216,10 +230,8 @@ class ReaderBottomMenu extends StatelessWidget {
     final canSlideChapter = maxChapterIndex > 0;
     // CupertinoSlider 在 min==max 时语义计算会除 0，需保证可渲染范围大于 0。
     final chapterSliderMax = canSlideChapter ? maxChapterIndex.toDouble() : 1.0;
-    final chapterSliderValue = currentChapterIndex
-        .toDouble()
-        .clamp(0.0, chapterSliderMax)
-        .toDouble();
+    final chapterSliderValue =
+        currentChapterIndex.toDouble().clamp(0.0, chapterSliderMax).toDouble();
     final safeBrightness =
         settings.brightness.isFinite ? settings.brightness : 1.0;
 
@@ -262,7 +274,10 @@ class ReaderBottomMenu extends StatelessWidget {
                             ? (value) {
                                 // 实时更新章节（拖动时立即跳转）
                                 onChapterChanged(
-                                  value.round().clamp(0, maxChapterIndex).toInt(),
+                                  value
+                                      .round()
+                                      .clamp(0, maxChapterIndex)
+                                      .toInt(),
                                 );
                               }
                             : null,

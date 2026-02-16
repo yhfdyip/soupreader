@@ -82,6 +82,33 @@ class BookAddService {
     return a.trim() == b.trim();
   }
 
+  String _buildBookshelfMatchKey(String name, String author) {
+    final normalizedName = name.trim();
+    final normalizedAuthor = author.trim();
+    if (normalizedAuthor.isNotEmpty) {
+      return '$normalizedName-$normalizedAuthor';
+    }
+    return normalizedName;
+  }
+
+  Set<String> buildSearchBookshelfKeys() {
+    final keys = <String>{};
+    final books = _bookRepo.getAllBooks();
+    for (final book in books) {
+      final name = book.title.trim();
+      final author = book.author.trim();
+      final bookUrl = (book.bookUrl ?? '').trim();
+      if (name.isNotEmpty) {
+        keys.add(name);
+        keys.add(_buildBookshelfMatchKey(name, author));
+      }
+      if (bookUrl.isNotEmpty) {
+        keys.add(bookUrl);
+      }
+    }
+    return keys;
+  }
+
   /// 复用与导入一致的 ID 生成规则，保证“是否已在书架”的判断稳定。
   String? buildBookId(SearchResult result) {
     final source = _sourceRepo.getSourceByUrl(result.sourceUrl);
@@ -92,10 +119,25 @@ class BookAddService {
     );
   }
 
-  bool isInBookshelf(SearchResult result) {
-    final bookId = buildBookId(result);
-    if (bookId == null) return false;
-    return _bookRepo.hasBook(bookId);
+  bool isInBookshelf(
+    SearchResult result, {
+    Set<String>? bookshelfKeys,
+  }) {
+    final name = result.name.trim();
+    final author = result.author.trim();
+    final bookUrl = result.bookUrl.trim();
+    if (name.isEmpty && bookUrl.isEmpty) return false;
+    final keys = bookshelfKeys ?? buildSearchBookshelfKeys();
+    if (name.isNotEmpty) {
+      final key = _buildBookshelfMatchKey(name, author);
+      if (keys.contains(key) || keys.contains(name)) {
+        return true;
+      }
+    }
+    if (bookUrl.isNotEmpty && keys.contains(bookUrl)) {
+      return true;
+    }
+    return false;
   }
 
   List<Chapter> _buildChapters(String bookId, List<TocItem> tocItems) {

@@ -192,7 +192,17 @@ class RuleParserEngine {
         index1Based: i + 1,
         jsLib: jsLib,
       );
-      out.add(TocItem(index: item.index, name: newName, url: item.url));
+      out.add(
+        TocItem(
+          index: item.index,
+          name: newName,
+          url: item.url,
+          isVolume: item.isVolume,
+          isVip: item.isVip,
+          isPay: item.isPay,
+          tag: item.tag,
+        ),
+      );
     }
     return out;
   }
@@ -242,6 +252,34 @@ class RuleParserEngine {
       );
     }
     return transformed;
+  }
+
+  void _runPreUpdateJs({
+    required String? jsRule,
+    required String currentUrl,
+    String? jsLib,
+    void Function(String message)? onLog,
+  }) {
+    final js = (jsRule ?? '').trim();
+    if (js.isEmpty) return;
+    try {
+      final vars = Map<String, String>.from(_runtimeVariables);
+      _evalJsMaybeString(
+        js: js,
+        jsLib: jsLib,
+        bindings: <String, Object?>{
+          'baseUrl': currentUrl,
+          'url': currentUrl,
+          'vars': vars,
+        },
+      );
+      for (final entry in vars.entries) {
+        _putRuntimeVariable(entry.key, entry.value);
+      }
+      onLog?.call('preUpdateJs 已执行（目录前置）');
+    } catch (e) {
+      onLog?.call('preUpdateJs 执行失败：$e');
+    }
   }
 
   String _evalStageJsFallback({
@@ -708,6 +746,18 @@ class RuleParserEngine {
   bool _isLiteralRuleCandidate(String rawRule) {
     if (rawRule.trim().isEmpty) return false;
     return _isPureGetTokenRule(rawRule) || _isPureTemplateTokenRule(rawRule);
+  }
+
+  // 对齐 legado 的 `String.isTrue()` 常见语义：
+  // - 空/null 默认 false
+  // - false/no/not/0 视为 false
+  // - 其它非空值视为 true
+  bool _isRuleTruthy(String? raw) {
+    final value = (raw ?? '').trim();
+    if (value.isEmpty) return false;
+    final lowered = value.toLowerCase();
+    if (lowered == 'null') return false;
+    return !RegExp(r'^(false|no|not|0)$', caseSensitive: false).hasMatch(value);
   }
 
   Map<String, Object?> _buildUrlJsBindings({
@@ -3255,72 +3305,430 @@ class RuleParserEngine {
     }
   }
 
-  /// 搜索书籍
-  Future<List<SearchResult>> search(BookSource source, String keyword) async {
-    _clearRuntimeVariables();
-    final searchRule = source.ruleSearch;
-    final searchUrlRule = source.searchUrl;
-    if (searchRule == null || searchUrlRule == null || searchUrlRule.isEmpty) {
-      return [];
+  _ResolvedBookListRule? _resolveBookListRuleForStage(
+    BookSource source, {
+    required bool isSearch,
+  }) {
+    if (isSearch) {
+      final searchRule = source.ruleSearch;
+      if (searchRule == null) return null;
+      return _ResolvedBookListRule(
+        rule: searchRule,
+        usedSearchRuleAsExploreFallback: false,
+      );
     }
 
+    final exploreRule = source.ruleExplore;
+    if (exploreRule != null && (exploreRule.bookList ?? '').trim().isNotEmpty) {
+      return _ResolvedBookListRule(
+        rule: exploreRule,
+        usedSearchRuleAsExploreFallback: false,
+      );
+    }
+
+    final searchRule = source.ruleSearch;
+    if (searchRule != null) {
+      return _ResolvedBookListRule(
+        rule: searchRule,
+        usedSearchRuleAsExploreFallback: true,
+      );
+    }
+
+    if (exploreRule != null) {
+      return _ResolvedBookListRule(
+        rule: exploreRule,
+        usedSearchRuleAsExploreFallback: false,
+      );
+    }
+
+    return null;
+  }
+
+  bool _matchesBookUrlPatternLikeLegado(
+    String? pattern,
+    String url,
+  ) {
+    final raw = (pattern ?? '').trim();
+    if (raw.isEmpty) return false;
+    final target = url.trim();
+    if (target.isEmpty) return false;
     try {
-      // 构建搜索URL
-      final searchUrl = _buildUrl(
-        source.bookSourceUrl,
-        searchUrlRule,
-        {'key': keyword, 'searchKey': keyword},
-        jsLib: source.jsLib,
-      );
+      // Kotlin String.matches(regex) 语义是“整串匹配”，而非 contains/hasMatch。
+      final match = RegExp(raw).firstMatch(target);
+      return match != null && match.start == 0 && match.end == target.length;
+    } catch (_) {
+      return false;
+    }
+  }
 
-      // 发送请求
-      final response = await _fetch(
-        searchUrl,
-        header: source.header,
-        jsLib: source.jsLib,
-        timeoutMs: source.respondTime,
-        enabledCookieJar: source.enabledCookieJar,
-        sourceKey: source.bookSourceUrl,
-        concurrentRate: source.concurrentRate,
-      );
-      if (response == null) return [];
+  String _resolveBookInfoTocUrlLikeLegado({
+    required String rawValue,
+    required String requestUrl,
+    required String redirectUrl,
+  }) {
+    // 对标 AnalyzeRule.getString(..., isUrl=true)：
+    // - 规则值为空 -> fallback baseUrl（这里是请求 URL）
+    // - 规则值非空 -> 以 redirectUrl 为基准绝对化
+    final request = requestUrl.trim();
+    final redirect =
+        redirectUrl.trim().isNotEmpty ? redirectUrl.trim() : request;
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) return request;
+    return _absoluteUrl(redirect, trimmed).trim();
+  }
 
-      final results = <SearchResult>[];
+  static final RegExp _bookNameRegexLikeLegado =
+      RegExp(r'\s+作\s*者.*|\s+\S+\s+著');
+  static final RegExp _bookAuthorRegexLikeLegado =
+      RegExp(r'^\s*作\s*者[:：\s]+|\s+著');
+  static final RegExp _numericRegexLikeLegado = RegExp(r'^-?[0-9]+$');
 
-      // 获取书籍列表
-      final bookListRule = searchRule.bookList ?? '';
-      final trimmed = response.trimLeft();
+  String _formatBookNameLikeLegado(String raw) {
+    return raw.replaceAll(_bookNameRegexLikeLegado, '').trim();
+  }
+
+  String _formatBookAuthorLikeLegado(String raw) {
+    return raw.replaceAll(_bookAuthorRegexLikeLegado, '').trim();
+  }
+
+  String _formatWordCountLikeLegado(String? raw) {
+    final wc = (raw ?? '').trim();
+    if (wc.isEmpty) return '';
+    if (!_numericRegexLikeLegado.hasMatch(wc)) return wc;
+
+    final words = int.tryParse(wc) ?? 0;
+    if (words <= 0) return '';
+    if (words > 10000) {
+      final value = (words / 10000.0)
+          .toStringAsFixed(1)
+          .replaceFirst(RegExp(r'\.0$'), '');
+      return '$value万字';
+    }
+    return '$words字';
+  }
+
+  String _formatIntroLikeLegado(String raw) {
+    if (raw.trim().isEmpty) return '';
+    return HtmlTextFormatter.formatToPlainText(raw);
+  }
+
+  String _joinKindLikeLegado(List<String> values) {
+    final cleaned = values
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    if (cleaned.isEmpty) return '';
+    return cleaned.join(',');
+  }
+
+  String _parseKindFromJsonNodeLikeLegado(
+    dynamic node,
+    String? rule,
+    String baseUrl,
+  ) {
+    final rawRule = (rule ?? '').trim();
+    if (rawRule.isEmpty) return '';
+    final values = _parseStringListFromJson(
+      json: node,
+      rule: rawRule,
+      baseUrl: baseUrl,
+      isUrl: false,
+    );
+    if (values.isNotEmpty) {
+      return _joinKindLikeLegado(values);
+    }
+    return _parseValueOnNode(node, rawRule, baseUrl).trim();
+  }
+
+  String _parseKindFromHtmlElementLikeLegado(
+    Element root,
+    String? rule,
+    String baseUrl,
+  ) {
+    final rawRule = (rule ?? '').trim();
+    if (rawRule.isEmpty) return '';
+    final values = _parseStringListFromHtml(
+      root: root,
+      rule: rawRule,
+      baseUrl: baseUrl,
+      isUrl: false,
+    );
+    if (values.isNotEmpty) {
+      return _joinKindLikeLegado(values);
+    }
+    return _parseRule(root, rawRule, baseUrl).trim();
+  }
+
+  String _searchResultDedupKey(SearchResult result) {
+    // 对标 legado：SearchBook.equals/hashCode 仅基于 bookUrl。
+    return result.bookUrl;
+  }
+
+  List<SearchResult> _postProcessBookListLikeLegado({
+    required List<SearchResult> results,
+    required bool reverse,
+  }) {
+    if (results.isEmpty) return const <SearchResult>[];
+    final out = <SearchResult>[];
+    final seen = <String>{};
+    for (final item in results) {
+      final key = _searchResultDedupKey(item);
+      if (!seen.add(key)) continue;
+      out.add(item);
+    }
+    if (reverse) {
+      return out.reversed.toList(growable: false);
+    }
+    return out;
+  }
+
+  BookDetail? _parseBookDetailFromBodyLikeLegado({
+    required BookSource source,
+    required String parseBaseUrl,
+    required String body,
+  }) {
+    final rule = source.ruleBookInfo;
+    if (rule == null) return null;
+    try {
+      final trimmed = body.trimLeft();
       final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(response)
+          ? _tryDecodeJsonValue(body)
           : null;
 
-      // JSONPath 模式（对标 legado：部分源直接返回 JSON）
-      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
-        final nodes = _selectJsonList(jsonRoot, bookListRule);
-        for (final node in nodes) {
-          final name = _parseValueOnNode(node, searchRule.name, searchUrl);
-          final author = _parseValueOnNode(node, searchRule.author, searchUrl);
-          final intro = _parseValueOnNode(node, searchRule.intro, searchUrl);
-          final kind = _parseValueOnNode(node, searchRule.kind, searchUrl);
-          final lastChapter =
-              _parseValueOnNode(node, searchRule.lastChapter, searchUrl);
-          final updateTime =
-              _parseValueOnNode(node, searchRule.updateTime, searchUrl);
-          final wordCount =
-              _parseValueOnNode(node, searchRule.wordCount, searchUrl);
+      if (jsonRoot != null) {
+        var coverUrl = _parseValueOnNode(jsonRoot, rule.coverUrl, parseBaseUrl);
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
+        }
+        final name = _formatBookNameLikeLegado(
+            _parseValueOnNode(jsonRoot, rule.name, parseBaseUrl));
+        final author = _formatBookAuthorLikeLegado(
+          _parseValueOnNode(jsonRoot, rule.author, parseBaseUrl),
+        );
+        final intro = _formatIntroLikeLegado(
+          _parseValueOnNode(jsonRoot, rule.intro, parseBaseUrl),
+        );
+        final kind = _parseKindFromJsonNodeLikeLegado(
+          jsonRoot,
+          rule.kind,
+          parseBaseUrl,
+        );
+        final wordCount = _formatWordCountLikeLegado(
+          _parseValueOnNode(jsonRoot, rule.wordCount, parseBaseUrl),
+        );
+        return BookDetail(
+          name: name,
+          author: author,
+          coverUrl: coverUrl,
+          intro: intro,
+          kind: kind,
+          lastChapter:
+              _parseValueOnNode(jsonRoot, rule.lastChapter, parseBaseUrl),
+          updateTime:
+              _parseValueOnNode(jsonRoot, rule.updateTime, parseBaseUrl),
+          wordCount: wordCount,
+          tocUrl: _resolveTocUrlLikeLegado(
+            rawValue: _parseValueOnNode(jsonRoot, rule.tocUrl, parseBaseUrl),
+            baseUrl: parseBaseUrl,
+          ),
+          bookUrl: parseBaseUrl,
+        );
+      }
 
-          var bookUrl = _parseValueOnNode(node, searchRule.bookUrl, searchUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(searchUrl, bookUrl);
-          }
+      final document = html_parser.parse(body);
+      Element? root = document.documentElement;
+      if (rule.init != null && rule.init!.trim().isNotEmpty) {
+        root = _selectFirstElementByRule(document, rule.init!.trim());
+      }
+      if (root == null) return null;
+      final name =
+          _formatBookNameLikeLegado(_parseRule(root, rule.name, parseBaseUrl));
+      final author = _formatBookAuthorLikeLegado(
+          _parseRule(root, rule.author, parseBaseUrl));
+      final intro =
+          _formatIntroLikeLegado(_parseRule(root, rule.intro, parseBaseUrl));
+      final kind = _parseKindFromHtmlElementLikeLegado(
+        root,
+        rule.kind,
+        parseBaseUrl,
+      );
+      final wordCount = _formatWordCountLikeLegado(
+        _parseRule(root, rule.wordCount, parseBaseUrl),
+      );
+      return BookDetail(
+        name: name,
+        author: author,
+        coverUrl: _parseRuleAsUrlLikeLegado(root, rule.coverUrl, parseBaseUrl),
+        intro: intro,
+        kind: kind,
+        lastChapter: _parseRule(root, rule.lastChapter, parseBaseUrl),
+        updateTime: _parseRule(root, rule.updateTime, parseBaseUrl),
+        wordCount: wordCount,
+        tocUrl: _resolveTocUrlLikeLegado(
+          rawValue:
+              _parseRuleAsUrlRawLikeLegado(root, rule.tocUrl, parseBaseUrl),
+          baseUrl: parseBaseUrl,
+        ),
+        bookUrl: parseBaseUrl,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
-          var coverUrl =
-              _parseValueOnNode(node, searchRule.coverUrl, searchUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(searchUrl, coverUrl);
-          }
+  SearchResult? _parseInfoAsSearchResultLikeLegado({
+    required BookSource source,
+    required String requestUrl,
+    required String responseUrl,
+    required bool isRedirect,
+    required String body,
+    bool Function(String name, String author)? filter,
+  }) {
+    final detail = _parseBookDetailFromBodyLikeLegado(
+      source: source,
+      parseBaseUrl: responseUrl,
+      body: body,
+    );
+    if (detail == null) return null;
+    final name = detail.name.trim();
+    if (name.isEmpty) return null;
+    final author = detail.author.trim();
+    if (filter?.call(name, author) == false) {
+      return null;
+    }
+    final normalizedRequestUrl = _parseLegadoStyleUrl(requestUrl).url.trim();
+    final bookUrl = isRedirect
+        ? responseUrl.trim()
+        : (normalizedRequestUrl.isNotEmpty
+            ? normalizedRequestUrl
+            : responseUrl.trim());
+    return SearchResult(
+      name: name,
+      author: author,
+      coverUrl: detail.coverUrl.trim(),
+      intro: detail.intro.trim(),
+      kind: detail.kind.trim(),
+      lastChapter: detail.lastChapter.trim(),
+      updateTime: detail.updateTime.trim(),
+      wordCount: detail.wordCount.trim(),
+      bookUrl: bookUrl,
+      sourceUrl: source.bookSourceUrl,
+      sourceName: source.bookSourceName,
+    );
+  }
 
-          final result = SearchResult(
+  _BookListAnalyzeOutcome _analyzeBookListLikeLegado({
+    required BookSource source,
+    required BookListRule rule,
+    required String requestUrl,
+    required String responseUrl,
+    required bool isRedirect,
+    required String body,
+    required bool isSearch,
+    bool Function(String name, String author)? filter,
+    bool Function(int size)? shouldBreak,
+    void Function(String msg)? onLog,
+  }) {
+    final baseUrl =
+        responseUrl.trim().isNotEmpty ? responseUrl.trim() : requestUrl.trim();
+    final normalizedListRule = _normalizeListRule(rule.bookList);
+    final selector = normalizedListRule.selector;
+    final isInfoByPattern = isSearch &&
+        _matchesBookUrlPatternLikeLegado(source.bookUrlPattern, baseUrl);
+    if (isInfoByPattern) {
+      onLog?.call('≡链接为详情页');
+      final info = _parseInfoAsSearchResultLikeLegado(
+        source: source,
+        requestUrl: requestUrl,
+        responseUrl: baseUrl,
+        isRedirect: isRedirect,
+        body: body,
+        filter: filter,
+      );
+      final infoList =
+          info == null ? const <SearchResult>[] : <SearchResult>[info];
+      return _BookListAnalyzeOutcome(
+        results: infoList,
+        listCount: 0,
+        fieldSample: info == null
+            ? const <String, String>{}
+            : <String, String>{
+                'name': info.name,
+                'author': info.author,
+                'coverUrl': info.coverUrl,
+                'intro': info.intro,
+                'kind': info.kind,
+                'lastChapter': info.lastChapter,
+                'updateTime': info.updateTime,
+                'wordCount': info.wordCount,
+                'bookUrl': info.bookUrl,
+              },
+        listRuleRaw: rule.bookList,
+        usedInfoFallback: true,
+      );
+    }
+
+    final results = <SearchResult>[];
+    Map<String, String> fieldSample = const <String, String>{};
+    var listCount = 0;
+
+    final trimmed = body.trimLeft();
+    final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
+        ? _tryDecodeJsonValue(body)
+        : null;
+
+    if (jsonRoot != null && _looksLikeJsonPath(selector)) {
+      final nodes = _selectJsonList(jsonRoot, selector);
+      listCount = nodes.length;
+      onLog?.call('└列表大小:${nodes.length}');
+      for (final node in nodes) {
+        final name = _formatBookNameLikeLegado(
+            _parseValueOnNode(node, rule.name, baseUrl));
+        final author = _formatBookAuthorLikeLegado(
+            _parseValueOnNode(node, rule.author, baseUrl));
+        if (name.isEmpty) continue;
+        if (filter?.call(name, author) == false) {
+          continue;
+        }
+        final intro = _formatIntroLikeLegado(
+          _parseValueOnNode(node, rule.intro, baseUrl),
+        );
+        final kind = _parseKindFromJsonNodeLikeLegado(node, rule.kind, baseUrl);
+        final lastChapter =
+            _parseValueOnNode(node, rule.lastChapter, baseUrl).trim();
+        final updateTime =
+            _parseValueOnNode(node, rule.updateTime, baseUrl).trim();
+        final wordCount = _formatWordCountLikeLegado(
+          _parseValueOnNode(node, rule.wordCount, baseUrl),
+        );
+        var bookUrl = _parseValueOnNode(node, rule.bookUrl, baseUrl).trim();
+        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+          bookUrl = _absoluteUrl(baseUrl, bookUrl);
+        }
+        if (bookUrl.isEmpty) {
+          bookUrl = baseUrl;
+        }
+        var coverUrl = _parseValueOnNode(node, rule.coverUrl, baseUrl).trim();
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(baseUrl, coverUrl);
+        }
+
+        if (fieldSample.isEmpty) {
+          fieldSample = <String, String>{
+            'name': name,
+            'author': author,
+            'coverUrl': coverUrl,
+            'intro': intro,
+            'kind': kind,
+            'lastChapter': lastChapter,
+            'updateTime': updateTime,
+            'wordCount': wordCount,
+            'bookUrl': bookUrl,
+          };
+        }
+
+        results.add(
+          SearchResult(
             name: name,
             author: author,
             coverUrl: coverUrl,
@@ -3332,47 +3740,184 @@ class RuleParserEngine {
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
-          );
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
+          ),
+        );
+        if (shouldBreak?.call(results.length) == true) {
+          break;
         }
-      } else {
-        // HTML 模式
-        final document = html_parser.parse(response);
-        final bookElements = _selectAllElementsByRule(document, bookListRule);
+      }
+    } else {
+      final document = html_parser.parse(body);
+      final elements = _selectAllElementsByRule(document, selector);
+      listCount = elements.length;
+      onLog?.call('└列表大小:${elements.length}');
+      for (final element in elements) {
+        final name =
+            _formatBookNameLikeLegado(_parseRule(element, rule.name, baseUrl));
+        final author = _formatBookAuthorLikeLegado(
+          _parseRule(element, rule.author, baseUrl),
+        );
+        if (name.isEmpty) continue;
+        if (filter?.call(name, author) == false) {
+          continue;
+        }
+        final kind =
+            _parseKindFromHtmlElementLikeLegado(element, rule.kind, baseUrl);
+        final intro =
+            _formatIntroLikeLegado(_parseRule(element, rule.intro, baseUrl));
+        final lastChapter =
+            _parseRule(element, rule.lastChapter, baseUrl).trim();
+        final updateTime = _parseRule(element, rule.updateTime, baseUrl).trim();
+        final wordCount = _formatWordCountLikeLegado(
+          _parseRule(element, rule.wordCount, baseUrl),
+        );
+        var bookUrl =
+            _parseRuleAsUrlLikeLegado(element, rule.bookUrl, baseUrl).trim();
+        if (bookUrl.isEmpty) {
+          bookUrl = baseUrl;
+        }
+        final coverUrl =
+            _parseRuleAsUrlLikeLegado(element, rule.coverUrl, baseUrl).trim();
 
-        for (final element in bookElements) {
-          final bookUrl =
-              _parseRuleAsUrlLikeLegado(element, searchRule.bookUrl, searchUrl);
-          final coverUrl = _parseRuleAsUrlLikeLegado(
-            element,
-            searchRule.coverUrl,
-            searchUrl,
-          );
+        if (fieldSample.isEmpty) {
+          fieldSample = <String, String>{
+            'name': name,
+            'author': author,
+            'coverUrl': coverUrl,
+            'intro': intro,
+            'kind': kind,
+            'lastChapter': lastChapter,
+            'updateTime': updateTime,
+            'wordCount': wordCount,
+            'bookUrl': bookUrl,
+          };
+        }
 
-          final result = SearchResult(
-            name: _parseRule(element, searchRule.name, searchUrl),
-            author: _parseRule(element, searchRule.author, searchUrl),
+        results.add(
+          SearchResult(
+            name: name,
+            author: author,
             coverUrl: coverUrl,
-            intro: _parseRule(element, searchRule.intro, searchUrl),
-            kind: _parseRule(element, searchRule.kind, searchUrl),
-            lastChapter: _parseRule(element, searchRule.lastChapter, searchUrl),
-            updateTime: _parseRule(element, searchRule.updateTime, searchUrl),
-            wordCount: _parseRule(element, searchRule.wordCount, searchUrl),
+            intro: intro,
+            kind: kind,
+            lastChapter: lastChapter,
+            updateTime: updateTime,
+            wordCount: wordCount,
             bookUrl: bookUrl,
             sourceUrl: source.bookSourceUrl,
             sourceName: source.bookSourceName,
-          );
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
+          ),
+        );
+        if (shouldBreak?.call(results.length) == true) {
+          break;
         }
       }
+    }
+    if (listCount == 0) {
+      onLog?.call('≡列表为空，可能是详情页或规则不匹配');
+    }
 
-      return results;
+    var out = _postProcessBookListLikeLegado(
+      results: results,
+      reverse: normalizedListRule.reverse,
+    );
+
+    if (out.isEmpty &&
+        isSearch &&
+        (source.bookUrlPattern ?? '').trim().isEmpty) {
+      onLog?.call('└列表为空,按详情页解析');
+      final info = _parseInfoAsSearchResultLikeLegado(
+        source: source,
+        requestUrl: requestUrl,
+        responseUrl: baseUrl,
+        isRedirect: isRedirect,
+        body: body,
+        filter: filter,
+      );
+      if (info != null) {
+        out = <SearchResult>[info];
+        fieldSample = <String, String>{
+          'name': info.name,
+          'author': info.author,
+          'coverUrl': info.coverUrl,
+          'intro': info.intro,
+          'kind': info.kind,
+          'lastChapter': info.lastChapter,
+          'updateTime': info.updateTime,
+          'wordCount': info.wordCount,
+          'bookUrl': info.bookUrl,
+        };
+      }
+    }
+
+    return _BookListAnalyzeOutcome(
+      results: out,
+      listCount: listCount,
+      fieldSample: fieldSample,
+      listRuleRaw: rule.bookList,
+      usedInfoFallback: out.isNotEmpty && listCount == 0,
+    );
+  }
+
+  /// 搜索书籍
+  Future<List<SearchResult>> search(
+    BookSource source,
+    String keyword, {
+    int page = 1,
+    bool Function(String name, String author)? filter,
+    bool Function(int size)? shouldBreak,
+  }) async {
+    _clearRuntimeVariables();
+    final resolved = _resolveBookListRuleForStage(source, isSearch: true);
+    final searchUrlRule = source.searchUrl;
+    if (resolved == null || searchUrlRule == null || searchUrlRule.isEmpty) {
+      return [];
+    }
+
+    try {
+      // 构建搜索URL
+      final searchUrl = _buildUrl(
+        source.bookSourceUrl,
+        searchUrlRule,
+        {'key': keyword, 'searchKey': keyword, 'page': '$page'},
+        jsLib: source.jsLib,
+      );
+      var responseUrl = searchUrl;
+      var isRedirect = false;
+
+      // 发送请求
+      final response = await _fetch(
+        searchUrl,
+        header: source.header,
+        jsLib: source.jsLib,
+        loginCheckJs: source.loginCheckJs,
+        timeoutMs: source.respondTime,
+        enabledCookieJar: source.enabledCookieJar,
+        sourceKey: source.bookSourceUrl,
+        concurrentRate: source.concurrentRate,
+        onFinalUrl: (finalUrl) {
+          if (finalUrl.trim().isNotEmpty) {
+            responseUrl = finalUrl.trim();
+          }
+        },
+        onIsRedirect: (redirected) {
+          isRedirect = redirected;
+        },
+      );
+      if (response == null) return [];
+
+      final outcome = _analyzeBookListLikeLegado(
+        source: source,
+        rule: resolved.rule,
+        requestUrl: searchUrl,
+        responseUrl: responseUrl,
+        isRedirect: isRedirect,
+        body: response,
+        isSearch: true,
+        filter: filter,
+        shouldBreak: shouldBreak,
+      );
+      return outcome.results;
     } catch (e, st) {
       debugPrint('搜索失败: $e');
       ExceptionLogService().record(
@@ -3384,6 +3929,7 @@ class RuleParserEngine {
           'sourceUrl': source.bookSourceUrl,
           'sourceName': source.bookSourceName,
           'keyword': keyword,
+          'page': page,
         },
       );
       return [];
@@ -3446,6 +3992,7 @@ class RuleParserEngine {
         url,
         header: source.header,
         jsLib: source.jsLib,
+        loginCheckJs: source.loginCheckJs,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
@@ -3667,7 +4214,10 @@ class RuleParserEngine {
     required void Function(String msg, {int state, bool showTime}) log,
   }) async {
     final isSearch = mode == _DebugListMode.search;
-    final bookListRule = isSearch ? source.ruleSearch : source.ruleExplore;
+    final resolved = _resolveBookListRuleForStage(
+      source,
+      isSearch: isSearch,
+    );
     final urlRule = isSearch
         ? source.searchUrl
         : ((exploreUrlOverride != null && exploreUrlOverride.trim().isNotEmpty)
@@ -3676,9 +4226,13 @@ class RuleParserEngine {
 
     log(isSearch ? '︾开始解析搜索页' : '︾开始解析发现页');
 
-    if (bookListRule == null || urlRule == null || urlRule.trim().isEmpty) {
+    if (resolved == null || urlRule == null || urlRule.trim().isEmpty) {
       log(isSearch ? '⇒搜索规则为空' : '⇒发现规则为空', state: -1);
       return null;
+    }
+    final bookListRule = resolved.rule;
+    if (!isSearch && resolved.usedSearchRuleAsExploreFallback) {
+      log('≡发现列表规则为空，回退使用搜索列表规则');
     }
 
     final requestUrl = isSearch
@@ -3702,128 +4256,40 @@ class RuleParserEngine {
       return null;
     }
 
-    final listSelector = bookListRule.bookList ?? '';
-
     log('┌获取书籍列表');
-    final results = <SearchResult>[];
-    var loggedSample = false;
+    final responseUrl =
+        (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
+            ? requestUrl
+            : fetch.finalUrl!.trim();
+    final outcome = _analyzeBookListLikeLegado(
+      source: source,
+      rule: bookListRule,
+      requestUrl: requestUrl,
+      responseUrl: responseUrl,
+      isRedirect: fetch.isRedirect,
+      body: body,
+      isSearch: isSearch,
+      onLog: (msg) => log(msg, showTime: false),
+    );
 
-    final trimmed = body.trimLeft();
-    final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-        ? _tryDecodeJsonValue(body)
-        : null;
-
-    if (jsonRoot != null && _looksLikeJsonPath(listSelector)) {
-      final nodes = _selectJsonList(jsonRoot, listSelector);
-      log('└列表大小:${nodes.length}');
-      if (nodes.isEmpty) {
-        log('≡列表为空，可能是详情页或规则不匹配');
-      }
-
-      for (var i = 0; i < nodes.length; i++) {
-        final node = nodes[i];
-        final name = _parseValueOnNode(node, bookListRule.name, requestUrl);
-        final author = _parseValueOnNode(node, bookListRule.author, requestUrl);
-        var coverUrl =
-            _parseValueOnNode(node, bookListRule.coverUrl, requestUrl);
-        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-          coverUrl = _absoluteUrl(requestUrl, coverUrl);
-        }
-        final intro = _parseValueOnNode(node, bookListRule.intro, requestUrl);
-        final lastChapter =
-            _parseValueOnNode(node, bookListRule.lastChapter, requestUrl);
-        var bookUrl = _parseValueOnNode(node, bookListRule.bookUrl, requestUrl);
-        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-          bookUrl = _absoluteUrl(requestUrl, bookUrl);
-        }
-
-        if (!loggedSample && name.isNotEmpty && bookUrl.isNotEmpty) {
-          loggedSample = true;
-          log('┌获取书名');
-          log('└$name');
-          log('┌获取作者');
-          log('└$author');
-          log('┌获取封面');
-          log('└$coverUrl');
-          log('┌获取简介');
-          log('└${intro.isEmpty ? '' : intro}');
-          log('┌获取最新章节');
-          log('└$lastChapter');
-          log('┌获取详情链接');
-          log('└$bookUrl');
-        }
-
-        if (name.isEmpty || bookUrl.isEmpty) continue;
-        results.add(
-          SearchResult(
-            name: name,
-            author: author,
-            coverUrl: coverUrl,
-            intro: intro,
-            lastChapter: lastChapter,
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          ),
-        );
-      }
-    } else {
-      final document = html_parser.parse(body);
-      final elements = _selectAllElementsByRule(document, listSelector);
-      log('└列表大小:${elements.length}');
-
-      if (elements.isEmpty) {
-        // 对齐 legado：列表为空时可能是“详情页”，这里仅提示，不强行走详情解析（后续可按 bookUrlPattern 补齐）
-        log('≡列表为空，可能是详情页或规则不匹配');
-      }
-
-      for (var i = 0; i < elements.length; i++) {
-        final el = elements[i];
-        final name = _parseRule(el, bookListRule.name, requestUrl);
-        final author = _parseRule(el, bookListRule.author, requestUrl);
-        final coverUrl =
-            _parseRuleAsUrlLikeLegado(el, bookListRule.coverUrl, requestUrl);
-        final intro = _parseRule(el, bookListRule.intro, requestUrl);
-        final lastChapter =
-            _parseRule(el, bookListRule.lastChapter, requestUrl);
-        final bookUrl =
-            _parseRuleAsUrlLikeLegado(el, bookListRule.bookUrl, requestUrl);
-
-        // 对齐 legado：仅输出“一条有效样本”，避免 selector 命中广告/空节点导致样本全空而误导排查。
-        if (!loggedSample && name.isNotEmpty && bookUrl.isNotEmpty) {
-          loggedSample = true;
-          log('┌获取书名');
-          log('└$name');
-          log('┌获取作者');
-          log('└$author');
-          log('┌获取封面');
-          log('└$coverUrl');
-          log('┌获取简介');
-          log('└${intro.isEmpty ? '' : intro}');
-          log('┌获取最新章节');
-          log('└$lastChapter');
-          log('┌获取详情链接');
-          log('└$bookUrl');
-        }
-
-        if (name.isEmpty || bookUrl.isEmpty) continue;
-        results.add(
-          SearchResult(
-            name: name,
-            author: author,
-            coverUrl: coverUrl,
-            intro: intro,
-            lastChapter: lastChapter,
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          ),
-        );
-      }
+    final sample = outcome.fieldSample;
+    if (sample.isNotEmpty) {
+      log('┌获取书名');
+      log('└${sample['name'] ?? ''}');
+      log('┌获取作者');
+      log('└${sample['author'] ?? ''}');
+      log('┌获取封面');
+      log('└${sample['coverUrl'] ?? ''}');
+      log('┌获取简介');
+      log('└${sample['intro'] ?? ''}');
+      log('┌获取最新章节');
+      log('└${sample['lastChapter'] ?? ''}');
+      log('┌获取详情链接');
+      log('└${sample['bookUrl'] ?? ''}');
     }
 
-    log('◇书籍总数:${results.length}');
-    return results.isNotEmpty ? results.first.bookUrl : null;
+    log('◇书籍总数:${outcome.results.length}');
+    return outcome.results.isNotEmpty ? outcome.results.first.bookUrl : null;
   }
 
   Future<bool> _debugInfoTocContent({
@@ -3892,32 +4358,50 @@ class RuleParserEngine {
 
     // JSON 模式：不支持 init
     if (jsonRoot != null) {
-      String getField(String label, String? ruleStr) {
+      String getField(
+        String label,
+        String? ruleStr, {
+        String Function(String value)? transform,
+      }) {
         log('┌$label');
-        final value = _parseValueOnNode(jsonRoot, ruleStr, parseBaseUrl);
+        var value = _parseValueOnNode(jsonRoot, ruleStr, parseBaseUrl);
+        if (transform != null) {
+          value = transform(value);
+        }
         log('└$value');
         return value;
       }
 
-      final name = getField('获取书名', rule.name);
-      final author = getField('获取作者', rule.author);
-      getField('获取分类', rule.kind);
-      getField('获取字数', rule.wordCount);
+      final name = getField(
+        '获取书名',
+        rule.name,
+        transform: _formatBookNameLikeLegado,
+      );
+      final author = getField(
+        '获取作者',
+        rule.author,
+        transform: _formatBookAuthorLikeLegado,
+      );
+      log('┌获取分类');
+      final kind =
+          _parseKindFromJsonNodeLikeLegado(jsonRoot, rule.kind, parseBaseUrl);
+      log('└$kind');
+      getField('获取字数', rule.wordCount, transform: _formatWordCountLikeLegado);
       final lastChapter = getField('获取最新章节', rule.lastChapter);
-      getField('获取简介', rule.intro);
+      getField('获取简介', rule.intro, transform: _formatIntroLikeLegado);
       getField('获取封面', rule.coverUrl);
       log('┌获取目录链接');
       final rawTocUrl = _parseValueOnNode(jsonRoot, rule.tocUrl, parseBaseUrl);
       if (rawTocUrl.trim().isEmpty) {
         log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
       }
-      final tocUrl = _resolveTocUrlLikeLegado(
+      final tocUrl = _resolveBookInfoTocUrlLikeLegado(
         rawValue: rawTocUrl,
-        baseUrl: parseBaseUrl,
+        requestUrl: fullUrl,
+        redirectUrl: parseBaseUrl,
       );
       log('└$tocUrl');
-      if (_normalizeUrlVisitKey(tocUrl) ==
-          _normalizeUrlVisitKey(parseBaseUrl)) {
+      if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(fullUrl)) {
         _cacheBookInfoTocHtml(
           tocUrl: tocUrl,
           html: body,
@@ -3954,19 +4438,37 @@ class RuleParserEngine {
       }
     }
 
-    String getField(String label, String? ruleStr) {
+    String getField(
+      String label,
+      String? ruleStr, {
+      String Function(String value)? transform,
+    }) {
       log('┌$label');
-      final value = _parseRule(root!, ruleStr, parseBaseUrl);
+      var value = _parseRule(root!, ruleStr, parseBaseUrl);
+      if (transform != null) {
+        value = transform(value);
+      }
       log('└$value');
       return value;
     }
 
-    final name = getField('获取书名', rule.name);
-    final author = getField('获取作者', rule.author);
-    getField('获取分类', rule.kind);
-    getField('获取字数', rule.wordCount);
+    final name = getField(
+      '获取书名',
+      rule.name,
+      transform: _formatBookNameLikeLegado,
+    );
+    final author = getField(
+      '获取作者',
+      rule.author,
+      transform: _formatBookAuthorLikeLegado,
+    );
+    log('┌获取分类');
+    final kind =
+        _parseKindFromHtmlElementLikeLegado(root, rule.kind, parseBaseUrl);
+    log('└$kind');
+    getField('获取字数', rule.wordCount, transform: _formatWordCountLikeLegado);
     final lastChapter = getField('获取最新章节', rule.lastChapter);
-    getField('获取简介', rule.intro);
+    getField('获取简介', rule.intro, transform: _formatIntroLikeLegado);
     getField('获取封面', rule.coverUrl);
     log('┌获取目录链接');
     final rawTocUrl = _parseRuleAsUrlRawLikeLegado(
@@ -3977,12 +4479,13 @@ class RuleParserEngine {
     if (rawTocUrl.trim().isEmpty) {
       log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
     }
-    final tocUrl = _resolveTocUrlLikeLegado(
+    final tocUrl = _resolveBookInfoTocUrlLikeLegado(
       rawValue: rawTocUrl,
-      baseUrl: parseBaseUrl,
+      requestUrl: fullUrl,
+      redirectUrl: parseBaseUrl,
     );
     log('└$tocUrl');
-    if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(parseBaseUrl)) {
+    if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(fullUrl)) {
       _cacheBookInfoTocHtml(
         tocUrl: tocUrl,
         html: body,
@@ -4025,11 +4528,18 @@ class RuleParserEngine {
     final visitedUrlKeys = <String>{};
     var currentUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
     var page = 0;
-    const maxPages = 12;
+    const safetyMaxPages = 1000;
     final pendingNextUrls = <String>[];
     final queuedUrlKeys = <String>{};
 
-    while (currentUrl.trim().isNotEmpty && page < maxPages) {
+    _runPreUpdateJs(
+      jsRule: tocRule.preUpdateJs,
+      currentUrl: currentUrl,
+      jsLib: source.jsLib,
+      onLog: (msg) => log('└$msg', showTime: false),
+    );
+
+    while (currentUrl.trim().isNotEmpty) {
       if (!_markVisitedUrl(visitedUrlKeys, currentUrl)) break;
       queuedUrlKeys.remove(_normalizeUrlVisitKey(currentUrl));
 
@@ -4046,19 +4556,11 @@ class RuleParserEngine {
         }
         body = fetch.body!;
       }
-      final stageBody = _applyStageResponseJs(
-        responseText: body,
-        jsRule: tocRule.preUpdateJs,
-        currentUrl: currentUrl,
-        jsLib: source.jsLib,
-        stageLabel: 'preUpdateJs',
-        onLog: (msg) => log('└$msg', showTime: false),
-      );
-      emitRaw(30, stageBody);
+      emitRaw(30, body);
 
-      final trimmed = stageBody.trimLeft();
+      final trimmed = body.trimLeft();
       final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(stageBody)
+          ? _tryDecodeJsonValue(body)
           : null;
 
       List<String> nextCandidates = const <String>[];
@@ -4070,18 +4572,53 @@ class RuleParserEngine {
         for (var i = 0; i < nodes.length; i++) {
           final node = nodes[i];
           final name = _parseValueOnNode(node, tocRule.chapterName, currentUrl);
+          final tag = _parseValueOnNode(node, tocRule.updateTime, currentUrl);
+          final isVolume = _isRuleTruthy(
+            _parseValueOnNode(node, tocRule.isVolume, currentUrl),
+          );
+          final isVip = _isRuleTruthy(
+            _parseValueOnNode(node, tocRule.isVip, currentUrl),
+          );
+          final isPay = _isRuleTruthy(
+            _parseValueOnNode(node, tocRule.isPay, currentUrl),
+          );
           var url = _parseValueOnNode(node, tocRule.chapterUrl, currentUrl);
           if (url.isNotEmpty && !url.startsWith('http')) {
             url = _absoluteUrl(currentUrl, url);
+          }
+          if (url.trim().isEmpty) {
+            if (isVolume) {
+              url = '$name$i';
+              log('⇒一级目录$i未获取到url,使用标题替代', showTime: false);
+            } else {
+              url = currentUrl;
+              log('⇒目录$i未获取到url,使用baseUrl替代', showTime: false);
+            }
           }
           if (toc.isEmpty && i == 0) {
             log('┌获取章节名');
             log('└$name');
             log('┌获取章节链接');
             log('└$url');
+            log('┌获取章节信息');
+            log('└$tag');
+            log('┌是否VIP');
+            log('└$isVip');
+            log('┌是否购买');
+            log('└$isPay');
           }
           if (name.isEmpty || url.isEmpty) continue;
-          toc.add(TocItem(index: toc.length, name: name, url: url));
+          toc.add(
+            TocItem(
+              index: toc.length,
+              name: name,
+              url: url,
+              isVolume: isVolume,
+              isVip: isVip,
+              isPay: isPay,
+              tag: tag.isEmpty ? null : tag,
+            ),
+          );
         }
         if (tocRule.nextTocUrl != null &&
             tocRule.nextTocUrl!.trim().isNotEmpty) {
@@ -4097,23 +4634,56 @@ class RuleParserEngine {
           }
         }
       } else {
-        final document = html_parser.parse(stageBody);
+        final document = html_parser.parse(body);
         final elements =
             _selectAllElementsByRule(document, normalized.selector);
         log('└列表大小:${elements.length}');
         for (var i = 0; i < elements.length; i++) {
           final el = elements[i];
           final name = _parseRule(el, tocRule.chapterName, currentUrl);
+          final tag = _parseRule(el, tocRule.updateTime, currentUrl);
+          final isVolume =
+              _isRuleTruthy(_parseRule(el, tocRule.isVolume, currentUrl));
+          final isVip =
+              _isRuleTruthy(_parseRule(el, tocRule.isVip, currentUrl));
+          final isPay =
+              _isRuleTruthy(_parseRule(el, tocRule.isPay, currentUrl));
           final url =
               _parseRuleAsUrlLikeLegado(el, tocRule.chapterUrl, currentUrl);
+          var resolvedUrl = url;
+          if (resolvedUrl.trim().isEmpty) {
+            if (isVolume) {
+              resolvedUrl = '$name$i';
+              log('⇒一级目录$i未获取到url,使用标题替代', showTime: false);
+            } else {
+              resolvedUrl = currentUrl;
+              log('⇒目录$i未获取到url,使用baseUrl替代', showTime: false);
+            }
+          }
           if (toc.isEmpty && i == 0) {
             log('┌获取章节名');
             log('└$name');
             log('┌获取章节链接');
-            log('└$url');
+            log('└$resolvedUrl');
+            log('┌获取章节信息');
+            log('└$tag');
+            log('┌是否VIP');
+            log('└$isVip');
+            log('┌是否购买');
+            log('└$isPay');
           }
-          if (name.isEmpty || url.isEmpty) continue;
-          toc.add(TocItem(index: toc.length, name: name, url: url));
+          if (name.isEmpty || resolvedUrl.isEmpty) continue;
+          toc.add(
+            TocItem(
+              index: toc.length,
+              name: name,
+              url: resolvedUrl,
+              isVolume: isVolume,
+              isVip: isVip,
+              isPay: isPay,
+              tag: tag.isEmpty ? null : tag,
+            ),
+          );
         }
         if (tocRule.nextTocUrl != null &&
             tocRule.nextTocUrl!.trim().isNotEmpty) {
@@ -4161,6 +4731,10 @@ class RuleParserEngine {
       }
       currentUrl = pendingNextUrls.removeAt(0);
       page++;
+      if (page >= safetyMaxPages) {
+        log('≡目录翻页达到安全上限（$safetyMaxPages），停止继续翻页');
+        break;
+      }
     }
 
     var out = _postProcessTocLikeLegado(
@@ -4182,10 +4756,19 @@ class RuleParserEngine {
     log('︽目录页解析完成', showTime: false);
     log('', showTime: false);
 
+    final readable = out
+        .where((item) => !(item.isVolume && item.url.startsWith(item.name)))
+        .toList(growable: false);
+    if (readable.isEmpty) {
+      log('≡没有正文章节');
+      return true;
+    }
+
     return _debugContentOnly(
       source: source,
-      chapterUrl: out.first.url,
-      nextChapterUrl: out.length > 1 ? out[1].url : null,
+      chapterUrl: readable.first.url,
+      nextChapterUrl:
+          readable.length > 1 ? readable[1].url : readable.first.url,
       fetchStage: fetchStage,
       emitRaw: emitRaw,
       log: log,
@@ -4209,6 +4792,12 @@ class RuleParserEngine {
       log('⇒正文规则为空', state: -1);
       return false;
     }
+    if ((rule.content ?? '').trim().isEmpty) {
+      log('⇒正文规则为空,使用章节链接:$chapterUrl');
+      emitRaw(41, chapterUrl);
+      log('︽正文页解析完成');
+      return true;
+    }
 
     final visitedUrlKeys = <String>{};
     var currentUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
@@ -4217,20 +4806,24 @@ class RuleParserEngine {
       nextChapterUrl: nextChapterUrl,
     );
     var page = 0;
-    const maxPages = 8;
+    const safetyMaxPages = 1000;
 
     final parts = <String>[];
     var totalExtracted = 0;
     final pendingNextUrls = <String>[];
     final queuedUrlKeys = <String>{};
 
-    while (currentUrl.trim().isNotEmpty && page < maxPages) {
+    while (currentUrl.trim().isNotEmpty) {
       if (!_markVisitedUrl(visitedUrlKeys, currentUrl)) break;
       queuedUrlKeys.remove(_normalizeUrlVisitKey(currentUrl));
 
       log('≡正文页请求:${page + 1}');
       final fetch = await fetchStage(currentUrl, rawState: 40);
-      final body = fetch.body!;
+      final body = fetch.body;
+      if (body == null) {
+        log('⇒正文页请求失败', state: -1);
+        break;
+      }
       final stageBody = _applyStageResponseJs(
         responseText: body,
         jsRule: rule.webJs,
@@ -4273,13 +4866,7 @@ class RuleParserEngine {
           log('⇒页面无 documentElement', state: -1);
           return false;
         }
-
-        if (rule.content == null || rule.content!.trim().isEmpty) {
-          if (page == 0) log('⇒内容规则为空，默认获取整个网页');
-          extracted = root.text;
-        } else {
-          extracted = _parseRule(root, rule.content, currentUrl);
-        }
+        extracted = _parseRule(root, rule.content, currentUrl);
 
         if (rule.nextContentUrl != null &&
             rule.nextContentUrl!.trim().isNotEmpty) {
@@ -4338,6 +4925,10 @@ class RuleParserEngine {
       }
       currentUrl = pendingNextUrls.removeAt(0);
       page++;
+      if (page >= safetyMaxPages) {
+        log('≡正文翻页达到安全上限（$safetyMaxPages），停止继续翻页');
+        break;
+      }
     }
 
     final cleanedAll = parts.join('\n');
@@ -4364,16 +4955,17 @@ class RuleParserEngine {
   Future<SearchDebugResult> searchDebug(
     BookSource source,
     String keyword, {
+    int page = 1,
     CancelToken? cancelToken,
   }) async {
-    final searchRule = source.ruleSearch;
+    final resolved = _resolveBookListRuleForStage(source, isSearch: true);
     final searchUrlRule = source.searchUrl;
-    if (searchRule == null || searchUrlRule == null || searchUrlRule.isEmpty) {
+    if (resolved == null || searchUrlRule == null || searchUrlRule.isEmpty) {
       return SearchDebugResult(
         fetch: FetchDebugResult.empty(),
         requestType: DebugRequestType.search,
         requestUrlRule: searchUrlRule,
-        listRule: searchRule?.bookList,
+        listRule: resolved?.rule.bookList,
         listCount: 0,
         results: const [],
         fieldSample: const {},
@@ -4384,7 +4976,7 @@ class RuleParserEngine {
     final requestUrl = _buildUrl(
       source.bookSourceUrl,
       searchUrlRule,
-      {'key': keyword, 'searchKey': keyword},
+      {'key': keyword, 'searchKey': keyword, 'page': '$page'},
       jsLib: source.jsLib,
     );
 
@@ -4392,6 +4984,7 @@ class RuleParserEngine {
       requestUrl,
       header: source.header,
       jsLib: source.jsLib,
+      loginCheckJs: source.loginCheckJs,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
@@ -4403,7 +4996,7 @@ class RuleParserEngine {
         fetch: fetch,
         requestType: DebugRequestType.search,
         requestUrlRule: searchUrlRule,
-        listRule: searchRule.bookList,
+        listRule: resolved.rule.bookList,
         listCount: 0,
         results: const [],
         fieldSample: const {},
@@ -4412,142 +5005,29 @@ class RuleParserEngine {
     }
 
     try {
-      final bookListRule = searchRule.bookList ?? '';
-      final results = <SearchResult>[];
-      Map<String, String> fieldSample = const {};
-      var listCount = 0;
-
       final body = fetch.body!;
-      final trimmed = body.trimLeft();
-      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(body)
-          : null;
-
-      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
-        final nodes = _selectJsonList(jsonRoot, bookListRule);
-        listCount = nodes.length;
-        for (final node in nodes) {
-          final name = _parseValueOnNode(node, searchRule.name, requestUrl);
-          final author = _parseValueOnNode(node, searchRule.author, requestUrl);
-          final kind = _parseValueOnNode(node, searchRule.kind, requestUrl);
-          var coverUrl =
-              _parseValueOnNode(node, searchRule.coverUrl, requestUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(requestUrl, coverUrl);
-          }
-          final intro = _parseValueOnNode(node, searchRule.intro, requestUrl);
-          final lastChapter =
-              _parseValueOnNode(node, searchRule.lastChapter, requestUrl);
-          final updateTime =
-              _parseValueOnNode(node, searchRule.updateTime, requestUrl);
-          final wordCount =
-              _parseValueOnNode(node, searchRule.wordCount, requestUrl);
-          var bookUrl = _parseValueOnNode(node, searchRule.bookUrl, requestUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(requestUrl, bookUrl);
-          }
-
-          final result = SearchResult(
-            name: name,
-            author: author,
-            coverUrl: coverUrl,
-            intro: intro,
-            kind: kind,
-            lastChapter: lastChapter,
-            updateTime: updateTime,
-            wordCount: wordCount,
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          );
-
-          if (results.isEmpty) {
-            fieldSample = <String, String>{
-              'name': name,
-              'author': author,
-              'coverUrl': coverUrl,
-              'intro': intro,
-              'kind': kind,
-              'lastChapter': lastChapter,
-              'updateTime': updateTime,
-              'wordCount': wordCount,
-              'bookUrl': bookUrl,
-            };
-          }
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
-        }
-      } else {
-        final document = html_parser.parse(body);
-        final bookElements = _selectAllElementsByRule(document, bookListRule);
-        listCount = bookElements.length;
-
-        for (final element in bookElements) {
-          final name = _parseRule(element, searchRule.name, requestUrl);
-          final author = _parseRule(element, searchRule.author, requestUrl);
-          final kind = _parseRule(element, searchRule.kind, requestUrl);
-          final coverUrl = _parseRuleAsUrlLikeLegado(
-            element,
-            searchRule.coverUrl,
-            requestUrl,
-          );
-          final intro = _parseRule(element, searchRule.intro, requestUrl);
-          final lastChapter =
-              _parseRule(element, searchRule.lastChapter, requestUrl);
-          final updateTime =
-              _parseRule(element, searchRule.updateTime, requestUrl);
-          final wordCount =
-              _parseRule(element, searchRule.wordCount, requestUrl);
-          final bookUrl = _parseRuleAsUrlLikeLegado(
-            element,
-            searchRule.bookUrl,
-            requestUrl,
-          );
-
-          final result = SearchResult(
-            name: name,
-            author: author,
-            coverUrl: coverUrl,
-            intro: intro,
-            kind: kind,
-            lastChapter: lastChapter,
-            updateTime: updateTime,
-            wordCount: wordCount,
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          );
-
-          if (results.isEmpty) {
-            fieldSample = <String, String>{
-              'name': name,
-              'author': author,
-              'coverUrl': coverUrl,
-              'intro': intro,
-              'kind': kind,
-              'lastChapter': lastChapter,
-              'updateTime': updateTime,
-              'wordCount': wordCount,
-              'bookUrl': bookUrl,
-            };
-          }
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
-        }
-      }
+      final responseUrl =
+          (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
+              ? requestUrl
+              : fetch.finalUrl!.trim();
+      final outcome = _analyzeBookListLikeLegado(
+        source: source,
+        rule: resolved.rule,
+        requestUrl: requestUrl,
+        responseUrl: responseUrl,
+        isRedirect: fetch.isRedirect,
+        body: body,
+        isSearch: true,
+      );
 
       return SearchDebugResult(
         fetch: fetch,
         requestType: DebugRequestType.search,
         requestUrlRule: searchUrlRule,
-        listRule: bookListRule,
-        listCount: listCount,
-        results: results,
-        fieldSample: fieldSample,
+        listRule: outcome.listRuleRaw,
+        listCount: outcome.listCount,
+        results: outcome.results,
+        fieldSample: outcome.fieldSample,
         error: null,
       );
     } catch (e) {
@@ -4555,7 +5035,7 @@ class RuleParserEngine {
         fetch: fetch,
         requestType: DebugRequestType.search,
         requestUrlRule: searchUrlRule,
-        listRule: searchRule.bookList,
+        listRule: resolved.rule.bookList,
         listCount: 0,
         results: const [],
         fieldSample: const {},
@@ -4573,9 +5053,9 @@ class RuleParserEngine {
     int page = 1,
   }) async {
     _clearRuntimeVariables();
-    final exploreRule = source.ruleExplore;
+    final resolved = _resolveBookListRuleForStage(source, isSearch: false);
     final exploreUrlRule = exploreUrlOverride ?? source.exploreUrl;
-    if (exploreRule == null ||
+    if (resolved == null ||
         exploreUrlRule == null ||
         exploreUrlRule.trim().isEmpty) {
       return [];
@@ -4590,108 +5070,39 @@ class RuleParserEngine {
         },
         jsLib: source.jsLib,
       );
+      var responseUrl = exploreUrl;
+      var isRedirect = false;
 
       final response = await _fetch(
         exploreUrl,
         header: source.header,
         jsLib: source.jsLib,
+        loginCheckJs: source.loginCheckJs,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
         concurrentRate: source.concurrentRate,
+        onFinalUrl: (finalUrl) {
+          if (finalUrl.trim().isNotEmpty) {
+            responseUrl = finalUrl.trim();
+          }
+        },
+        onIsRedirect: (redirected) {
+          isRedirect = redirected;
+        },
       );
       if (response == null) return [];
 
-      final results = <SearchResult>[];
-
-      final bookListRule = exploreRule.bookList ?? '';
-      final trimmed = response.trimLeft();
-      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(response)
-          : null;
-
-      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
-        final nodes = _selectJsonList(jsonRoot, bookListRule);
-        for (final node in nodes) {
-          final name = _parseValueOnNode(node, exploreRule.name, exploreUrl);
-          final author =
-              _parseValueOnNode(node, exploreRule.author, exploreUrl);
-          final intro = _parseValueOnNode(node, exploreRule.intro, exploreUrl);
-          final kind = _parseValueOnNode(node, exploreRule.kind, exploreUrl);
-          final lastChapter =
-              _parseValueOnNode(node, exploreRule.lastChapter, exploreUrl);
-          final updateTime =
-              _parseValueOnNode(node, exploreRule.updateTime, exploreUrl);
-          final wordCount =
-              _parseValueOnNode(node, exploreRule.wordCount, exploreUrl);
-
-          var bookUrl =
-              _parseValueOnNode(node, exploreRule.bookUrl, exploreUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(exploreUrl, bookUrl);
-          }
-
-          var coverUrl =
-              _parseValueOnNode(node, exploreRule.coverUrl, exploreUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(exploreUrl, coverUrl);
-          }
-
-          final result = SearchResult(
-            name: name,
-            author: author,
-            coverUrl: coverUrl,
-            intro: intro,
-            kind: kind,
-            lastChapter: lastChapter,
-            updateTime: updateTime,
-            wordCount: wordCount,
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          );
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
-        }
-      } else {
-        final document = html_parser.parse(response);
-        final bookElements = _selectAllElementsByRule(document, bookListRule);
-
-        for (final element in bookElements) {
-          final bookUrl = _parseRuleAsUrlLikeLegado(
-            element,
-            exploreRule.bookUrl,
-            exploreUrl,
-          );
-          final coverUrl = _parseRuleAsUrlLikeLegado(
-            element,
-            exploreRule.coverUrl,
-            exploreUrl,
-          );
-          final result = SearchResult(
-            name: _parseRule(element, exploreRule.name, exploreUrl),
-            author: _parseRule(element, exploreRule.author, exploreUrl),
-            coverUrl: coverUrl,
-            intro: _parseRule(element, exploreRule.intro, exploreUrl),
-            kind: _parseRule(element, exploreRule.kind, exploreUrl),
-            lastChapter:
-                _parseRule(element, exploreRule.lastChapter, exploreUrl),
-            updateTime: _parseRule(element, exploreRule.updateTime, exploreUrl),
-            wordCount: _parseRule(element, exploreRule.wordCount, exploreUrl),
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          );
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
-        }
-      }
-
-      return results;
+      final outcome = _analyzeBookListLikeLegado(
+        source: source,
+        rule: resolved.rule,
+        requestUrl: exploreUrl,
+        responseUrl: responseUrl,
+        isRedirect: isRedirect,
+        body: response,
+        isSearch: false,
+      );
+      return outcome.results;
     } catch (e, st) {
       debugPrint('发现失败: $e');
       ExceptionLogService().record(
@@ -4714,16 +5125,16 @@ class RuleParserEngine {
     String? exploreUrlOverride,
     CancelToken? cancelToken,
   }) async {
-    final exploreRule = source.ruleExplore;
+    final resolved = _resolveBookListRuleForStage(source, isSearch: false);
     final exploreUrlRule = exploreUrlOverride ?? source.exploreUrl;
-    if (exploreRule == null ||
+    if (resolved == null ||
         exploreUrlRule == null ||
         exploreUrlRule.trim().isEmpty) {
       return ExploreDebugResult(
         fetch: FetchDebugResult.empty(),
         requestType: DebugRequestType.explore,
         requestUrlRule: exploreUrlRule,
-        listRule: exploreRule?.bookList,
+        listRule: resolved?.rule.bookList,
         listCount: 0,
         results: const [],
         fieldSample: const {},
@@ -4741,6 +5152,7 @@ class RuleParserEngine {
       requestUrl,
       header: source.header,
       jsLib: source.jsLib,
+      loginCheckJs: source.loginCheckJs,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
@@ -4752,7 +5164,7 @@ class RuleParserEngine {
         fetch: fetch,
         requestType: DebugRequestType.explore,
         requestUrlRule: exploreUrlRule,
-        listRule: exploreRule.bookList,
+        listRule: resolved.rule.bookList,
         listCount: 0,
         results: const [],
         fieldSample: const {},
@@ -4761,144 +5173,29 @@ class RuleParserEngine {
     }
 
     try {
-      final bookListRule = exploreRule.bookList ?? '';
-      final results = <SearchResult>[];
-      Map<String, String> fieldSample = const {};
-      var listCount = 0;
-
       final body = fetch.body!;
-      final trimmed = body.trimLeft();
-      final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(body)
-          : null;
-
-      if (jsonRoot != null && _looksLikeJsonPath(bookListRule)) {
-        final nodes = _selectJsonList(jsonRoot, bookListRule);
-        listCount = nodes.length;
-        for (final node in nodes) {
-          final name = _parseValueOnNode(node, exploreRule.name, requestUrl);
-          final author =
-              _parseValueOnNode(node, exploreRule.author, requestUrl);
-          final kind = _parseValueOnNode(node, exploreRule.kind, requestUrl);
-          var coverUrl =
-              _parseValueOnNode(node, exploreRule.coverUrl, requestUrl);
-          if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
-            coverUrl = _absoluteUrl(requestUrl, coverUrl);
-          }
-          final intro = _parseValueOnNode(node, exploreRule.intro, requestUrl);
-          final lastChapter =
-              _parseValueOnNode(node, exploreRule.lastChapter, requestUrl);
-          final updateTime =
-              _parseValueOnNode(node, exploreRule.updateTime, requestUrl);
-          final wordCount =
-              _parseValueOnNode(node, exploreRule.wordCount, requestUrl);
-          var bookUrl =
-              _parseValueOnNode(node, exploreRule.bookUrl, requestUrl);
-          if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
-            bookUrl = _absoluteUrl(requestUrl, bookUrl);
-          }
-
-          final result = SearchResult(
-            name: name,
-            author: author,
-            coverUrl: coverUrl,
-            intro: intro,
-            kind: kind,
-            lastChapter: lastChapter,
-            updateTime: updateTime,
-            wordCount: wordCount,
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          );
-
-          if (results.isEmpty) {
-            fieldSample = <String, String>{
-              'name': name,
-              'author': author,
-              'coverUrl': coverUrl,
-              'intro': intro,
-              'kind': kind,
-              'lastChapter': lastChapter,
-              'updateTime': updateTime,
-              'wordCount': wordCount,
-              'bookUrl': bookUrl,
-            };
-          }
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
-        }
-      } else {
-        final document = html_parser.parse(body);
-        final bookElements = _selectAllElementsByRule(document, bookListRule);
-        listCount = bookElements.length;
-
-        for (final element in bookElements) {
-          final name = _parseRule(element, exploreRule.name, requestUrl);
-          final author = _parseRule(element, exploreRule.author, requestUrl);
-          final kind = _parseRule(element, exploreRule.kind, requestUrl);
-          final coverUrl = _parseRuleAsUrlLikeLegado(
-            element,
-            exploreRule.coverUrl,
-            requestUrl,
-          );
-          final intro = _parseRule(element, exploreRule.intro, requestUrl);
-          final lastChapter =
-              _parseRule(element, exploreRule.lastChapter, requestUrl);
-          final updateTime =
-              _parseRule(element, exploreRule.updateTime, requestUrl);
-          final wordCount =
-              _parseRule(element, exploreRule.wordCount, requestUrl);
-          final bookUrl = _parseRuleAsUrlLikeLegado(
-            element,
-            exploreRule.bookUrl,
-            requestUrl,
-          );
-
-          final result = SearchResult(
-            name: name,
-            author: author,
-            coverUrl: coverUrl,
-            intro: intro,
-            kind: kind,
-            lastChapter: lastChapter,
-            updateTime: updateTime,
-            wordCount: wordCount,
-            bookUrl: bookUrl,
-            sourceUrl: source.bookSourceUrl,
-            sourceName: source.bookSourceName,
-          );
-
-          if (results.isEmpty) {
-            fieldSample = <String, String>{
-              'name': name,
-              'author': author,
-              'coverUrl': coverUrl,
-              'intro': intro,
-              'kind': kind,
-              'lastChapter': lastChapter,
-              'updateTime': updateTime,
-              'wordCount': wordCount,
-              'bookUrl': bookUrl,
-            };
-          }
-
-          if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
-            results.add(result);
-          }
-        }
-      }
+      final responseUrl =
+          (fetch.finalUrl == null || fetch.finalUrl!.trim().isEmpty)
+              ? requestUrl
+              : fetch.finalUrl!.trim();
+      final outcome = _analyzeBookListLikeLegado(
+        source: source,
+        rule: resolved.rule,
+        requestUrl: requestUrl,
+        responseUrl: responseUrl,
+        isRedirect: fetch.isRedirect,
+        body: body,
+        isSearch: false,
+      );
 
       return ExploreDebugResult(
         fetch: fetch,
         requestType: DebugRequestType.explore,
         requestUrlRule: exploreUrlRule,
-        listRule: bookListRule,
-        listCount: listCount,
-        results: results,
-        fieldSample: fieldSample,
+        listRule: outcome.listRuleRaw,
+        listCount: outcome.listCount,
+        results: outcome.results,
+        fieldSample: outcome.fieldSample,
         error: null,
       );
     } catch (e) {
@@ -4906,7 +5203,7 @@ class RuleParserEngine {
         fetch: fetch,
         requestType: DebugRequestType.explore,
         requestUrlRule: exploreUrlRule,
-        listRule: exploreRule.bookList,
+        listRule: resolved.rule.bookList,
         listCount: 0,
         results: const [],
         fieldSample: const {},
@@ -4934,6 +5231,7 @@ class RuleParserEngine {
         fullUrl,
         header: source.header,
         jsLib: source.jsLib,
+        loginCheckJs: source.loginCheckJs,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
@@ -4953,13 +5251,19 @@ class RuleParserEngine {
 
       // JSON 模式
       if (jsonRoot != null) {
-        final tocUrl = _resolveTocUrlLikeLegado(
+        final name = _formatBookNameLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.name, parseBaseUrl),
+        );
+        final author = _formatBookAuthorLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.author, parseBaseUrl),
+        );
+        final tocUrl = _resolveBookInfoTocUrlLikeLegado(
           rawValue:
               _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, parseBaseUrl),
-          baseUrl: parseBaseUrl,
+          requestUrl: fullUrl,
+          redirectUrl: parseBaseUrl,
         );
-        if (_normalizeUrlVisitKey(tocUrl) ==
-            _normalizeUrlVisitKey(parseBaseUrl)) {
+        if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(fullUrl)) {
           _cacheBookInfoTocHtml(
             tocUrl: tocUrl,
             html: response,
@@ -4971,20 +5275,29 @@ class RuleParserEngine {
         if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
           coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
         }
+        final intro = _formatIntroLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.intro, parseBaseUrl),
+        );
+        final kind = _parseKindFromJsonNodeLikeLegado(
+          jsonRoot,
+          bookInfoRule.kind,
+          parseBaseUrl,
+        );
+        final wordCount = _formatWordCountLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl),
+        );
 
         return BookDetail(
-          name: _parseValueOnNode(jsonRoot, bookInfoRule.name, parseBaseUrl),
-          author:
-              _parseValueOnNode(jsonRoot, bookInfoRule.author, parseBaseUrl),
+          name: name,
+          author: author,
           coverUrl: coverUrl,
-          intro: _parseValueOnNode(jsonRoot, bookInfoRule.intro, parseBaseUrl),
-          kind: _parseValueOnNode(jsonRoot, bookInfoRule.kind, parseBaseUrl),
+          intro: intro,
+          kind: kind,
           lastChapter: _parseValueOnNode(
               jsonRoot, bookInfoRule.lastChapter, parseBaseUrl),
           updateTime: _parseValueOnNode(
               jsonRoot, bookInfoRule.updateTime, parseBaseUrl),
-          wordCount:
-              _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl),
+          wordCount: wordCount,
           tocUrl: tocUrl,
           bookUrl: parseBaseUrl,
         );
@@ -5001,13 +5314,13 @@ class RuleParserEngine {
 
       if (root == null) return null;
 
-      final tocUrl = _resolveTocUrlLikeLegado(
+      final tocUrl = _resolveBookInfoTocUrlLikeLegado(
         rawValue: _parseRuleAsUrlRawLikeLegado(
             root, bookInfoRule.tocUrl, parseBaseUrl),
-        baseUrl: parseBaseUrl,
+        requestUrl: fullUrl,
+        redirectUrl: parseBaseUrl,
       );
-      if (_normalizeUrlVisitKey(tocUrl) ==
-          _normalizeUrlVisitKey(parseBaseUrl)) {
+      if (_normalizeUrlVisitKey(tocUrl) == _normalizeUrlVisitKey(fullUrl)) {
         _cacheBookInfoTocHtml(
           tocUrl: tocUrl,
           html: response,
@@ -5019,16 +5332,32 @@ class RuleParserEngine {
         bookInfoRule.coverUrl,
         parseBaseUrl,
       );
+      final name = _formatBookNameLikeLegado(
+          _parseRule(root, bookInfoRule.name, parseBaseUrl));
+      final author = _formatBookAuthorLikeLegado(
+        _parseRule(root, bookInfoRule.author, parseBaseUrl),
+      );
+      final intro = _formatIntroLikeLegado(
+        _parseRule(root, bookInfoRule.intro, parseBaseUrl),
+      );
+      final kind = _parseKindFromHtmlElementLikeLegado(
+        root,
+        bookInfoRule.kind,
+        parseBaseUrl,
+      );
+      final wordCount = _formatWordCountLikeLegado(
+        _parseRule(root, bookInfoRule.wordCount, parseBaseUrl),
+      );
 
       return BookDetail(
-        name: _parseRule(root, bookInfoRule.name, parseBaseUrl),
-        author: _parseRule(root, bookInfoRule.author, parseBaseUrl),
+        name: name,
+        author: author,
         coverUrl: coverUrl,
-        intro: _parseRule(root, bookInfoRule.intro, parseBaseUrl),
-        kind: _parseRule(root, bookInfoRule.kind, parseBaseUrl),
+        intro: intro,
+        kind: kind,
         lastChapter: _parseRule(root, bookInfoRule.lastChapter, parseBaseUrl),
         updateTime: _parseRule(root, bookInfoRule.updateTime, parseBaseUrl),
-        wordCount: _parseRule(root, bookInfoRule.wordCount, parseBaseUrl),
+        wordCount: wordCount,
         tocUrl: tocUrl,
         bookUrl: parseBaseUrl,
       );
@@ -5072,6 +5401,7 @@ class RuleParserEngine {
       fullUrl,
       header: source.header,
       jsLib: source.jsLib,
+      loginCheckJs: source.loginCheckJs,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
@@ -5106,29 +5436,37 @@ class RuleParserEngine {
         final initRule = bookInfoRule.init;
         final initMatched = initRule == null || initRule.trim().isEmpty;
 
-        final name =
-            _parseValueOnNode(jsonRoot, bookInfoRule.name, parseBaseUrl);
-        final author =
-            _parseValueOnNode(jsonRoot, bookInfoRule.author, parseBaseUrl);
+        final name = _formatBookNameLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.name, parseBaseUrl),
+        );
+        final author = _formatBookAuthorLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.author, parseBaseUrl),
+        );
         var coverUrl =
             _parseValueOnNode(jsonRoot, bookInfoRule.coverUrl, parseBaseUrl);
         if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
           coverUrl = _absoluteUrl(parseBaseUrl, coverUrl);
         }
-        final intro =
-            _parseValueOnNode(jsonRoot, bookInfoRule.intro, parseBaseUrl);
-        final kind =
-            _parseValueOnNode(jsonRoot, bookInfoRule.kind, parseBaseUrl);
+        final intro = _formatIntroLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.intro, parseBaseUrl),
+        );
+        final kind = _parseKindFromJsonNodeLikeLegado(
+          jsonRoot,
+          bookInfoRule.kind,
+          parseBaseUrl,
+        );
         final lastChapter =
             _parseValueOnNode(jsonRoot, bookInfoRule.lastChapter, parseBaseUrl);
         final updateTime =
             _parseValueOnNode(jsonRoot, bookInfoRule.updateTime, parseBaseUrl);
-        final wordCount =
-            _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl);
-        final tocUrl = _resolveTocUrlLikeLegado(
+        final wordCount = _formatWordCountLikeLegado(
+          _parseValueOnNode(jsonRoot, bookInfoRule.wordCount, parseBaseUrl),
+        );
+        final tocUrl = _resolveBookInfoTocUrlLikeLegado(
           rawValue:
               _parseValueOnNode(jsonRoot, bookInfoRule.tocUrl, parseBaseUrl),
-          baseUrl: parseBaseUrl,
+          requestUrl: fullUrl,
+          redirectUrl: parseBaseUrl,
         );
 
         final detail = BookDetail(
@@ -5188,24 +5526,36 @@ class RuleParserEngine {
         );
       }
 
-      final name = _parseRule(root, bookInfoRule.name, parseBaseUrl);
-      final author = _parseRule(root, bookInfoRule.author, parseBaseUrl);
+      final name = _formatBookNameLikeLegado(
+          _parseRule(root, bookInfoRule.name, parseBaseUrl));
+      final author = _formatBookAuthorLikeLegado(
+        _parseRule(root, bookInfoRule.author, parseBaseUrl),
+      );
       final coverUrl = _parseRuleAsUrlLikeLegado(
         root,
         bookInfoRule.coverUrl,
         parseBaseUrl,
       );
-      final intro = _parseRule(root, bookInfoRule.intro, parseBaseUrl);
-      final kind = _parseRule(root, bookInfoRule.kind, parseBaseUrl);
+      final intro = _formatIntroLikeLegado(
+        _parseRule(root, bookInfoRule.intro, parseBaseUrl),
+      );
+      final kind = _parseKindFromHtmlElementLikeLegado(
+        root,
+        bookInfoRule.kind,
+        parseBaseUrl,
+      );
       final lastChapter =
           _parseRule(root, bookInfoRule.lastChapter, parseBaseUrl);
       final updateTime =
           _parseRule(root, bookInfoRule.updateTime, parseBaseUrl);
-      final wordCount = _parseRule(root, bookInfoRule.wordCount, parseBaseUrl);
-      final tocUrl = _resolveTocUrlLikeLegado(
+      final wordCount = _formatWordCountLikeLegado(
+        _parseRule(root, bookInfoRule.wordCount, parseBaseUrl),
+      );
+      final tocUrl = _resolveBookInfoTocUrlLikeLegado(
         rawValue: _parseRuleAsUrlRawLikeLegado(
             root, bookInfoRule.tocUrl, parseBaseUrl),
-        baseUrl: parseBaseUrl,
+        requestUrl: fullUrl,
+        redirectUrl: parseBaseUrl,
       );
 
       final detail = BookDetail(
@@ -5274,11 +5624,17 @@ class RuleParserEngine {
       final visitedUrlKeys = <String>{};
       var currentUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
       var page = 0;
-      const maxPages = 12;
+      const safetyMaxPages = 1000;
       final pendingNextUrls = <String>[];
       final queuedUrlKeys = <String>{};
 
-      while (currentUrl.trim().isNotEmpty && page < maxPages) {
+      _runPreUpdateJs(
+        jsRule: tocRule.preUpdateJs,
+        currentUrl: currentUrl,
+        jsLib: source.jsLib,
+      );
+
+      while (currentUrl.trim().isNotEmpty) {
         if (!_markVisitedUrl(visitedUrlKeys, currentUrl)) break;
         queuedUrlKeys.remove(_normalizeUrlVisitKey(currentUrl));
 
@@ -5287,6 +5643,7 @@ class RuleParserEngine {
           currentUrl,
           header: source.header,
           jsLib: source.jsLib,
+          loginCheckJs: source.loginCheckJs,
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
           sourceKey: source.bookSourceUrl,
@@ -5294,32 +5651,52 @@ class RuleParserEngine {
         );
         if (response == null) break;
 
-        final stageBody = _applyStageResponseJs(
-          responseText: response,
-          jsRule: tocRule.preUpdateJs,
-          currentUrl: currentUrl,
-          jsLib: source.jsLib,
-          stageLabel: 'preUpdateJs',
-        );
-
-        final trimmed = stageBody.trimLeft();
+        final trimmed = response.trimLeft();
         final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-            ? _tryDecodeJsonValue(stageBody)
+            ? _tryDecodeJsonValue(response)
             : null;
 
         List<String> nextCandidates = const <String>[];
 
         if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
           final nodes = _selectJsonList(jsonRoot, normalized.selector);
-          for (final node in nodes) {
+          for (var i = 0; i < nodes.length; i++) {
+            final node = nodes[i];
             final name =
                 _parseValueOnNode(node, tocRule.chapterName, currentUrl);
+            final tag = _parseValueOnNode(node, tocRule.updateTime, currentUrl);
+            final isVolume = _isRuleTruthy(
+              _parseValueOnNode(node, tocRule.isVolume, currentUrl),
+            );
+            final isVip = _isRuleTruthy(
+              _parseValueOnNode(node, tocRule.isVip, currentUrl),
+            );
+            final isPay = _isRuleTruthy(
+              _parseValueOnNode(node, tocRule.isPay, currentUrl),
+            );
             var url = _parseValueOnNode(node, tocRule.chapterUrl, currentUrl);
             if (url.isNotEmpty && !url.startsWith('http')) {
               url = _absoluteUrl(currentUrl, url);
             }
+            if (url.trim().isEmpty) {
+              if (isVolume) {
+                url = '$name$i';
+              } else {
+                url = currentUrl;
+              }
+            }
             if (name.isEmpty || url.isEmpty) continue;
-            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+            chapters.add(
+              TocItem(
+                index: chapters.length,
+                name: name,
+                url: url,
+                isVolume: isVolume,
+                isVip: isVip,
+                isPay: isPay,
+                tag: tag.isEmpty ? null : tag,
+              ),
+            );
           }
 
           if (tocRule.nextTocUrl != null &&
@@ -5332,22 +5709,50 @@ class RuleParserEngine {
             );
           }
         } else {
-          final document = html_parser.parse(stageBody);
+          final document = html_parser.parse(response);
           final root = document.documentElement;
           if (root == null) break;
 
           final chapterElements =
               _selectAllElementsByRule(document, normalized.selector);
 
-          for (final element in chapterElements) {
+          for (var i = 0; i < chapterElements.length; i++) {
+            final element = chapterElements[i];
             final name = _parseRule(element, tocRule.chapterName, currentUrl);
-            final url = _parseRuleAsUrlLikeLegado(
+            final tag = _parseRule(element, tocRule.updateTime, currentUrl);
+            final isVolume = _isRuleTruthy(
+              _parseRule(element, tocRule.isVolume, currentUrl),
+            );
+            final isVip = _isRuleTruthy(
+              _parseRule(element, tocRule.isVip, currentUrl),
+            );
+            final isPay = _isRuleTruthy(
+              _parseRule(element, tocRule.isPay, currentUrl),
+            );
+            var url = _parseRuleAsUrlLikeLegado(
               element,
               tocRule.chapterUrl,
               currentUrl,
             );
+            if (url.trim().isEmpty) {
+              if (isVolume) {
+                url = '$name$i';
+              } else {
+                url = currentUrl;
+              }
+            }
             if (name.isEmpty || url.isEmpty) continue;
-            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+            chapters.add(
+              TocItem(
+                index: chapters.length,
+                name: name,
+                url: url,
+                isVolume: isVolume,
+                isVip: isVip,
+                isPay: isPay,
+                tag: tag.isEmpty ? null : tag,
+              ),
+            );
           }
 
           if (tocRule.nextTocUrl != null &&
@@ -5379,6 +5784,7 @@ class RuleParserEngine {
         if (pendingNextUrls.isEmpty) break;
         currentUrl = pendingNextUrls.removeAt(0);
         page++;
+        if (page >= safetyMaxPages) break;
       }
 
       final reIndexed = _postProcessTocLikeLegado(
@@ -5428,6 +5834,7 @@ class RuleParserEngine {
       fullUrl,
       header: source.header,
       jsLib: source.jsLib,
+      loginCheckJs: source.loginCheckJs,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
@@ -5453,32 +5860,63 @@ class RuleParserEngine {
       var listCount = 0;
 
       final body = fetch.body!;
-      final stageBody = _applyStageResponseJs(
-        responseText: body,
+      _runPreUpdateJs(
         jsRule: tocRule.preUpdateJs,
         currentUrl: fullUrl,
         jsLib: source.jsLib,
-        stageLabel: 'preUpdateJs',
       );
-      final trimmed = stageBody.trimLeft();
+      final trimmed = body.trimLeft();
       final jsonRoot = (trimmed.startsWith('{') || trimmed.startsWith('['))
-          ? _tryDecodeJsonValue(stageBody)
+          ? _tryDecodeJsonValue(body)
           : null;
 
       if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
         final nodes = _selectJsonList(jsonRoot, normalized.selector);
         listCount = nodes.length;
-        for (final node in nodes) {
+        for (var i = 0; i < nodes.length; i++) {
+          final node = nodes[i];
           final name = _parseValueOnNode(node, tocRule.chapterName, fullUrl);
+          final tag = _parseValueOnNode(node, tocRule.updateTime, fullUrl);
+          final isVolume = _isRuleTruthy(
+            _parseValueOnNode(node, tocRule.isVolume, fullUrl),
+          );
+          final isVip =
+              _isRuleTruthy(_parseValueOnNode(node, tocRule.isVip, fullUrl));
+          final isPay =
+              _isRuleTruthy(_parseValueOnNode(node, tocRule.isPay, fullUrl));
           var url = _parseValueOnNode(node, tocRule.chapterUrl, fullUrl);
           if (url.isNotEmpty && !url.startsWith('http')) {
             url = _absoluteUrl(fullUrl, url);
           }
+          if (url.trim().isEmpty) {
+            if (isVolume) {
+              url = '$name$i';
+            } else {
+              url = fullUrl;
+            }
+          }
           if (chapters.isEmpty) {
-            sample = <String, String>{'name': name, 'url': url};
+            sample = <String, String>{
+              'name': name,
+              'url': url,
+              'tag': tag,
+              'isVolume': '$isVolume',
+              'isVip': '$isVip',
+              'isPay': '$isPay',
+            };
           }
           if (name.isNotEmpty && url.isNotEmpty) {
-            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+            chapters.add(
+              TocItem(
+                index: chapters.length,
+                name: name,
+                url: url,
+                isVolume: isVolume,
+                isVip: isVip,
+                isPay: isPay,
+                tag: tag.isEmpty ? null : tag,
+              ),
+            );
           }
         }
         if (tocRule.nextTocUrl != null &&
@@ -5497,7 +5935,7 @@ class RuleParserEngine {
           }
         }
       } else {
-        final document = html_parser.parse(stageBody);
+        final document = html_parser.parse(body);
         final chapterElements =
             _selectAllElementsByRule(document, normalized.selector);
         listCount = chapterElements.length;
@@ -5505,13 +5943,44 @@ class RuleParserEngine {
         for (var i = 0; i < chapterElements.length; i++) {
           final element = chapterElements[i];
           final name = _parseRule(element, tocRule.chapterName, fullUrl);
-          final url =
+          final tag = _parseRule(element, tocRule.updateTime, fullUrl);
+          final isVolume =
+              _isRuleTruthy(_parseRule(element, tocRule.isVolume, fullUrl));
+          final isVip =
+              _isRuleTruthy(_parseRule(element, tocRule.isVip, fullUrl));
+          final isPay =
+              _isRuleTruthy(_parseRule(element, tocRule.isPay, fullUrl));
+          var url =
               _parseRuleAsUrlLikeLegado(element, tocRule.chapterUrl, fullUrl);
+          if (url.trim().isEmpty) {
+            if (isVolume) {
+              url = '$name$i';
+            } else {
+              url = fullUrl;
+            }
+          }
           if (chapters.isEmpty) {
-            sample = <String, String>{'name': name, 'url': url};
+            sample = <String, String>{
+              'name': name,
+              'url': url,
+              'tag': tag,
+              'isVolume': '$isVolume',
+              'isVip': '$isVip',
+              'isPay': '$isPay',
+            };
           }
           if (name.isNotEmpty && url.isNotEmpty) {
-            chapters.add(TocItem(index: chapters.length, name: name, url: url));
+            chapters.add(
+              TocItem(
+                index: chapters.length,
+                name: name,
+                url: url,
+                isVolume: isVolume,
+                isVip: isVip,
+                isPay: isPay,
+                tag: tag.isEmpty ? null : tag,
+              ),
+            );
           }
         }
 
@@ -5606,7 +6075,15 @@ class RuleParserEngine {
 
     return <TocItem>[
       for (var i = 0; i < deduped.length; i++)
-        TocItem(index: i, name: deduped[i].name, url: deduped[i].url),
+        TocItem(
+          index: i,
+          name: deduped[i].name,
+          url: deduped[i].url,
+          isVolume: deduped[i].isVolume,
+          isVip: deduped[i].isVip,
+          isPay: deduped[i].isPay,
+          tag: deduped[i].tag,
+        ),
     ];
   }
 
@@ -5663,6 +6140,9 @@ class RuleParserEngine {
     }
     final contentRule = source.ruleContent;
     if (contentRule == null) return '';
+    if ((contentRule.content ?? '').trim().isEmpty) {
+      return chapterUrl;
+    }
 
     try {
       final visitedUrlKeys = <String>{};
@@ -5672,13 +6152,13 @@ class RuleParserEngine {
         nextChapterUrl: nextChapterUrl,
       );
       var page = 0;
-      const maxPages = 8;
+      const safetyMaxPages = 1000;
 
       final parts = <String>[];
       final pendingNextUrls = <String>[];
       final queuedUrlKeys = <String>{};
 
-      while (currentUrl.trim().isNotEmpty && page < maxPages) {
+      while (currentUrl.trim().isNotEmpty) {
         if (!_markVisitedUrl(visitedUrlKeys, currentUrl)) break;
         queuedUrlKeys.remove(_normalizeUrlVisitKey(currentUrl));
 
@@ -5686,6 +6166,7 @@ class RuleParserEngine {
           currentUrl,
           header: source.header,
           jsLib: source.jsLib,
+          loginCheckJs: source.loginCheckJs,
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
           sourceKey: source.bookSourceUrl,
@@ -5727,12 +6208,7 @@ class RuleParserEngine {
           final document = html_parser.parse(stageBody);
           final root = document.documentElement;
           if (root == null) break;
-          if (contentRule.content == null ||
-              contentRule.content!.trim().isEmpty) {
-            extracted = root.text;
-          } else {
-            extracted = _parseRule(root, contentRule.content, currentUrl);
-          }
+          extracted = _parseRule(root, contentRule.content, currentUrl);
           if (contentRule.nextContentUrl != null &&
               contentRule.nextContentUrl!.trim().isNotEmpty) {
             nextCandidates = _parseStringListFromHtml(
@@ -5771,6 +6247,7 @@ class RuleParserEngine {
         if (pendingNextUrls.isEmpty) break;
         currentUrl = pendingNextUrls.removeAt(0);
         page++;
+        if (page >= safetyMaxPages) break;
       }
 
       return parts.join('\n');
@@ -5809,12 +6286,24 @@ class RuleParserEngine {
         error: 'ruleContent 为空',
       );
     }
+    if ((contentRule.content ?? '').trim().isEmpty) {
+      return ContentDebugResult(
+        fetch: FetchDebugResult.empty(),
+        requestType: DebugRequestType.content,
+        requestUrlRule: chapterUrl,
+        extractedLength: chapterUrl.length,
+        cleanedLength: chapterUrl.length,
+        content: chapterUrl,
+        error: null,
+      );
+    }
 
     final fullUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
     final fetch = await _fetchDebug(
       fullUrl,
       header: source.header,
       jsLib: source.jsLib,
+      loginCheckJs: source.loginCheckJs,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
       sourceKey: source.bookSourceUrl,
@@ -5840,14 +6329,14 @@ class RuleParserEngine {
         nextChapterUrl: nextChapterUrl,
       );
       var page = 0;
-      const maxPages = 8;
+      const safetyMaxPages = 1000;
 
       var totalExtracted = 0;
       final parts = <String>[];
       final pendingNextUrls = <String>[];
       final queuedUrlKeys = <String>{};
 
-      while (currentUrl.trim().isNotEmpty && page < maxPages) {
+      while (currentUrl.trim().isNotEmpty) {
         if (!_markVisitedUrl(visitedUrlKeys, currentUrl)) break;
         queuedUrlKeys.remove(_normalizeUrlVisitKey(currentUrl));
 
@@ -5858,6 +6347,7 @@ class RuleParserEngine {
                 currentUrl,
                 header: source.header,
                 jsLib: source.jsLib,
+                loginCheckJs: source.loginCheckJs,
                 timeoutMs: source.respondTime,
                 enabledCookieJar: source.enabledCookieJar,
                 sourceKey: source.bookSourceUrl,
@@ -5899,12 +6389,7 @@ class RuleParserEngine {
           final document = html_parser.parse(stageBody);
           final root = document.documentElement;
           if (root == null) break;
-          if (contentRule.content == null ||
-              contentRule.content!.trim().isEmpty) {
-            extracted = root.text;
-          } else {
-            extracted = _parseRule(root, contentRule.content, currentUrl);
-          }
+          extracted = _parseRule(root, contentRule.content, currentUrl);
           if (contentRule.nextContentUrl != null &&
               contentRule.nextContentUrl!.trim().isNotEmpty) {
             nextCandidates = _parseStringListFromHtml(
@@ -5945,6 +6430,7 @@ class RuleParserEngine {
         if (pendingNextUrls.isEmpty) break;
         currentUrl = pendingNextUrls.removeAt(0);
         page++;
+        if (page >= safetyMaxPages) break;
       }
 
       final cleanedAll = parts.join('\n');
@@ -6186,11 +6672,13 @@ class RuleParserEngine {
     String url, {
     String? header,
     String? jsLib,
+    String? loginCheckJs,
     int? timeoutMs,
     bool? enabledCookieJar,
     String? sourceKey,
     String? concurrentRate,
     void Function(String finalUrl)? onFinalUrl,
+    void Function(bool isRedirect)? onIsRedirect,
   }) async {
     try {
       final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
@@ -6282,10 +6770,18 @@ class RuleParserEngine {
         optionCharset: parsedUrl.option?.charset,
       );
       final finalResponseUrl = resp.realUri.toString().trim();
+      final redirected = resp.redirects.isNotEmpty || resp.isRedirect;
+      onIsRedirect?.call(redirected);
       if (finalResponseUrl.isNotEmpty) {
         onFinalUrl?.call(finalResponseUrl);
       }
-      return decoded.text;
+      return _applyStageResponseJs(
+        responseText: decoded.text,
+        jsRule: loginCheckJs,
+        currentUrl: finalResponseUrl.isNotEmpty ? finalResponseUrl : finalUrl,
+        jsLib: jsLib,
+        stageLabel: 'loginCheckJs',
+      );
     } catch (e) {
       debugPrint('请求失败: $url - $e');
       return null;
@@ -6296,6 +6792,7 @@ class RuleParserEngine {
     String url, {
     String? header,
     String? jsLib,
+    String? loginCheckJs,
     int? timeoutMs,
     bool? enabledCookieJar,
     String? sourceKey,
@@ -6416,17 +6913,26 @@ class RuleParserEngine {
         responseHeaders: respHeaders,
         optionCharset: parsedUrl.option?.charset,
       );
+      final responseRealUrl = response.realUri.toString().trim();
+      final checkedBody = _applyStageResponseJs(
+        responseText: decoded.text,
+        jsRule: loginCheckJs,
+        currentUrl: responseRealUrl.isNotEmpty ? responseRealUrl : finalUrl,
+        jsLib: jsLib,
+        stageLabel: 'loginCheckJs',
+      );
       sw.stop();
       return FetchDebugResult(
         requestUrl: parsedUrl.url,
         finalUrl: response.realUri.toString(),
         statusCode: response.statusCode,
         elapsedMs: sw.elapsedMilliseconds,
+        isRedirect: response.redirects.isNotEmpty || response.isRedirect,
         method: method,
         requestBodySnippet: _snippet(body),
         responseCharset: decoded.charset,
-        responseLength: decoded.text.length,
-        responseSnippet: _snippet(decoded.text),
+        responseLength: checkedBody.length,
+        responseSnippet: _snippet(checkedBody),
         requestHeaders: forLog,
         headersWarning: parsedHeaders.warning,
         responseHeaders: respHeaders,
@@ -6441,7 +6947,7 @@ class RuleParserEngine {
         responseCharsetDecision: decoded.charsetDecision,
         concurrentWaitMs: concurrentWaitMs,
         concurrentDecision: concurrentDecision,
-        body: decoded.text,
+        body: checkedBody,
       );
     } catch (e) {
       sw.stop();
@@ -6469,7 +6975,15 @@ class RuleParserEngine {
             responseHeaders: respHeaders,
             optionCharset: parsedUrl.option?.charset,
           );
-          bodyText = decoded.text;
+          bodyText = _applyStageResponseJs(
+            responseText: decoded.text,
+            jsRule: loginCheckJs,
+            currentUrl: (finalUrl != null && finalUrl.trim().isNotEmpty)
+                ? finalUrl.trim()
+                : parsedUrl.url,
+            jsLib: jsLib,
+            stageLabel: 'loginCheckJs',
+          );
           responseCharset = decoded.charset;
           responseCharsetSource = decoded.charsetSource;
           responseCharsetDecision = decoded.charsetDecision;
@@ -6491,6 +7005,8 @@ class RuleParserEngine {
           finalUrl: finalUrl,
           statusCode: statusCode,
           elapsedMs: sw.elapsedMilliseconds,
+          isRedirect: (response?.redirects.isNotEmpty ?? false) ||
+              (response?.isRedirect ?? false),
           method: method,
           requestBodySnippet: _snippet(body),
           responseCharset: responseCharset,
@@ -6518,6 +7034,7 @@ class RuleParserEngine {
         finalUrl: null,
         statusCode: null,
         elapsedMs: sw.elapsedMilliseconds,
+        isRedirect: false,
         method: method,
         requestBodySnippet: _snippet(body),
         responseCharset: null,
@@ -8571,6 +9088,7 @@ class FetchDebugResult {
   final String? finalUrl;
   final int? statusCode;
   final int elapsedMs;
+  final bool isRedirect;
   final String method;
   final String? requestBodySnippet;
   final String? responseCharset;
@@ -8619,6 +9137,7 @@ class FetchDebugResult {
     required this.finalUrl,
     required this.statusCode,
     required this.elapsedMs,
+    this.isRedirect = false,
     this.method = 'GET',
     this.requestBodySnippet,
     this.responseCharset,
@@ -8647,6 +9166,7 @@ class FetchDebugResult {
       finalUrl: null,
       statusCode: null,
       elapsedMs: 0,
+      isRedirect: false,
       method: 'GET',
       requestBodySnippet: null,
       responseCharset: null,
@@ -8918,6 +9438,32 @@ class _NormalizedListRule {
   String toString() => 'selector=$selector reverse=$reverse';
 }
 
+class _ResolvedBookListRule {
+  final BookListRule rule;
+  final bool usedSearchRuleAsExploreFallback;
+
+  const _ResolvedBookListRule({
+    required this.rule,
+    required this.usedSearchRuleAsExploreFallback,
+  });
+}
+
+class _BookListAnalyzeOutcome {
+  final List<SearchResult> results;
+  final int listCount;
+  final Map<String, String> fieldSample;
+  final String? listRuleRaw;
+  final bool usedInfoFallback;
+
+  const _BookListAnalyzeOutcome({
+    required this.results,
+    required this.listCount,
+    required this.fieldSample,
+    required this.listRuleRaw,
+    required this.usedInfoFallback,
+  });
+}
+
 class SearchDebugResult {
   final FetchDebugResult fetch;
   final DebugRequestType requestType;
@@ -9087,10 +9633,18 @@ class TocItem {
   final int index;
   final String name;
   final String url;
+  final bool isVolume;
+  final bool isVip;
+  final bool isPay;
+  final String? tag;
 
   const TocItem({
     required this.index,
     required this.name,
     required this.url,
+    this.isVolume = false,
+    this.isVip = false,
+    this.isPay = false,
+    this.tag,
   });
 }

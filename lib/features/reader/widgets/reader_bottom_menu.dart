@@ -15,6 +15,7 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final ReadingThemeColors currentTheme;
   final ValueChanged<int> onChapterChanged;
   final ValueChanged<int> onPageChanged;
+  final ValueChanged<int> onSeekChapterProgress;
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback onShowChapterList;
   final VoidCallback onShowReadAloud;
@@ -31,6 +32,7 @@ class ReaderBottomMenuNew extends StatefulWidget {
     required this.currentTheme,
     required this.onChapterChanged,
     required this.onPageChanged,
+    required this.onSeekChapterProgress,
     required this.onSettingsChanged,
     required this.onShowChapterList,
     required this.onShowReadAloud,
@@ -102,10 +104,12 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 _buildSectionCard(
                   child: _buildChapterSlider(scheme),
                 ),
-                const SizedBox(height: 8),
-                _buildSectionCard(
-                  child: _buildBrightnessRow(scheme),
-                ),
+                if (widget.settings.showBrightnessView) ...[
+                  const SizedBox(height: 8),
+                  _buildSectionCard(
+                    child: _buildBrightnessRow(scheme),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 _buildBottomTabs(scheme),
               ],
@@ -136,17 +140,27 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   }
 
   Widget _buildChapterSlider(ShadColorScheme scheme) {
+    final chapterMode =
+        widget.settings.progressBarBehavior == ProgressBarBehavior.chapter;
+    final maxChapter = (widget.totalChapters - 1).clamp(0, 9999);
     final maxPage = (widget.totalPages - 1).clamp(0, 9999);
-    final canSlidePage = maxPage > 0;
+    final canSlide = chapterMode ? maxChapter > 0 : maxPage > 0;
     // CupertinoSlider 在 min==max 时语义层会触发 0 除，导致 NaN 崩溃。
-    final sliderMax = canSlidePage ? maxPage.toDouble() : 1.0;
+    final sliderMax = canSlide
+        ? (chapterMode ? maxChapter.toDouble() : maxPage.toDouble())
+        : 1.0;
     final rawSliderValue = _isDragging
         ? _safeFinite(_dragValue)
-        : _safeFinite(widget.currentPageIndex.toDouble());
+        : _safeFinite(chapterMode
+            ? widget.currentChapterIndex.toDouble()
+            : widget.currentPageIndex.toDouble());
     final sliderValue = rawSliderValue.clamp(0.0, sliderMax).toDouble();
-    final chapterLabel =
-        '第${widget.currentChapterIndex + 1}章 / ${widget.totalChapters}章';
-    final pageLabel = '${widget.currentPageIndex + 1}/${widget.totalPages}页';
+    final leftLabel = chapterMode
+        ? '章节跳转'
+        : '第${widget.currentChapterIndex + 1}章 / ${widget.totalChapters}章';
+    final rightLabel = chapterMode
+        ? '${widget.currentChapterIndex + 1}/${widget.totalChapters}章'
+        : '${widget.currentPageIndex + 1}/${widget.totalPages}页';
     final accent = _isDarkMode
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
@@ -157,7 +171,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         Row(
           children: [
             Text(
-              chapterLabel,
+              leftLabel,
               style: TextStyle(
                 color: scheme.foreground,
                 fontSize: 13,
@@ -166,7 +180,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             ),
             const Spacer(),
             Text(
-              pageLabel,
+              rightLabel,
               style: TextStyle(
                 color: scheme.mutedForeground,
                 fontSize: 12,
@@ -200,7 +214,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 max: sliderMax,
                 activeColor: accent,
                 thumbColor: _isDarkMode ? CupertinoColors.white : accent,
-                onChanged: canSlidePage
+                onChanged: canSlide
                     ? (value) {
                         setState(() {
                           _isDragging = true;
@@ -208,12 +222,18 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                         });
                       }
                     : null,
-                onChangeEnd: canSlidePage
+                onChangeEnd: canSlide
                     ? (value) {
                         setState(() => _isDragging = false);
-                        final target =
-                            value.round().clamp(0, maxPage).toInt();
-                        widget.onPageChanged(target);
+                        if (chapterMode) {
+                          final targetChapter =
+                              value.round().clamp(0, maxChapter).toInt();
+                          widget.onSeekChapterProgress(targetChapter);
+                        } else {
+                          final targetPage =
+                              value.round().clamp(0, maxPage).toInt();
+                          widget.onPageChanged(targetPage);
+                        }
                       }
                     : null,
               ),
@@ -257,16 +277,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         Expanded(
           child: IgnorePointer(
             ignoring: widget.settings.useSystemBrightness,
-              child: Opacity(
-                opacity: widget.settings.useSystemBrightness ? 0.35 : 1.0,
-                child: CupertinoSlider(
-                  value: _safeFinite(
-                    widget.settings.brightness,
-                    fallback: 1.0,
-                  ).clamp(0.0, 1.0).toDouble(),
-                  min: 0.0,
-                  max: 1.0,
-                  activeColor: accent,
+            child: Opacity(
+              opacity: widget.settings.useSystemBrightness ? 0.35 : 1.0,
+              child: CupertinoSlider(
+                value: _safeFinite(
+                  widget.settings.brightness,
+                  fallback: 1.0,
+                ).clamp(0.0, 1.0).toDouble(),
+                min: 0.0,
+                max: 1.0,
+                activeColor: accent,
                 thumbColor: accent,
                 onChanged: (value) {
                   widget.onSettingsChanged(

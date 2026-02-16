@@ -19,7 +19,8 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp(
       'soupreader_booklist_import_',
     );
-    const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+    const pathProviderChannel =
+        MethodChannel('plugins.flutter.io/path_provider');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(pathProviderChannel, (MethodCall call) async {
       return tempDir.path;
@@ -173,7 +174,13 @@ class _FakeBooklistRuleParserEngine extends RuleParserEngine {
   });
 
   @override
-  Future<List<SearchResult>> search(BookSource source, String keyword) async {
+  Future<List<SearchResult>> search(
+    BookSource source,
+    String keyword, {
+    int page = 1,
+    bool Function(String name, String author)? filter,
+    bool Function(int size)? shouldBreak,
+  }) async {
     requestedSourceUrls.add(source.bookSourceUrl);
     final action = searchBySource[source.bookSourceUrl];
     if (action is Exception) {

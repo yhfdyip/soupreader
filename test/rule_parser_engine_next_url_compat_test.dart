@@ -312,5 +312,206 @@ void main() {
       }
     });
 
+    test('toc keeps volume/vip/pay/tag and applies chapterUrl fallback',
+        () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleToc: const TocRule(
+          chapterList: '.item',
+          chapterName: '.name@text',
+          chapterUrl: '.name@href',
+          updateTime: '.tag@text',
+          isVolume: '.is-volume@text',
+          isVip: '.is-vip@text',
+          isPay: '.is-pay@text',
+        ),
+      );
+
+      final responses = <String, String>{
+        'https://example.com/toc': '''
+          <html><body>
+            <div class="item">
+              <a class="name">卷一</a>
+              <span class="tag">分卷</span>
+              <span class="is-volume">true</span>
+              <span class="is-vip">false</span>
+              <span class="is-pay">0</span>
+            </div>
+            <div class="item">
+              <a class="name">第一章</a>
+              <span class="tag">正文</span>
+              <span class="is-volume">false</span>
+              <span class="is-vip">1</span>
+              <span class="is-pay">yes</span>
+            </div>
+          </body></html>
+        ''',
+      };
+
+      final dio = RuleParserEngine.debugDioForTest();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final body = responses[options.uri.toString()];
+            if (body != null) {
+              handler.resolve(
+                Response<List<int>>(
+                  requestOptions: options,
+                  data: utf8.encode(body),
+                  statusCode: 200,
+                ),
+              );
+              return;
+            }
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                error: 'missing mock for ${options.uri}',
+              ),
+            );
+          },
+        ),
+      );
+
+      try {
+        final toc = await engine.getToc(source, '/toc');
+        expect(toc.length, 2);
+        expect(toc[0].name, '卷一');
+        expect(toc[0].url, '卷一0');
+        expect(toc[0].isVolume, isTrue);
+        expect(toc[0].isVip, isFalse);
+        expect(toc[0].isPay, isFalse);
+        expect(toc[0].tag, '分卷');
+
+        expect(toc[1].name, '第一章');
+        expect(toc[1].url, 'https://example.com/toc');
+        expect(toc[1].isVolume, isFalse);
+        expect(toc[1].isVip, isTrue);
+        expect(toc[1].isPay, isTrue);
+        expect(toc[1].tag, '正文');
+      } finally {
+        dio.interceptors.removeLast();
+      }
+    });
+
+    test('toc paging is not limited by legacy temporary cap (12)', () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleToc: const TocRule(
+          chapterList: '.item',
+          chapterName: '.name@text',
+          chapterUrl: '.name@href',
+          nextTocUrl: 'a.next@href',
+        ),
+      );
+
+      final responses = <String, String>{};
+      for (var i = 1; i <= 13; i++) {
+        final url = i == 1
+            ? 'https://example.com/toc'
+            : 'https://example.com/toc?page=$i';
+        final next =
+            i < 13 ? '<a class="next" href="/toc?page=${i + 1}">n</a>' : '';
+        responses[url] =
+            '<html><body><div class="item"><a class="name" href="/c$i">C$i</a></div>$next</body></html>';
+      }
+
+      final dio = RuleParserEngine.debugDioForTest();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final body = responses[options.uri.toString()];
+            if (body != null) {
+              handler.resolve(
+                Response<List<int>>(
+                  requestOptions: options,
+                  data: utf8.encode(body),
+                  statusCode: 200,
+                ),
+              );
+              return;
+            }
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                error: 'missing mock for ${options.uri}',
+              ),
+            );
+          },
+        ),
+      );
+
+      try {
+        final toc = await engine.getToc(source, '/toc');
+        expect(toc.length, 13);
+        expect(toc.last.name, 'C13');
+        expect(toc.last.url, 'https://example.com/c13');
+      } finally {
+        dio.interceptors.removeLast();
+      }
+    });
+
+    test('content paging is not limited by legacy temporary cap (8)', () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleContent: const ContentRule(
+          content: 'div#content@text',
+          nextContentUrl: 'a.next@href',
+        ),
+      );
+
+      final responses = <String, String>{};
+      for (var i = 1; i <= 9; i++) {
+        final url = i == 1
+            ? 'https://example.com/chapter/1'
+            : 'https://example.com/chapter/1?page=$i';
+        final next = i < 9
+            ? '<a class="next" href="/chapter/1?page=${i + 1}">n</a>'
+            : '';
+        responses[url] =
+            '<html><body><div id="content">P$i</div>$next</body></html>';
+      }
+
+      final dio = RuleParserEngine.debugDioForTest();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final body = responses[options.uri.toString()];
+            if (body != null) {
+              handler.resolve(
+                Response<List<int>>(
+                  requestOptions: options,
+                  data: utf8.encode(body),
+                  statusCode: 200,
+                ),
+              );
+              return;
+            }
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                error: 'missing mock for ${options.uri}',
+              ),
+            );
+          },
+        ),
+      );
+
+      try {
+        final content = await engine.getContent(source, '/chapter/1');
+        expect(content, 'P1\nP2\nP3\nP4\nP5\nP6\nP7\nP8\nP9');
+      } finally {
+        dio.interceptors.removeLast();
+      }
+    });
   });
 }

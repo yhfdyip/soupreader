@@ -19,6 +19,9 @@ class ReadingSettings {
   final bool showChapterProgress; // 显示章节内进度
   final double brightness; // 0.0 - 1.0
   final bool useSystemBrightness;
+  final bool showBrightnessView; // 是否显示阅读菜单亮度调节栏
+  final ProgressBarBehavior progressBarBehavior; // 进度条行为（页内/章节）
+  final bool confirmSkipChapter; // 章节进度条跳转确认（对标 legado）
 
   // === 新增字段 ===
   final int textBold; // 0:正常 1:粗体 2:细体
@@ -63,6 +66,7 @@ class ReadingSettings {
   // === 其他功能开关 ===
   final bool chineseTraditional; // 繁简体转换（true=繁体）
   final bool cleanChapterTitle; // 净化正文章节名称
+  final bool textBottomJustify; // 底部对齐（对标 legado）
 
   const ReadingSettings({
     // 安装后默认值：尽量对齐 Legado 的阅读默认体验
@@ -85,6 +89,9 @@ class ReadingSettings {
     this.showChapterProgress = true,
     this.brightness = 1.0,
     this.useSystemBrightness = true,
+    this.showBrightnessView = true,
+    this.progressBarBehavior = ProgressBarBehavior.page,
+    this.confirmSkipChapter = true,
     // 新增字段默认值
     this.textBold = 0,
     this.paragraphIndent = '　　',
@@ -120,6 +127,7 @@ class ReadingSettings {
     // 其他功能开关
     this.chineseTraditional = false,
     this.cleanChapterTitle = false,
+    this.textBottomJustify = true,
   });
 
   /// 获取 padding（兼容旧代码）
@@ -190,10 +198,25 @@ class ReadingSettings {
     return parsed;
   }
 
+  static ProgressBarBehavior _parseProgressBarBehavior(
+    dynamic raw, {
+    ProgressBarBehavior fallback = ProgressBarBehavior.page,
+  }) {
+    if (raw is String) {
+      final normalized = raw.trim().toLowerCase();
+      if (normalized == 'chapter') return ProgressBarBehavior.chapter;
+      if (normalized == 'page') return ProgressBarBehavior.page;
+    }
+    if (raw is num && raw.isFinite) {
+      final index = raw.toInt().clamp(0, ProgressBarBehavior.values.length - 1);
+      return ProgressBarBehavior.values[index];
+    }
+    return fallback;
+  }
+
   factory ReadingSettings.fromJson(Map<String, dynamic> json) {
     final rawPageTurnMode = json['pageTurnMode'];
-    final pageTurnModeIndex =
-        _toInt(rawPageTurnMode, PageTurnMode.cover.index);
+    final pageTurnModeIndex = _toInt(rawPageTurnMode, PageTurnMode.cover.index);
     final safePageTurnModeIndex =
         pageTurnModeIndex.clamp(0, PageTurnMode.values.length - 1);
     final safePageTurnMode = PageTurnMode.values[safePageTurnModeIndex];
@@ -202,7 +225,8 @@ class ReadingSettings {
         ? PageDirection.vertical.index
         : PageDirection.horizontal.index;
     final rawPageDirection = json['pageDirection'];
-    final pageDirectionIndex = _toInt(rawPageDirection, defaultPageDirectionIndex);
+    final pageDirectionIndex =
+        _toInt(rawPageDirection, defaultPageDirectionIndex);
     final safePageDirectionIndex =
         pageDirectionIndex.clamp(0, PageDirection.values.length - 1);
 
@@ -228,6 +252,10 @@ class ReadingSettings {
       showChapterProgress: _toBool(json['showChapterProgress'], true),
       brightness: _toDouble(json['brightness'], 1.0),
       useSystemBrightness: _toBool(json['useSystemBrightness'], true),
+      showBrightnessView: _toBool(json['showBrightnessView'], true),
+      progressBarBehavior:
+          _parseProgressBarBehavior(json['progressBarBehavior']),
+      confirmSkipChapter: _toBool(json['confirmSkipChapter'], true),
       // 新增字段
       textBold: _toInt(json['textBold'], 0),
       paragraphIndent: json['paragraphIndent'] as String? ?? '　　',
@@ -262,6 +290,7 @@ class ReadingSettings {
       // 其他功能开关
       chineseTraditional: _toBool(json['chineseTraditional'], false),
       cleanChapterTitle: _toBool(json['cleanChapterTitle'], false),
+      textBottomJustify: _toBool(json['textBottomJustify'], true),
     ).sanitize();
   }
 
@@ -284,6 +313,9 @@ class ReadingSettings {
       'showChapterProgress': showChapterProgress,
       'brightness': brightness,
       'useSystemBrightness': useSystemBrightness,
+      'showBrightnessView': showBrightnessView,
+      'progressBarBehavior': progressBarBehavior.name,
+      'confirmSkipChapter': confirmSkipChapter,
       // 新增字段
       'textBold': textBold,
       'paragraphIndent': paragraphIndent,
@@ -318,6 +350,7 @@ class ReadingSettings {
       // 其他功能开关
       'chineseTraditional': chineseTraditional,
       'cleanChapterTitle': cleanChapterTitle,
+      'textBottomJustify': textBottomJustify,
     };
   }
 
@@ -375,6 +408,9 @@ class ReadingSettings {
         fallback: 1.0,
       ),
       useSystemBrightness: useSystemBrightness,
+      showBrightnessView: showBrightnessView,
+      progressBarBehavior: progressBarBehavior,
+      confirmSkipChapter: confirmSkipChapter,
       textBold: _safeInt(textBold, min: 0, max: 2, fallback: 0),
       paragraphIndent: paragraphIndent,
       titleMode: _safeInt(titleMode, min: 0, max: 2, fallback: 0),
@@ -442,6 +478,7 @@ class ReadingSettings {
           _safeInt(footerRightContent, min: 0, max: 9, fallback: 8),
       chineseTraditional: chineseTraditional,
       cleanChapterTitle: cleanChapterTitle,
+      textBottomJustify: textBottomJustify,
     );
   }
 
@@ -463,6 +500,9 @@ class ReadingSettings {
     bool? showChapterProgress,
     double? brightness,
     bool? useSystemBrightness,
+    bool? showBrightnessView,
+    ProgressBarBehavior? progressBarBehavior,
+    bool? confirmSkipChapter,
     // 新增字段
     int? textBold,
     String? paragraphIndent,
@@ -497,6 +537,7 @@ class ReadingSettings {
     // 其他功能开关
     bool? chineseTraditional,
     bool? cleanChapterTitle,
+    bool? textBottomJustify,
   }) {
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -516,6 +557,9 @@ class ReadingSettings {
       showChapterProgress: showChapterProgress ?? this.showChapterProgress,
       brightness: brightness ?? this.brightness,
       useSystemBrightness: useSystemBrightness ?? this.useSystemBrightness,
+      showBrightnessView: showBrightnessView ?? this.showBrightnessView,
+      progressBarBehavior: progressBarBehavior ?? this.progressBarBehavior,
+      confirmSkipChapter: confirmSkipChapter ?? this.confirmSkipChapter,
       // 新增字段
       textBold: textBold ?? this.textBold,
       paragraphIndent: paragraphIndent ?? this.paragraphIndent,
@@ -550,7 +594,24 @@ class ReadingSettings {
       // 其他功能开关
       chineseTraditional: chineseTraditional ?? this.chineseTraditional,
       cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
+      textBottomJustify: textBottomJustify ?? this.textBottomJustify,
     ).sanitize();
+  }
+}
+
+enum ProgressBarBehavior {
+  page, // 进度条拖动定位到章节内页
+  chapter, // 进度条拖动切换章节
+}
+
+extension ProgressBarBehaviorExtension on ProgressBarBehavior {
+  String get label {
+    switch (this) {
+      case ProgressBarBehavior.page:
+        return '页内进度';
+      case ProgressBarBehavior.chapter:
+        return '章节进度';
+    }
   }
 }
 

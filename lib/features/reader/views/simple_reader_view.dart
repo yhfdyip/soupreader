@@ -2872,6 +2872,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         );
 
     final keyword = currentBook.title.trim();
+    final authorKeyword = currentBook.author.trim();
     if (keyword.isEmpty) {
       _showToast('书名为空，无法换源');
       return;
@@ -2885,11 +2886,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _showToast('没有可用书源');
       return;
     }
+    final orderedSources = enabledSources
+        .asMap()
+        .entries
+        .toList(growable: false)
+      ..sort((a, b) {
+        final orderCompare = a.value.customOrder.compareTo(b.value.customOrder);
+        if (orderCompare != 0) return orderCompare;
+        return a.key.compareTo(b.key);
+      });
+    final sortedEnabledSources =
+        orderedSources.map((entry) => entry.value).toList(growable: false);
 
     final searchResults = <SearchResult>[];
-    for (final source in enabledSources) {
+    for (final source in sortedEnabledSources) {
       try {
-        final list = await _ruleEngine.search(source, keyword);
+        final list = await _ruleEngine.search(
+          source,
+          keyword,
+          filter: (name, author) {
+            if (name != keyword) return false;
+            if (authorKeyword.isEmpty) return true;
+            return author.contains(authorKeyword);
+          },
+        );
         searchResults.addAll(list);
       } catch (_) {
         // 单源失败隔离
@@ -2900,7 +2920,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     final candidates = ReaderSourceSwitchHelper.buildCandidates(
       currentBook: currentBook,
-      enabledSources: enabledSources,
+      enabledSources: sortedEnabledSources,
       searchResults: searchResults,
     );
     if (candidates.isEmpty) {

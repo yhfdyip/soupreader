@@ -348,9 +348,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _refreshBookshelfState();
     final useBookshelfToc =
         _inBookshelf && _bookId != null && _bookId!.trim().isNotEmpty;
-    final localToc = useBookshelfToc
-        ? _loadStoredToc(_bookId!.trim())
-        : const <TocItem>[];
+    final localToc =
+        useBookshelfToc ? _loadStoredToc(_bookId!.trim()) : const <TocItem>[];
     setState(() {
       _source = source;
       _detail = detail ??
@@ -578,7 +577,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       return;
     }
 
-    final source = _source ?? _sourceRepo.getSourceByUrl(_activeResult.sourceUrl);
+    final source =
+        _source ?? _sourceRepo.getSourceByUrl(_activeResult.sourceUrl);
     if (source == null) {
       _showMessage('书源不存在或已被删除，无法刷新目录');
       return;
@@ -642,11 +642,12 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
             final maxChapter = chapters.length - 1;
             await _bookRepo.updateBook(
               storedBook.copyWith(
-                title: _pickFirstNonEmpty([detail?.name ?? '', storedBook.title]) ??
+                title: _pickFirstNonEmpty(
+                        [detail?.name ?? '', storedBook.title]) ??
                     storedBook.title,
-                author:
-                    _pickFirstNonEmpty([detail?.author ?? '', storedBook.author]) ??
-                        storedBook.author,
+                author: _pickFirstNonEmpty(
+                        [detail?.author ?? '', storedBook.author]) ??
+                    storedBook.author,
                 coverUrl: _pickFirstNonEmpty(
                       [detail?.coverUrl ?? '', storedBook.coverUrl ?? ''],
                     ) ??
@@ -690,8 +691,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       }
       _toc = localToc;
       _loadingToc = false;
-      _tocError =
-          localToc.isEmpty ? (tocRefreshError ?? '目录为空（书架缓存中无章节，请先刷新目录）') : null;
+      _tocError = localToc.isEmpty
+          ? (tocRefreshError ?? '目录为空（书架缓存中无章节，请先刷新目录）')
+          : null;
     });
 
     if (localToc.isNotEmpty && tocRefreshError == null) {
@@ -768,6 +770,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     }
 
     final keyword = _displayName.trim();
+    final authorKeyword = _displayAuthor.trim();
     if (keyword.isEmpty) {
       _showMessage('书名为空，无法换源');
       return;
@@ -781,12 +784,31 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       _showMessage('没有可用书源');
       return;
     }
+    final orderedSources = enabledSources
+        .asMap()
+        .entries
+        .toList(growable: false)
+      ..sort((a, b) {
+        final orderCompare = a.value.customOrder.compareTo(b.value.customOrder);
+        if (orderCompare != 0) return orderCompare;
+        return a.key.compareTo(b.key);
+      });
+    final sortedEnabledSources =
+        orderedSources.map((entry) => entry.value).toList(growable: false);
 
     setState(() => _switchingSource = true);
     final searchResults = <SearchResult>[];
-    for (final source in enabledSources) {
+    for (final source in sortedEnabledSources) {
       try {
-        final list = await _engine.search(source, keyword);
+        final list = await _engine.search(
+          source,
+          keyword,
+          filter: (name, author) {
+            if (name != keyword) return false;
+            if (authorKeyword.isEmpty) return true;
+            return author.contains(authorKeyword);
+          },
+        );
         for (final item in list) {
           searchResults.add(_copyResultWithSource(item, source));
         }
@@ -814,7 +836,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
     final candidates = ReaderSourceSwitchHelper.buildCandidates(
       currentBook: currentBook,
-      enabledSources: enabledSources,
+      enabledSources: sortedEnabledSources,
       searchResults: searchResults,
     );
 
