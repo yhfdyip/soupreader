@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/source_aware_cover_image.dart';
 import '../../../core/database/database_service.dart';
@@ -13,6 +16,9 @@ import '../../../core/services/settings_service.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/source_cover_loader.dart';
+import '../models/search_scope.dart';
+import '../models/search_scope_group_helper.dart';
 import '../services/search_cache_service.dart';
 import 'search_book_info_view.dart';
 import 'search_scope_picker_view.dart';
@@ -40,10 +46,12 @@ class SearchView extends StatefulWidget {
 
 class _SearchViewState extends State<SearchView> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _resultScrollController = ScrollController();
   final SettingsService _settingsService = SettingsService();
   final SearchCacheService _cacheService = SearchCacheService();
   late final SourceRepository _sourceRepo;
   late final BookAddService _addService;
+  final _LegadoSearchAggregator _aggregator = _LegadoSearchAggregator();
 
   late AppSettings _settings;
   List<String> _historyKeywords = const <String>[];
@@ -55,15 +63,18 @@ class _SearchViewState extends State<SearchView> {
   bool _isSearching = false;
   String _searchingSource = '';
   String _currentKeyword = '';
+  String _currentCacheKey = '';
+  int _currentPage = 0;
+  bool _hasMore = false;
+  List<BookSource> _sessionSources = const <BookSource>[];
   int _completedSources = 0;
   int _searchSessionSeed = 0;
   int _runningSearchSessionId = 0;
-
-  bool get _isEntryScoped {
-    final scoped = widget.sourceUrls;
-    if (scoped == null || scoped.isEmpty) return false;
-    return scoped.any((item) => item.trim().isNotEmpty);
-  }
+  StreamSubscription<List<BookSource>>? _enabledGroupsSub;
+  bool _enabledGroupsReady = false;
+  List<String> _enabledGroups = const <String>[];
+  final Map<String, SourceAwareCoverLoadState> _coverLoadStateByItem =
+      <String, SourceAwareCoverLoadState>{};
 
   @override
   void initState() {
@@ -71,7 +82,10 @@ class _SearchViewState extends State<SearchView> {
     final db = DatabaseService();
     _sourceRepo = SourceRepository(db);
     _addService = BookAddService(database: db);
+    _resultScrollController.addListener(_onResultScroll);
     _settings = _sanitizeSettings(_settingsService.appSettings);
+    _applyScopedEntrySearchScope();
+    _startEnabledGroupsFlow();
     unawaited(_prepareLocalState());
 
     final initialKeyword = widget.initialKeyword?.trim();
@@ -93,7 +107,10 @@ class _SearchViewState extends State<SearchView> {
 
   @override
   void dispose() {
+    unawaited(_enabledGroupsSub?.cancel());
     _cancelOngoingSearch(updateState: false);
+    _resultScrollController.removeListener(_onResultScroll);
+    _resultScrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -107,8 +124,29 @@ class _SearchViewState extends State<SearchView> {
     setState(() => _historyKeywords = history);
   }
 
+  void _startEnabledGroupsFlow() {
+    _enabledGroupsSub?.cancel();
+    _enabledGroupsSub = _sourceRepo.watchAllSources().listen((allSources) {
+      final next = SearchScopeGroupHelper.enabledGroupsFromSources(allSources);
+      if (_enabledGroupsReady && listEquals(next, _enabledGroups)) {
+        return;
+      }
+      if (!mounted) {
+        _enabledGroupsReady = true;
+        _enabledGroups = next;
+        return;
+      }
+      setState(() {
+        _enabledGroupsReady = true;
+        _enabledGroups = next;
+      });
+    });
+  }
+
   AppSettings _sanitizeSettings(AppSettings settings) {
-    final normalizedScope = settings.searchScopeSourceUrls
+    final normalizedScope =
+        SearchScope.normalizeScopeText(settings.searchScope);
+    final legacyUrls = settings.searchScopeSourceUrls
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toSet()
@@ -118,7 +156,8 @@ class _SearchViewState extends State<SearchView> {
     return settings.copyWith(
       searchConcurrency: settings.searchConcurrency.clamp(2, 12),
       searchCacheRetentionDays: settings.searchCacheRetentionDays.clamp(1, 30),
-      searchScopeSourceUrls: normalizedScope,
+      searchScope: normalizedScope,
+      searchScopeSourceUrls: legacyUrls,
     );
   }
 
@@ -139,125 +178,73 @@ class _SearchViewState extends State<SearchView> {
         .toSet();
   }
 
-  List<BookSource> _allEnabledSources() {
-    final enabled = _sourceRepo
-        .getAllSources()
+  List<BookSource> _allSources() {
+    final all = _sourceRepo.getAllSources().toList(growable: false);
+    final indexed = all.asMap().entries.toList(growable: false);
+    indexed.sort((a, b) {
+      final orderCompare = a.value.customOrder.compareTo(b.value.customOrder);
+      if (orderCompare != 0) return orderCompare;
+      return a.key.compareTo(b.key);
+    });
+    return indexed.map((entry) => entry.value).toList(growable: false);
+  }
+
+  List<BookSource> _allEnabledSources(List<BookSource> allSources) {
+    return allSources
         .where((source) => source.enabled == true)
         .toList(growable: false);
-    enabled.sort((a, b) {
-      if (a.weight != b.weight) {
-        return b.weight.compareTo(a.weight);
-      }
-      return a.bookSourceName.compareTo(b.bookSourceName);
-    });
-    return enabled;
   }
 
-  List<BookSource> _enabledSources() {
-    final enabled = _allEnabledSources();
-
-    final forcedScope = widget.sourceUrls == null
-        ? const <String>{}
-        : _normalizeUrlSet(widget.sourceUrls!);
-    if (forcedScope.isNotEmpty) {
-      return enabled
-          .where((source) => forcedScope.contains(source.bookSourceUrl))
-          .toList(growable: false);
-    }
-
-    final configuredScope = _normalizeUrlSet(_settings.searchScopeSourceUrls);
-    if (configuredScope.isEmpty) return enabled;
-    return enabled
-        .where((source) => configuredScope.contains(source.bookSourceUrl))
-        .toList(growable: false);
+  void _applyScopedEntrySearchScope() {
+    final scoped = widget.sourceUrls;
+    if (scoped == null || scoped.isEmpty) return;
+    final scopedUrls = _normalizeUrlSet(scoped);
+    if (scopedUrls.isEmpty) return;
+    if (scopedUrls.length != 1) return;
+    final sourceUrl = scopedUrls.first;
+    final source = _sourceRepo.getSourceByUrl(sourceUrl);
+    if (source == null) return;
+    final nextScope = SearchScope.fromSource(source);
+    if (nextScope == _settings.searchScope) return;
+    unawaited(_saveSettings(_settings.copyWith(searchScope: nextScope)));
   }
 
-  String _resultKey(SearchResult item) {
-    return '${item.sourceUrl.trim()}|${item.bookUrl.trim()}';
-  }
-
-  String _preferNonEmpty(String preferred, String fallback) {
-    return preferred.trim().isNotEmpty ? preferred : fallback;
-  }
-
-  SearchResult _mergeSearchResult(SearchResult oldItem, SearchResult newItem) {
-    return SearchResult(
-      name: _preferNonEmpty(newItem.name, oldItem.name),
-      author: _preferNonEmpty(newItem.author, oldItem.author),
-      coverUrl: _preferNonEmpty(newItem.coverUrl, oldItem.coverUrl),
-      intro: _preferNonEmpty(newItem.intro, oldItem.intro),
-      kind: _preferNonEmpty(newItem.kind, oldItem.kind),
-      lastChapter: _preferNonEmpty(newItem.lastChapter, oldItem.lastChapter),
-      updateTime: _preferNonEmpty(newItem.updateTime, oldItem.updateTime),
-      wordCount: _preferNonEmpty(newItem.wordCount, oldItem.wordCount),
-      bookUrl: _preferNonEmpty(newItem.bookUrl, oldItem.bookUrl),
-      sourceUrl: _preferNonEmpty(newItem.sourceUrl, oldItem.sourceUrl),
-      sourceName: _preferNonEmpty(newItem.sourceName, oldItem.sourceName),
+  _ResolvedSearchScope _resolveSearchScope() {
+    final allSources = _allSources();
+    final enabledSources = _allEnabledSources(allSources);
+    final resolved = SearchScope(_settings.searchScope).resolve(
+      enabledSources,
+      allSourcesForSourceMode: allSources,
+    );
+    return _ResolvedSearchScope(
+      allSources: allSources,
+      allEnabledSources: enabledSources,
+      resolvedScope: resolved,
     );
   }
 
-  bool _searchResultEquals(SearchResult a, SearchResult b) {
-    return a.name == b.name &&
-        a.author == b.author &&
-        a.coverUrl == b.coverUrl &&
-        a.intro == b.intro &&
-        a.kind == b.kind &&
-        a.lastChapter == b.lastChapter &&
-        a.updateTime == b.updateTime &&
-        a.wordCount == b.wordCount &&
-        a.bookUrl == b.bookUrl &&
-        a.sourceUrl == b.sourceUrl &&
-        a.sourceName == b.sourceName;
-  }
+  int get _coverUrlEmptyCount => _displayResults
+      .where((item) => item.displayCoverUrl.trim().isEmpty)
+      .length;
 
-  _SearchUpsertStat _upsertResults(
-    List<SearchResult> incoming,
-    List<SearchResult> target,
-    Map<String, int> keyToIndex,
-  ) {
-    var added = 0;
-    var updated = 0;
-    for (final item in incoming) {
-      final bookUrl = item.bookUrl.trim();
-      final sourceUrl = item.sourceUrl.trim();
-      if (bookUrl.isEmpty || sourceUrl.isEmpty) continue;
+  int get _coverLoadSuccessCount => _coverLoadStateByItem.values
+      .where((state) => state == SourceAwareCoverLoadState.success)
+      .length;
 
-      final normalizedItem = SearchResult(
-        name: item.name,
-        author: item.author,
-        coverUrl: item.coverUrl,
-        intro: item.intro,
-        kind: item.kind,
-        lastChapter: item.lastChapter,
-        updateTime: item.updateTime,
-        wordCount: item.wordCount,
-        bookUrl: bookUrl,
-        sourceUrl: sourceUrl,
-        sourceName:
-            item.sourceName.trim().isNotEmpty ? item.sourceName : sourceUrl,
-      );
+  int get _coverLoadFailedCount => _coverLoadStateByItem.values
+      .where((state) => state == SourceAwareCoverLoadState.failed)
+      .length;
 
-      final key = _resultKey(normalizedItem);
-      final index = keyToIndex[key];
-      if (index == null) {
-        keyToIndex[key] = target.length;
-        target.add(normalizedItem);
-        added++;
-        continue;
-      }
-
-      final merged = _mergeSearchResult(target[index], normalizedItem);
-      if (_searchResultEquals(merged, target[index])) {
-        continue;
-      }
-      target[index] = merged;
-      updated++;
-    }
-    return _SearchUpsertStat(added: added, updated: updated);
-  }
-
-  String _normalizeCompare(String text) {
-    return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  void _handleCoverLoadState(String itemKey, SourceAwareCoverLoadState state) {
+    if (!mounted) return;
+    if (_coverLoadStateByItem[itemKey] == state) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_coverLoadStateByItem[itemKey] == state) return;
+      setState(() {
+        _coverLoadStateByItem[itemKey] = state;
+      });
+    });
   }
 
   List<SearchResult> _filterResultsByMode(
@@ -269,117 +256,39 @@ class _SearchViewState extends State<SearchView> {
       case SearchFilterMode.normal:
         return incoming;
       case SearchFilterMode.precise:
-        final normalizedKeyword = _normalizeCompare(keyword);
-        if (normalizedKeyword.isEmpty) return incoming;
+        if (keyword.isEmpty) return incoming;
         return incoming.where((item) {
-          final name = _normalizeCompare(item.name);
-          final author = _normalizeCompare(item.author);
-          return name.contains(normalizedKeyword) ||
-              author.contains(normalizedKeyword);
+          return item.name.contains(keyword) || item.author.contains(keyword);
         }).toList(growable: false);
     }
   }
 
-  int _matchRank(SearchResult result, String normalizedKeyword) {
-    if (normalizedKeyword.isEmpty) return 2;
-    final name = _normalizeCompare(result.name);
-    final author = _normalizeCompare(result.author);
-    if (name == normalizedKeyword || author == normalizedKeyword) return 0;
-    if (name.contains(normalizedKeyword) ||
-        author.contains(normalizedKeyword)) {
-      return 1;
-    }
-    return 2;
-  }
-
-  SearchResult _pickPrimaryResult(
-    List<SearchResult> origins,
-    String normalizedKeyword,
-  ) {
-    if (origins.length <= 1) return origins.first;
-    final sorted = origins.toList(growable: false)
-      ..sort((a, b) {
-        final rankCompare = _matchRank(a, normalizedKeyword).compareTo(
-          _matchRank(b, normalizedKeyword),
-        );
-        if (rankCompare != 0) return rankCompare;
-        final sourceNameCompare = a.sourceName.compareTo(b.sourceName);
-        if (sourceNameCompare != 0) return sourceNameCompare;
-        return a.bookUrl.compareTo(b.bookUrl);
-      });
-    return sorted.first;
-  }
-
   void _rebuildDisplayResults({String? keyword}) {
-    final normalizedKeyword = _normalizeCompare(keyword ?? _currentKeyword);
-    final mode = _settings.searchFilterMode;
-    final built = <_SearchDisplayItem>[];
+    final searchKeyword = keyword ?? _currentKeyword;
+    final bookshelfKeys = _addService.buildSearchBookshelfKeys();
+    final built = _aggregator.buildDisplayItems(
+      searchKeyword: searchKeyword,
+      precision: _settings.searchFilterMode == SearchFilterMode.precise,
+      isInBookshelf: (item) => _addService.isInBookshelf(
+        item,
+        bookshelfKeys: bookshelfKeys,
+      ),
+    );
+    _results = _aggregator.rawResults;
 
-    if (mode == SearchFilterMode.none) {
-      for (final item in _results) {
-        final cover = _pickDisplayCover(<SearchResult>[item]);
-        built.add(
-          _SearchDisplayItem(
-            key: '${item.sourceUrl.trim()}|${item.bookUrl.trim()}',
-            primary: item,
-            origins: <SearchResult>[item],
-            inBookshelf: _addService.isInBookshelf(item),
-            displayCoverUrl: cover.url,
-            displayCoverSourceUrl: cover.sourceUrl,
-          ),
-        );
-      }
-    } else {
-      final grouped = <String, List<SearchResult>>{};
-      for (final item in _results) {
-        final groupKey =
-            '${_normalizeCompare(item.name)}|${_normalizeCompare(item.author)}';
-        grouped.putIfAbsent(groupKey, () => <SearchResult>[]).add(item);
-      }
-      for (final entry in grouped.entries) {
-        final origins = entry.value;
-        if (origins.isEmpty) continue;
-        final primary = _pickPrimaryResult(origins, normalizedKeyword);
-        final cover = _pickDisplayCover(origins);
-        built.add(
-          _SearchDisplayItem(
-            key: '${entry.key}|${primary.bookUrl.trim()}',
-            primary: primary,
-            origins: origins,
-            inBookshelf: origins.any(_addService.isInBookshelf),
-            displayCoverUrl: cover.url,
-            displayCoverSourceUrl: cover.sourceUrl,
-          ),
-        );
+    final activeKeys = built.map((item) => item.key).toSet();
+    _coverLoadStateByItem.removeWhere((key, _) => !activeKeys.contains(key));
+    for (final item in built) {
+      final coverUrl = item.displayCoverUrl.trim();
+      if (coverUrl.isEmpty) {
+        _coverLoadStateByItem[item.key] = SourceAwareCoverLoadState.emptyUrl;
+      } else if (_coverLoadStateByItem[item.key] ==
+          SourceAwareCoverLoadState.emptyUrl) {
+        _coverLoadStateByItem.remove(item.key);
       }
     }
-
-    built.sort((a, b) {
-      final rankCompare = _matchRank(a.primary, normalizedKeyword).compareTo(
-        _matchRank(b.primary, normalizedKeyword),
-      );
-      if (rankCompare != 0) return rankCompare;
-      final originsCompare = b.origins.length.compareTo(a.origins.length);
-      if (originsCompare != 0) return originsCompare;
-      final nameCompare = a.primary.name.compareTo(b.primary.name);
-      if (nameCompare != 0) return nameCompare;
-      return a.primary.author.compareTo(b.primary.author);
-    });
 
     _displayResults = built;
-  }
-
-  _DisplayCover _pickDisplayCover(List<SearchResult> origins) {
-    for (final item in origins) {
-      final cover = item.coverUrl.trim();
-      if (cover.isNotEmpty) {
-        return _DisplayCover(
-          url: cover,
-          sourceUrl: item.sourceUrl.trim(),
-        );
-      }
-    }
-    return const _DisplayCover(url: '', sourceUrl: '');
   }
 
   bool _isSearchSessionActive(int sessionId) {
@@ -403,6 +312,7 @@ class _SearchViewState extends State<SearchView> {
     _isSearching = false;
     _runningSearchSessionId = 0;
     _searchingSource = '';
+    _hasMore = false;
 
     final tokens = _activeCancelTokens.toList(growable: false);
     _activeCancelTokens.clear();
@@ -417,16 +327,72 @@ class _SearchViewState extends State<SearchView> {
     }
   }
 
+  void _onResultScroll() {
+    if (!_resultScrollController.hasClients) return;
+    if (_resultScrollController.position.extentAfter > 120) return;
+    if (_isSearching || !_hasMore) return;
+    if (_currentKeyword.trim().isEmpty) return;
+    if (_displayResults.isEmpty) return;
+    unawaited(_loadNextPage());
+  }
+
+  Future<void> _loadNextPage() async {
+    if (_isSearching || !_hasMore) return;
+    if (_sessionSources.isEmpty) return;
+    if (_currentKeyword.trim().isEmpty) return;
+    final sessionId = _runningSearchSessionId;
+    if (sessionId == 0) return;
+    final nextPage = _currentPage + 1;
+
+    setState(() {
+      _isSearching = true;
+      _completedSources = 0;
+      _searchingSource = '';
+    });
+
+    final hasMore = await _runSearchPage(
+      searchSessionId: sessionId,
+      sources: _sessionSources,
+      page: nextPage,
+    );
+
+    if (!_isSearchSessionActive(sessionId)) return;
+    _currentPage = nextPage;
+    if (_results.isNotEmpty && _currentCacheKey.isNotEmpty) {
+      unawaited(
+          _cacheService.writeCache(key: _currentCacheKey, results: _results));
+    }
+
+    setState(() {
+      _isSearching = false;
+      _searchingSource = '';
+      _hasMore = hasMore;
+    });
+  }
+
   Future<void> _search() async {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) return;
-    _currentKeyword = keyword;
 
-    final enabledSources = _enabledSources();
+    final resolvedScopeState = _resolveSearchScope();
+    if (resolvedScopeState.resolvedScope.normalizedScope !=
+        _settings.searchScope) {
+      await _saveSettings(
+        _settings.copyWith(
+          searchScope: resolvedScopeState.resolvedScope.normalizedScope,
+        ),
+      );
+      if (!mounted) return;
+    }
+
+    final enabledSources = resolvedScopeState.sources;
     if (enabledSources.isEmpty) {
       _showMessage('当前搜索范围没有启用书源，请先调整“搜索范围”。');
       return;
     }
+
+    // 新搜索会话清理封面内存缓存（含失败负缓存），避免旧失败状态持续影响显示。
+    SourceCoverLoader.instance.clearMemoryCache();
 
     await _saveHistoryKeyword(keyword);
 
@@ -442,30 +408,103 @@ class _SearchViewState extends State<SearchView> {
     final cachedResults = cached?.results ?? const <SearchResult>[];
 
     _cancelOngoingSearch(updateState: false);
-    final keyToIndex = <String, int>{};
-    final initialResults = <SearchResult>[];
-    _upsertResults(cachedResults, initialResults, keyToIndex);
-
     final searchSessionId = _startSearchSession();
-    var nextSourceIndex = 0;
-    final workerCount = enabledSources.length < _settings.searchConcurrency
-        ? enabledSources.length
-        : _settings.searchConcurrency;
+    _currentKeyword = keyword;
+    _currentCacheKey = cacheKey;
+    _currentPage = 1;
+    _hasMore = true;
+    _sessionSources = enabledSources;
+    _aggregator.reset();
+    _aggregator.ingest(cachedResults);
 
     setState(() {
       _isSearching = true;
-      _results = initialResults;
+      _coverLoadStateByItem.clear();
       _sourceIssues.clear();
       _completedSources = 0;
       _searchingSource = '';
       _rebuildDisplayResults(keyword: keyword);
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_resultScrollController.hasClients) return;
+      _resultScrollController.jumpTo(0);
+    });
+
+    final hasMore = await _runSearchPage(
+      searchSessionId: searchSessionId,
+      sources: enabledSources,
+      page: _currentPage,
+    );
+
+    if (!_isSearchSessionActive(searchSessionId)) return;
+    if (_results.isNotEmpty && _currentCacheKey.isNotEmpty) {
+      unawaited(
+          _cacheService.writeCache(key: _currentCacheKey, results: _results));
+    }
+
+    setState(() {
+      _isSearching = false;
+      _searchingSource = '';
+      _hasMore = hasMore;
+    });
+    unawaited(_maybePromptEmptyResultLikeLegado());
+  }
+
+  Future<void> _maybePromptEmptyResultLikeLegado() async {
+    if (!mounted) return;
+    if (_isSearching) return;
+    if (_displayResults.isNotEmpty) return;
+    if (_currentKeyword.trim().isEmpty) return;
+    final scope = _resolveSearchScope().resolvedScope;
+    if (scope.isAll) return;
+    final scopeLabel = scope.display();
+
+    if (_settings.searchFilterMode == SearchFilterMode.precise) {
+      final confirm = await _confirm(
+        title: '搜索结果为空',
+        content: '$scopeLabel 搜索结果为空，是否关闭精准过滤并重试？',
+        confirmText: '关闭并重试',
+      );
+      if (!confirm || !mounted) return;
+      await _saveSettings(
+        _settings.copyWith(searchFilterMode: SearchFilterMode.normal),
+      );
+      if (!mounted) return;
+      await _search();
+      return;
+    }
+
+    final confirm = await _confirm(
+      title: '搜索结果为空',
+      content: '$scopeLabel 搜索结果为空，是否切换到所有书源并重试？',
+      confirmText: '切换并重试',
+    );
+    if (!confirm || !mounted) return;
+    await _saveSettings(
+      _settings.copyWith(searchScope: ''),
+    );
+    if (!mounted) return;
+    await _search();
+  }
+
+  Future<bool> _runSearchPage({
+    required int searchSessionId,
+    required List<BookSource> sources,
+    required int page,
+  }) async {
+    if (sources.isEmpty) return false;
+    var nextSourceIndex = 0;
+    var pageHasAnyResult = false;
+    final workerCount = sources.length < _settings.searchConcurrency
+        ? sources.length
+        : _settings.searchConcurrency;
 
     Future<void> runWorker() async {
       while (true) {
         if (!_isSearchSessionActive(searchSessionId)) return;
-        if (nextSourceIndex >= enabledSources.length) return;
-        final source = enabledSources[nextSourceIndex++];
+        if (nextSourceIndex >= sources.length) return;
+        final source = sources[nextSourceIndex++];
         if (!_isSearchSessionActive(searchSessionId)) return;
         setState(() => _searchingSource = source.bookSourceName);
 
@@ -474,22 +513,28 @@ class _SearchViewState extends State<SearchView> {
 
         try {
           final debugEngine = RuleParserEngine();
-          final debugResult = await debugEngine.searchDebug(
-            source,
-            keyword,
-            cancelToken: token,
-          );
+          final debugResult = await debugEngine
+              .searchDebug(
+                source,
+                _currentKeyword,
+                page: page,
+                cancelToken: token,
+              )
+              .timeout(const Duration(seconds: 30));
           if (!_isSearchSessionActive(searchSessionId)) return;
 
           final issue = _buildSearchIssue(source, debugResult);
           final filtered =
-              _filterResultsByMode(debugResult.results, keyword.trim());
-          final upsertStat = _upsertResults(filtered, _results, keyToIndex);
+              _filterResultsByMode(debugResult.results, _currentKeyword.trim());
+          if (filtered.isNotEmpty) {
+            pageHasAnyResult = true;
+          }
+          final ingestStat = _aggregator.ingest(filtered);
           if (!_isSearchSessionActive(searchSessionId)) return;
 
           setState(() {
-            if (upsertStat.added > 0 || upsertStat.updated > 0) {
-              _rebuildDisplayResults(keyword: keyword);
+            if (ingestStat.changed) {
+              _rebuildDisplayResults(keyword: _currentKeyword);
             }
             if (issue != null) {
               _sourceIssues.add(issue);
@@ -499,6 +544,10 @@ class _SearchViewState extends State<SearchView> {
         } catch (e) {
           if (!_isSearchSessionActive(searchSessionId)) return;
           if (_isCanceledError(e)) {
+            setState(() => _completedSources++);
+            return;
+          }
+          if (e is TimeoutException) {
             setState(() => _completedSources++);
             return;
           }
@@ -520,17 +569,7 @@ class _SearchViewState extends State<SearchView> {
     await Future.wait(
       List<Future<void>>.generate(workerCount, (_) => runWorker()),
     );
-
-    if (!_isSearchSessionActive(searchSessionId)) return;
-    if (_results.isNotEmpty) {
-      unawaited(_cacheService.writeCache(key: cacheKey, results: _results));
-    }
-
-    setState(() {
-      _isSearching = false;
-      _runningSearchSessionId = 0;
-      _searchingSource = '';
-    });
+    return pageHasAnyResult;
   }
 
   _SourceRunIssue? _buildSearchIssue(
@@ -622,21 +661,150 @@ class _SearchViewState extends State<SearchView> {
   }
 
   String _scopeLabel({
-    required int scopedCount,
+    required SearchScopeResolveResult scope,
     required int allEnabledCount,
   }) {
-    if (_isEntryScoped) {
-      return '入口限定 $scopedCount 源';
-    }
-    if (_settings.searchScopeSourceUrls.isEmpty) {
+    if (scope.isAll) {
       return '所有书源';
     }
-    return '$scopedCount/$allEnabledCount 书源';
+    if (scope.isSource) {
+      return scope.display();
+    }
+    return '${scope.display()}（${scope.sources.length}/$allEnabledCount 源）';
+  }
+
+  Future<void> _updateScopeAndMaybeSearch(String nextScope) async {
+    final normalized = SearchScope.normalizeScopeText(nextScope);
+    if (normalized == _settings.searchScope) return;
+    await _saveSettings(_settings.copyWith(searchScope: normalized));
+    if (!mounted) return;
+    if (_searchController.text.trim().isNotEmpty) {
+      await _search();
+    }
+  }
+
+  Future<void> _showScopeQuickSheet() async {
+    final scopeState = _resolveSearchScope();
+    final scope = scopeState.resolvedScope;
+    final selectedNames = scope.displayNames;
+    final enabledGroups = _enabledGroupsReady
+        ? _enabledGroups
+        : SearchScopeGroupHelper.enabledGroupsFromSources(
+            scopeState.allSources,
+          );
+    final allEnabledCount = scopeState.allEnabledSources.length;
+
+    final action = await showCupertinoModalPopup<_ScopeQuickAction>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('搜索范围'),
+        message: Text(
+          _scopeLabel(
+            scope: scope,
+            allEnabledCount: allEnabledCount,
+          ),
+        ),
+        actions: [
+          for (final selectedName in selectedNames)
+            _buildScopeQuickAction(
+              ctx,
+              title: selectedName,
+              selected: true,
+              action: _ScopeQuickAction.remove(selectedName),
+            ),
+          _buildScopeQuickAction(
+            ctx,
+            title: '所有书源',
+            selected: scope.isAll,
+            action: const _ScopeQuickAction(
+              type: _ScopeQuickActionType.all,
+              value: '',
+            ),
+          ),
+          for (final group in enabledGroups)
+            if (!selectedNames.contains(group))
+              _buildScopeQuickAction(
+                ctx,
+                title: group,
+                selected: false,
+                action: _ScopeQuickAction(
+                  type: _ScopeQuickActionType.group,
+                  value: group,
+                ),
+              ),
+          _buildScopeQuickAction(
+            ctx,
+            title: '多分组/单源模式…',
+            selected: false,
+            action: const _ScopeQuickAction(
+              type: _ScopeQuickActionType.dialog,
+              value: '',
+            ),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (action == null) return;
+
+    switch (action.type) {
+      case _ScopeQuickActionType.dialog:
+        await _openScopePicker();
+        return;
+      case _ScopeQuickActionType.all:
+        await _updateScopeAndMaybeSearch('');
+        return;
+      case _ScopeQuickActionType.group:
+        await _updateScopeAndMaybeSearch(action.value);
+        return;
+      case _ScopeQuickActionType.remove:
+        if (scope.isSource) {
+          await _updateScopeAndMaybeSearch('');
+          return;
+        }
+        final remaining = scope.selectedGroups
+            .where((item) => item != action.value)
+            .toList(growable: false);
+        await _updateScopeAndMaybeSearch(SearchScope.fromGroups(remaining));
+        return;
+    }
+  }
+
+  CupertinoActionSheetAction _buildScopeQuickAction(
+    BuildContext ctx, {
+    required String title,
+    required bool selected,
+    required _ScopeQuickAction action,
+  }) {
+    return CupertinoActionSheetAction(
+      onPressed: () => Navigator.pop(ctx, action),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (selected)
+            Icon(
+              CupertinoIcons.check_mark_circled_solid,
+              size: 18,
+              color: CupertinoColors.activeGreen.resolveFrom(context),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showSearchSettingsSheet() async {
-    final enabledCount = _enabledSources().length;
-    final allEnabledCount = _allEnabledSources().length;
+    final scopeState = _resolveSearchScope();
+    final allEnabledCount = scopeState.allEnabledSources.length;
     final action = await showCupertinoModalPopup<_SearchSettingAction>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
@@ -654,7 +822,7 @@ class _SearchViewState extends State<SearchView> {
             action: _SearchSettingAction.scope,
             label: '搜索范围',
             value: _scopeLabel(
-              scopedCount: enabledCount,
+              scope: scopeState.resolvedScope,
               allEnabledCount: allEnabledCount,
             ),
           ),
@@ -705,11 +873,7 @@ class _SearchViewState extends State<SearchView> {
         await _pickFilterMode();
         break;
       case _SearchSettingAction.scope:
-        if (_isEntryScoped) {
-          _showMessage('当前为源内搜索，范围由入口限定。');
-        } else {
-          await _openScopePicker();
-        }
+        await _showScopeQuickSheet();
         break;
       case _SearchSettingAction.concurrency:
         await _pickConcurrency();
@@ -778,6 +942,10 @@ class _SearchViewState extends State<SearchView> {
     if (selected == null || selected == _settings.searchFilterMode) return;
     await _saveSettings(_settings.copyWith(searchFilterMode: selected));
     if (!mounted) return;
+    if (_searchController.text.trim().isNotEmpty) {
+      await _search();
+      return;
+    }
     setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
   }
 
@@ -818,31 +986,31 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Future<void> _openScopePicker() async {
-    final allEnabled = _allEnabledSources();
-    if (allEnabled.isEmpty) {
-      _showMessage('没有可用的启用书源。');
+    final scopeState = _resolveSearchScope();
+    if (scopeState.allSources.isEmpty) {
+      _showMessage('没有可用书源。');
       return;
     }
 
-    final selected = _normalizeUrlSet(_settings.searchScopeSourceUrls);
     final result =
-        await Navigator.of(context, rootNavigator: true).push<List<String>>(
+        await Navigator.of(context, rootNavigator: true).push<String>(
       CupertinoPageRoute(
         builder: (_) => SearchScopePickerView(
-          sources: allEnabled,
-          initialSelectedUrls: selected,
+          sources: scopeState.allSources,
+          enabledSources: scopeState.allEnabledSources,
         ),
       ),
     );
     if (result == null) return;
 
-    final normalized = _normalizeUrlSet(result);
-    final scopeToSave = normalized.length == allEnabled.length
-        ? const <String>[]
-        : (normalized.toList(growable: false)..sort());
+    final scopeToSave = SearchScope.normalizeScopeText(result);
     await _saveSettings(
-      _settings.copyWith(searchScopeSourceUrls: scopeToSave),
+      _settings.copyWith(searchScope: scopeToSave),
     );
+    if (!mounted) return;
+    if (_searchController.text.trim().isNotEmpty) {
+      await _search();
+    }
   }
 
   Future<void> _pickConcurrency() async {
@@ -1047,9 +1215,14 @@ class _SearchViewState extends State<SearchView> {
 
   @override
   Widget build(BuildContext context) {
-    final enabledSources = _enabledSources();
+    final scopeState = _resolveSearchScope();
+    final enabledSources = scopeState.sources;
     final totalSources = enabledSources.length;
-    final allEnabledCount = _allEnabledSources().length;
+    final allEnabledCount = scopeState.allEnabledSources.length;
+    final scopeLabel = _scopeLabel(
+      scope: scopeState.resolvedScope,
+      allEnabledCount: allEnabledCount,
+    );
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
 
@@ -1117,7 +1290,7 @@ class _SearchViewState extends State<SearchView> {
                         ),
                         Text(
                           '${_filterModeLabel(_settings.searchFilterMode)} · '
-                          '${_scopeLabel(scopedCount: totalSources, allEnabledCount: allEnabledCount)} · '
+                          '$scopeLabel · '
                           '并发 ${_settings.searchConcurrency}',
                           style: theme.textTheme.small.copyWith(
                             color: scheme.mutedForeground,
@@ -1136,7 +1309,9 @@ class _SearchViewState extends State<SearchView> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 4,
                   children: [
                     Text(
                       '书源 $totalSources',
@@ -1144,22 +1319,35 @@ class _SearchViewState extends State<SearchView> {
                         color: scheme.mutedForeground,
                       ),
                     ),
-                    const SizedBox(width: 10),
                     Text(
                       '结果 ${_displayResults.length}',
                       style: theme.textTheme.small.copyWith(
                         color: scheme.mutedForeground,
                       ),
                     ),
-                    if (_sourceIssues.isNotEmpty) ...[
-                      const SizedBox(width: 10),
+                    if (_sourceIssues.isNotEmpty)
                       Text(
                         '失败 ${_sourceIssues.length}',
                         style: theme.textTheme.small.copyWith(
                           color: scheme.destructive,
                         ),
                       ),
-                    ],
+                    if (_settings.searchShowCover)
+                      Text(
+                        '封面 空$_coverUrlEmptyCount 成功$_coverLoadSuccessCount 失败$_coverLoadFailedCount',
+                        style: theme.textTheme.small.copyWith(
+                          color: _coverLoadFailedCount > 0
+                              ? scheme.destructive
+                              : scheme.mutedForeground,
+                        ),
+                      )
+                    else
+                      Text(
+                        '封面 已关闭',
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.mutedForeground,
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -1221,6 +1409,7 @@ class _SearchViewState extends State<SearchView> {
             child: _displayResults.isEmpty
                 ? _buildEmptyBody(totalSources: totalSources)
                 : ListView.builder(
+                    controller: _resultScrollController,
                     padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
                     itemCount: _displayResults.length,
                     itemBuilder: (context, index) =>
@@ -1374,6 +1563,7 @@ class _SearchViewState extends State<SearchView> {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
     final result = item.primary;
+    final coverUrl = item.displayCoverUrl.trim();
     final sourceCount = item.origins.length;
     final meta = <String>[
       if (result.kind.trim().isNotEmpty) result.kind.trim(),
@@ -1395,17 +1585,30 @@ class _SearchViewState extends State<SearchView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (_settings.searchShowCover) ...[
-                SourceAwareCoverImage(
-                  urlOrPath: item.displayCoverUrl,
-                  source: coverSource,
-                  title: result.name,
-                  author: result.author,
-                  width: 52,
-                  height: 74,
-                  borderRadius: 8,
-                  fit: BoxFit.cover,
-                  showTextOnPlaceholder: false,
-                ),
+                coverUrl.isEmpty
+                    ? AppCoverImage(
+                        urlOrPath: '',
+                        title: result.name,
+                        author: result.author,
+                        width: 52,
+                        height: 74,
+                        borderRadius: 8,
+                        fit: BoxFit.cover,
+                        showTextOnPlaceholder: false,
+                      )
+                    : SourceAwareCoverImage(
+                        urlOrPath: coverUrl,
+                        source: coverSource,
+                        title: result.name,
+                        author: result.author,
+                        width: 52,
+                        height: 74,
+                        borderRadius: 8,
+                        fit: BoxFit.cover,
+                        showTextOnPlaceholder: false,
+                        onLoadStateChanged: (state) =>
+                            _handleCoverLoadState(item.key, state),
+                      ),
                 const SizedBox(width: 10),
               ],
               Expanded(
@@ -1519,6 +1722,20 @@ class _SearchViewState extends State<SearchView> {
   }
 }
 
+class _ResolvedSearchScope {
+  final List<BookSource> allSources;
+  final List<BookSource> allEnabledSources;
+  final SearchScopeResolveResult resolvedScope;
+
+  const _ResolvedSearchScope({
+    required this.allSources,
+    required this.allEnabledSources,
+    required this.resolvedScope,
+  });
+
+  List<BookSource> get sources => resolvedScope.sources;
+}
+
 class _SearchDisplayItem {
   final String key;
   final SearchResult primary;
@@ -1537,23 +1754,207 @@ class _SearchDisplayItem {
   });
 }
 
-class _DisplayCover {
-  final String url;
-  final String sourceUrl;
+class _LegadoSearchAggregator {
+  final Map<String, SearchResult> _rawBySourceBookKey =
+      <String, SearchResult>{};
+  final Map<String, _LegadoSearchGroup> _groupMap =
+      <String, _LegadoSearchGroup>{};
+  int _seenOrderSeed = 0;
 
-  const _DisplayCover({
-    required this.url,
-    required this.sourceUrl,
-  });
+  void reset() {
+    _rawBySourceBookKey.clear();
+    _groupMap.clear();
+    _seenOrderSeed = 0;
+  }
+
+  List<SearchResult> get rawResults =>
+      _rawBySourceBookKey.values.toList(growable: false);
+
+  _AggregatorIngestStat ingest(List<SearchResult> incoming) {
+    var changed = false;
+    for (final item in incoming) {
+      final normalized = _normalizeResult(item);
+      if (normalized == null) continue;
+      final sourceBookKey = _sourceBookKey(normalized);
+      final groupKey = _groupKey(normalized);
+      if (groupKey.isEmpty) continue;
+
+      final existingRaw = _rawBySourceBookKey[sourceBookKey];
+      if (existingRaw == null) {
+        _rawBySourceBookKey[sourceBookKey] = normalized;
+        changed = true;
+      }
+
+      final group = _groupMap[groupKey];
+      if (group == null) {
+        final nextGroup = _LegadoSearchGroup(
+          key: groupKey,
+          primary: normalized,
+          orderRank: _seenOrderSeed++,
+        );
+        nextGroup.addResult(sourceBookKey, normalized);
+        _groupMap[groupKey] = nextGroup;
+        changed = true;
+        continue;
+      }
+
+      if (group.addResult(sourceBookKey, normalized)) {
+        changed = true;
+      }
+    }
+    return _AggregatorIngestStat(changed: changed);
+  }
+
+  List<_SearchDisplayItem> buildDisplayItems({
+    required String searchKeyword,
+    required bool precision,
+    required bool Function(SearchResult item) isInBookshelf,
+  }) {
+    final exact = <_LegadoSearchGroup>[];
+    final contains = <_LegadoSearchGroup>[];
+    final others = <_LegadoSearchGroup>[];
+
+    final groups = _groupMap.values.toList(growable: false)
+      ..sort((a, b) => a.orderRank.compareTo(b.orderRank));
+    for (final group in groups) {
+      final rank = _matchRank(group.primary, searchKeyword);
+      if (rank == 0) {
+        exact.add(group);
+      } else if (rank == 1) {
+        contains.add(group);
+      } else if (!precision) {
+        others.add(group);
+      }
+    }
+
+    _stableSortByOriginCountDesc(exact);
+    _stableSortByOriginCountDesc(contains);
+
+    final ordered = <_LegadoSearchGroup>[...exact, ...contains, ...others];
+    for (var i = 0; i < ordered.length; i++) {
+      ordered[i].orderRank = i;
+    }
+
+    return ordered.map((group) {
+      final originList = group.originRepresentatives;
+      final primary = group.primary;
+      return _SearchDisplayItem(
+        key: group.key,
+        primary: primary,
+        origins: originList,
+        inBookshelf: isInBookshelf(primary),
+        displayCoverUrl: primary.coverUrl.trim(),
+        displayCoverSourceUrl: primary.sourceUrl.trim(),
+      );
+    }).toList(growable: false);
+  }
+
+  static void _stableSortByOriginCountDesc(List<_LegadoSearchGroup> groups) {
+    if (groups.length < 2) return;
+    final indexed = groups.asMap().entries.toList(growable: false);
+    indexed.sort((a, b) {
+      final originCompare =
+          b.value.origins.length.compareTo(a.value.origins.length);
+      if (originCompare != 0) {
+        return originCompare;
+      }
+      return a.key.compareTo(b.key);
+    });
+    groups
+      ..clear()
+      ..addAll(indexed.map((entry) => entry.value));
+  }
+
+  static SearchResult? _normalizeResult(SearchResult item) {
+    final name = item.name.trim();
+    final bookUrl = item.bookUrl.trim();
+    final sourceUrl = item.sourceUrl.trim();
+    if (name.isEmpty || bookUrl.isEmpty || sourceUrl.isEmpty) {
+      return null;
+    }
+    return SearchResult(
+      name: name,
+      author: item.author.trim(),
+      coverUrl: item.coverUrl.trim(),
+      intro: item.intro.trim(),
+      kind: item.kind.trim(),
+      lastChapter: item.lastChapter.trim(),
+      updateTime: item.updateTime.trim(),
+      wordCount: item.wordCount.trim(),
+      bookUrl: bookUrl,
+      sourceUrl: sourceUrl,
+      sourceName: item.sourceName.trim().isNotEmpty
+          ? item.sourceName.trim()
+          : sourceUrl,
+    );
+  }
+
+  static String _sourceBookKey(SearchResult item) {
+    return '${item.sourceUrl.trim()}|${item.bookUrl.trim()}';
+  }
+
+  static String _groupKey(SearchResult item) {
+    return '${item.name}|${item.author}';
+  }
+
+  static int _matchRank(SearchResult result, String searchKeyword) {
+    if (searchKeyword.isEmpty) return 2;
+    final name = result.name;
+    final author = result.author;
+    if (name == searchKeyword || author == searchKeyword) {
+      return 0;
+    }
+    if (name.contains(searchKeyword) || author.contains(searchKeyword)) {
+      return 1;
+    }
+    return 2;
+  }
 }
 
-class _SearchUpsertStat {
-  final int added;
-  final int updated;
+class _LegadoSearchGroup {
+  final String key;
+  int orderRank;
+  SearchResult primary;
+  final LinkedHashMap<String, SearchResult> _resultBySourceBookKey =
+      LinkedHashMap<String, SearchResult>();
+  final LinkedHashMap<String, SearchResult> _representativeByOrigin =
+      LinkedHashMap<String, SearchResult>();
 
-  const _SearchUpsertStat({
-    required this.added,
-    required this.updated,
+  _LegadoSearchGroup({
+    required this.key,
+    required this.primary,
+    required this.orderRank,
+  });
+
+  Set<String> get origins => _representativeByOrigin.keys.toSet();
+
+  List<SearchResult> get originRepresentatives =>
+      _representativeByOrigin.values.toList(growable: false);
+
+  bool addResult(String sourceBookKey, SearchResult result) {
+    var changed = false;
+    final oldSourceBook = _resultBySourceBookKey[sourceBookKey];
+    if (oldSourceBook == null) {
+      _resultBySourceBookKey[sourceBookKey] = result;
+      changed = true;
+    }
+
+    final originKey = result.sourceUrl.trim();
+    final oldRepresentative = _representativeByOrigin[originKey];
+    if (oldRepresentative == null) {
+      _representativeByOrigin[originKey] = result;
+      changed = true;
+    }
+
+    return changed;
+  }
+}
+
+class _AggregatorIngestStat {
+  final bool changed;
+
+  const _AggregatorIngestStat({
+    required this.changed,
   });
 }
 
@@ -1565,6 +1966,30 @@ class _SourceRunIssue {
     required this.sourceName,
     required this.reason,
   });
+}
+
+enum _ScopeQuickActionType {
+  remove,
+  group,
+  all,
+  dialog,
+}
+
+class _ScopeQuickAction {
+  final _ScopeQuickActionType type;
+  final String value;
+
+  const _ScopeQuickAction({
+    required this.type,
+    required this.value,
+  });
+
+  factory _ScopeQuickAction.remove(String name) {
+    return _ScopeQuickAction(
+      type: _ScopeQuickActionType.remove,
+      value: name,
+    );
+  }
 }
 
 enum _SearchSettingAction {

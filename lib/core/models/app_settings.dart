@@ -36,6 +36,7 @@ class AppSettings {
   final SearchFilterMode searchFilterMode;
   final int searchConcurrency;
   final int searchCacheRetentionDays;
+  final String searchScope;
   final List<String> searchScopeSourceUrls;
   final bool searchShowCover;
 
@@ -48,6 +49,7 @@ class AppSettings {
     this.searchFilterMode = SearchFilterMode.normal,
     this.searchConcurrency = 8,
     this.searchCacheRetentionDays = 5,
+    this.searchScope = '',
     this.searchScopeSourceUrls = const <String>[],
     this.searchShowCover = true,
   });
@@ -117,6 +119,18 @@ class AppSettings {
       return out;
     }
 
+    String parseString(dynamic raw) {
+      if (raw == null) return '';
+      return raw.toString().trim();
+    }
+
+    final legacyScopeSourceUrls =
+        parseStringList(json['searchScopeSourceUrls']);
+    var parsedSearchScope = parseString(json['searchScope']);
+    if (parsedSearchScope.isEmpty && legacyScopeSourceUrls.length == 1) {
+      parsedSearchScope = '::${legacyScopeSourceUrls.first}';
+    }
+
     return AppSettings(
       appearanceMode: parseAppearanceMode(json['appearanceMode']),
       wifiOnlyDownload: json['wifiOnlyDownload'] as bool? ?? true,
@@ -128,7 +142,8 @@ class AppSettings {
           parseIntWithDefault(json['searchConcurrency'], 8).clamp(2, 12),
       searchCacheRetentionDays:
           parseIntWithDefault(json['searchCacheRetentionDays'], 5).clamp(1, 30),
-      searchScopeSourceUrls: parseStringList(json['searchScopeSourceUrls']),
+      searchScope: parsedSearchScope,
+      searchScopeSourceUrls: legacyScopeSourceUrls,
       searchShowCover: json['searchShowCover'] as bool? ?? true,
     );
   }
@@ -143,6 +158,7 @@ class AppSettings {
       'searchFilterMode': searchFilterMode.index,
       'searchConcurrency': searchConcurrency,
       'searchCacheRetentionDays': searchCacheRetentionDays,
+      'searchScope': searchScope,
       'searchScopeSourceUrls': searchScopeSourceUrls,
       'searchShowCover': searchShowCover,
     };
@@ -157,6 +173,7 @@ class AppSettings {
     SearchFilterMode? searchFilterMode,
     int? searchConcurrency,
     int? searchCacheRetentionDays,
+    String? searchScope,
     List<String>? searchScopeSourceUrls,
     bool? searchShowCover,
   }) {
@@ -170,6 +187,7 @@ class AppSettings {
       searchConcurrency: searchConcurrency ?? this.searchConcurrency,
       searchCacheRetentionDays:
           searchCacheRetentionDays ?? this.searchCacheRetentionDays,
+      searchScope: searchScope ?? this.searchScope,
       searchScopeSourceUrls:
           searchScopeSourceUrls ?? this.searchScopeSourceUrls,
       searchShowCover: searchShowCover ?? this.searchShowCover,

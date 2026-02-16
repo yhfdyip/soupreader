@@ -65,6 +65,7 @@ dependencies:
   shadcn_ui: ^0.46.0
   mobile_scanner: ^5.2.3
   cached_network_image: ^3.4.1
+  pinyin: ^3.3.0
 
 dev_dependencies:
   flutter_test:

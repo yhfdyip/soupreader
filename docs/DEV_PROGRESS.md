@@ -1,3285 +1,497 @@
-# SoupReader 开发进度日志
+# DEV Progress
 
-## 2026-02-15（阅读界面核心交互对齐 legado：进度条行为 + 阅读内搜索菜单 + 高级入口）
+## 2026-02-15 - legado 全链路语义对齐（除仿真翻页）
 
-### 已完成
-- `lib/features/reader/models/reading_settings.dart`
-  - 新增并持久化阅读高频配置（对齐 legado 对应语义）：
-    - `progressBarBehavior`（`page/chapter`）；
-    - `confirmSkipChapter`（章节跳转确认）；
-    - `showBrightnessView`（阅读菜单亮度条显隐）；
-    - `textBottomJustify`（底部对齐开关，配置先行落地）。
-  - 补充 JSON 兼容解析与 `sanitize` 约束，确保旧配置自动回退默认值。
-- `lib/features/reader/widgets/reader_bottom_menu.dart`
-  - 底部进度条支持两种行为：
-    - 页内进度（拖动跳页）；
-    - 章节进度（拖动跳章）。
-  - 亮度调节区增加 `showBrightnessView` 控制，关闭后不展示亮度条。
-- `lib/features/reader/widgets/reader_menus.dart`
-  - 顶部菜单补齐高频入口：`搜索正文` 与 `更多`。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 新增阅读内“搜索菜单”流程（参考 legado `SearchMenu` 交互语义）：
-    - 关键词搜索当前章节；
-    - 上一个/下一个命中跳转；
-    - 搜索信息展示（命中序号/总数/章节）；
-    - 搜索菜单可切回主菜单或退出。
-  - 新增“阅读操作”动作面板（更多菜单）：
-    - 搜索正文、自动翻页启停、书签切换、刷新章节、换源、更新目录。
-  - 章节进度条跳章接入确认逻辑（会话内确认一次）。
-  - 统一菜单层级与系统 UI 模式联动：
-    - 主菜单与搜索菜单互斥显示；
-    - 返回键优先关闭搜索菜单，再回主菜单。
-  - 目录弹窗打开前自动关闭主菜单/搜索菜单，避免层级冲突。
-
-### 为什么
-- 你要求“对比 legado 阅读界面功能，逐一完善，保持一致”并明确先做核心高频能力。
-- legado 阅读链路里，“进度条行为（页/章）+ 阅读内搜索导航 + 菜单入口完整性”是日常使用最频繁的交互，本次优先落地这些语义一致项。
-
-### 如何验证
-- 执行：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 阅读页打开菜单，确认顶部有“搜索”与“更多”入口；
-  - 使用“搜索正文”，验证命中数量显示、上下命中跳转、退出搜索；
-  - 阅读设置 -> 翻页操作：切换进度条行为为“章节进度”，拖动底部进度条时触发章节跳转确认；
-  - 阅读设置 -> 状态栏与显示：关闭“显示亮度条”，确认底部菜单不再展示亮度调节区。
-
-### 兼容影响
-- 新增阅读设置字段走向后兼容解析；旧配置不会因缺字段崩溃，自动使用默认值。
-- 本次不涉及数据库 schema 变更，也不改变书源解析协议（search/explore/bookInfo/toc/content）。
-- `textBottomJustify` 目前为配置项先行，渲染细节将在后续批次继续对齐 legado。
-
-## 2026-02-15（搜索封面显示二次修复：严格 legado 语义 + 诊断可观测）
-
-### 已完成
-- `lib/app/widgets/source_aware_cover_image.dart`
-  - 为封面加载过程补充状态回调能力（`emptyUrl/loading/success/failed`），用于搜索列表逐项诊断。
-  - 组件内部按 URL 为空、加载中、加载成功、加载失败分支上报状态，避免重复上报。
-- `lib/features/search/views/search_view.dart`
-  - 新增搜索结果封面状态跟踪映射（按展示项 key 记录加载状态）。
-  - 新增封面统计信息展示：`封面 空X 成功Y 失败Z`，与“书源/结果/失败”同级显示，便于定位问题来源。
-  - 搜索会话开始前清理 `SourceCoverLoader` 内存缓存与负缓存，避免上次失败状态影响本次结果。
-  - 结果重建时将“无封面链接”显式标记为 `emptyUrl`，并在封面 URL 恢复时移除旧空状态。
-  - 结果项封面渲染新增严格分支：
-    - `displayCoverUrl` 为空时，直接渲染无封面占位（不发起网络封面请求）；
-    - `displayCoverUrl` 非空时，使用 `SourceAwareCoverImage` 并回传加载状态。
-
-### 为什么
-- 你反馈“搜索列表还是不显示图片”，并要求继续按计划实现。
-- 在保持 legado 语义前提下，搜索列表不应通过额外 `bookInfo` 请求补图；因此本次重点是把“无封面规则命中”和“封面加载失败”拆分可观测，便于直接判断是书源规则缺失还是图片请求失败。
-
-### 如何验证
-- 执行：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 搜索任意关键词，观察顶部统计中的封面状态计数；
-  - 若“空”计数较高，说明多数结果未提供 `ruleSearch.coverUrl`；
-  - 若“失败”计数较高，说明有封面链接但加载失败，可继续按书源调试定位 header/cookie/解密规则。
-
-### 兼容影响
-- 搜索封面行为保持 legado 基线：仅使用搜索结果中的封面字段，不新增跨链路补图请求。
-- 新增的仅是状态可观测与空封面显式占位，不改变书源规则协议。
-
-## 2026-02-15（搜索 UI 结构重构：参考 IMG 布局关系并对齐 legado 搜索语义）
-
-### 已完成
-- `lib/core/models/app_settings.dart`
-  - 新增搜索设置模型字段并持久化：
-    - `searchFilterMode`（不过滤/普通过滤/精准过滤）；
-    - `searchConcurrency`（并发任务）；
-    - `searchCacheRetentionDays`（缓存保留天数）；
-    - `searchScopeSourceUrls`（搜索范围书源 URL 列表）；
-    - `searchShowCover`（搜索结果封面开关）。
-- `lib/features/search/services/search_cache_service.dart`（新增）
-  - 新增搜索本地状态服务：
-    - 维护历史关键词（最多 12 条）；
-    - 按“关键词+过滤模式+范围”缓存搜索结果；
-    - 支持缓存过期清理、清空缓存。
-- `lib/features/search/views/search_scope_picker_view.dart`（新增）
-  - 新增搜索范围选择页：
-    - 支持书源搜索过滤、计数展示、取消全选；
-    - 支持多选后返回 URL 列表并持久化。
-- `lib/features/search/views/search_view.dart`
-  - 搜索页结构重构（参考 IMG 的布局关系，不照搬视觉风格）：
-    - 顶部输入栏 + 搜索按钮；
-    - 新增“搜索设置”入口卡片（过滤/范围/并发/缓存/封面/清理动作）；
-    - 空态新增“搜索历史”分区（点击回填搜索、长按删除、支持清空）；
-    - 结果列表恢复封面展示（可开关），采用中等密度信息层级。
-  - 搜索行为对齐 legado 语义：
-    - 支持过滤模式切换；
-    - 支持范围过滤（范围为空表示所有启用书源）；
-    - 支持并发任务数设置；
-    - 保留“搜索进行中可停止”与失败书源原因查看。
-  - 引入缓存命中回显：
-    - 命中缓存时先展示已有结果，再继续刷新网络搜索并回写缓存。
-
-### 为什么
-- 你要求“分析当前目录 IMG 参考布局排版，优化搜索功能，且不照搬图片风格”。
-- legacy 搜索链路具备“过滤模式/范围设置/历史词/停止搜索”等关键语义；此前 SoupReader 搜索页缺少完整设置链路与本地历史体验。
-- 本次在保持 `Shadcn + Cupertino` 体系前提下，提炼参考图的“信息架构与交互层级”，并补齐 legado 语义能力。
-
-### 如何验证
-- 执行：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 进入搜索页，点击“搜索设置”，验证过滤模式/范围/并发/缓存时间可调整并持久化；
-  - 搜索后返回空态，验证历史词展示、点击可回填搜索、长按可删除、可清空历史；
-  - 调整“结果封面”开关，验证搜索结果列表封面显示可切换；
-  - 搜索进行中点击“停止”，验证任务可立即中止，状态区退出加载。
-
-### 兼容影响
-- 搜索页展示行为变更：
-  - 从“默认无封面列表”调整为“默认显示封面（可关闭）”；
-  - 新增设置与历史区，页面信息密度与交互路径有所变化。
-- 不涉及数据库 schema 与书源规则字段，不影响五段链路解析协议（search/bookInfo/toc/content）。
-- 旧版本 `app_settings` 缺少新增字段时会自动回落默认值，向后兼容。
-
-## 2026-02-15（根目录 IMG 扩展忽略规则补充）
-
-### 已完成
-- `.gitignore`
-  - 新增根目录图片扩展忽略规则：`/*.IMG`。
-  - 规则仅作用于仓库根目录，避免误伤子目录内同扩展文件。
-
-### 为什么
-- 根目录可能出现临时或设备导出的 `.IMG` 文件，不应进入版本控制。
-- 你要求将“根目录 IMG 扩展名”加入 ignore，本次按该范围精确处理。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 执行：`git check-ignore -v demo.IMG ./demo.IMG sub/demo.IMG`
-  - 预期：仅 `./demo.IMG` 命中 `/*.IMG` 规则，`sub/demo.IMG` 不命中。
-
-### 兼容影响
-- 仅调整版本控制忽略规则，不涉及运行时代码与书源解析链路。
-- 对旧书源兼容性无影响。
-
-## 2026-02-15（发现入口链路恢复：对齐 legado 二级发现页）
-
-### 已完成
-- `lib/features/discovery/views/discovery_view.dart`
-  - 恢复发现入口点击后的目标页面：
-    - 从 `SearchView.scoped` 兜底跳转改回 `DiscoveryExploreResultsView`；
-    - 保持原有边界语义：`url` 为空不跳转、`ERROR:` 标题弹错误信息。
-  - 恢复对二级发现页的 import：
-    - `import 'discovery_explore_results_view.dart';`
-- `lib/features/discovery/views/discovery_explore_results_view.dart`
-  - 将二级发现结果页重新纳入仓库跟踪（此前被当作未跟踪文件移出）；
-  - 页面能力包括：单书源发现结果加载、分页加载、失败重试、点击进入书籍详情。
-
-### 为什么
-- 你要求“检查 legado 逻辑并保持一致”。
-- legado 在发现页点击入口后会进入二级发现列表（`ExploreShowActivity`），而不是直接转到搜索页。
-- 上一轮为满足“删除未跟踪文件并保证编译”临时切到搜索兜底，语义上不等价于 legado，本次已恢复。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 手工路径：
-  - 进入发现页，展开任一书源入口，点击有效入口；
-  - 确认进入二级发现结果页（不是搜索页）；
-  - 滚动到底触发下一页加载，点击书籍进入详情页。
-
-### 兼容影响
-- 发现入口行为回到 legado 语义：入口点击走二级发现结果页。
-- 不涉及数据库 schema 与书源规则字段变更。
-
-## 2026-02-14（书源管理导入/编辑对齐 legado：默认勾选、排序保留、URL 连续保存）
-
-### 已完成
-- `lib/features/source/views/source_list_view.dart`
-  - 导入选择弹窗默认勾选策略对齐 legado：
-    - 从“全部默认勾选”改为“仅新增或有更新默认勾选”；
-    - 已有且未更新条目默认不勾选，仍可手动勾选导入。
-  - 导入冲突合并逻辑对齐 legado：
-    - 当本地已存在同 URL 书源时，始终保留本地 `customOrder`；
-    - 防止导入覆盖后打乱用户手动排序。
-- `lib/features/source/views/source_edit_view.dart`
-  - 修复同一编辑会话中“多次改 URL 保存”导致旧 URL 残留问题：
-    - 新增 `_currentOriginalUrl` 跟踪当前已保存版本 URL；
-    - 每次保存后更新跟踪值，下一次保存按最新 URL 执行“旧记录删除 + 新记录写入”。
-
-### 为什么
-- 你要求“保持与 legado 完全一致”。
-- legado 导入默认只选“新增/更新”项，避免误覆盖已有未更新书源；并且冲突合并会保留本地排序字段。
-- 现有编辑页只用初始 `originalUrl` 保存，连续改 URL 时会留下中间 URL 脏记录。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 手工路径：
-  - 导入包含“新增/更新/已有”混合书源，确认默认仅新增/更新被勾选；
-  - 导入前后对比同 URL 书源的 `customOrder`，确认保持本地值不变；
-  - 编辑同一书源：A -> 改 B 保存 -> 再改 C 保存，确认最终仅 C 存在，无 A/B 残留。
-
-### 兼容影响
-- 导入默认勾选行为变更：默认覆盖数量会减少（属于 legado 对齐后的预期变化）。
-- 导入冲突时优先保留本地排序，避免用户已调序结果被重置。
-- 编辑页 URL 连续保存由“可能残留”改为“链式替换”，属于数据一致性修复。
-
-## 2026-02-14（书源管理一致性修复：URL 归一 + 检测任务即时停止）
-
-### 已完成
-- URL 主键语义收敛（避免前后空白导致缓存/数据库键不一致）：
-  - `lib/features/source/models/book_source.dart`
-    - `BookSource.fromJson` 中 `bookSourceUrl` 统一 `trim()`。
-  - `lib/core/database/repositories/source_repository.dart`
-    - 新增 `_normalizeUrlKey/_normalizeSource`，在读写全链路统一 URL 归一；
-    - `getSourceByUrl/getRawJsonByUrl` 按归一 key 查询；
-    - `addSource/addSources/upsertSourceRawJson/deleteSource` 全部按归一 URL 写库与更新缓存；
-    - `upsertSourceRawJson` 写入前强制回填 `bookSourceUrl` 归一值；
-    - `_sourceToCompanion` 空 URL 直接抛 `FormatException`，防止脏数据落库。
-- 书源可用性检测“停止”改为即时中断当前请求：
-  - `lib/features/source/services/rule_parser_engine.dart`
-    - `exploreDebug` 新增 `cancelToken` 参数并透传至 `_fetchDebug`；
-    - `_fetchDebug` 对 `DioExceptionType.cancel` 不再吞为失败结果，改为上抛取消异常。
-  - `lib/features/source/services/source_availability_check_task_service.dart`
-    - 新增 `_runningCancelToken` 跟踪当前请求；
-    - `requestStop()` 在置 `stopRequested` 后立即 `cancel()` 当前 token；
-    - 搜索/发现检测调用统一传入 `cancelToken`；
-    - 捕获取消异常后将当前条目标记为 `skipped`（`已停止`），不再误判 `fail`。
-
-### 为什么
-- 书源管理页存在“同一 URL 因空白差异被视为不同源”的风险，可能导致删除/覆盖/缓存命中不一致。
-- 检测任务此前“停止”仅置位，正在执行的网络请求会继续等待返回，体验与 legado 的可中断语义不一致。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 导入或编辑书源时，把 `bookSourceUrl` 前后加入空格，确认保存后不会出现重复主键/删除不到的问题；
-  - 书源可用性检测启动后立即点击“停止”，确认当前请求会立刻中断，条目状态显示为“已停止/已跳过”。
-
-### 兼容影响
-- URL 归一仅做 `trim()`，不改协议、域名大小写与路径语义；属于兼容性增强。
-- 检测停止行为从“等待当前请求结束”变为“即时中断当前请求”，结果统计中 `skipped` 数可能上升（符合预期）。
-
-## 2026-02-14（书架列表模式排版修复：对齐 legado 信息层级）
-
-### 已完成
-- `lib/features/bookshelf/views/bookshelf_view.dart`
-  - 重构书架“列表模式”条目布局，修复原有排版紧凑且信息挤压的问题：
-    - 取消 `ShadCard.leading/trailing` 自动布局，改为自定义 `Row + Expanded` 稳定排版；
-    - 封面尺寸调整为 `66x90`，与 legado 列表项比例一致；
-    - 文本区改为 4 层信息：书名、作者、阅读进度、最新章节；
-    - 增加阅读进度徽标（`xx.x%`）与“上次阅读时间”文案；
-    - 对空作者/空最新章节/本地书籍场景增加兜底文案，避免空白行导致视觉错位。
-  - 新增辅助文案方法：
-    - `_buildReadLine(Book)`：生成阅读进度行文案；
-    - `_buildLatestLine(Book)`：生成最新章节行文案；
-    - `_formatReadAgo(DateTime?)`：格式化“刚刚/xx分钟前/xx小时前/日期”。
-
-### 为什么
-- 用户反馈“书架列表视图排版有问题”。
-- 原列表模式信息仅两行且依赖组件自动 leading/trailing 排版，长文本与不同数据状态下可读性较差，难以与 legado 列表信息密度保持一致。
-
-### 如何验证
-- 执行：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 书架切换到“列表模式”；
-  - 核对每个条目包含：书名、作者、阅读进度、最新章节；
-  - 长书名/空作者/本地书籍/无最新章节场景下，确认无错位或重叠。
-
-### 兼容影响
-- 仅变更书架列表模式 UI 排版，不改书籍数据结构与阅读链路；
-- 图墙模式与书源解析逻辑不受影响。
-
-## 2026-02-14（发现 Tab 重复点击行为对齐 legado：收起展开并回顶）
-
-### 已完成
-- `lib/main.dart`
-  - `MainScreen` 从 `StatelessWidget` 调整为 `StatefulWidget`；
-  - 新增 `CupertinoTabController` 与发现页重选信号 `ValueNotifier<int>`；
-  - 在底部 `CupertinoTabBar.onTap` 中识别“重复点击当前发现 Tab（index=1）”，触发发现页压缩信号。
-- `lib/features/discovery/views/discovery_view.dart`
-  - 新增外部压缩信号监听（`compressSignal`）；
-  - 收到重选信号时执行页面内 `compress` 逻辑：
-    - 若当前有展开书源，先收起；
-    - 否则滚动到顶部。
-
-### 为什么
-- legado 发现页支持 `compressExplore()` 语义：重复触发时优先收起展开项，再回到顶部。
-- 你确认要继续对齐该交互，本次已把该行为接入 SoupReader 的底部 Tab 重选路径。
-
-### 如何验证
-- 执行：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 进入发现页并展开任一书源；
-  - 再次点击底部“发现”Tab，确认先收起展开项；
-  - 再次点击底部“发现”Tab，确认列表回到顶部。
-
-### 兼容影响
-- 仅新增发现页 Tab 重选交互，不改变书源解析与发现数据结构；
-- 其余 Tab 行为不变。
-
-## 2026-02-14（发现页语义重构：对齐 legado 书源入口模型）
-
-### 已完成
-- `lib/features/discovery/views/discovery_view.dart`
-  - 发现页主语义从“跨书源聚合书籍”重构为“书源列表 -> 展开发现入口”，与 legado `ExploreFragment/ExploreAdapter` 对齐。
-  - 数据流改为 `SourceRepository.watchAllSources()` 实时驱动，支持书源增删改后的自动刷新。
-  - 新增查询过滤语义：
-    - 普通关键词匹配书源名/URL/分组；
-    - `group:分组名` 过滤；
-    - 顶部分组菜单一键注入 `group:` 查询。
-  - 新增展开/收起行为：
-    - 单次仅展开一个书源；
-    - 展开时异步加载发现入口并显示 loading；
-    - 提供“收起/回到顶部”动作（页面内 `compress` 等价能力）。
-  - 新增长按书源菜单（对齐 legado `explore_item`）：
-    - 编辑书源、置顶、源内搜索、登录、刷新发现缓存、删除书源。
-  - 发现入口点击语义对齐：
-    - `url` 为空不可点击；
-    - `title` 以 `ERROR:` 开头弹错误详情；
-    - 正常入口跳转二级发现结果页。
-
-- `lib/features/discovery/views/discovery_explore_results_view.dart`（新增）
-  - 新增二级发现结果页（对标 legado `ExploreShowActivity`）：
-    - 单书源 + 单发现入口加载；
-    - 支持滚动到底自动加载更多；
-    - 支持失败重试与手动刷新；
-    - 点击结果进入 `SearchBookInfoView`；
-    - 书架状态图标实时根据本地书架判断显示。
-
+### 做了什么
 - `lib/features/source/services/rule_parser_engine.dart`
-  - `explore(...)` 新增 `page` 参数（默认 `1`），构建请求 URL 时注入 `{{page}}` 变量，支持发现链路分页。
+  - 目录链路对齐 legado：
+    - `preUpdateJs` 改为“目录前置执行”（不再改写目录响应体）。
+    - 目录解析补齐 `isVolume/isVip/isPay/tag` 字段（JSON/HTML 双路径）。
+    - 章节链接为空时新增 legado 回退：卷使用 `title+index`，非卷使用当前目录页 URL。
+    - 目录后处理与去重后保留上述元字段，不再丢失。
+    - 目录分页移除固定小上限（原 12），改为 visited/队列驱动并保留安全阈值（1000）。
+  - 正文链路对齐 legado：
+    - `ruleContent.content` 为空时，直接返回章节链接（普通/调试接口一致）。
+    - 正文分页移除固定小上限（原 8），改为 visited/队列驱动并保留安全阈值（1000）。
+  - 登录检查对齐 legado：
+    - 在 `_fetch/_fetchDebug` 注入 `loginCheckJs`，统一覆盖搜索、发现、详情、目录、正文与调试链路。
+  - 调试链路一致性：
+    - `_debugTocThenContent`、`_debugContentOnly` 同步采用上述目录/正文语义。
+  - `TocItem` 模型扩展并默认值兼容：新增 `isVolume/isVip/isPay/tag`。
 
-- `lib/features/source/services/source_explore_kinds_service.dart`
-  - `SourceExploreKind` 新增 `style`；
-  - 新增 `SourceExploreKindStyle`，解析入口 JSON 的 `style` 字段（`layout_flexBasisPercent/layout_flexGrow/layout_wrapBefore` 等）；
-  - 发现页入口标签渲染可按样式宽度与换行提示布局，保持与 legado 入口样式语义一致。
+- `lib/features/search/views/search_view.dart`
+  - 搜索聚合与过滤对齐 legado `SearchModel`：
+    - 去除大小写/空白归一化比较。
+    - 分组键使用原始 `name+author`（按 `==` 语义归并）。
+    - 排序分桶使用原始 `== / contains`（区分大小写）。
+    - 精准过滤改为原始 `contains`（不过度归一化）。
+
+- 测试补充与调整
+  - `test/rule_parser_engine_stage_js_compat_test.dart`
+    - 更新 `preUpdateJs` 语义测试为“前置执行，不改写响应体”。
+    - 新增 `loginCheckJs` 在搜索、发现、详情、目录、正文（含 `getContentDebug`）生效测试。
+    - 新增“正文规则为空返回章节链接”测试。
+  - `test/rule_parser_engine_next_url_compat_test.dart`
+    - 新增目录元字段保留与 `chapterUrl` 回退测试。
+    - 新增目录分页超过 12 页与正文分页超过 8 页的回归测试。
 
 ### 为什么
-- 旧实现是“发现页直接跨源抓书单”，与 legado 的“发现页先选书源，再选发现入口”语义不一致。
-- 你要求“保持与 legado 一致”，因此本次按 legado 的状态流与交互边界重构发现主链路，并补齐二级分页发现能力。
+- 当前实现与 legado 在关键规则语义上仍存在偏差（`loginCheckJs`、`preUpdateJs`、正文空规则、分页上限、搜索聚合比较规则），会导致部分旧书源行为与调试结果不一致。
+- 本次目标是按要求将书源处理行为对齐到 legado（仅排除仿真翻页）。
 
 ### 如何验证
-- 执行：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径（建议）：
-  - 进入发现页，确认展示为书源列表而非聚合书籍列表；
-  - 输入 `group:xxx` 或通过分组菜单筛选，确认列表变化正确；
-  - 点击书源展开，确认显示发现入口标签；
-  - 点击有效入口进入二级列表，滚动到底可继续加载下一页；
-  - 长按书源验证菜单动作（编辑/置顶/源内搜索/登录/刷新缓存/删除）均可执行。
+- 自动校验：`flutter analyze`
+- 关键回归：
+  - `test/rule_parser_engine_stage_js_compat_test.dart`
+  - `test/rule_parser_engine_next_url_compat_test.dart`
 
 ### 兼容影响
-- 发现页产品形态变更：
-  - 不再以“跨书源聚合书籍”作为主视图；
-  - 改为 legacy 一致的“书源入口页 + 二级发现结果页”。
-- 不涉及数据库 schema 变更；
-- 发现入口若携带 `style`，现在会参与 UI 布局（旧版本仅按纯文本入口处理）。
+- **有兼容影响（正向）**：
+  - 旧书源中依赖 `loginCheckJs`、目录 `isVolume/isVip/isPay/tag`、空正文规则和多页正文/目录的场景将更贴近 legado 原行为。
+- **行为变化点**：
+  - `preUpdateJs` 不再作为目录响应改写脚本使用，而是目录前置执行语义；依赖其“改写响应体”的非 legado 用法将不再生效。
 
-## 2026-02-14（搜索/详情/目录 UI 优化 + 封面加载缓存统一）
+## 2026-02-16 - legado BookList 语义对齐（搜索/发现）
 
-### 已完成
-- 新增统一封面组件并引入缓存加载能力：
-  - 文件：`lib/app/widgets/app_cover_image.dart`
-  - 依赖：`pubspec.yaml` 新增 `cached_network_image`
-  - 能力：统一处理远程 URL、本地路径、加载占位、失败回退封面。
-- 书架封面展示入口统一到 `AppCoverImage`：
-  - 文件：`lib/features/bookshelf/views/bookshelf_view.dart`
-  - 文件：`lib/features/bookshelf/widgets/book_cover_card.dart`
-  - 移除分散的 `Image.network/Image.file` 直连逻辑。
-- 阅读器目录抽屉 UI 优化：
-  - 文件：`lib/features/reader/widgets/reader_catalog_sheet.dart`
-  - 调整搜索条与统计提示（总章/匹配章）；
-  - 优化章节行样式（序号、当前章高亮、缓存标记胶囊）；
-  - 抽屉封面改为统一封面组件。
-- 搜索页 UI 优化并按需求去除结果封面图：
-  - 文件：`lib/features/search/views/search_view.dart`
-  - 优化顶部状态信息（书源数/结果数/失败数）；
-  - 搜索结果卡片改为纯文本信息布局；
-  - 满足“搜索结果列表不显示图片”需求。
-- 书籍详情与目录列表 UI 优化：
-  - 文件：`lib/features/search/views/search_book_info_view.dart`
-  - 详情头部封面改为统一封面组件；
-  - 简介支持折叠/展开；
-  - 基础信息行改为标签-值双列布局；
-  - `_SearchBookTocView` 升级为可搜索、可倒序的目录列表，并保留章节索引显示。
+### 做了什么
+- `lib/features/source/services/rule_parser_engine.dart`
+  - 新增并接入统一列表解析内核（主链路与调试链路复用）：
+    - `_resolveBookListRuleForStage(...)`
+    - `_analyzeBookListLikeLegado(...)`
+    - `_parseInfoAsSearchResultLikeLegado(...)`
+    - `_parseBookDetailFromBodyLikeLegado(...)`
+    - `_postProcessBookListLikeLegado(...)`
+  - 搜索链路对齐 legado `BookList`：
+    - 支持 `bookUrlPattern` 命中后按“详情页”解析返回结果。
+    - 列表为空且 `bookUrlPattern` 为空时，回退按“详情页”解析。
+    - 列表项 `bookUrl` 为空时回退为当前页面 URL。
+    - 支持列表规则前缀 `-`（逆序）与 `+`（剥离）语义。
+    - 引擎层增加去重后处理（对齐 legado `LinkedHashSet` 行为）。
+  - 发现链路对齐 legado `BookList` 规则选择：
+    - 当 `ruleExplore.bookList` 为空时，自动回退使用 `ruleSearch`。
+  - 调试链路同构：
+    - `searchDebug`、`exploreDebug`、`debugRun` 的列表入口统一使用同一解析内核。
+
+- 测试新增
+  - 新增 `test/rule_parser_engine_book_list_parity_test.dart`，覆盖：
+    - `bookUrlPattern` 详情页识别
+    - 列表为空详情回退
+    - 空 `bookUrl` 回退
+    - `explore` 回退 `searchRule`
+    - `-` 逆序规则
+    - `searchDebug` 与主链路语义一致
 
 ### 为什么
-- 你要求统一优化搜索、书籍详情和目录列表体验，并明确“搜索结果不显示图片”。
-- 同时要求核对 legado 书架封面逻辑。legado 实际是“URL 加载 + 图片库缓存 + 默认封面回退”，本次在 SoupReader 侧用统一组件和缓存加载能力对齐该语义。
+- 第一阶段完成后，五段链路核心能力已对齐，但搜索/发现的 `BookList` 仍缺少 legado 的关键分支（详情页识别、空列表回退、规则回退、逆序与去重），导致部分旧书源在列表阶段行为不一致。
+- 本次补齐后，搜索/发现主链路与调试链路的行为收敛到同一规则内核。
 
 ### 如何验证
-- 执行：`flutter pub get`
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 搜索页执行搜索，确认结果列表不再显示封面图；
-  - 点进书籍详情，确认封面、基础信息、简介折叠与目录入口展示正常；
-  - 打开目录（搜索详情目录页 + 阅读器目录抽屉），确认搜索与倒序交互可用。
+- 自动校验：`flutter analyze`
+- 回归测试：
+  - `flutter test test/rule_parser_engine_book_list_parity_test.dart test/rule_parser_engine_stage_js_compat_test.dart test/rule_parser_engine_next_url_compat_test.dart`
 
 ### 兼容影响
-- 搜索结果列表视觉行为变更为“无封面”，属于产品交互调整。
-- 其余页面封面改为统一组件，网络封面加载更稳定，失败回退更一致。
-- 不涉及书源规则与五段链路（search/bookInfo/toc/content）解析语义变更。
+- **有兼容影响（正向）**：
+  - 依赖 `bookUrlPattern`、列表空回退详情、`ruleExplore` 空列表规则回退到 `ruleSearch` 的书源，将与 legado 行为一致。
+- **潜在行为变化点**：
+  - 列表阶段新增引擎层去重与 `-` 逆序语义后，部分重复条目或顺序可能与旧实现不同，但与 legado 一致。
 
-## 2026-02-14（翻页跨章回调链路修复：解决“下一章仅标题无正文”）
+## 2026-02-16 - legado BookList 复核修正（去重与重定向 bookUrl）
 
-### 已完成
-- 修复 `PageFactory` 内容变更回调被覆盖的问题：
-  - 文件：`lib/features/reader/widgets/page_factory.dart`
-  - 新增多监听器机制：
-    - `addContentChangedListener(VoidCallback listener)`
-    - `removeContentChangedListener(VoidCallback listener)`
-    - `_notifyContentChanged()`
-  - 将翻页相关通知点统一改为 `_notifyContentChanged()`，避免仅单一回调生效。
-  - 保留 `onContentChanged` 兼容入口，确保旧调用路径不被破坏。
-- 阅读页改为监听器注册（不再依赖单回调赋值）：
-  - 文件：`lib/features/reader/views/simple_reader_view.dart`
-  - `_initReader()` 中改为注册 `_handlePageFactoryContentChanged` 监听；
-  - `dispose()` 中移除监听，避免泄漏。
-- 翻页组件改为监听器注册，避免覆盖阅读页逻辑：
-  - 文件：`lib/features/reader/widgets/paged_reader_widget.dart`
-  - 新增 `_onPageFactoryContentChangedForRender()` 作为渲染回调；
-  - `initState/didUpdateWidget/dispose` 完成监听注册、切换与解绑。
-- 新增回归测试：
-  - 文件：`test/page_factory_listener_test.dart`
-  - 覆盖多监听器通知、移除监听生效、兼容 `onContentChanged` 三个场景。
+### 做了什么
+- `lib/features/source/services/rule_parser_engine.dart`
+  - 书籍列表去重语义修正为“仅按 `bookUrl` 去重”，对齐 legado `SearchBook.equals/hashCode`（`LinkedHashSet` 去重键即 `bookUrl`）。
+  - 搜索详情分支 `bookUrl` 计算改为显式 `isRedirect` 驱动：
+    - 重定向场景取响应最终 URL；
+    - 非重定向场景取请求 URL（去掉 URL option 后）。
+  - `_fetch` 增加重定向标记回调；`search/explore` 与 `searchDebug/exploreDebug/debugRun` 的列表解析统一透传该标记。
+  - `FetchDebugResult` 增加 `isRedirect` 字段，保证调试链路与主链路同语义。
+
+- `test/rule_parser_engine_book_list_parity_test.dart`
+  - 新增“按 `bookUrl` 去重”回归用例，验证重复 `bookUrl` 仅保留首条，行为与 legado 一致。
 
 ### 为什么
-- 现象是“从目录点进章节有正文，但翻页到下一章只剩标题”。
-- 根因是 `SimpleReaderView` 注册的章节补加载回调被 `PagedReaderWidget` 重写，跨章后未触发自动补拉正文。
-- 本次将 `PageFactory` 回调模型改为可并存监听，确保“阅读状态同步”与“渲染刷新”两条链路同时生效。
+- 复核 legado `BookList.kt` 后发现，去重键应为 `bookUrl`，此前全字段去重会导致重复链接未被正确折叠。
+- 复核 `getInfoItem` 后确认 `bookUrl` 取值应由“是否发生重定向”决定，不能仅依赖 URL 字符串差异推断。
 
 ### 如何验证
-- 执行：`flutter test test/page_factory_listener_test.dart`
-- 执行：`flutter analyze`
+- 自动校验：`flutter analyze`
+- 回归测试：
+  - `flutter test test/rule_parser_engine_book_list_parity_test.dart test/rule_parser_engine_stage_js_compat_test.dart test/rule_parser_engine_next_url_compat_test.dart`
 
 ### 兼容影响
-- 对外书源规则与五段链路协议无变更。
-- 阅读页翻页事件分发从“单回调”升级为“多监听器 + 兼容单回调”，可避免后续同类覆盖问题。
+- **有兼容影响（正向）**：
+  - 重复详情链接的列表将更接近 legado：同 `bookUrl` 条目去重后仅保留首条。
+  - 搜索命中详情页且存在重定向的场景，返回 `bookUrl` 与 legado 一致。
 
-## 2026-02-14（目录顺序再次对齐 legado：修复“最新章节倒序 + 正文重启”）
+## 2026-02-16 - legado 字段格式化语义对齐（BookList/BookInfo）
 
-### 已完成
-- 修复目录“去重后顺序不对”的问题，统一目录后处理逻辑为 legado 流程：
-  - 文件：`lib/features/source/services/rule_parser_engine.dart`
-  - 新增：`_postProcessTocLikeLegado(...)`
-  - 统一接入：
-    - `_debugTocThenContent(...)`
-    - `getToc(...)`
-    - `getTocDebug(...)`
-- 目录后处理规则改为与 legado 一致（默认 `reverseToc=false` 语义）：
-  - `!listRuleReverse` 时先反转列表；
-  - 按章节 URL 去重（保留首个）；
-  - 去重后再反转回阅读顺序并重排索引。
-- 更新回归测试：
-  - 文件：`test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
-  - 调整 `toc stage dedups duplicated chapter urls like legado` 断言为正序结果；
-  - 新增 `toc stage with -chapterList keeps legado reverse/dedup order` 用例；
-  - 调整 `toc debug output keeps same dedup result as toc stage` 断言，确保 debug 与主链路口径一致。
+### 做了什么
+- `lib/features/source/services/rule_parser_engine.dart`
+  - 新增并接入 legado 风格字段格式化：
+    - `name`：按 `AppPattern.nameRegex` 语义清洗（去除“作者…”尾缀）。
+    - `author`：按 `AppPattern.authorRegex` 语义清洗（去除“作者:”前缀与“著”后缀）。
+    - `wordCount`：按 `StringUtils.wordCountFormat` 语义格式化（如 `12001 -> 1.2万字`，`9999 -> 9999字`）。
+    - `intro`：按 `HtmlFormatter.format` 语义做 HTML 转文本清理。
+  - `kind` 字段改为对齐 legado 的 `getStringList(...).joinToString(",")`：
+    - HTML/JSON 路径统一按“列表提取后逗号拼接”输出，而非单值提取。
+  - 对齐范围覆盖：
+    - 搜索/发现列表解析（`_analyzeBookListLikeLegado`）；
+    - 列表详情回退解析（`_parseBookDetailFromBodyLikeLegado`）；
+    - 详情主链路与调试链路（`getBookInfo/getBookInfoDebug/_debugBookInfo`）。
+
+- `test/rule_parser_engine_book_list_parity_test.dart`
+  - 新增“搜索列表字段格式化语义”回归：
+    - 验证 `name/author/kind/wordCount/intro` 与 legado 语义一致。
+  - 新增“详情字段格式化语义”回归：
+    - 验证 `getBookInfo` 的同字段格式化行为与 legado 一致。
 
 ### 为什么
-- 你反馈“目录前面是最新章节倒序，后面从第一章又开始，末尾没有最新章节”。
-- 根因是 SoupReader 之前仅做了“单次 reverse + 去重”，未完整复刻 legado 的“双反转 + 去重”时序，导致命中“最新章节块 + 正文块”混合目录时保留了错误顺序。
+- 复核 legado `BookList.kt` 与 `BookInfo.kt` 后，当前实现虽已覆盖链路分支，但字段值后处理仍存在差异（尤其 `kind` 列表、字数字符串和简介 HTML 清理），会导致旧书源展示结果与 legado 不一致。
 
 ### 如何验证
-- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
-- 结果：`All tests passed!`
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
+- 自动校验：`flutter analyze`
+- 回归测试：
+  - `flutter test test/rule_parser_engine_book_list_parity_test.dart test/rule_parser_engine_stage_js_compat_test.dart test/rule_parser_engine_next_url_compat_test.dart`
 
 ### 兼容影响
-- 目录输出顺序向 legado 默认行为收敛：从第一章到最新章。
-- 对依赖“保留顶部最新章节区标题版本”的非典型书源，重复 URL 项会继续被去重，且标题将遵循 legado 对最终保留项的选择结果。
+- **有兼容影响（正向）**：
+  - 书名/作者噪声文本、字数字段显示、分类聚合与简介展示将更接近 legado。
+- **潜在行为变化点**：
+  - 先前依赖“未格式化原文”的展示可能出现文案变化（例如 `12001` 变为 `1.2万字`），但与 legado 基准一致。
 
-## 2026-02-14（阅读翻章对齐 legado：跨章节自动补加载正文）
+## 2026-02-16 - legado 链接匹配与详情回退语义复核修正
 
-### 已完成
-- 修复“翻页模式连续阅读到下一章只显示标题、正文为空”的问题：
-  - 文件：`lib/features/reader/views/simple_reader_view.dart`
-  - 变更：
-    - `PageFactory.onContentChanged` 改为统一走 `_handlePageFactoryContentChanged`；
-    - 当翻页跨章且目标章节正文为空时，自动触发 `_loadChapter(index)` 补加载正文；
-    - 新增 `_isHydratingChapterFromPageFactory` 防重入，避免跨章加载回调递归。
-- 补充章节正文请求并发去重（对齐 legado loading lock 思路）：
-  - 文件：`lib/features/reader/views/simple_reader_view.dart`
-  - 新增 `_chapterContentInFlight`，同章节并发请求复用同一个 `Future`，避免重复请求与状态抖动。
-  - ` _fetchChapterContent(...)` 改为包装器，实际网络拉取下沉到 `_fetchChapterContentInternal(...)`。
+### 做了什么
+- `lib/features/source/services/rule_parser_engine.dart`
+  - `bookUrlPattern` 匹配改为“整串匹配”语义（对齐 Kotlin `String.matches`），不再使用子串命中。
+  - 新增 `_resolveBookInfoTocUrlLikeLegado(...)`，用于对齐 `AnalyzeRule.getString(..., isUrl=true)`：
+    - `tocUrl` 规则为空时，回退请求 URL（`baseUrl`）；
+    - `tocUrl` 非空时，以重定向后的 URL（`redirectUrl`）做绝对化。
+  - `getBookInfo/getBookInfoDebug/_debugBookInfo` 全部切换为上述语义。
+  - 详情页源码复用缓存条件同步对齐：从“等于重定向 URL”改为“等于请求 URL”时缓存（与 legado `book.tocHtml` 条件一致）。
+
+- `test/rule_parser_engine_book_list_parity_test.dart`
+  - 新增 `bookUrlPattern` 全匹配回归用例。
+  - 新增“详情重定向且 `tocUrl` 为空时回退请求 URL”回归（同时验证 `getBookInfoDebug`）。
 
 ### 为什么
-- 现象是“从目录单独点章节有正文，但连续翻到下一章只剩标题”。
-- 根因是翻页模式跨章时只更新章节索引与标题，未像 legado 一样在跨章后确保当前章正文已加载。
-- 本次将阅读层行为收敛到 legado：跨章若内容未就绪则立即补加载，同时控制并发请求。
+- 复核 `legado` 的 `BookList.kt` 与 `AnalyzeRule.kt` 后发现：
+  - `bookUrlPattern` 在 legado 使用 `matches`，是整串匹配；
+  - `BookInfo` 的 `tocUrl` 空值回退基准是请求 URL，而不是重定向后的最终 URL。
+- 现有实现在上述两点存在偏差，可能导致详情识别分支与目录回退行为不一致。
 
 ### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 阅读器（翻页模式）从目录进入某章；
-  - 连续翻到下一章；
-  - 验证不再出现“只有标题无正文”。
+- 自动校验：`flutter analyze`
+- 回归测试：
+  - `flutter test test/rule_parser_engine_book_list_parity_test.dart test/rule_parser_engine_stage_js_compat_test.dart test/rule_parser_engine_next_url_compat_test.dart`
 
 ### 兼容影响
-- 仅调整阅读器翻页跨章时的正文加载时机，不修改书源规则语义（`ruleContent`/`nextContentUrl` 行为保持不变）。
-- 对网络章节切换会更及时触发加载；同章节重复请求将被合并，减少无效并发。
+- **有兼容影响（正向）**：
+  - `bookUrlPattern` 写法不完整（仅子串）的书源不再被误判为详情页。
+  - 详情页发生重定向且目录规则缺失时，目录链接回退将与 legado 完全一致。
 
-## 2026-02-14（目录解析对齐 legado：按章节 URL 去重）
+## 2026-02-16 - legado 搜索聚合排序语义复核修正（SearchView）
 
-### 已完成
-- 对齐 legado 的目录去重语义（按章节 URL 去重，保留首个）：
-  - 文件：`lib/features/source/services/rule_parser_engine.dart`
-  - 新增：`_dedupTocByUrlLikeLegado(List<TocItem>)`
-  - 接入：
-    - `getToc(...)` 主链路返回前去重后再重排索引；
-    - `getTocDebug(...)` 调试链路返回前同口径去重，避免与主链路不一致；
-    - `_debugTocThenContent(...)` 调试流程目录结果同样按 URL 去重。
-- 补充 legado 语义回归测试：
-  - 文件：`test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
-  - 新增用例：
-    - `toc stage dedups duplicated chapter urls like legado`
-    - `toc debug output keeps same dedup result as toc stage`
-  - 覆盖“最新章节 + 正文混合目录、同 URL 重复项”的场景。
+### 做了什么
+- `lib/features/search/views/search_view.dart`
+  - 搜索书源调度顺序改为按 `customOrder` 升序，移除按 `weight` 排序，统一到 legado `SearchScope.getBookSourceParts()` 语义。
+  - `customOrder` 相同场景下保持原序稳定，不再引入书源名次级排序，避免额外排序噪声。
+  - 搜索范围命中结果为空时自动回退到“全部启用书源”，避免因范围失效导致搜索直接不可用（对齐 legado 范围兜底策略）。
+  - 搜索入口新增“范围失效自动持久化回写”：
+    - 当已保存范围与当前启用书源无任何命中时，自动将范围设置回“全部书源”（空范围存储），与 legado `SearchScope` 的自动修正策略一致。
+  - 新增“范围内搜空”的 legado 式提示链路：
+    - 精准过滤开启且结果为空时，提示“关闭精准过滤并重试”；
+    - 非精准过滤且范围非全量时，提示“切换到所有书源并重试”；
+    - 用户确认后自动执行重试。
+  - 过滤模式或搜索范围变更后，若当前有查询词则自动重跑搜索（不再只做本地重排），对齐 legado 菜单改动后的重搜行为。
+  - 搜索并发 worker 增加 30 秒单源总超时上限（对齐 legado `SearchModel` 外层 `withTimeout(30000)` 语义）。
+  - 单源超时改为“静默跳过并继续下一个书源”，不再额外记为失败提示，贴近 legado `mapParallelSafe` 的容错流。
+  - 对齐 legado `SearchModel.mergeItems` 的“同名同作者合并”语义：
+    - 合并时只累计来源集合（`origins`），不再用后续结果回填/覆盖首条字段。
+    - 原始结果缓存去重改为“首条保留”策略（`sourceUrl + bookUrl` 首次命中即固定）。
+  - 对齐排序稳定性语义：
+    - `exact/contains` 仍按来源数降序；
+    - 当来源数相同，改为保持“上一次列表顺序”的稳定排序，不再固定按首见顺序回退。
+  - 展示语义收敛到 legado 主条目行为：
+    - 封面来源使用主条目（首条）而非“跨来源找首个非空封面”；
+    - “已在书架中”判定以主条目为准，不再对所有来源做 `any` 判定。
+- `lib/features/bookshelf/services/book_add_service.dart`
+  - `isInBookshelf` 对齐 legado 搜索命中语义，改为多键匹配：
+    - `name-author`
+    - `name`
+    - `bookUrl`
+  - 新增 `buildSearchBookshelfKeys()`，供搜索页一次性构建键集合，避免逐条重复扫描书架。
+- `lib/features/search/views/search_book_info_view.dart`
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 两处“换源”入口的启用书源遍历统一改为 `customOrder` 升序（同序号保持原序稳定），避免未排序遍历导致候选顺序与 legado 不一致。
+  - 两处“换源”搜索调用补齐 legado 风格过滤：
+    - 书名需精确匹配；
+    - 作者按“包含”匹配（作者为空则不限制）。
+- `lib/features/source/services/rule_parser_engine.dart`
+  - `search(...)` 新增并贯通 legado 同款参数：
+    - `filter(name, author)`：按书名/作者过滤搜索结果；
+    - `shouldBreak(size)`：满足条件后提前结束列表解析。
+  - `_analyzeBookListLikeLegado` 与详情回退分支同步接入上述参数，保证过滤与提前终止语义在列表解析阶段生效。
+- `lib/features/search/views/search_scope_picker_view.dart`
+  - 搜索范围选择列表排序去除 `weight` 次排序，收敛为 `customOrder` 优先顺序（同序号保持原序稳定），减少与 legado 范围列表顺序偏差。
+- `test/bookshelf_booklist_import_service_test.dart`
+  - 同步更新测试桩 `search(...)` 覆盖签名，适配引擎新参数。
+- `test/rule_parser_engine_book_list_parity_test.dart`
+  - 新增 `filter/shouldBreak` 对齐回归：
+    - 搜索列表解析支持 `filter(name, author)`；
+    - 搜索列表解析支持 `shouldBreak(size)` 提前终止；
+    - “列表空回退详情”分支同样受 `filter` 约束。
 
 ### 为什么
-- 你反馈同一份书源在 dbss/legado 表现正常，但 SoupReader 目录会多出“最新章节”重复项。
-- 根因是 SoupReader 的 `ruleToc.chapterList` 抓取后未执行 legado 同款 URL 去重，导致同一章节链接在“最新章节”和“正文”区重复出现时被重复保留。
-- 本次按 legado 基准收敛为“抓取不做分段特判，最终按 URL 去重”。
+- 复核 legado `SearchModel.kt` 与 `SearchAdapter.kt` 后确认：
+  - 搜索书源范围输出顺序以 `customOrder` 为准；
+  - `customOrder` 相同场景应保持稳定顺序，不引入额外字段次排；
+  - 搜索范围失效（如目标书源缺失）时会回退到全部启用书源，而不是保持空范围；
+  - 范围内搜空时会引导关闭精准搜索或切回全部范围并自动重试；
+  - 精准搜索开关与范围切换会触发当前查询重搜，而不是仅对已有结果做前端过滤；
+  - 单书源搜索应受 30 秒总超时保护，避免长耗时源拖慢整页流程；
+  - 单源超时应按“跳过继续”处理，避免阻断或污染整体搜索结果；
+  - “在书架中”判定应兼容同名同作者或同链接场景，不仅限 source+bookUrl 精确 ID；
+  - 书源候选遍历顺序应优先遵循 `customOrder`，保证换源候选输出稳定；
+  - 换源搜索应在源内阶段就执行“书名精确 + 作者包含”过滤，避免无关候选干扰；
+  - 搜索解析阶段应支持 `filter/shouldBreak`，与 legado `WebBook.searchBookAwait` 行为一致；
+  - 搜索聚合对象在合并重复书目时只做 `addOrigin`，不会做字段补全；
+  - 排序依赖稳定排序与当前列表顺序，不应在同权重时回退到固定首见序；
+  - 列表展示使用聚合主条目的字段（含封面/点击目标）。
+- 当前实现在这几处存在偏差，导致相同书源集合下的展示字段与顺序可能和 legado 不一致。
 
 ### 如何验证
-- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
-- 结果：`All tests passed!`
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
+- 自动校验：`flutter analyze`
+- 回归测试：
+  - `flutter test test/rule_parser_engine_book_list_parity_test.dart`
+  - `flutter test test/bookshelf_booklist_import_service_test.dart`
 
 ### 兼容影响
-- 与 legado 行为一致：目录项按 URL 去重，重复 URL 的后续条目将被移除。
-- 不引入站点特化的“最新章节/正文”文案过滤，旧书源规则语法不变。
-- 对依赖“同 URL 重复章节也要显示”的非典型书源，目录条目数可能减少（这是语义对齐的预期变化）。
+- **有兼容影响（正向）**：
+  - 多来源同名合并结果的字段与排序将更贴近 legado。
+- **潜在行为变化点**：
+  - 某些结果项封面可能从“后续来源补齐封面”回退为主条目封面（与 legado 一致）。
 
-## 2026-02-13（搜索加入书架失败：章节写入 0 条误判修复）
+## 2026-02-16 - SearchScopeDialog/SearchScope 语义对齐（分组模式 + 单源模式）
 
-### 已完成
-- 修复“点击搜索结果加入书架，提示章节写入失败”的核心误判：
-  - 文件：`lib/features/bookshelf/services/book_add_service.dart`
-  - 变更：加入书架后不再用内存缓存判断章节数，改为直接查询 Drift 实际落库数量（`countChaptersForBook`）。
-  - 错误文案同步显示真实写入数（`stored/expected`），提升可观测性。
-- 章节仓库新增数据库计数接口：
-  - 文件：`lib/core/database/repositories/book_repository.dart`
-  - 新增：`ChapterRepository.countChaptersForBook(String bookId)`。
-- 补齐书源仓库“写后读”一致性（避免缓存异步刷新竞态）：
-  - 文件：`lib/core/database/repositories/source_repository.dart`
-  - 变更：`addSource/addSources/upsertSourceRawJson/deleteSource` 成功后同步刷新内存缓存并广播；
-  - `deleteDisabledSources` 执行后主动重载缓存。
-
-### 为什么
-- 线上现象是“书源调试正常，但搜索结果点击加入失败，提示章节写入失败”。
-- 根因是加入流程在写入后立即从内存缓存读取章节数，缓存刷新是异步 watch 驱动，存在短暂窗口返回 0 的竞态，导致误判失败。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 执行：`flutter test test/book_add_service_test.dart test/bookshelf_booklist_import_service_test.dart`
-- 结果：`All tests passed!`
-- 执行：`flutter test test/rule_parser_engine_*`
-- 结果：`All tests passed!`
-
-### 兼容影响
-- 仅修复写后校验时序与缓存一致性，不改变书源解析规则与章节结构语义。
-- 对既有书籍数据无迁移影响；对导入/加书稳定性为增强。
-
-## 2026-02-13（书源详情 tocUrl 语义收敛：严格对齐 legado）
-
-### 已完成
-- 对齐 legado 的 `bookInfo.tocUrl` 处理语义，新增统一解析入口并替换所有关键链路调用点：
-  - 文件：`lib/features/source/services/rule_parser_engine.dart`
-  - 新增 `_resolveUrlFieldWithLegadoSemantics(...)` 与 `_resolveTocUrlLikeLegado(...)`
-  - 将以下分支统一改为使用该入口，移除分散的手写回退逻辑：
-    - `_debugBookInfo`（JSON/HTML）
-    - `getBookInfo`（JSON/HTML）
-    - `getBookInfoDebug`（JSON/HTML）
-- 对齐 legado 的重定向 URL 语义（解析基准 URL）：
-  - 在 `_fetch(...)` 增加 `onFinalUrl` 回调，暴露响应最终 URL；
-  - `getBookInfo` 与 `getBookInfoDebug` 使用最终 URL 作为字段解析与相对链接绝对化的 base；
-  - `_debugBookInfo` 同步使用 `fetch.finalUrl` 作为解析 base，并输出“详情页重定向至”调试信息。
-- 对齐 legado 的“详情页即目录页”复用语义：
-  - 新增 `bookInfo -> toc` 临时源码缓存（按 URL 归一键）；
-  - 当 `tocUrl == 详情页URL` 时，缓存详情页源码；
-  - `getToc` 首次目录页解析优先复用缓存源码，减少一次网络请求；
-  - 调试链路 `_debugTocThenContent` 同步复用缓存并输出日志“复用详情页源码作为目录页”。
-- 修复调试日志可观测性：
-  - “获取目录链接”改为输出最终生效值（空值时先提示回退，再输出回退后的详情页 URL）。
-- 新增回归测试覆盖 `tocUrl` 容错：
-  - 文件：`test/rule_parser_engine_bookinfo_tocurl_compat_test.dart`
-  - 覆盖：空值回退详情页、空白回退、相对链接绝对化、绝对链接保持不变。
-- legado 对照（已完整核查相关实现）：
-  - `/home/server/legado/app/src/main/java/io/legado/app/model/webBook/BookInfo.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSoup.kt`
+### 做了什么
+- `lib/features/search/models/search_scope.dart`
+  - 新增 legado 风格搜索范围语义模型：
+    - `""`（全部书源）
+    - `groupA,groupB`（分组模式）
+    - `name::url`（单源模式）
+  - 落地 `resolve(...)` 规则：
+    - 分组模式按分组映射启用书源；
+    - 无效分组自动剔除并回写；
+    - 单源 URL 失效时回退到全部书源；
+    - 返回范围展示文案与 `displayNames`。
+- `lib/core/models/app_settings.dart`
+  - 新增 `searchScope` 持久化字段（字符串语义）。
+  - 保留旧 `searchScopeSourceUrls` 读取以兼容历史配置，并在“单 URL”历史值上迁移为 `::url`。
+- `lib/features/search/views/search_scope_picker_view.dart`
+  - 搜索范围选择改为 legado 对齐双模式：
+    - 分组模式：多选分组；
+    - 书源模式：单选书源 + 关键字筛选（含禁用书源）；
+  - 增加“全部书源/取消/确定”操作链路；
+  - 返回值改为 `SearchScope` 字符串语义（不再返回 URL 列表）。
+- `lib/features/search/views/search_view.dart`
+  - 搜索范围生效链路改为基于 `searchScope` 解析：
+    - 搜索前自动规范化并在需要时持久化修正；
+    - 分组失效自动回退“全部书源”；
+    - 单源模式按 legado 语义允许使用禁用书源（只要 URL 存在）；
+    - 单源失效（URL 不存在）时自动回退“全部书源”；
+    - 搜索设置中的范围标签改为展示当前分组/单源语义。
+  - `SearchView.scoped(...)` 改为“注入单源 scope”语义（与 legado 入口传 scope 行为一致），不再硬锁范围。
+  - 搜空提示链路改为按“scope 是否为 all”判断（对齐 legado）：
+    - 精准过滤模式可提示关闭并重试；
+    - 非全量范围可提示切回全部并重试。
+- `test/search_scope_test.dart`
+  - 新增范围语义回归：
+    - 全量、分组、单源、无效回退、`fromSource` 名称清洗。
+- `test/app_settings_test.dart`
+  - 增加 `searchScope` roundtrip 与旧 `searchScopeSourceUrls` 迁移用例。
 
 ### 为什么
-- 你提供的 `soupreader_debug_bundle` 在详情阶段报错 `≡未获取到目录链接`，样例中 `ruleBookInfo.tocUrl = ".dirlist@href"` 在该站点命中为空。
-- 根因是 SoupReader 里 `tocUrl` 容错分散在多个调用点，且存在条件分叉，不等价于 legado 的统一 `isUrl` 语义（空值回退 baseUrl）。
-- 本次将语义下沉到统一函数，避免同类漏网路径。
-- 同时补齐“重定向后 URL 参与相对链接解析”的语义，避免 `bqgu -> bq00` 这类站点因 base 不一致导致字段链接偏差。
-
-### 如何验证
-- 执行：`flutter test test/rule_parser_engine_bookinfo_tocurl_compat_test.dart`
-- 结果：`All tests passed!`
-- 执行：`flutter test test/rule_parser_engine_*`
-- 结果：`All tests passed!`
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-
-### 兼容影响
-- 行为向 legado 收敛：`bookInfo.tocUrl` 为空时将统一回退到当前详情页 URL（详情页即目录页场景可继续解析）。
-- 对历史书源是兼容增强，不是破坏性变更；原本能取到有效 `tocUrl` 的书源行为不变。
-
-## 2026-02-13（Web 打包部署修复：Drift Web 连接 + JS 整数兼容）
-
-### 已完成
-- 修复 Web 构建被 `dart:ffi` 阻塞的问题（Drift 连接改为平台分离）：
-  - `lib/core/database/drift/source_drift_database.dart`
-  - `lib/core/database/drift/source_drift_connection.dart`
-  - `lib/core/database/drift/source_drift_connection_native.dart`
-  - `lib/core/database/drift/source_drift_connection_web.dart`
-  - `lib/core/database/drift/source_drift_connection_stub.dart`
-- 修复书源发现分类缓存 key 在 Web 下的 JS 整数精度报错：
-  - `lib/features/source/services/source_explore_kinds_service.dart`
-  - 将 64 位 FNV 哈希改为 32 位 FNV-1a，避免 `dart2js` 对大整数常量报错。
-- 完成 Web 打包与部署：
-  - 构建：`flutter build web --release`
-  - 部署：`rsync -a --delete build/web/ /home/soup_dist/`
-
-### 为什么
-- 你要求“打包 web 端并部署到 `/home/soup_dist/`”。
-- 现状阻塞点：
-  - Drift 原实现直接依赖 `native`（`dart:ffi`），Web 无法编译；
-  - 书源缓存 key 使用 64 位整数字面量，Web(JS number) 无法精确表示。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 执行：`flutter build web --release`
-- 结果：`✓ Built build/web`
-- 执行：`ls -la /home/soup_dist`
-- 结果：包含 `index.html`、`main.dart.js`、`assets/`、`canvaskit/` 等完整静态产物。
-
-### 兼容影响
-- 移动端/桌面端继续使用原生 Drift 存储路径；
-- Web 端切换为 Drift Web 存储实现（浏览器存储）；
-- `source_explore_kinds` 缓存 key 算法更新后，旧 key 仅会失效重建，不影响书源功能语义。
-
-## 2026-02-13（本地 TXT 导入后书架不刷新 + 阅读乱码修复）
-
-### 已完成
-- 修复“导入 TXT 成功但书架列表不刷新”：
-  - 文件：`lib/features/bookshelf/views/bookshelf_view.dart`
-  - 改动：书架页新增 `watchAllBooks()` 流订阅，数据库变更后自动刷新 `_books`，并在 `dispose` 中取消订阅。
-  - 语义对齐 legado：书架数据变化后由观察流驱动 UI 更新（而非仅依赖一次性读取）。
-- 修复“进入阅读界面内容乱码”：
-  - 文件：`lib/features/import/txt_parser.dart`
-  - 改动：TXT 解码策略调整为：
-    - UTF-8 BOM
-    - UTF-16 LE/BE BOM
-    - UTF-8 严格解码
-    - GBK 解码回退（`fast_gbk`）
-    - UTF-8 容错兜底
-  - 移除旧的 `latin1` 回退，避免中文 TXT 被错误按西文编码解码。
-- legado 对照（完整读取）：
-  - `/home/server/legado/app/src/main/java/io/legado/app/model/localBook/TextFile.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/utils/EncodingDetect.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/main/bookshelf/BookshelfViewModel.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt`
-
-### 为什么
-- 你反馈两个问题：
-  - 导入 TXT 提示成功后，书架未及时显示新书；
-  - 打开阅读后正文乱码。
-- 根因分别是：
-  - 书架页缺少持续数据订阅，导入后仅一次性读取可能拿到旧快照；
-  - TXT 解码回退使用 `latin1`，对中文（GBK/GB18030）文本会产生乱码。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 书架 -> 本机导入 -> 选择 `.txt`；
-  - 提示导入成功后，书架列表应立即出现新书；
-  - 点击进入阅读，正文应为正常中文，不出现大面积乱码。
-
-### 兼容影响
-- 仅影响本地 TXT 导入后的 UI 刷新与文本解码策略，不改书源五段链路解析逻辑。
-- 乱码修复对“新导入 TXT”立即生效；已导入且已写入乱码内容的旧书需重新导入以应用新解码策略。
-
-## 2026-02-13（书源导入异常修复：分组追加时 fixed-length list 崩溃）
-
-### 已完成
-- 修复“添加/导入书源”时可能出现的异常：
-  - 错误：`Unsupported operation: Cannot remove from a fixed-length list`
-  - 文件：`lib/features/source/views/source_list_view.dart`
-  - 改动：`_extractGroups()` 返回值由固定长度列表改为可变列表（`toList()`），确保后续 `add/remove` 分组操作可执行。
-- 对照 legado 导入逻辑确认语义：
-  - 参考并完整读取：`/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt`
-  - 保持“导入时按策略追加/覆盖分组”的行为一致，不改导入决策逻辑。
-
-### 为什么
-- 你反馈添加书源时报错，堆栈信息指向对固定长度列表执行 `remove`。
-- 当前实现中导入合并策略会对分组列表执行 `add/remove`，但分组提取函数返回的是不可变长度列表，导致运行时崩溃。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 书源管理 -> 导入（网络/剪贴板/文件）；
-  - 在导入选项里使用“保留分组/追加分组/覆盖分组”组合提交；
-  - 确认导入成功，不再出现 fixed-length list 异常。
-
-### 兼容影响
-- 仅修复分组列表可变性问题，不改变书源字段语义与导入策略。
-- 对既有书源数据结构无兼容破坏。
-
-## 2026-02-13（设置首页信息架构重排：分组导航替代平铺菜单）
-
-### 已完成
-- 重构设置首页为“一级入口页”，不再平铺大量细项：
-  - `lib/features/settings/views/settings_view.dart`
-  - 首屏改为两组 `insetGrouped`：
-    - `设置分组`：源管理、主题、功能 & 设置、其它
-    - `诊断`：开发工具
-- 具体设置项下沉到既有二级页面，通过导航进入：
-  - `SourceManagementView`
-  - `ThemeSettingsView`
-  - `FunctionSettingsView`
-  - `OtherHubView`
-  - `DeveloperToolsView`
-- 保留设置首页关键摘要信息，避免信息损失：
-  - 书源数量与自动更新状态
-  - 主题摘要（外观模式 + 阅读主题）
-  - 阅读记录与缓存摘要
-  - 版本信息
-
-### 为什么
-- 你反馈“设置页面菜单太挤”，首屏平铺项过多导致扫描成本高、点击区域密集。
-- 通过入口化分层可降低首屏密度，保持 legado 风格的分组导航语义与可达性。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 进入设置首页，确认仅展示分组入口与摘要信息，不再出现拥挤平铺；
-  - 依次点击 `源管理/主题/功能 & 设置/其它/开发工具`，确认可正常进入二级页并返回；
-  - 返回设置首页后，摘要信息可刷新显示。
-
-### 兼容影响
-- 仅调整设置首页的信息架构与布局排版，不改变书源管理、阅读设置、开发工具等业务逻辑。
-- 不涉及书源五段链路（search/explore/bookInfo/toc/content）协议与解析行为。
-
-## 2026-02-13（设置新增开发工具：异常日志面板 + 关键节点异常采集）
-
-### 已完成
-- 新增异常日志服务（对标 legado `AppLog`/`AppLogDialog` 思路）：
-  - `lib/core/services/exception_log_service.dart`
-  - 支持内存日志、Drift 持久化（`app_key_value_records`）、数量上限、清空。
-- 设置入口新增“开发工具”：
-  - `lib/features/settings/views/settings_view.dart` 增加“开发工具 -> 异常日志”入口；
-  - `lib/features/settings/views/other_settings_view.dart` 原“日志文件暂未实现”改为可用入口。
-- 新增开发工具与异常日志 UI：
-  - `lib/features/settings/views/developer_tools_view.dart`
-  - `lib/features/settings/views/exception_logs_view.dart`
-  - 能力包括：日志列表、异常详情、复制详情、清空日志。
-- 关键节点异常采集接入：
-  - 全局：`lib/main.dart`（`FlutterError.onError`、`PlatformDispatcher.onError`、`runZonedGuarded`、启动步骤失败）
-  - 书源五段链路：`lib/features/source/services/rule_parser_engine.dart`
-    - `search` / `explore` / `bookInfo` / `toc` / `content` catch 节点
-  - 书源导入与设置读写：`lib/features/source/views/source_list_view.dart`
-
-### 为什么
-- 你需要“在设置中添加开发工具，能看异常日志，并在关键节点定位异常原因”。
-- 现状仅 `debugPrint`，无法在 UI 中留存和回看异常上下文，排查效率低。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 设置 -> 开发工具 -> 异常日志：可进入并看到日志列表；
-  - 点击日志项：可查看节点、消息、错误、上下文、堆栈；
-  - 点击“复制”：可复制完整日志详情；
-  - 点击“清空”：日志被清空；
-  - 触发一次书源导入异常或规则解析异常后，列表出现对应节点日志（如 `source.import.*`、`source.search` 等）。
-
-### 兼容影响
-- 不涉及书源协议解析逻辑变更，仅增加异常可观测性。
-- 旧版本无“开发工具/异常日志”入口，本次新增后默认可用，无需兼容旧 UI 行为。
-
-## 2026-02-13（页面顶出修复：统一顶部安全区 + 书源管理筛选防裁切）
-
-### 已完成
-- 修复通用页面容器顶部被导航栏挤压问题：
-  - `lib/app/widgets/app_cupertino_page_scaffold.dart`
-  - `includeTopSafeArea` 默认值由 `false` 调整为 `true`，统一避免页面首屏内容被状态栏/导航栏遮挡。
-- 书源管理页面顶部筛选行做防裁切微调：
-  - `lib/features/source/views/source_list_view.dart`
-  - 分组筛选容器高度 `42 -> 46`；
-  - 横向列表增加垂直内边距 `EdgeInsets.symmetric(horizontal: 16, vertical: 2)`。
-
-### 为什么
-- 线上反馈“进入设置、源管理会顶出界面”“主设置界面文字显示不全”，截图可见顶部筛选控件被裁切。
-- 根因是通用容器顶部安全区默认关闭，叠加书源管理筛选行高度偏紧，导致在 iOS 设备上首屏顶部显示不稳定。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 手工路径：
-  - 进入 `设置`：首个分组卡片需完整显示，不再贴顶或被导航栏压住；
-  - 进入 `书源管理`：顶部分类胶囊和“全部状态/仅启用/仅禁用”分段控件完整显示；
-  - 在小屏机型（如 iPhone SE）与大屏机型（如 Pro Max）抽检首屏无越界。
-
-### 兼容影响
-- 不保留旧的“顶部安全区默认关闭”行为，统一按新布局策略渲染。
-- 该改动仅影响页面可视布局，不改变书源管理与设置页的业务逻辑。
-
-## 2026-02-13（去兼容继续收口：移除 settingsBox 兼容层）
-
-### 已完成
-- 删除 `DatabaseService` 中 `DriftSettingsBox` 兼容壳与 `settingsBox` getter。
-- 书源相关调用点改为直接使用数据库服务原生方法：
-  - `source_explore_kinds_service.dart`：`getSetting/putSetting/deleteSetting`
-  - `source_list_view.dart`：设置读写与初始化检查不再依赖 `settingsBox`
-
-### 为什么
-- 你已明确“不用兼容”，因此继续清理旧接口封装，减少一层历史适配代码与调用歧义。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 进入书源管理，执行导入流程并观察导入配置项（保留原名、分组等）是否正常记忆；
-  - 在书源编辑页触发发现页分类调试缓存，确认不报设置存取异常。
-
-### 兼容影响
-- 不再保留 `settingsBox` 旧调用入口，内部统一为 `DatabaseService` 直接设置 API。
-
-## 2026-02-13（明确不做历史兼容：移除旧键回退逻辑）
-
-### 已完成
-- 按“无需兼容”要求，移除阅读滚动偏移的旧键兼容逻辑：
-  - `saveScrollOffset` 不再额外写入旧的书籍级偏移键；
-  - `getScrollOffset` 不再回退读取旧键，只读取当前请求键（章节级或书籍级）。
-- 影响文件：`lib/core/services/settings_service.dart`。
-
-### 为什么
-- 需求明确“不用兼容”，因此去掉历史兼容分支，避免双写/回退路径增加维护成本。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 手工路径：
-  - 阅读一本书并滚动到中间位置，退出后重进同章节，确认按章节偏移恢复；
-  - 切换章节后再次进入，确认不会读取旧书籍级偏移。
-
-### 兼容影响
-- 明确不兼容旧滚动偏移键数据；仅使用当前键体系。
-
-## 2026-02-13（存储层重构收口：全面切换 Drift，移除 Hive 依赖）
-
-### 已完成
-- 存储入口统一为 Drift：
-  - `DatabaseService` 保留单例与 `settingsBox.get/put/delete` 兼容接口，但底层改为 Drift `app_key_value_records` 表。
-  - `SourceDriftDatabase` 扩展并统一承载书源、书籍、章节、替换规则、书签、应用键值存储。
-- 主要仓库完成 Drift 化并保留原有对外语义：
-  - `SourceRepository`、`BookRepository`、`ChapterRepository`、`ReplaceRuleRepository`、`BookmarkRepository`。
-  - 其中 `ReplaceRuleRepository` 修复了 `Companion.insert` 的参数类型问题（`id: Value(rule.id)`）。
-- UI/服务侧去除对 Hive Box 的直接监听与读写，改为仓库流或 `DatabaseService` 兼容层：
-  - `reading_history_view.dart`
-  - `replace_rule_list_view.dart`
-  - `settings_view.dart`
-  - `storage_settings_view.dart`
-  - `backup_service.dart`
-  - `source_explore_kinds_service.dart`
-- 启动引导补齐 Drift 仓库预热：
-  - `main.dart` 增加 `BookRepository/ChapterRepository/ReplaceRuleRepository.bootstrap`。
-- 清理 Hive 遗留代码与依赖：
-  - 删除 `source_hive_to_drift_migrator.dart`。
-  - 删除无业务引用的 `book_entity.dart`、`book_entity.g.dart`、`bookmark_entity.g.dart`。
-  - `bookmark_entity.dart` 改为纯 Dart 数据模型，不再依赖 Hive 注解/基类。
-  - `source_edit_view.dart` 移除旧 `BookSourceEntity` 入口。
-  - `pubspec.yaml` 移除 `hive`、`hive_flutter`、`hive_generator`。
-
-### 为什么
-- 当前需求是“所有 Hive 存储改为 Drift”，并且要消除打包后在存储层的混用风险。
-- 之前代码存在“仓库 Drift 化 + 部分 UI/实体仍带 Hive 依赖”的半迁移状态，容易导致维护复杂度和行为不一致。
-
-### 如何验证
-- 执行：`flutter pub get`
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工回归建议：
-  - 书源管理：导入（网络/剪贴板/文件）-> 列表展示 -> 编辑保存；
-  - 阅读链路：打开书籍 -> 目录/正文 -> 添加与删除书签；
-  - 替换规则：列表展示、增删改、启用状态切换；
-  - 设置页：缓存统计、清理缓存、备份入口可正常读取数据。
-
-### 兼容影响
-- 运行时已不再读取 Hive Box，应用存储完全依赖 Drift。
-- 对“旧版本仅保存在 Hive 中但未迁移”的本地数据，升级后不会自动读取；建议通过现有导入/备份路径恢复。
-- 书源解析与五段链路（search/explore/bookInfo/toc/content）语义未做协议级改动，兼容目标仍对齐 legado。
-
-## 2026-02-12（设置系统 UI/UX 优化第二批：全页密度一致性收口）
-
-### 已完成
-- 对剩余设置子页统一应用“紧凑留白”规范，收敛视觉密度：
-  - `about_settings_view.dart`
-  - `appearance_settings_view.dart`
-  - `backup_settings_view.dart`
-  - `storage_settings_view.dart`
-  - `text_rules_settings_view.dart`
-  - `reading_preferences_view.dart`
-  - `reading_theme_settings_view.dart`
-  - `reading_tip_settings_view.dart`
-  - `reading_page_settings_view.dart`
-  - `reading_status_action_settings_view.dart`
-  - `reading_other_settings_view.dart`
-- `storage_settings_view.dart` 缓存状态文案统一为短标签格式：
-  - `缓存大小 · 章节数量`（复用 `SettingsUiTokens.status`）。
-- 延续“计划中”弱化策略到 Hub/源管理等补充页面：
-  - `source_management_view.dart`
-  - `other_hub_view.dart`
-  - `function_settings_view.dart`
-
-### 为什么
-- 第一批已优化首页和主二级页，但部分子页仍存在默认留白与文案密度不一致，切换页面时观感跳变明显。
-- 需要将设置系统整体拉齐到同一信息密度与语义表达规范。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 从设置首页依次进入“主题/功能&设置/源管理/其它设置/阅读设置”，确认列表顶部留白与分组密度一致；
-  - 进入“下载与缓存”，确认缓存状态文案改为 `值 · 值` 的短标签风格；
-  - 进入占位项，确认仍展示统一的“计划中”弹窗。
-
-### 兼容影响
-- 本批次仅为设置页面布局密度和文案样式统一，不涉及数据模型、存储键、网络与书源链路。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（设置系统 UI/UX 优化：信息密度优先 + 计划中弱化）
-
-### 已完成
-- 设置系统首页与二级页完成统一优化（iOS 风格、可用项优先）：
-  - `settings_view.dart`
-    - 四区块结构保持不变（源管理/主题/功能&设置/其它），但区块内按“可用优先、计划中后置”重排；
-    - 压缩列表密度（顶部/底部留白、区块间距、行内垂直 padding、图标尺寸）；
-    - 新增“计划中”弱化样式：占位项标题、图标和右侧状态文案统一降权；
-    - 状态文案统一为短标签 + 数值（如 `仅 Wi‑Fi · 缓存 xxx`）。
-  - `theme_settings_view.dart`、`other_settings_view.dart`、`function_settings_view.dart`、`source_management_view.dart`、`other_hub_view.dart`
-    - 将右侧 `暂未实现` 统一改为 `计划中`，并使用次级颜色显示；
-    - 页面列表统一收紧顶部/底部空白，提升同屏可见信息量。
-  - `global_reading_settings_view.dart`
-    - 同步收紧列表顶部间距；
-    - `界面（样式）`摘要更新为 `主题 / 字体 / 排版 / 翻页动画`，与当前阅读设置语义一致。
-- 新增设置 UI 规范常量：
-  - `settings_ui_tokens.dart`：统一 `计划中` 文案、状态拼接与占位文案归一化能力。
-- 占位弹窗统一：
-  - `settings_placeholders.dart` 改为统一标题 `计划中`，并自动将传入文案中的 `暂未实现` 归一化为 `计划中`。
-
-### 为什么
-- 你要求对设置页做优化，目标是“信息密度 + 可读性”优先，并在全设置系统范围内保持一致。
-- 原实现中“暂未实现”项视觉权重过高，且列表行高/留白偏松，导致有效信息同屏承载不足。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 设置首页：确认可用项前置、`计划中`项弱化、同屏可见项增多；
-  - 进入 `主题` / `其它设置` / `源管理` / `功能&设置`：确认占位项右侧文案统一为 `计划中`；
-  - 点击任一占位项：弹窗标题统一为 `计划中`，内容文案不再出现“暂未实现”原词。
-
-### 兼容影响
-- 本次仅为设置系统 UI/UX 与文案层调整，不涉及数据结构、存储键、书源解析与请求链路。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（阅读器配置复刻 legado：布局排版与操作逻辑重排）
-
-### 已完成
-- 阅读页内配置弹层按 legado 语义重排：
-  - `界面` 分组新增并承接 `翻页动画`（翻页模式 + 动画时长）；
-  - 将 `页眉页脚` 的显示开关、分割线和三栏内容位配置迁移到 `界面` 分组；
-  - `设置` 分组收敛为行为项：翻页触发/按键、状态栏显示、点击区域、自动阅读与其他行为。
-- 全局阅读设置入口与阅读页分组同构：
-  - `reading_interface_settings_hub_view.dart` 改为 `样式与排版`、`页眉页脚与标题`、`排版与边距（高级）` 三段结构；
-  - 新增 `reading_tip_settings_view.dart` 承接 legado `TipConfig` 对应能力（标题位置、页眉页脚内容位/分割线）；
-  - `reading_behavior_settings_hub_view.dart` 与子页面文案/分组同步收敛为行为域。
-- 全局子页面职责重排：
-  - `reading_preferences_view.dart` 增加 `翻页动画时长`（界面域）；
-  - `reading_page_settings_view.dart` 移除动画项，仅保留翻页触发与按键/文本行为；
-  - `reading_status_action_settings_view.dart` 移除页眉页脚配置，仅保留状态栏与点击区域。
-
-### 为什么
-- 需求要求“复刻 legado 的布局排版与操作逻辑”，并保持 `Shadcn + Cupertino` 组件约束。
-- 现状中 `翻页动画` 与 `页眉页脚` 分散在行为页，导致与 legado 的 `界面/设置` 分工不一致，用户操作路径不稳定。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 阅读页 -> 菜单 -> `界面`：确认可设置主题/排版/翻页动画/页眉页脚；
-  - 阅读页 -> 菜单 -> `设置`：确认仅剩行为项（灵敏度/按键/点击区域/自动阅读等）；
-  - 设置 -> 功能&设置 -> 阅读设置 -> `界面（样式）/设置（行为）`：确认分组与阅读页内同构。
-
-### 兼容影响
-- 仅调整阅读器配置 UI 的分组与入口，不变更 `ReadingSettings` 存储结构与解析逻辑。
-- 不涉及书源解析、网络请求和五段链路（search/explore/bookInfo/toc/content）。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（阅读器配置 UI/UX 重构：操作路径对齐 legado + Shadcn）
-
-### 已完成
-- 阅读页底部菜单重构为 `目录 / 朗读 / 界面 / 设置` 固定入口，交互路径对齐 legado。
-- `ReaderBottomMenuNew` 改为 Shadcn 风格卡片与按钮实现，保留章节进度与亮度调节。
-- 阅读设置弹层支持按入口裁剪：
-  - `界面` 入口只展示 `排版/界面` 两类配置；
-  - `设置` 入口只展示 `翻页/其他` 两类配置。
-- 新增朗读入口能力检测：当前版本未接入 TTS 时，明确提示 `语音朗读（TTS）暂未实现`。
-- 全局阅读设置页重构：改为 `界面（样式）` 与 `设置（行为）` 两个主入口，与阅读页内操作语义保持一致。
-- 新增两个 Hub 页面承接全局配置入口：
-  - `reading_interface_settings_hub_view.dart`
-  - `reading_behavior_settings_hub_view.dart`
-
-### 为什么
-- 需求要求优先重构阅读器配置界面 UI/UX，并“操作方式跟 legado 一样，UI 使用 shadcn”。
-- 现有实现存在阅读页内与全局设置页路径分叉、命名不一致的问题，增加学习和维护成本。
-
-### 如何验证
-- 手工路径：
-  - 阅读页打开菜单，确认底部主入口顺序为 `目录/朗读/界面/设置`。
-  - 点击 `界面`，确认仅出现样式相关配置分组。
-  - 点击 `设置`，确认仅出现行为相关配置分组。
-  - 点击 `朗读`，确认触发能力检测并给出明确提示。
-  - 进入“设置 -> 功能&设置 -> 阅读设置”，确认全局入口为 `界面（样式）/设置（行为）`。
-- 静态检查：尝试执行 `flutter analyze`（当前环境缺少 Flutter 命令，无法执行）。
-
-### 兼容影响
-- 本次主要是阅读器 UI/交互路径重排，不改书源解析引擎与网络请求逻辑。
-- 对旧书源兼容性无直接协议级影响。
-
-## 2026-02-12（analyze 报错修复：主题类型导入 + concurrentRate 兼容回填）
-
-### 已完成
-- 修复 `reader_bottom_menu.dart` 缺失 `ReadingThemeColors` 导入导致的 `undefined_class`。
-- 对标 legado 并发率语义，给 `RuleParserEngine` 回填并发率限流兼容能力：
-  - 新增并发率记录池（按 `sourceKey` 共享）与测试重置入口 `debugResetConcurrentRateLimiterForTest()`；
-  - 支持 `N`（间隔模式）与 `count/window`（窗口模式）两种 `concurrentRate` 语义；
-  - 在 `_fetchDebug` 输出 `concurrentWaitMs` 与 `concurrentDecision`；
-  - 在 `search/explore/bookInfo/toc/content` 的调试与实际请求链路统一透传 `source.concurrentRate`。
-- 调试链路日志补充并发率决策与累计等待时间，保持五段链路可观测性。
-
-### 为什么
-- `flutter analyze` 报错包含：
-  - 阅读器底部菜单类型未定义；
-  - 并发率兼容测试依赖的调试接口（方法/字段）缺失。
-- 按协作规范先对齐 legado：完整阅读并参照
-  - `../legado/app/src/main/java/io/legado/app/help/ConcurrentRateLimiter.kt`
-  - `../legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt`
-  的并发率状态流转与等待语义后再回填实现，避免主观改写。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 并发率兼容验证路径（自动化）：
-  - `test/rule_parser_engine_concurrent_rate_compat_test.dart` 中依赖的方法与字段已恢复可解析（`debugResetConcurrentRateLimiterForTest` / `concurrentWaitMs` / `concurrentDecision`）。
-
-### 兼容影响
-- 旧书源若 `concurrentRate` 为空或为 `0`，行为保持不变（不启用限流）。
-- 旧书源若配置了 `concurrentRate`，请求链路将按 legado 语义执行等待：
-  - `N`：间隔模式；
-  - `count/window`：窗口模式（保持 legado 的计数判定细节）。
-- 该改动可能改变同源高并发请求的时间分布，但这是对 legado 兼容行为的恢复。
-
-## 2026-02-12（后续计划推进：目录规则入口落地）
-
-### 已完成
-- 将设置页与源管理页中的“目录规则”从“暂未实现”占位改为可用入口：
-  - `SettingsView` 的“目录规则”点击后直接进入 `SourceListView`；
-  - `SourceManagementView` 的“目录规则”点击后直接进入 `SourceListView`。
-- “目录规则”右侧说明文案由“暂未实现”改为“书源编辑”，与实际能力一致。
-
-### 为什么
-- 原入口仅弹未实现提示，无法形成实际操作闭环。
-- 按 legado 交互语义，目录规则属于书源编辑/调试体系，不是独立设置页：先进入书源管理，再在书源编辑里维护 `ruleToc`/`ruleContent`。
-- 已对照并完整阅读 legado 对应实现：
-  - `../legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceActivity.kt`
-  - `../legado/app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt`
-
-### 如何验证
-- 手工路径：
-  - 设置 -> 目录规则：应进入“书源管理”页面；
-  - 设置 -> 源管理 -> 目录规则：应进入“书源管理”页面；
-  - 在书源编辑页 `ruleToc` 分组可继续配置目录规则。
-- 静态检查：`flutter analyze`（结果：`No issues found!`）。
-
-### 兼容影响
-- 不涉及书源解析逻辑与数据结构变更，仅为入口导航调整。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（协作规范更新：UI 约束升级为全局强制）
-
-### 已完成
-- 更新 `AGENTS.md` 的 `1.2 UI 规范（强制）`，将 `Shadcn + Cupertino` 从原则要求升级为全项目强制约束。
-- 新增明确规则：
-  - 全项目新增/改造 UI 必须使用 `Shadcn + Cupertino` 组合；
-  - 禁止引入或混用其它 UI 体系作为主实现；
-  - 特殊场景需在任务说明与进度文档中记录原因、范围和替代方案；
-  - 不符合该规范的改动在评审中视为阻塞项。
-
-### 为什么
-- 需求明确要求“全局强制使用 `Shadcn + Cupertino`”，需要在项目协作规范中固化，避免后续执行口径不一致。
-
-### 如何验证
-- 手工检查：
-  - 打开 `AGENTS.md`，确认 `1.2 UI 规范（强制）` 已包含上述 4 条新增约束。
-  - 后续任务设计与实现需按该条款执行，若有例外必须在 `docs/DEV_PROGRESS.md` 记录说明。
-
-### 兼容影响
-- 该改动仅影响协作与评审规范，不影响现有运行时代码逻辑与旧书源兼容性。
-
-## 2026-02-12（阅读器 UI 合规重构：SimpleReaderView 子弹窗 + 书签弹窗）
-
-### 已完成
-- `simple_reader_view.dart`：
-  - 将翻页模式选择从 `ChoiceChip` 替换为 `CupertinoButton + 自定义容器` 方案，保留“隐藏模式”不可选语义；
-  - 将字体选择弹窗条目从 `ListTile` 替换为 `CupertinoButton + Row` 方案，保留选中态勾选与点击即生效行为；
-  - Material 导入收敛为 `show Colors`，避免引入 Material 组件实现。
-- `bookmark_dialog.dart`：
-  - 移除 `SnackBar/ScaffoldMessenger`，改为 Cupertino 弹出式轻提示；
-  - 书签空态、滑删背景、列表项、删除按钮全部替换为 Cupertino 图标与 Cupertino 交互组件；
-  - 移除 `ListTile`，改为自定义行布局，保留“点条目跳转 / 点删除移除 / 左滑删除”语义。
-- 删除未被路由使用的旧页面：`lib/features/reader/views/reader_view.dart`。
-
-### 为什么
-- 协作规范已升级为全项目强制 `Shadcn + Cupertino`，阅读器仍存在 Material 组件残留（`ChoiceChip`、`ListTile`、`SnackBar` 等），与规范冲突。
-- `ReaderView` 已不在实际跳转链路中，继续保留会造成维护噪音和潜在误用。
+- legado 的 `SearchScope` 是“字符串语义”而非“URL 列表语义”：
+  - URL 列表无法表达“分组模式”与“name::url 单源模式”；
+  - 无法复刻无效分组剔除、单源失效回退等状态流转。
+- 当前 SoupReader 搜索范围仅支持 URL 多选，导致与 legado 的范围选择语义和搜空提示边界不一致。
 
 ### 如何验证
 - 静态检查：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 打开阅读器设置 -> 翻页设置，验证模式切换可用，带“隐藏”标识的模式不可点选；
-  - 打开字体选择弹窗，点击任意字体应立即生效并关闭弹窗；
-  - 打开书签弹窗，验证添加提示、点击跳转、右侧删除、左滑删除均可用。
+- 相关测试：
+  - `flutter test test/search_scope_test.dart`
+  - `flutter test test/app_settings_test.dart`
 
 ### 兼容影响
-- 对书源解析、网络请求与五段链路（search/explore/bookInfo/toc/content）无逻辑改动。
-- 阅读器 UI 交互行为保持原语义，主要是组件实现替换与旧页清理。
-- `ReaderView` 已删除；若有外部分支仍直接引用该页面，需要改为 `SimpleReaderView`。
-
-## 2026-02-12（阅读器 UI 合规重构第二批：去除 Material Slider/InkWell）
-
-### 已完成
-- `lib/features/reader/widgets/reader_bottom_menu.dart`
-  - 将章节进度与亮度控制从 Material `Slider/SliderTheme` 重构为 `CupertinoSlider`；
-  - 移除 Material 依赖，仅保留 `Shadcn + Cupertino` 组合实现。
-- `lib/features/reader/widgets/typography_settings_dialog.dart`
-  - 将排版设置中的 Material `Slider` 重构为 `CupertinoSlider`；
-  - 同步移除 Material 颜色常量依赖。
-- `lib/features/reader/widgets/reader_menus.dart`
-  - 将底部菜单按钮从 `Material + InkWell` 重构为 `CupertinoButton`；
-  - 将章节/亮度滑杆替换为 `CupertinoSlider`，移除 Material 组件依赖。
-- `lib/features/reader/models/reading_settings.dart`
-  - 将翻页模式与翻页方向图标从 Material `Icons` 迁移为 `CupertinoIcons`，统一图标体系。
-
-### 为什么
-- 你要求继续按规则重构 UI，而阅读器链路中的多个菜单与设置面板仍在使用 Material 交互组件（`Slider`、`InkWell` 等），与全局 `Shadcn + Cupertino` 约束不一致。
-- 本批次优先处理“正在阅读链路中可见且交互频繁”的组件，降低 UI 体系混用风险。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 阅读页菜单 -> 底部菜单：章节拖动与亮度拖动可用；
-  - 阅读页菜单 -> 排版设置：所有滑杆可调且即时生效；
-  - 阅读页顶部/底部菜单点击反馈与原交互语义一致。
-
-### 兼容影响
-- 本次仅替换 UI 组件实现，不改阅读数据结构、请求链路与书源解析逻辑。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（阅读器/书架 UI 合规重构第三批：清理 Colors 级别 Material 依赖）
-
-### 已完成
-- `lib/features/bookshelf/widgets/book_cover_card.dart`
-  - 从 Material 迁移到 Cupertino：移除 `Theme.of`、`CircularProgressIndicator`；
-  - 文本样式改为 `CupertinoTheme`，加载态改为 `CupertinoActivityIndicator`。
-- 阅读器弹窗与面板清理 Material `Colors` 依赖：
-  - `lib/features/reader/views/simple_reader_view.dart`
-  - `lib/features/reader/widgets/chapter_list_dialog.dart`
-  - `lib/features/reader/widgets/click_action_config_dialog.dart`
-  - `lib/features/reader/widgets/reader_status_bar.dart`
-  - `lib/features/reader/widgets/reader_quick_settings_sheet.dart`
-  - `lib/features/reader/widgets/reader_catalog_sheet.dart`
-- 上述文件均移除 `import 'package:flutter/material.dart' show Colors`，并用 `CupertinoColors` / `Color` 常量替代。
-
-### 为什么
-- 虽然上一批已去掉主要 Material 交互组件，但仍有若干文件仅为 `Colors` 引入 Material，属于 UI 体系混用残留。
-- 本批次目标是继续收敛到 `Shadcn + Cupertino`，并尽量保持视觉和交互行为不变。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 书架页：封面卡片、占位图、加载态显示正常；
-  - 阅读页：目录弹窗、快速设置、点击区域配置、状态栏、电池图标与配色显示正常。
-
-### 兼容影响
-- 本次为 UI 实现层替换，不涉及数据模型、书源解析和网络请求逻辑变更。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（阅读器 UI 合规重构第四批：分页链路移除 Material 依赖）
-
-### 已完成
-- 分页核心与翻页委托链路从 `material.dart` 迁移到基础层导入（`widgets`/`cupertino`），并清理 `Colors.*` 残留：
-  - `lib/features/reader/widgets/page_factory.dart`
-  - `lib/features/reader/widgets/reader_page_agent.dart`
-  - `lib/features/reader/widgets/paged_reader_widget.dart`
-  - `lib/features/reader/widgets/simulation_page_painter.dart`
-  - `lib/features/reader/widgets/simulation_page_painter2.dart`
-  - `lib/features/reader/widgets/page_delegate/page_delegate.dart`
-  - `lib/features/reader/widgets/page_delegate/no_anim_delegate.dart`
-  - `lib/features/reader/widgets/page_delegate/slide_delegate.dart`
-  - `lib/features/reader/widgets/page_delegate/cover_delegate.dart`
-- 仅替换导入与颜色常量，不调整翻页状态机、动画轨迹与分页算法。
-
-### 为什么
-- 阅读器链路里仍有一批基础模块因为 `Colors` 或历史导入习惯依赖 `material.dart`，与全局 `Shadcn + Cupertino` 约束不一致。
-- 这批文件属于底层分页渲染链路，优先做“行为不变”的依赖收敛，降低后续维护中的 UI 体系混用风险。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 阅读页切换 `滑动/覆盖/仿真/无动画/滚动` 等翻页模式，确认翻页方向、阴影与手势行为正常；
-  - 阅读页反复切章并切换主题，确认分页与状态栏渲染无异常。
-
-### 兼容影响
-- 本次不涉及书源解析、网络请求、数据库结构与设置持久化字段变更。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（UI 合规重构第五批：基础主题文件去 Material 类型导入）
-
-### 已完成
-- 将以下基础主题文件从 `material.dart` 导入替换为更底层导入（不改字段语义）：
-  - `lib/app/theme/design_tokens.dart`：改为 `dart:ui`
-  - `lib/app/theme/colors.dart`：改为 `dart:ui`
-  - `lib/app/theme/typography.dart`：改为 `package:flutter/painting.dart`
-- 保留 `lib/app/theme/app_theme.dart` 的 Material 依赖（`ThemeData`/`ColorScheme`/`AppBarTheme` 等确实需要）。
-
-### 为什么
-- 在功能层 UI 已完成 `Shadcn + Cupertino` 收敛后，仍有基础主题文件仅因类型声明而依赖 Material。
-- 该批次目的是继续做低风险依赖收敛，减少 UI 体系混用的“隐式入口”。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-
-### 兼容影响
-- 本批次仅调整导入层级，不改变设计令牌、配色值、排版值或运行行为。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（UI 合规重构第六批：书源编辑调试文本去 Material 依赖）
-
-### 已完成
-- `lib/features/source/views/source_edit_view.dart`
-  - 移除 `SelectableText` 的 Material 导入；
-  - 将调试区两处可选中文本区域改为 `SelectableRegion + Text`（Cupertino 选择控件）；
-  - 增加并释放两个 `FocusNode`，避免选择区域焦点资源泄露。
-
-### 为什么
-- 书源编辑页调试面板仍因可选中文本使用了 Material 组件，属于 UI 体系混用残留。
-- 本批次在保持“可复制/可选中调试文本”能力不变的前提下，继续向 `Shadcn + Cupertino` 收敛。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 进入书源编辑 -> 调试标签页；
-  - 在“控制台文本”和“决策摘要”区域长按并选择文本，确认选择与复制行为可用。
-
-### 兼容影响
-- 本次仅替换调试文本展示组件，不涉及书源解析、网络请求或持久化结构变更。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（UI 合规重构第七批：清理最后 Material 导入）
-
-### 已完成
-- `lib/main.dart`
-  - 移除 `ThemeMode` 的 Material 导入；
-  - 改为根据 `_effectiveBrightness` 直接构造并注入 Shad 主题（`theme`/`darkTheme` 同步为当前有效主题），保持亮/暗切换行为。
-- 删除未被引用的旧 Material 主题文件：
-  - `lib/app/theme/app_theme.dart`
-- 全库扫描确认：`lib/` 下已无 `flutter/material.dart` 导入。
-
-### 为什么
-- 前几批重构后仅剩入口层与遗留主题文件在使用 Material。
-- 本批次目标是完成全链路收敛，避免后续新增 UI 继续沿用 Material 入口。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 设置中切换外观模式（浅色/深色/跟随系统）；
-  - 观察主界面与阅读器配色随设置变化是否正常。
-
-### 兼容影响
-- 不涉及书源解析、网络请求、数据库结构与阅读规则语义变更。
-- 删除的 `app_theme.dart` 为未使用遗留文件；运行路径无功能依赖。
-
-## 2026-02-12（功能入口落地：功能设置中的“阅读记录”接入实际页面）
-
-### 已完成
-- `lib/features/settings/views/function_settings_view.dart`
-  - 将“阅读记录”从“暂未实现”占位改为实际可用入口；
-  - 点击后跳转到 `ReadingHistoryView`；
-  - 右侧说明文案从“暂未实现”调整为“历史列表”。
-
-### 为什么
-- legacy 对应行为是“我的 -> 阅读记录”直接进入阅读记录列表（`ReadRecordActivity`），不是占位弹窗。
-- 当前项目已有 `ReadingHistoryView` 可承接该能力，继续保留占位会造成路径割裂。
-
-### legado 对标（已完整读取）
-- `../legado/app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt`
-- `../legado/app/src/main/java/io/legado/app/ui/main/my/MyFragment.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 设置 -> 功能 & 设置 -> 阅读记录；
-  - 应进入阅读记录列表页（`ReadingHistoryView`），不再弹“暂未实现”提示。
-
-### 兼容影响
-- 本次仅调整设置入口导航，不改阅读数据结构和记录存储逻辑。
-- 旧书源兼容性无协议级影响。
-
-## 2026-02-12（书源管理复刻 legado + 书源存储迁移到 drift）
-
-### 已完成
-- 书源域存储层改造为 drift（保留 Hive 仅作迁移来源）：
-  - 新增 `lib/core/database/drift/source_drift_database.dart`
-  - 新增 `lib/core/database/drift/source_drift_service.dart`
-  - 新增 `lib/core/database/migration/source_hive_to_drift_migrator.dart`
-- 启动流程接入迁移与缓存预热：
-  - `DatabaseService.init()` 中新增 drift 初始化与 `Hive -> drift` 幂等迁移；
-  - `main.dart` 新增 `SourceRepository.bootstrap` 启动步骤，确保上层同步读取可用。
-- `SourceRepository` 重写为 drift 实现：
-  - 写入：统一走 drift；
-  - 读取：使用内存缓存 + `watchAllSources()` 流，兼容现有同步调用点；
-  - 保留 `rawJson` 读写，继续支持 legado 字段保真。
-- 书源管理页重构为 legado 管理语义（Shadcn + Cupertino）：
-  - `source_list_view.dart` 从 Hive `ValueListenable` 改为 `SourceRepository.watchAllSources()`；
-  - 新增排序模式（手动/权重/名称/地址/更新时间/响应时间/启用状态）与升降序切换；
-  - 新增“按域名分组显示”与 host 头展示；
-  - 新增选择模式、批量操作栏（全选/反选/区间补选、启停、发现启停、分组增删、导出、分享、删除）；
-  - 新增分组管理弹层（新增、重命名、删除）；
-  - 单项菜单补齐（编辑、置顶/置底、登录、调试、发现启停、分享、删除）。
-- 导入能力升级为 legado 风格：
-  - 导入预览弹层支持逐条勾选、仅新增、仅更新；
-  - 新增保留策略开关：保留原名称 / 保留原分组 / 保留原启用状态；
-  - 新增自定义分组与追加模式；
-  - 导入策略配置持久化到设置。
-- 管理链路联动改造：
-  - `source_availability_check_view.dart` 与 `source_edit_view.dart` 联动改为基于 `BookSource + rawJson` 打开编辑；
-  - `settings_view.dart` 书源统计改为 `SourceRepository`。
-
-### 为什么
-- 需求明确要求“优化书源管理功能，一切参考 legado”，且存储要求改为 drift。
-- 原实现在管理页交互、批量操作、导入冲突策略、分组管理等方面与 legado 语义差异较大，且书源仍依赖 Hive。
-
-### 如何验证
-- 执行：`flutter pub get`
-- 执行：`dart run build_runner build --delete-conflicting-outputs`
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源页验证排序/筛选/按域名分组；
-  - 长按进入选择模式，验证批量操作；
-  - 打开分组管理弹层，验证新增/改名/删除；
-  - 用含“新增+更新+已有”的导入样本验证导入预览与保留策略。
-
-### 兼容影响
-- 书源读取/写入已切换为 drift；首次启动会自动从 Hive 迁移书源并写入迁移标记，迁移具备幂等性。
-- 旧 Hive 书源数据保留在本地作为迁移来源，不作为主读写路径。
-- 对旧书源 JSON 协议无破坏性变更，`rawJson` 保真策略继续生效。
-
-## 2026-02-12（书源管理持续开发：补齐 legado 关键交互）
-
-### 已完成
-- `source_list_view.dart` 新增手动排序拖拽能力（仅在手动排序 + 全量列表场景启用）：
-  - 使用拖拽手柄调整顺序；
-  - 拖拽落位后重算 `customOrder` 并批量写入。
-- 批量操作补齐 legado 高频动作：
-  - 新增 `置顶` / `置底` 批量动作；
-  - 新增 `校验` 批量动作（仅对已选书源进入可用性检测页）。
-- 单项置顶/置底语义对齐 legado：
-  - 当排序方向为降序时，单项“置顶/置底”会按 legado 行为映射到相反底层顺序操作。
-- `source_availability_check_view.dart` 增加定向检测能力：
-  - 新增可选参数 `sourceUrls`，支持只检测指定书源集合；
-  - 当传入集合为空时安全退出，不触发无意义检测。
-
-### 为什么
-- 上一轮虽已完成主流程迁移，但仍缺少 legado 管理页中影响效率的关键操作：手动拖拽排序、批量置顶/置底、按选择集发起校验。
-- 这些能力直接关系到书源维护效率和与 legado 的操作一致性。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源页切到“手动排序 + 全部 + 无搜索”，验证拖拽手柄可排序；
-  - 进入选择模式，选择多条书源，验证“置顶/置底”批量生效；
-  - 选择若干书源点击“校验”，验证检测页仅包含所选书源。
-
-### 兼容影响
-- 不涉及书源协议字段和网络解析链路调整，仅为管理交互增强。
-- 与已完成的 drift 存储方案兼容，写入仍统一走 `SourceRepository`。
-
-## 2026-02-12（书源管理继续：单源搜索可用化 + 在线导入历史）
-
-### 已完成
-- `source_list_view.dart`
-  - 单项菜单“搜索测试”从占位提示改为可用流程：
-    - 先输入关键词；
-    - 再进入搜索页并仅针对当前书源执行自动搜索。
-  - 在线导入升级为带历史记录的弹层：
-    - 支持历史地址回填、单条删除、清空历史；
-    - 导入成功前会将 URL 维护到历史（去重并保留最近 20 条）。
-  - 管理菜单新增“删除禁用书源”动作（带确认弹窗）。
-- `search_view.dart`
-  - 新增单源/多源范围搜索能力：
-    - `sourceUrls`（可选）用于限定参与搜索的书源集合；
-    - `initialKeyword` 与 `autoSearchOnOpen` 支持从书源管理页直接发起定向搜索。
-
-### 为什么
-- legado 的书源管理支持从单个书源直接进入搜索验证，当前实现为占位提示，影响校验效率。
-- legado 在线导入包含历史输入复用语义，现有实现仅单次输入，频繁调源时效率偏低。
-- 管理页需要保留“快速清理禁用源”的高频维护能力。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源页 -> 单项菜单 -> 搜索测试：输入关键词后应跳转并仅搜索该书源；
-  - 书源页 -> 从网络导入：验证历史地址展示、回填、删除与清空；
-  - 书源页 -> 管理菜单 -> 删除禁用书源：验证数量提示与确认删除流程。
-
-### 兼容影响
-- 不改书源协议与解析引擎，仅增强管理交互与搜索入口参数。
-- 搜索页默认行为不变（不传 `sourceUrls` 时仍是全启用书源搜索）。
-
-## 2026-02-12（书源管理优先复刻：导入编辑闭环 + 扫码导入/调试）
-
-### 已完成
-- `source_list_view.dart`
-  - 导入菜单新增“扫码导入”，扫码文本按 legado 导入语义处理：
-    - `http/https` 按在线链接导入；
-    - 其余文本按 JSON 导入；
-    - 空结果直接取消，不触发错误弹窗。
-  - 导入预览支持单条 JSON 编辑（弹层内“编辑JSON/已编辑”）：
-    - 保存前校验 JSON、`bookSourceUrl`、`bookSourceName`；
-    - 保存后实时重算“新增/更新/已有/重复”状态；
-    - 导入提交时按 URL 去重（保留最后一条），并基于保留策略生成最终 `rawJson` 入库。
-  - 补充导入重复 URL 提示，状态标签新增“重复”并高亮。
-- 调试页 `source_edit_view.dart`
-  - 调试“输入”区新增“扫码填充 Key”入口，扫码结果自动填入调试 key 输入框。
-- 新增通用扫码能力：
-  - `lib/features/common/views/qr_scan_view.dart`
-  - `lib/core/services/qr_scan_service.dart`
-  - `pubspec.yaml` 新增 `mobile_scanner`
-  - Android/iOS 增加相机权限声明（用于扫码导入与扫码填 key）。
-
-### 为什么
-- legado 调试页提供扫码输入 key（`menu_scan`）用于快速复现实例，当前项目缺失该能力，调试效率不足。
-- legado 导入流程强调“导入前可筛选 + 冲突感知 + 保留策略”，本轮优先把可影响导入正确性的闭环补齐（特别是重复 URL 与单条修正）。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源管理 -> 导入 -> 扫码导入：分别验证 URL 二维码 / JSON 二维码 / 空结果；
-  - 导入预览中修改某条 JSON 的 URL 或名称后，验证状态标签与重复提示实时刷新；
-  - 书源编辑 -> 调试 -> 扫码填充 Key -> 开始调试，验证 key 被正确注入并可执行调试流程。
-
-### 兼容影响
-- 不修改旧书源 JSON 协议字段，仅增强导入前校验与导入交互。
-- 新增扫码依赖与相机权限声明；无相机权限时用户可继续使用剪贴板/文件/网络导入，不影响既有导入链路。
-
-## 2026-02-12（书源管理持续复刻：sourceUrls 导入协议 + 校验关键词流程 + 域名分组排序细节）
-
-### 已完成
-- `source_import_export_service.dart`
-  - 新增 `importFromText` 统一文本导入入口（URL / JSON / `sourceUrls`）。
-  - 复刻 legado `sourceUrls` 语义：
-    - 当输入为 `{"sourceUrls":[...]}` 时，逐条在线拉取并合并结果；
-    - 汇总失败项告警与重复 URL 覆盖信息（后出现项覆盖前项）。
-  - 在线导入补齐 `#requestWithoutUA` 兼容：
-    - 识别 URL 后缀 `#requestWithoutUA`；
-    - 请求时发送 `User-Agent: null`；
-    - 导入结果附带对应提示信息。
-  - 在线返回内容解析从“仅 JSON 书源”扩展为“再次走统一文本导入”，支持远端返回 `sourceUrls` 聚合入口。
-- `source_list_view.dart`
-  - 剪贴板导入、扫码导入切换为 `importFromText`，可直接识别 `sourceUrls` 聚合内容。
-  - 批量校验与“检查可用性”入口增加“校验关键词”确认弹窗（默认记忆上次值，空输入回落到缓存值/`我的`）。
-  - 向 `SourceAvailabilityCheckView` 透传 `keywordOverride`，对齐 legado `CheckSource.keyword` 流程。
-  - 管理菜单新增“帮助（书源管理）”说明入口。
-  - 按域名分组排序细节对齐 legado：无有效 host 的 `#` 分组排到最后；名称比较改为不区分大小写。
-- `source_availability_check_view.dart`
-  - 新增 `keywordOverride` 参数；
-  - 搜索链路优先使用覆盖关键词，报告中记录本次关键词。
-
-### 为什么
-- legado 导入支持 `sourceUrls` 聚合入口和 `#requestWithoutUA` 兼容，当前实现未覆盖，导致一批真实分享源导入失败。
-- legado 书源校验支持“运行前指定关键词并复用上次输入”，当前实现固定使用规则内关键词，复现问题时效率较低。
-- 域名分组排序细节（`#` host 位置）与 legado 行为存在差异，需要补齐。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceAdapter.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceViewModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/GroupManageDialog.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceSort.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceDialog.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 导入：
-    - 剪贴板放入 `{"sourceUrls":["https://..."]}`，验证可拉取导入；
-    - 导入 URL 使用 `...#requestWithoutUA`，验证可识别并导入；
-    - 扫码导入 `sourceUrls` JSON，验证与剪贴板一致。
-  - 校验：
-    - 书源管理 -> 批量“校验”或“检查可用性”，确认先弹“校验关键词”；
-    - 输入关键词后进入检测页，确认报告中显示该关键词。
-  - 分组排序：
-    - 开启“按域名分组”后，确认无有效 host 的书源分组显示在列表末尾。
-
-### 兼容影响
-- 导入入口向后兼容原有 JSON/URL 语义；新增 `sourceUrls` 与 `#requestWithoutUA` 不影响旧书源导入。
-- 校验关键词仅作为检测时覆盖参数，不修改书源规则字段本身。
-
-## 2026-02-12（书源调试复刻：legacy 菜单动作 + 快捷区排版）
-
-### 已完成
-- `source_edit_view.dart` 调试 Tab 按 legacy 交互补齐：
-  - 输入区新增 legacy 菜单同类动作入口：
-    - 查看搜索源码 / 查看详情源码 / 查看目录源码 / 查看正文源码
-    - 刷新发现快捷项
-    - 调试帮助
-  - 快捷区排版升级为“对标 Legado”语义：
-    - 快捷按钮覆盖：`我的`、`系统`、`发现候选`、`详情URL`、`++目录`、`--正文`
-    - `我的/系统/发现候选` 直接填充并执行调试
-    - `++目录/--正文` 在已有 key 时自动加前缀并执行
-  - 新增发现候选提取能力：
-    - 从 `exploreUrl` 与 `exploreScreen`（JSON/文本）提取可用发现入口；
-    - 候选过多时可弹出选择面板。
-  - 新增调试帮助页（文本说明），集中说明 key 语法与快捷入口行为。
-
-### 为什么
-- legado 调试页具备“扫码 + 菜单动作 + 帮助提示 + 快捷输入”的完整闭环；
-- 当前实现虽有调试能力，但缺少 legacy 菜单入口的直达体验，且快捷区语义不够完整。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugAdapter.kt`
-- `/home/server/legado/app/src/main/res/menu/book_source_debug.xml`
-- `/home/server/legado/app/src/main/res/layout/activity_source_debug.xml`
-- `/home/server/legado/app/src/main/res/layout/item_log.xml`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试：
-    - 验证“查看搜索/详情/目录/正文源码”入口可打开对应页面；
-    - 验证“刷新发现快捷项”会更新候选并提示数量；
-    - 验证“调试帮助”可查看完整说明。
-  - 快捷区：
-    - 点击“我的/系统/发现候选”应自动触发调试；
-    - 输入详情 URL 后点击“详情URL”应按当前 key 重新执行；
-    - 对已有 key 点击“++目录/--正文”应自动加前缀并执行。
-
-### 兼容影响
-- 调试增强仅影响调试页交互，不改书源协议字段与解析引擎核心逻辑。
-- 发现候选提取是调试辅助能力，提取失败时不影响原有手动输入调试。
-
-## 2026-02-12（书源管理收口：文件分享语义 + 校验摘要联动 + 调试刷新发现）
-
-### 已完成
-- `source_list_view.dart`
-  - 批量“分享”改为文件分享语义（对齐 legado `saveToFile + share(file)`）：
-    - 优先生成临时 JSON 文件并调用系统分享；
-    - 系统分享不可用时回退为复制 JSON 到剪贴板。
-  - 新增“最近校验摘要”联动展示区：
-    - 显示最近校验时间、总量、可用/失败/空列表/超时/跳过统计；
-    - 支持一键筛选“失败/空列表”书源；
-    - 管理菜单新增“最近校验摘要”入口。
-  - 失败筛选状态接入主列表过滤与排序摘要文案，可随时清除筛选。
-- `source_availability_check_view.dart`
-  - 每次检测完成后写入全局摘要状态（供管理页联动）。
-  - 摘要包含：检测范围、关键词、统计计数、失败 URL 集合。
-- `source_edit_view.dart`
-  - “刷新发现快捷项”升级：
-    - 基于当前编辑态书源触发一次 `exploreDebug` 请求；
-    - 合并请求 URL 与本地 `exploreUrl/exploreScreen` 解析结果刷新候选；
-    - 请求异常时仍保留本地候选并提示异常摘要。
-  - 调试帮助文案改为统一常量，减少重复维护。
-- `source_import_export_service.dart`
-  - 新增 `exportToShareFile`：生成分享用临时 JSON 文件。
-- 文档
-  - 新增 `docs/source_management_parity_checklist.md`，整理当前对齐项与剩余差异。
-  - 新增统一帮助文案文件：`lib/features/source/constants/source_help_texts.dart`。
-
-### 为什么
-- legado 书源管理“分享”是文件分享语义，复制 JSON 仅能作为兜底，需补齐系统分享主路径。
-- 可用性检测结果需要回流到管理页，才能形成“检测 -> 定位失败源 -> 批量处理”的闭环。
-- 调试页“刷新发现”需要体现“重新刷新候选 + 请求反馈”的能力，便于快速定位发现链路问题。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceViewModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/help/source/BookSourceExtensions.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 手工路径建议：
-  - 书源管理 -> 选择多条 -> 分享：确认拉起系统分享面板（异常时回退复制 JSON）。
-  - 书源管理 -> 检查可用性 -> 完成后返回：确认页面出现“最近校验摘要”，且可一键筛选失败源。
-  - 书源编辑 -> 调试 -> 刷新发现快捷项：确认提示刷新数量；请求异常时能看到异常提示但候选仍可用。
-
-### 兼容影响
-- 批量分享新增 `share_plus` 依赖；在不支持系统分享的平台会自动回退到剪贴板，不影响既有导出能力。
-- 校验摘要为 UI 联动状态，不改变书源存储结构与导入协议。
-
-## 2026-02-12（书源调试差异收口：exploreKinds JS 缓存语义复刻）
-
-### 已完成
-- 新增 `source_explore_kinds_service.dart`，复刻 legado `BookSource.exploreKinds / clearExploreKindsCache` 关键行为：
-  - 支持 `exploreUrl` 的普通文本、JSON 数组、`@js:`、`<js>` 四类语义；
-  - `@js:`/`<js>` 执行结果支持持久化缓存（`sourceUrl + exploreUrl` 维度）；
-  - 支持手动清理缓存后强制刷新，语义对齐 legado “刷新发现”。
-- `source_edit_view.dart`
-  - 调试页“刷新发现快捷项”改为：
-    - 先清理 `exploreKinds` 缓存；
-    - 再按 `exploreKinds` 规则重建候选；
-    - 结合一次 `exploreDebug` 请求结果更新快捷项；
-    - 保留 `exploreScreen` 兜底候选解析。
-- `docs/source_management_parity_checklist.md`
-  - 将“exploreKinds JS 缓存差异”从未对齐项移除，当前仅保留后台常驻校验差异。
-
-### 为什么
-- legado 的“刷新发现”依赖 `exploreKinds` 缓存清理 + 重算机制；
-- 仅做本地字符串解析会导致复杂 `@js` 分类源无法按 legado 语义稳定刷新。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/help/source/BookSourceExtensions.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 手工路径建议：
-  - 书源编辑 -> 调试 -> 刷新发现快捷项，确认复杂 `@js` 发现配置也能产出候选；
-  - 连续刷新两次，确认第二次仍可快速复用候选（缓存命中路径）；
-  - 修改 `exploreUrl` 后刷新，确认可重新计算候选（缓存键随规则变化）。
-
-### 兼容影响
-- 新增缓存仅用于“发现候选提取”辅助链路，不影响搜索/详情/目录/正文主解析流程。
-
-## 2026-02-13（调试链路收口：key parser + orchestrator + 管理页调试摘要联动）
-
-### 已完成
-- `source_debug_key_parser.dart`
-  - 新增统一 key 解析器，按 legado `Debug.startDebug` 语义固化 5 类输入：
-    - 绝对 URL -> 详情调试；
-    - `标题::url` -> 发现调试；
-    - `++url` -> 目录调试；
-    - `--url` -> 正文调试；
-    - 其他文本 -> 搜索调试。
-  - 增加非法 key 的标准化错误提示（空 key、前缀缺 URL）。
-- `source_debug_orchestrator.dart`
-  - 新增调试编排层，统一“解析 key -> 执行调试 -> 聚合事件结果”流程；
-  - 调试页不再直接调用 `RuleParserEngine.debugRun`，统一走编排层。
-- `rule_parser_engine.dart`
-  - 修复发现调试语义偏差：
-    - `标题::url` 分支改为对齐 legado `substringAfter("::")`；
-    - 发现调试实际使用输入 URL（不再忽略传入 URL）。
-- `source_debug_summary_store.dart`
-  - 新增调试摘要 store，记录最近调试历史与“最近失败状态”书源集合。
-- `source_edit_view.dart`
-  - 调试执行改为 orchestrator 驱动；
-  - 调试结束后解析结构化摘要并写入 `SourceDebugSummaryStore`；
-  - key 输入区新增“当前解析类型”提示（搜索/详情/发现/目录/正文）。
-- `source_list_view.dart`
-  - 新增“最近调试摘要”展示条；
-  - 新增“筛选调试失败源/清除调试筛选/详情”操作；
-  - 管理菜单补充“最近调试摘要”“清除调试筛选”入口；
-  - 列表过滤支持“校验失败筛选 + 调试失败筛选”并行生效。
-
-### 为什么
-- 当前调试入口多，缺少统一 key 语义层，容易出现“同一 key 在不同入口行为不一致”。
-- legado 的 `标题::url` 会直接用传入 URL 做发现调试，现有实现存在偏差，影响问题复现准确性。
-- 调试结果需要回流书源管理页，形成“调试失败 -> 快速筛源 -> 再调试”的闭环。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/model/Debug.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/help/source/BookSourceExtensions.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试，分别输入：
-    - 关键字、`https://...`、`发现::https://...`、`++https://...`、`--https://...`；
-    - 验证 key 类型提示与执行链路一致。
-  - 书源编辑 -> 调试 -> 使用 `标题::url`：
-    - 验证日志中的“开始访问发现页”与输入 URL 一致。
-  - 调试完成后返回书源管理：
-    - 验证出现“最近调试摘要”；
-    - 点击“筛选调试失败源”，验证列表仅保留最近失败书源。
-
-### 兼容影响
-- 新增编排层和摘要 store 仅影响调试链路，不改书源协议和数据库结构。
-- 修复 `标题::url` 行为后，发现调试会严格使用输入 URL，旧“误用 exploreUrl”行为不再保留。
-
-## 2026-02-13（iOS 书源调试主流程重排：输入优先 + 高级能力下沉）
-
-### 已完成
-- `source_edit_view.dart`
-  - 调试 Tab 按 legacy 主路径重排为 4 段：
-    - 输入区（`Key`、扫码填充、开始调试）；
-    - 快捷区（`我的/系统/发现候选/详情URL/++目录/--正文`）；
-    - 工具区（查看源码、刷新发现快捷项、更多工具）；
-    - 日志控制台（作为主屏主体）。
-  - 将原先主屏上的高级动作下沉到“更多工具”弹层：
-    - 调试帮助、网页验证、结构化摘要查看/复制、调试包导出、变量快照查看/复制、复制控制台、复制最小复现、清空控制台。
-  - 新增“高级诊断与源码”二级页面入口，集中承载：
-    - 诊断标签与定位建议；
-    - 源码/结果查看与变量快照等高阶排障内容。
-  - 新增“查看源码/结果”二级菜单（ActionSheet），统一打开列表/详情/目录/正文/正文结果。
-  - 日志区补充“最近错误”高亮卡片，保证失败信息在主屏可见。
-
-### 为什么
-- legado 调试页是“输入并立即执行 + 日志主屏”，当前实现功能虽全但入口过多、主流程不够聚焦。
-- 需要在不删能力的前提下把高阶导出/摘要能力下沉，避免干扰 iOS 侧常规调试路径。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugModel.kt`
-- `/home/server/legado/app/src/main/res/layout/activity_source_debug.xml`
-- `/home/server/legado/app/src/main/res/menu/book_source_debug.xml`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试：确认主屏仅保留输入/快捷/工具/日志四段；
-  - 点击“查看源码”：确认弹出二级菜单并可打开各源码页；
-  - 点击“更多工具”：确认可触达摘要、导出、变量快照、帮助、网页验证等能力；
-  - 触发一次失败调试：确认日志区顶部显示“最近错误”并高亮。
-
-### 兼容影响
-- 仅调整调试页 UI 信息架构与入口层级，不改调试引擎语义、书源协议和数据库结构。
-- 高级能力未删除，仅从主屏迁移到二级入口。
-
-## 2026-02-13（iOS 调试体验收口：日志自动跟随与手动回到底部）
-
-### 已完成
-- `source_edit_view.dart`
-  - 调试控制台默认显示模式从“文本”调整为“逐行”，贴近 legado 日志列表主视图。
-  - 新增调试页滚动跟随机制：
-    - 日志实时输出时，若处于底部附近自动跟随到最新日志；
-    - 用户上滑离开底部后自动暂停跟随，不强制拉回。
-  - 新增“回到最新日志”入口（位于调试工具区）：
-    - 在暂停跟随且存在日志时展示；
-    - 点击后滚动到底并恢复自动跟随。
-  - 在“开始调试 / 清空控制台”时重置为自动跟随状态，保证每次新调试都从最新日志开始。
-
-### 为什么
-- legado 调试页核心体验是“执行后连续看最新日志”；
-- 当前实现在日志量大或手动回看后，缺少明确的“恢复跟随”能力，主流程可读性不足。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/res/layout/activity_source_debug.xml`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试 -> 开始调试，观察日志应持续停留在底部最新行；
-  - 调试过程中手动上滑，确认不再自动拉回；
-  - 点击“回到最新日志”，确认滚动到底并恢复自动跟随。
-
-### 兼容影响
-- 仅调试页滚动交互优化，不改调试引擎、书源协议、数据库结构。
-
-## 2026-02-13（iOS 调试输入流程收口：回车提交 + 空 Key 默认值）
-
-### 已完成
-- `source_edit_view.dart`
-  - 调试 Key 输入框接入 `TextInputAction.search`，支持键盘回车直接触发调试。
-  - 新增空 Key 回落逻辑：
-    - 若输入为空，自动回落到 `ruleSearch.checkKeyWord`；
-    - 若校验词为空，默认回落 `我的`。
-  - 开始调试时自动收起键盘，避免日志区被输入法遮挡。
-
-### 为什么
-- legado 调试入口是 SearchView 提交语义，回车即可执行；
-- 当前实现对空输入直接报错，不利于快速复测，和 legado 的默认关键词路径不一致。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试，在 Key 输入框输入关键词后按键盘回车，确认直接开始调试；
-  - 清空 Key 后点击“开始调试”，确认自动使用校验词/`我的` 执行；
-  - 调试启动后确认键盘自动收起。
-
-### 兼容影响
-- 仅调试输入交互优化，不改调试引擎语义、书源协议、数据库结构。
-
-## 2026-02-13（iOS 调试主屏再对齐 legado：控制台收敛为纯日志列表）
-
-### 已完成
-- `source_edit_view.dart`
-  - 调试主屏控制台移除“显示模式/全量开关/过滤关键字/换行开关/全文控制台”控件，改为纯日志列表视图。
-  - 主屏仅保留：
-    - 最近错误提示；
-    - 最近日志列表（逐行）；
-    - 单行复制与上下文查看。
-  - 当日志过多时，主屏提示“仅展示最近 600 行”，完整日志通过“更多工具 -> 复制控制台（全部）”导出。
-  - 清理不再需要的分段日志模型与相关状态字段，简化调试页状态复杂度。
-
-### 为什么
-- legado 调试页核心是“输入提交 + 日志列表”，不强调主屏上的多模式控制。
-- 当前主屏此前配置项偏多，会稀释关键日志信息，影响复现场景效率。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/res/layout/activity_source_debug.xml`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试 -> 开始调试，确认主屏控制台直接按日志行展示；
-  - 长日志场景下确认出现“最近 600 行”提示；
-  - 点击单条日志可查看上下文，点击复制图标可复制该行。
-
-### 兼容影响
-- 仅调试主屏 UI 简化，不改调试引擎、导出协议、书源协议与数据库结构。
-
-## 2026-02-13（iOS 调试帮助区显隐复刻：focus 打开 / 提交隐藏）
-
-### 已完成
-- `source_edit_view.dart`
-  - 调试快捷帮助区显隐语义向 legado 对齐：
-    - 默认显示；
-    - 提交调试后自动隐藏；
-    - 重新聚焦 Key 输入框后自动展开。
-  - 工具区补充“显示快捷提示”入口，便于在隐藏状态下手动恢复快捷区。
-  - “我的”快捷按钮文案改为动态显示默认搜索词（优先 `ruleSearch.checkKeyWord`，否则 `我的`），行为与点击值保持一致。
-
-### 为什么
-- legado 调试页中帮助区随搜索框 focus/submit 切换；
-- 当前实现快捷区长期常驻，信息密度偏高，不利于日志主屏阅读。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试：初始可见快捷帮助区；
-  - 点击开始调试后，快捷帮助区自动隐藏；
-  - 点击 Key 输入框后，快捷帮助区重新显示；
-  - 若书源配置了 `checkKeyWord`，确认“我的”按钮文案显示该值。
-
-### 兼容影响
-- 仅调试页 UI 交互收口，不改调试引擎、书源协议、数据库结构。
-
-## 2026-02-13（iOS 调试菜单再对齐 legado：菜单动作前置，高级能力后置）
-
-### 已完成
-- `source_edit_view.dart`
-  - 调试工具区改为两级入口：
-    - `菜单（对标 Legado）`：扫码填充 Key、查看搜索/详情/目录/正文源码、刷新发现快捷项、调试帮助；
-    - `高级工具`：网页验证、高级诊断、结构化摘要、调试包导出、变量快照、控制台复制等。
-  - 输入区移除独立“扫码填充 Key”行，扫码入口统一收口到 legado 菜单动作。
-  - 主屏文案同步调整：`菜单（对标 Legado）-> 调试帮助`、`高级工具 -> 复制控制台（全部）`。
-  - 清理不再使用的“源码二级菜单计数”辅助方法，减少冗余状态。
-
-### 为什么
-- legado 的调试能力入口以菜单动作为主，扫码/源码/刷新/帮助是同一层级；
-- 当前实现虽有能力，但入口分散在主屏多个位置，不利于形成一致操作心智。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/res/menu/book_source_debug.xml`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书源编辑 -> 调试 -> 工具区点击“菜单（对标 Legado）”，确认包含扫码/源码/刷新/帮助动作；
-  - 点击“高级工具”，确认高级导出与诊断能力仍可达；
-  - 验证“刷新发现快捷项”在菜单中可用且刷新中会提示。
-
-### 兼容影响
-- 仅入口层级与排版重排，不改调试引擎语义、书源协议、数据库结构。
-
-## 2026-02-13（打包后导入不可用与设置页溢出修复：启动硬化 + 导入防护 + 布局调整）
-
-### 已完成
-- `lib/main.dart`
-  - 启动流程改为严格串行初始化：`DatabaseService.init -> SourceRepository.bootstrap -> SettingsService.init -> CookieStore.setup`。
-  - 修复启动日志字符串插值（`$name/$error`）问题，避免 release 包日志不可读。
-  - 初始化失败时不再“继续进入主界面”，改为展示可见错误页（含失败步骤、错误摘要与“重试初始化”入口），防止后续书源管理链路在未初始化状态下连锁异常。
-- `lib/features/source/views/source_list_view.dart`
-  - 导入链路增强异常可观测性：
-    - 剪贴板读取失败增加 `try/catch` 与错误提示；
-    - 导入提交流程 `_commitImportResult` 增加总兜底 `try/catch`；
-    - 设置读写统一走 `_settingsGet/_settingsPut`，避免 `settingsBox` 异常导致静默失败。
-  - 在导入前增加初始化检查 `_ensureSettingsReady`，未就绪时直接提示并中止导入流程。
-  - 顶部导航右侧按钮收紧为 `minimumSize: Size(30, 30)`，降低小屏挤压导致的顶栏溢出风险。
-- `lib/features/settings/views/settings_view.dart`
-  - 设置项布局改为“标题 + 说明纵向”结构，避免原 `trailing` 文本被压缩/截断。
-  - `info` 支持两行省略，改善“主设置界面文字显示不全”问题。
-- `android/app/src/main/AndroidManifest.xml`
-  - 增加 `android.permission.INTERNET`，修复 Android 打包后网络导入的基础权限阻断。
-
-### 为什么
-- 现场问题表现为“打包后网络导入/剪贴板导入不可用 + 设置/源管理界面异常”。
-- 根因之一是初始化失败后仍继续进入 UI，导致后续导入和设置存储链路在未就绪状态触发异常。
-- 设置页原行布局把状态文本放在 trailing，遇到小屏或较长文案会被过度压缩。
-
-### legado 对标（已完整读取）
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/OnLineImportActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/association/ImportBookSourceDialog.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceViewModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditViewModel.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditAdapter.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt`
-- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugModel.kt`
-- `/home/server/legado/app/src/main/res/menu/book_source.xml`
-- `/home/server/legado/app/src/main/res/menu/source_edit.xml`
-- `/home/server/legado/app/src/main/res/menu/import_source.xml`
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 打包安装后进入书源管理，分别验证“从网络导入 / 从剪贴板导入”；
-  - 若初始化异常，启动后应显示“启动异常”页面而非进入主界面；
-  - 进入设置首页，检查各条目说明文字在小屏下不再被单行截断；
-  - 进入书源管理页，检查顶栏按钮与标题不再发生挤压溢出。
-
-### 兼容影响
-- 启动阶段由“容错继续”改为“失败阻断 + 可见错误页”，属于行为收敛，可能让历史上被静默吞掉的初始化错误变为显式可见；
-- 未改书源导入协议与解析语义（URL/JSON/sourceUrls/#requestWithoutUA），仅增强稳定性与可观测性。
-
-## 2026-02-13（全页面防溢出巡检与修复：导航栏、分段控件、设置项信息布局）
-
-### 已完成
-- `lib/app/widgets/app_cupertino_page_scaffold.dart`
-  - 导航栏 `leading/trailing` 增加统一宽度约束 + `FittedBox(scaleDown)`，避免各页面右上角多按钮在窄屏/大字号下挤出屏幕。
-- 导航栏多按钮页面收敛按钮最小尺寸（减少横向占用）：
-  - `lib/features/bookshelf/views/bookshelf_view.dart`
-  - `lib/features/replace/views/replace_rule_list_view.dart`
-  - `lib/features/source/views/source_edit_view.dart`
-  - `lib/features/source/views/source_availability_check_view.dart`
-  - `lib/features/source/views/source_list_view.dart`
-- 设置类入口页（阅读全局/界面/行为）条目布局改为“标题 + 说明纵向”并加省略策略，避免右侧 `info` 挤压标题：
-  - `lib/features/settings/views/global_reading_settings_view.dart`
-  - `lib/features/settings/views/reading_interface_settings_hub_view.dart`
-  - `lib/features/settings/views/reading_behavior_settings_hub_view.dart`
-- 高风险分段控件（`CupertinoSlidingSegmentedControl`）统一加横向滚动容器，避免小屏横向溢出：
-  - `lib/features/source/views/source_list_view.dart`
-  - `lib/features/source/views/source_edit_view.dart`
-  - `lib/features/source/views/source_availability_check_view.dart`
-  - `lib/features/reader/views/simple_reader_view.dart`
-  - `lib/features/reader/widgets/chapter_list_dialog.dart`
-  - `lib/features/reader/widgets/reader_quick_settings_sheet.dart`
-- 书源可用性检测页结果摘要文案由 `additionalInfo` 下沉为 `subtitle`（两行省略），降低长文案挤压风险：
-  - `lib/features/source/views/source_availability_check_view.dart`
-
-### 为什么
-- 用户反馈“页面顶出屏幕/文字显示不全”本质是横向空间竞争与小屏适配问题；
-- 问题集中在三个模式：导航栏右侧多动作、条目行右侧信息过长、分段控件宽度不足。
-
-### legado 对标说明
-- 本次为跨页面适配与容器层防溢出治理，不改变书源/阅读业务语义与状态流转；
-- 未修改 legado 对齐的核心功能路径，仅做显示层容错与布局稳健性增强。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 书架 / 书源管理 / 书源编辑 / 替换规则列表，检查导航栏按钮不再挤出；
-  - 设置首页、阅读（全局默认）、界面（样式）、设置（行为），检查标题与说明在小屏下无横向溢出；
-  - 书源可用性检测与阅读器相关设置弹层，检查分段控件在窄屏可横向滚动且不触发 overflow。
-
-### 兼容影响
-- 仅布局与容器防溢出增强，不改业务逻辑、数据结构和协议解析行为。
-
-## 2026-02-13（紧急修复：启动失败场景下空白页回归）
-
-### 已完成
-- `lib/main.dart`
-  - 修复启动失败路径下对 `SettingsService.appSettings` 的过早访问：
-    - 新增 `_settingsReady` 状态；
-    - 仅在设置初始化成功时注册 `appSettingsListenable`；
-    - `_effectiveBrightness` 在未就绪时回落到系统亮度，不触发 `late` 字段访问异常。
-  - 重试初始化成功后动态注册设置监听，并重新应用系统状态栏样式。
-
-### 为什么
-- 之前引入“启动异常页”后，如果初始化在 `SettingsService.init` 之前失败，UI 仍会尝试读取未初始化的 `appSettings`，导致再次抛错，最终表现为“开屏空白”。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径建议：
-  - 正常启动：应进入主界面；
-  - 人为制造初始化失败：应稳定展示“启动异常”页，不再白屏；
-  - 点击“重试初始化”后恢复成功，能正常进入主界面并响应主题设置。
-
-### 兼容影响
-- 仅修复启动失败分支的状态访问时序，不改主流程功能与交互语义。
-
-## 2026-02-13（全局排查并修复“写后立即读旧缓存”竞态）
-
-### 已完成
-- `lib/features/bookshelf/services/book_add_service.dart`
-  - 保持此前修复：加入书架后不再依赖章节内存缓存判定是否写入成功，改为 DB 计数校验，规避 watch 异步刷新短窗导致的“章节写入失败”误报。
-- `lib/core/database/repositories/book_repository.dart`
-  - `BookRepository` 写操作（`addBook/deleteBook/clearAll`）后同步更新内存缓存并立刻广播。
-  - `ChapterRepository` 写操作（`addChapters/cacheChapterContent/clearChaptersForBook/clearDownloadedCache`）后同步更新内存缓存并立刻广播。
-  - `BookRepository.deleteBook/clearAll` 同步清理章节缓存，避免删书后章节缓存残留导致的“读到旧章节”。
-- `lib/core/database/repositories/bookmark_repository.dart`
-  - `addBookmark/removeBookmark/removeAllBookmarksForBook` 后同步更新缓存并广播，消除“刚添加/删除书签，列表仍是旧值”的竞态窗口。
-- `lib/core/database/repositories/replace_rule_repository.dart`
-  - `addRule/addRules/deleteRule/deleteDisabledRules` 后同步更新缓存并广播，避免规则管理页在同一调用链里读取到旧缓存。
-- `lib/core/database/repositories/source_repository.dart`
-  - 保持此前修复：书源增删改后同步缓存并广播，`deleteDisabledSources` 后全量回载缓存。
-- 新增回归测试 `test/repository_write_read_consistency_test.dart`
-  - 覆盖 Book/Chapter、Bookmark、ReplaceRule 三类“写后立即读”一致性场景。
-
-### 为什么
-- 用户反馈“搜索点击结果后加入失败：章节写入失败”，本质是仓储层采用“DB 写入 + watch 异步回填缓存”，业务层在写入后立刻读取同步缓存，可能读到旧值。
-- 该模式不只存在于章节写入，书签与替换规则等模块同样存在潜在竞态窗口，需要统一治理。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 执行：`flutter test test/book_add_service_test.dart test/repository_write_read_consistency_test.dart`
-- 执行：`flutter test test/bookshelf_booklist_import_service_test.dart`
-- 执行：`flutter test test/replace_rule_engine_test.dart`
-- 结果：全部通过。
-
-### 兼容影响
-- 不改 legado 书源规则语义与五段链路解析逻辑，仅修复本地仓储“可见性时序”问题；
-- 行为变化是“写入成功后同调用链立即可读最新状态”，属于一致性增强，对旧书源规则无破坏性影响。
-
-## 2026-02-13（设置页扁平化：一级下静态展示二级菜单）
-
-### 已完成
-- `lib/features/settings/views/settings_view.dart`
-  - 将设置首页从“一级入口跳转二级Hub”改为“一级分组下直接展示二级菜单”。
-  - 首页新增/直连以下二级项（保持现有页面与逻辑不变）：
-    - 源管理：书源管理、替换净化、目录规则、订阅管理、语音管理、广告屏蔽
-    - 主题：应用外观、阅读主题、白天/黑夜主题、动态颜色/色差
-    - 功能 & 设置：备份/同步、阅读设置（界面）、阅读设置（行为）、阅读记录、其它设置、隔空阅读
-    - 其它：分享、好评支持、关于我们
-    - 诊断：开发工具
-  - 保留原先统计摘要能力（书源数量、阅读记录/缓存、版本号）并挂到对应二级项 `additionalInfo`。
-  - 未实现能力继续走占位提示（`SettingsPlaceholders.showNotImplemented`），避免行为断裂。
-
-### 为什么
-- 用户要求“设置页面不要展示分层，将二级菜单挂在一级菜单下面”，需要减少跳转层级，进入设置后即看到可操作项。
-- 该调整是信息架构优化，不改业务状态流与功能语义。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 手工路径：
-  - 打开设置页，确认不再只有一级入口，而是直接看到各分组下二级项；
-  - 点击“书源管理/替换净化/阅读设置（界面）/阅读设置（行为）/开发工具”等项可直达目标页面；
-  - 未实现项点击后展示对应提示，不出现空白页或异常。
-
-### 兼容影响
-- 仅调整设置首页菜单编排与导航入口，不修改数据结构、存储或解析链路；
-- 旧二级Hub页面文件仍保留，避免潜在外部引用失效。
-
-## 2026-02-13（书源编辑调试页优化：信息层级重排，严格保留 legado 调试语义）
-
-### 已完成
-- `lib/features/source/views/source_edit_view.dart`
-  - 调试 Tab 结构重排为：
-    - 调试状态（新增）
-    - 快速输入
-    - 快捷动作（对标 legado）
-    - 诊断结果导航（诊断标签 + 源码/摘要/变量）
-    - 工具
-    - 控制台
-  - 新增调试状态总览卡片（`ShadCard`）：
-    - 展示当前意图、运行状态、日志数量、自动跟随状态、最近错误；
-    - 提供高频操作：回到最新日志、复制控制台、复制复现信息、清空日志。
-  - 快速输入区改为主按钮直达（`ShadButton`），保留 key 语法与 legado 一致。
-  - 快捷按钮改为 `ShadButton.ghost`，统一交互视觉并保留原有动作。
-  - 工具区收敛为高频项：菜单（对标 legado）、高级工具、复制控制台、一键导出调试包。
-  - 控制台增强：
-    - 增加头部状态行（总行数/展示行数/自动跟随状态）；
-    - 错误区支持一键复制最小复现信息；
-    - 保留逐行复制与日志上下文查看。
-  - 保持调试链路语义不变：
-    - `search/bookInfo/explore/toc/content` 意图判定与执行流程未改；
-    - `++/--/::/URL` key 规则未改；
-    - 菜单与高级工具能力未删减（扫码、源码、导出、帮助等）。
-  - UI 组件符合约束：使用 `Shadcn + Cupertino` 组合实现。
-
-### 为什么
-- 旧布局中输入、工具、控制台在首屏层级并列，错误与关键状态不够突出，排查路径长。
-- 本次优化目标是让“是否失败、失败在哪、下一步做什么”在首屏可见，提升调试效率。
-
-### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 进入书源编辑 -> 调试 Tab，确认首屏先展示状态总览和开始调试入口；
-  - 输入普通关键词、`++url`、`--url`、`标题::url`，确认意图提示与链路执行正常；
-  - 构造失败规则，确认“最近错误”高亮出现且可一键复制复现信息；
-  - 确认菜单（对标 legado）与高级工具仍可用。
-
-### 兼容影响
-- 仅 UI/交互层优化，不变更调试引擎、数据结构、书源解析语义；
-- 与 legado 的调试 key 规则和链路语义保持一致。
-
-## 2026-02-13（搜索/发现点击行为对齐 legado：先进入书籍详情）
-
-### 已完成
+- **有兼容影响（正向）**：
+  - 搜索范围语义从“纯 URL 列表”收敛到 legado 语义（分组/单源/全量）。
+  - 单源范围失效、分组失效时会自动回退全部书源，避免空范围阻断搜索。
+- **迁移说明**：
+  - 历史 `searchScopeSourceUrls` 若仅 1 个 URL，会迁移为 `::url`；
+  - 历史多 URL 自定义范围无法 1:1 映射到 legado `SearchScope`，会按新语义逐步由用户在范围选择页重设。
+
+## 2026-02-16 - SearchScope 继续收口（动态范围菜单 + 默认态复刻）
+
+### 做了什么
 - `lib/features/search/views/search_view.dart`
-  - 结果项点击从“直接加入书架”改为“打开书籍详情页”。
-  - 移除页面内导入中状态展示，避免与新详情页动作重复。
-- `lib/features/discovery/views/discovery_view.dart`
-  - 结果项点击同样改为“打开书籍详情页”，与搜索页一致。
-  - 保持发现列表拉取、失败书源提示与停止逻辑不变。
-- `lib/features/search/views/search_book_info_view.dart`（新增）
-  - 新增 `Shadcn + Cupertino` 书籍详情页，承接搜索/发现点击后的主流程。
-  - 展示封面、作者、来源、简介、基础字段（分类/字数/更新时间/最新章节/详情链接/目录链接）。
-  - 首屏异步拉取 `ruleBookInfo` 详情，并支持手动刷新详情。
-  - 提供“加入书架”主操作；加入后按钮切换为“开始阅读”，可直接进入阅读页。
-  - 已在书架时展示状态标签“已在书架中”。
-- `lib/features/bookshelf/services/book_add_service.dart`
-  - 新增 `buildBookId` / `isInBookshelf`，复用与导入一致的 ID 规则，供详情页判定书架状态。
-  - `addFromSearchResult` 内改为复用 `buildBookId`，避免 ID 规则分叉。
+  - 新增 legado 风格“动态范围快捷菜单”（在“搜索设置 -> 搜索范围”进入）：
+    - 当前已选范围项（分组或单源）可直接点选移除；
+    - 提供“所有书源”快速切换；
+    - 提供可选分组列表（选中即切到单分组）；
+    - 提供“多分组/单源模式…”入口跳转到范围选择页。
+  - 范围来源收口为“两套集合”：
+    - 分组模式基于启用书源；
+    - 单源模式基于全部书源（含禁用），对齐 legado `isSource` 分支行为。
+- `lib/features/search/views/search_scope_picker_view.dart`
+  - 默认态复刻 legado：
+    - 默认进入“分组模式”；
+    - 不根据当前 scope 预选任何分组/书源。
+- `lib/features/search/models/search_scope.dart`
+  - `resolve(...)` 新增 `allSourcesForSourceMode` 参数，用于单源模式按全量书源解析。
+- `test/search_scope_test.dart`
+  - 新增“单源可命中禁用书源”回归用例。
 
 ### 为什么
-- 当前实现与 legado 不一致：点击搜索/发现结果会直接加入书架。
-- legado 语义是“点击结果进入书籍详情页，再由详情页决定加入书架或阅读”。
-- 本次改动将主交互恢复为 legado 同款流程，减少误触导入并提升可解释性。
+- legado 搜索范围存在两条并行交互：
+  - 顶部菜单动态切换/移除当前范围；
+  - 对话框用于多分组或单源重设。
+- 当前实现若只保留“范围选择页”，会缺少快捷切换语义；若单源只基于启用书源，也会偏离 legado。
+- legado 的 SearchScopeDialog 默认不预选当前范围，需复刻该默认态以保持交互一致。
 
 ### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 搜索任意关键词，点击结果项，应进入“书籍详情”而不是直接加入书架；
-  - 在详情页点击“加入书架”，应提示加入结果；
-  - 加入成功后按钮应切换为“开始阅读”，点击可进入阅读页；
-  - 发现页点击结果项行为与搜索页一致。
+- 静态检查：`flutter analyze`
+- 相关测试：
+  - `flutter test test/search_scope_test.dart`
+  - `flutter test test/app_settings_test.dart --plain-name "AppSettings JSON roundtrip"`
+  - `flutter test test/app_settings_test.dart --plain-name "AppSettings migrates legacy single source scope urls"`
 
 ### 兼容影响
-- 交互入口有变化：搜索/发现主点击从“直接导入”改为“先看详情再导入”（对齐 legado）。
-- 不改变书源解析链路与导入实现，仅调整入口行为与状态呈现。
+- **有兼容影响（正向）**：
+  - 搜索范围切换路径更接近 legado（支持快捷切换与移除）。
+  - 单源范围可直接覆盖到禁用书源，行为与 legado 对齐。
+- **潜在行为变化点**：
+  - 打开“多分组/单源模式”选择页时不再回显当前选择（按 legado 默认态）。
 
-## 2026-02-13（主流程继续对齐 legado：列表细节 + 详情三主操作 + 未入架直读 + 详情换源）
+## 2026-02-16 - SearchScope 分组来源与排序对齐（flowEnabledGroups / dealGroups）
 
-### 已完成
+### 做了什么
+- 新增 `lib/features/search/models/search_scope_group_helper.dart`：
+  - 抽取并统一分组处理逻辑，语义对齐 legado `BookSourceDao.dealGroups(...)`：
+    - 仅统计启用书源；
+    - 分组按 `[,;，；]` 拆分；
+    - 去空、去重；
+    - 排序输出。
 - `lib/features/search/views/search_view.dart`
-  - 搜索结果改为“同名同作者聚合展示”（按 `name+author` 归并），对齐 legado 的多来源合并语义。
-  - 列表新增来源数量徽标（`N源`）与在架标识（书本勾选图标）。
-  - 列表信息层级调整：书名/作者/简介/元信息/来源，点击仍是“进详情”。
-- `lib/features/discovery/views/discovery_view.dart`
-  - 发现列表同步实现聚合展示、来源数量徽标、在架标识，交互与搜索页一致。
-- `lib/features/search/views/search_book_info_view.dart`
-  - 详情页重构为 legado 主动作模型：`阅读`、`目录`、`加入/移出书架`。
-  - 进入详情后同时拉取 `ruleBookInfo` 与目录（`ruleToc`），并提供失败原因可见提示。
-  - 新增详情页换源（按“书名匹配 + 作者优先”筛候选），切源后重载详情与目录。
-  - 目录页改为独立列表页，点击章节可直接进入阅读指定章节。
-  - 未入书架时支持直接阅读（不再强制先加入书架）。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 新增临时阅读构造 `SimpleReaderView.ephemeral(...)`，支持“未入架直读”会话。
-  - 阅读器内容拉取从“必须依赖书架 Book”改为“可使用会话 sourceUrl”，保证临时会话可正常请求正文。
-  - 阅读器换源逻辑兼容临时会话（不将临时章节写回数据库）。
+  - 搜索范围快捷菜单中的分组来源改为“flow 风格”：
+    - 订阅 `SourceRepository.watchAllSources()`；
+    - 实时派生启用分组缓存（等价 legado `flowEnabledGroups().map(dealGroups)`）；
+    - 菜单展示优先读取该缓存，首帧未就绪时再用当前快照兜底。
+  - 删除原本页面内重复的 `_enabledGroups(...)` 本地拼装逻辑，避免与对话框实现分叉。
+- `lib/features/search/views/search_scope_picker_view.dart`
+  - 分组列表改为复用 `SearchScopeGroupHelper.enabledGroupsFromSources(...)`，不再维护独立 `_buildGroups(...)`。
+- 新增测试 `test/search_scope_group_helper_test.dart`：
+  - 覆盖启用过滤、legacy 分隔符拆分、去重与排序。
 
 ### 为什么
-- 你反馈要按主流程逐项对齐 legado；之前虽修复了“点击搜索结果先进入详情”，但仍缺少列表细节（来源聚合/在架状态）与详情页完整动作语义。
-- legado 关键体验是：列表看状态 -> 进详情 -> 可直接阅读/看目录/加书架，并支持详情换源；本次就是对这条链路做完整补齐。
+- 之前 `SearchView` 与 `SearchScopePickerView` 各自实现分组拼装与排序，存在两套逻辑，无法保证与 legado `flowEnabledGroups + dealGroups` 行为稳定一致。
+- legado 的分组来源是“启用书源集合的流式派生”，不是仅在弹窗时临时扫描；若不统一来源和处理规则，菜单分组与对话框分组可能出现偏差。
 
 ### 如何验证
-- 执行：`flutter analyze`
-- 结果：`No issues found!`
-- 手工路径：
-  - 搜索同一本书（多源可命中）后，确认列表出现 `N源` 徽标与在架标识；
-  - 点击结果进入详情，确认存在 `阅读/目录/加入或移出书架` 三主按钮；
-  - 未加入书架时直接点“阅读”可进入正文；
-  - 点“目录”进入目录页，选任一章节可跳转对应章节阅读；
-  - 点“换源”后可切换候选源，详情与目录刷新为新源结果；
-  - 加入书架后返回搜索/发现列表，在架标识能同步更新。
+- 静态检查：`flutter analyze`
+- 相关测试：
+  - `flutter test test/search_scope_group_helper_test.dart`
+  - `flutter test test/search_scope_test.dart`
 
 ### 兼容影响
-- 详情页行为从“偏导入页”升级为“主流程操作页”，与 legado 更一致；
-- 引入临时阅读会话后，未入架也可阅读，但不改变已在书架书籍的阅读与持久化行为；
-- 仅涉及主流程交互与状态展示，不改书源规则语义与解析引擎核心规则。
+- **有兼容影响（正向）**：
+  - 搜索范围快捷菜单与范围对话框的分组展示来源、拆分和排序规则收敛到同一实现，行为更贴近 legado。
+- **潜在行为变化点**：
+  - 分组顺序将以统一排序结果为准，可能与此前“页面局部临时排序”存在差异。
 
-## 2026-02-13（修复在线导入历史崩溃：Cannot remove from a fixed-length list）
+## 2026-02-16 - SearchScope 中文分组排序对齐（cnCompare）
 
-### 已完成
-- `lib/features/source/views/source_list_view.dart`
-  - 对齐 legado 在线导入历史的可变列表语义，修复历史列表为 fixed-length 时执行 `remove/insert/clear` 崩溃。
-  - `_loadOnlineImportHistory()` 改为返回可变列表（`toList(growable: true)`）。
-  - `_saveOnlineImportHistory()` 与 `_pushImportHistory()` 内部中间列表改为可变列表，保证后续删除、置顶、截断逻辑稳定。
+### 做了什么
+- `pubspec.yaml`
+  - 新增依赖 `pinyin`，用于中文分组排序键计算。
+- `lib/features/search/models/search_scope_group_helper.dart`
+  - 新增 `cnCompareLikeLegado(...)` 比较器：
+    - 中文字符转换为无声调拼音后比较；
+    - 非中文字符按小写原文比较；
+    - 拼音键一致时回退原文比较，保证稳定性。
+  - `dealGroups(...)` 排序从 `compareTo` 改为 `cnCompareLikeLegado`。
+  - 增加轻量排序键缓存，降低频繁弹菜单时的重复转换开销。
+- `test/search_scope_group_helper_test.dart`
+  - 新增中文分组排序回归：验证“都市/历史/武侠/玄幻”按拼音序输出。
 
 ### 为什么
-- 异常日志显示：
-  - `Unsupported operation: Cannot remove from a fixed-length list`
-  - 堆栈定位到 `_pushImportHistory` 的 `history.remove(url)`。
-- 根因是在线导入历史在读取后被构造成了 fixed-length 列表，而导入流程和历史管理都需要可变操作。
+- legado `BookSourceDao.dealGroups(...)` 最终使用 `cnCompare`（中文 Collator）排序；此前 Dart 侧使用默认 `compareTo`，中文分组顺序存在偏差。
+- 本次目标是把 SearchScope 分组展示顺序进一步收敛到 legado 的中文排序语义。
 
 ### 如何验证
-- 执行：`flutter analyze`
-- 手工路径：
-  - 书源管理 -> 在线导入，输入 URL 导入；
-  - 重复导入同 URL（触发历史置顶）；
-  - 在历史中删除单条、清空历史；
-  - 以上操作不再出现 fixed-length list 异常。
+- 静态检查：`flutter analyze`
+- 相关测试：
+  - `flutter test test/search_scope_group_helper_test.dart`
+  - `flutter test test/search_scope_test.dart`
 
 ### 兼容影响
-- 仅修复历史记录容器可变性，不改变导入协议、书源解析与导入结果语义；
-- 与 legado 的在线导入历史交互（可删、可清空、可复用）保持一致。
+- **有兼容影响（正向）**：
+  - 中文分组展示顺序将更贴近 legado `cnCompare` 效果。
+- **潜在行为变化点**：
+  - 某些中英混合分组名的相对顺序可能与旧版 `compareTo` 不同。
 
-## 2026-02-14（规则引擎继续对齐 legado：前缀语义 + 旧式点号索引 + 提取器 + replaceFirst）
+## 2026-02-16 - SearchScope 中文排序二次校准（多音字短语 + 中英混排）
 
-### 已完成
-- `lib/features/source/services/rule_parser_engine.dart`
-  - 新增 `@CSS:` / `@@` 前缀标准化（`_normalizeCssRulePrefix`），并接入三处入口：
-    - 单值规则解析（`_parseRule`）
-    - 列表元素选择（`_selectAllElementsByRule`）
-    - HTML 字符串列表提取（`_parseStringListFromHtmlSingle`）
-  - 旧式点号索引语法扩展，对齐 legado：
-    - 继续支持 `selector.2`
-    - 新增支持 `selector.-1:10:2`（旧式“冒号索引列表”）
-    - 新增支持 `selector!0:3`（排除模式）
-    - 复用统一 `indexSpec` 执行路径，避免双套索引逻辑漂移。
-  - 继续补齐 legacy selector 前缀语义：
-    - `children` / `children.*`：按“仅当前节点直接子元素”选择；
-    - `text.xxx`：按“元素 ownText 包含 xxx”选择（兼容 legado `getElementsContainingOwnText`）。
-  - 提取器语义对齐 legado：
-    - `textNodes` 改为逐 text node 清洗后按 `\n` 拼接；
-    - `ownText` 改为仅提取当前节点直系文本；
-    - `html` 改为在副本中移除 `script/style` 后输出 HTML；
-    - 新增 `all` extractor 支持。
-  - 替换语义增强：
-    - 新增 legado 风格 `replaceFirst` 处理（`##regex##replacement###`）；
-    - 内联替换与正文 `replaceRegex` 共用同一替换函数，保持行为一致。
-- `test/rule_parser_engine_legado_rule_semantic_compat_test.dart`（新增）
-  - 覆盖上述差异点的规则级与五段链路级回归：
-    - `@CSS:` / `@@`
-    - 旧式点号索引与排除
-    - `textNodes/ownText/html/all`
-    - `replaceFirst`
-    - `children` / `text.xxx`
-    - search / explore / bookInfo / toc / content 全链路验证。
-- `test/rule_parser_engine_legado_index_compat_test.dart`
-  - 保持并复用此前 `[]` 索引兼容回归测试，作为本次对齐的基线保护。
+### 做了什么
+- `lib/features/search/models/search_scope_group_helper.dart`
+  - `cnCompareLikeLegado(...)` 增加排序类别优先级：
+    - 数字开头分组优先；
+    - 其次中文；
+    - 再次英文字母开头；
+    - 最后其它字符。
+  - 中文排序键由“逐字拼音”改为“整词拼音”（`PinyinHelper.getPinyinE(value, ...)`）：
+    - 改善多音字短语排序，如“重庆/重生/中文”。
+- `test/search_scope_group_helper_test.dart`
+  - 新增“中英混排排序优先级”回归。
+  - 新增“多音字短语整词拼音排序”回归。
 
 ### 为什么
-- 在修复 `td[0]@text` 后，仍存在多项 legado 规则语义差异会导致旧书源出现“能导入但字段异常/调试值不一致”的问题。
-- 本次按 legado 核心实现继续补齐高频差异，降低后续书源兼容维护成本。
+- 首轮 `cnCompare` 对齐后，纯中文分组已明显改善，但中英混排与部分多音字短语仍有偏差风险。
+- 本次通过“类别优先级 + 整词拼音键”进一步收敛到 legado 的中文排序观感。
 
 ### 如何验证
-- 执行：`flutter analyze --no-version-check`
-- 结果：`No issues found!`
-- 执行：`flutter test test/rule_parser_engine_legado_index_compat_test.dart test/rule_parser_engine_legado_rule_semantic_compat_test.dart --no-version-check`
-- 结果：`All tests passed!`
-- 关键回归用例（已新增）：
-  - `rule_parser_engine_legado_rule_semantic_compat_test.dart`
-  - `rule_parser_engine_legado_index_compat_test.dart`
+- 静态检查：`flutter analyze`
+- 相关测试：
+  - `flutter test test/search_scope_group_helper_test.dart`
+  - `flutter test test/search_scope_test.dart`
 
 ### 兼容影响
-- 行为更接近 legado：可能修正少量“历史上可用但语义不标准”的规则输出。
-- 旧语法兼容增强（`@CSS/@@`、旧式点号索引、`replaceFirst`），对已有标准 CSS 规则无破坏性变更。
-- 五段链路调试可观测性保持不变，仅解析结果语义更贴近 legado。
+- **有兼容影响（正向）**：
+  - 中英混排分组排序更稳定，且更接近中文场景直觉与 legado 行为。
+- **潜在行为变化点**：
+  - 混合符号分组名（如特殊前缀）排序位置可能与旧逻辑不同。
 
-## 2026-02-14（规则引擎再对齐 legado：单值多节点聚合 + URL 首值语义）
+## 2026-02-16 - SearchScope 中文排序样本扩展回归（稳定性补强）
 
-### 已完成
-- `lib/features/source/services/rule_parser_engine.dart`
-  - 修复单值规则在 HTML 节点选择阶段仅取首节点的问题：
-    - `_parseSingleRule` 改为对 selector 命中的全部节点执行提取，再按语义聚合。
-  - 新增单值聚合双语义：
-    - 文本字段：多节点结果按 `\n` 合并（对齐 legado `AnalyzeByJSoup.getString`）。
-    - URL 字段：仅取首个非空值（对齐 legado `AnalyzeByJSoup.getString0`）。
-  - 新增 URL 专用解析辅助：
-    - `_parseRuleAsUrlRawLikeLegado`
-    - `_parseRuleAsUrlLikeLegado`
-  - 将 HTML 路径下的 URL 字段调用统一切换为 URL 专用语义（search/explore/bookInfo/toc 及对应 debug 路径），避免多节点文本拼接后再绝对化导致的 URL 异常。
-- `test/rule_parser_engine_legado_index_compat_test.dart`
-  - 新增 `td[5,4,3]@text` 回归：验证单值文本规则会按顺序换行聚合。
-  - 新增 URL 回归：验证 `td[1,0]@a@href`、`a[0,1]@href` 在 search/bookInfo/toc 场景下均按“首个非空值”取 URL。
-- `test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
-  - 更新既有断言，显式对齐 `td!0:1@text` 在单值文本路径下的多值换行语义。
+### 做了什么
+- `test/search_scope_group_helper_test.dart`
+  - 在已有排序回归基础上，新增三组样本矩阵：
+    - 常见中文分组：`都市/科幻/男频/女频/轻小说/玄幻`；
+    - 符号+中英数字混排：`2区/!活动/_其它/历史/玄幻/A区/B区`；
+    - 同拼音前缀细分：`东京/东野/斗罗/斗破/斗气/都市`。
+  - 目标是覆盖 legacy 书源分组中最容易出现排序抖动的边界场景，防止后续迭代回退到 `compareTo` 风格排序。
 
 ### 为什么
-- 线上反馈 `td[5,4,3]@text` 及同类多索引规则无法得到 legado 一致结果。
-- 根因是单值规则解析历史上只消费第一个匹配节点，导致多索引/多节点规则丢值。
-- 同时 URL 字段需要与 legado 保持 `getString0 + isUrl=true` 语义，否则在多节点场景会出现 URL 拼接异常。
+- 完成 `cnCompare` 近似对齐后，需要通过更贴近实际书源命名的数据样本，持续验证排序稳定性与可预期性。
+- 这一步主要是“测试面补强”，避免未来改动在不知情情况下破坏当前对齐成果。
 
 ### 如何验证
-- 执行：`flutter test test/rule_parser_engine_legado_index_compat_test.dart --no-version-check`
-  - 结果：`All tests passed!`
-- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart --no-version-check`
-  - 结果：`All tests passed!`
-- 执行：`flutter analyze --no-version-check`
-  - 结果：`No issues found!`
+- 静态检查：`flutter analyze`
+- 相关测试：
+  - `flutter test test/search_scope_group_helper_test.dart`
+  - `flutter test test/search_scope_test.dart`
 
 ### 兼容影响
-- 文本单值规则：
-  - 多索引/多节点不再默认截断为首值，改为与 legado 一致的换行聚合；
-  - 部分历史“依赖首值截断”的非标准写法会看到更完整结果。
-- URL 单值规则：
-  - 固定为“首个非空值 + 绝对化”，避免多值拼接 URL；
-  - 与 legado URL 获取路径保持一致，提升旧书源兼容稳定性。
-
-## 2026-02-14（修复目录空结果：单 token `text/href` 提取语义对齐 legado）
-
-### 已完成
-- `lib/features/source/services/rule_parser_engine.dart`
-  - 修复 `_LegadoTextRule.parse` 对单 token 规则的判定：
-    - 当规则仅 1 个 token 且命中 extractor（如 `text`、`href`）时，按“当前元素 extractor”处理，不再误判为 selector。
-  - 直接覆盖了 `ruleToc.chapterName = "text"`、`ruleToc.chapterUrl = "href"` 这类 legado 常见写法在 SoupReader 中章节名/链接为空的问题。
-- `test/rule_parser_engine_legado_rule_semantic_compat_test.dart`
-  - 新增规则级回归：`text` / `href` 单 token 作为当前元素 extractor 的行为验证。
-  - 新增链路级回归：目录规则 `chapterList="#list a" + chapterName="text" + chapterUrl="href"` 可正常产出章节。
-
-### 为什么
-- 最小复现日志显示目录列表命中（`#list a` 列表大小 > 0），但章节名与章节链接均为空，最终 `章节总数:0`。
-- 根因是单 token `text/href` 被当作 selector 解析，导致查不到目标节点；与 legado `getResultLast` 的 extractor 语义不一致。
-
-### 如何验证
-- 执行：`flutter test test/rule_parser_engine_legado_rule_semantic_compat_test.dart --no-version-check`
-  - 结果：`All tests passed!`
-- 执行：`flutter test test/rule_parser_engine_legado_index_compat_test.dart --no-version-check`
-  - 结果：`All tests passed!`
-- 执行：`flutter analyze --no-version-check`
-  - 结果：`No issues found!`
-
-### 兼容影响
-- 旧书源兼容性提升：`chapterName=text`、`chapterUrl=href`、以及其他单 token extractor 写法恢复 legado 预期行为。
-- 对已有 `selector@extractor`、`text.xxx`、`children.*` 等规则无破坏性变更。
-
-## 2026-02-14（阅读器仿真翻页首翻空白修复：仅 Simulation，对齐 legado 状态机）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 新增仿真翻页启动门闩：`_prepareSimulationTurnFrames` + `_startSimulationTurnWhenReady`。
-    - 在 `PageTurnMode.simulation` 下，翻页动画启动前先确保关键帧资源就绪（当前页/目标页）。
-    - 资源未就绪时不再硬进动画，避免首翻出现空白页。
-  - 调整动画结束状态机，行为对齐 legado：
-    - `onAnimComplete` 改为先 `fillPage`（非取消场景）再 `stopScroll`。
-    - `stopScroll` 仅负责状态收尾，不再触发换页。
-  - 移除 `stopScroll` 中的提前 `_invalidatePictures()`，避免换页瞬间出现渲染空窗。
-  - 增加仿真模式首次进入预热：首帧后主动 `_warmupSimulationFrames()`，提前生成 shader 所需图像。
-  - 增加准备任务取消逻辑：内容变化/手势中断/组件销毁时取消待执行的仿真准备任务，避免竞态。
-  - 修正仿真绘制前置判断：按方向分别检查必要资源（next 依赖 `curPageImage`，prev 依赖 `targetPageImage`）。
-
-### 为什么
-- 用户反馈仿真翻页首次进入后第一次翻页会出现空白页面。
-- 根因是动画与图像转换存在竞态，且结束阶段状态切换顺序与 legado 不一致，导致短暂掉入空白兜底路径。
-
-### 如何验证
-- 命令：`flutter analyze --no-version-check`
-  - 结果：`No issues found!`
-- 手工路径（建议）：
-  - 仿真翻页模式首次进入阅读页，连续进行“首次翻页/取消翻页/跨章节翻页”验证，确认不再出现首翻空白。
-
-### 兼容影响
-- 仅影响 `PageTurnMode.simulation` 的内部时序与资源准备策略。
-- 不引入 `simulation2` 回退路径；其他翻页模式（slide/cover/none/scroll）行为不变。
-
-## 2026-02-14（目录当前章定位与邻章预加载：对齐 legado 阅读链路）
-
-### 已完成
-- `lib/features/reader/widgets/reader_catalog_sheet.dart`
-  - 目录定位由“固定高度估算滚动”改为“基于真实章节索引定位”：
-    - 新增 `_findCurrentVisibleListIndex()`，在当前可见列表（含搜索/倒序）中定位 `chapter.index == currentChapterIndex`。
-    - 新增 `_chapterItemKeys` + `Scrollable.ensureVisible`，按真实 item 上下文滚动，避免估算误差。
-    - 对齐 legado 语义：自动滚到“当前章前一项”（若存在），避免当前章贴边或半遮挡。
-  - 统一定位触发时机：
-    - 首次打开目录；
-    - 切换 Tab；
-    - 切换倒序；
-    - 搜索关键字变更；
-    - 刷新目录后。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 新增邻章预加载链路（legado 风格的“当前/前后章”准备）：
-    - `_prefetchNeighborChapters(centerIndex)`
-    - `_prefetchChapterIfNeeded(index)`
-  - 在章节打开与跨章回调时触发邻章预加载：
-    - `_loadChapter()` 完成后触发 `center±1` 预加载；
-    - `_handlePageFactoryContentChanged()` 检测到章节变化后触发 `center±1` 预加载。
-  - 请求层新增 `showLoading` 参数：
-    - `_fetchChapterContent(..., showLoading)`
-    - `_fetchChapterContentInternal(..., showLoading)`
-    - 邻章预加载使用 `showLoading=false`，避免后台预取干扰前台阅读加载状态。
-  - 预加载成功后同步刷新分页数据（保持当前位置）：
-    - `_syncPageFactoryChapters(keepPosition: true)`
-    - 非滚动模式下执行 `_paginateContentLogicOnly()`，让后续跨章翻页更容易命中已准备内容。
-
-### 为什么
-- 用户反馈目录打开时“当前章节定位显示异常”，且翻到下一章存在明显实时请求等待。
-- legado 在目录定位与章节加载上都采用“真实索引 + 前后章准备”的策略；本次按同语义修复 SoupReader 行为。
-
-### 如何验证
-- 命令：`flutter analyze --no-version-check`
-- 手工路径：
-  - 在不同章节打开目录，确认当前章稳定可见且不贴顶；
-  - 倒序/搜索后再次打开目录，确认当前章定位仍准确；
-  - 连续跨章翻页，观察“翻到下一章才请求”的等待显著减少。
-
-### 兼容影响
-- 仅调整阅读器目录定位与章节预加载策略，不涉及书源规则解析语义变更。
-- 预加载请求会增加少量后台网络访问（默认仅前后 1 章），换取跨章翻页连贯性。
-
-## 2026-02-14（书籍详情布局对齐 legado + 阅读默认排版对齐 legado）
-
-### 已完成
-- `lib/features/search/views/search_book_info_view.dart`
-  - 重构详情页布局为 legado 语义：
-    - 顶部封面背景 + 弧形过渡 + 中央悬浮封面；
-    - 信息区按“作者/来源/最新/目录”行展示；
-    - 底部固定操作区（加入/移出书架、开始阅读）。
-  - 新增书架入口构造：`SearchBookInfoView.fromBookshelf(...)`。
-  - 新增“历史书架缺少详情链接”的降级路径：
-    - 不再硬失败；
-    - 展示书架缓存信息与本地目录；
-    - 明确提示无法在线刷新/换源。
-  - 阅读入口逻辑修正：已在书架时优先直开已保存书籍，不再被“在线目录为空”阻断。
-- `lib/features/bookshelf/views/bookshelf_view.dart`
-  - 书架“书籍详情”入口从弹窗改为进入统一详情页（与搜索/发现一致）。
-- `lib/features/bookshelf/models/book.dart`
-  - 新增 `bookUrl` 字段，并补齐 `fromJson/toJson/copyWith`。
-- `lib/core/database/drift/source_drift_database.dart`
-  - `BookRecords` 新增 `bookUrl` 列；
-  - `schemaVersion` 从 `2` 升级到 `3`；
-  - 增加升级迁移：`from >= 2 && from < 3` 时执行 `addColumn(bookUrl)`。
-- `lib/core/database/repositories/book_repository.dart`
-  - 持久化映射补齐 `bookUrl` 读写。
-- `lib/features/bookshelf/services/book_add_service.dart`
-  - 加书架时写入 `bookUrl`（优先详情页解析结果，回退搜索结果 URL）。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 换源成功/回滚时同步维护 `bookUrl`；
-  - 目录更新逻辑改为优先使用持久化 `bookUrl`，并保留无 `bookUrl` 的搜索兜底；
-  - 目录刷新成功后回写 `bookUrl`，避免后续重复回推。
-- `lib/features/reader/models/reading_settings.dart`
-  - 默认值改为 legado 对齐（字号/行距/段距/边距/对齐/页眉页脚项/翻页模式等）。
-- `lib/core/services/settings_service.dart`
-  - 新增“一次性阅读设置 schema 迁移”：强制将现网用户阅读设置重置为新的 legado 默认值；
-  - 保留翻页方向规范化，但按模式归一（滚动=垂直，其它=水平），避免覆盖 legado 默认翻页体验。
-- `lib/app/theme/design_tokens.dart`
-  - 新增 `ReaderThemeTokens.legadoClassic`（经典纸色主题）。
-- `lib/app/theme/colors.dart`
-  - 新增 `legadoClassicTheme` 并追加到 `readingThemes`，默认 `themeIndex` 指向该主题。
-- `lib/core/database/drift/source_drift_database.g.dart`
-  - 已通过 `build_runner` 重新生成，匹配新 schema 与字段。
-
-### 为什么
-- 当前详情页为卡片式信息流，与 legado 的“背景封面 + 弧形过渡 + 中央封面 + 底部动作区”视觉语义不一致。
-- 书架入口仍是弹窗，导致用户在书架与搜索/发现之间体验割裂。
-- 未持久化 `bookUrl` 会导致书架详情、目录刷新、换源链路只能临时回推，稳定性和一致性不足。
-- 阅读默认排版与 legado 默认值偏差较大，导致默认阅读观感不一致。
-
-### 如何验证
-- 执行：`flutter pub run build_runner build --delete-conflicting-outputs`
-  - 结果：成功生成 Drift 代码。
-- 执行：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 搜索/发现进入详情，验证新布局、目录入口、阅读入口、换源和书架操作。
-  - 书架进入详情，验证已统一到同一详情页。
-  - 对历史无 `bookUrl` 书籍进入详情，验证降级提示与可读缓存行为。
-  - 打开阅读器，验证默认排版参数与主题已切换为 legado 对齐值。
-
-### 兼容影响
-- 数据库升级到 schema v3，新增 `bookUrl` 列；旧库将自动迁移，不删除原有数据。
-- 阅读设置会在本版本首次启动时执行一次性全量重置（按需求强制对齐 legado 默认值）。
-- 历史缺少 `bookUrl` 的书籍不会崩溃，但在线刷新/换源将受限，需重新入书架后获得完整能力。
-
-## 2026-02-14（详情目录与在架阅读目录一致性修复：对齐 legado）
-
-### 已完成
-- `lib/features/search/views/search_book_info_view.dart`
-  - 修复“目录展示源”和“在架阅读章节源”不一致问题：
-    - 在架场景下，详情页目录展示统一改为本地持久目录（`ChapterRepository`），不再直接展示在线临时目录。
-    - 目录弹窗打开前强制以本地目录为准，避免在线目录索引与本地阅读索引不一致。
-  - 修复在架阅读入口章节上限：
-    - `_openReader()` 不再使用 `Book.totalChapters` 直接限制跳转；
-    - 改为按本地真实章节列表长度计算可跳转上限；
-    - 本地目录为空时明确提示“先刷新目录”，阻断无效跳转。
-  - 新增“刷新目录并落库”链路（对齐 legado 的“先更新目录再阅读”语义）：
-    - 新增 `_refreshBookshelfToc()`；
-    - 从在线获取详情/目录后，先写入本地章节表，再回读本地目录刷新 UI；
-    - 同步回写书籍元数据（章节总数、最新章节、基础信息）并校正当前章节索引范围。
-  - 交互入口调整：
-    - 顶部刷新按钮：在架时执行“刷新目录并落库”，非在架维持“刷新详情”；
-    - 更多操作菜单新增“刷新目录”。
-
-### 为什么
-- 用户反馈“目录能看到章节，但阅读跳转后被夹断/回退”，根因是详情页目录与阅读器目录来自不同数据源。
-- legado 的行为是以本地持久目录作为阅读权威数据，在线目录更新后需先落库再使用；本次按该语义修复。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径（建议）：
-  - 在架书籍进入详情页 -> 打开目录，确认目录数量与阅读器章节一致；
-  - 在目录中选择末尾章节，确认能进入正确章节且不再被错误夹断；
-  - 点击刷新（或“更多 -> 刷新目录”）后，确认新增章节先入库再展示，并可直接阅读。
-
-### 兼容影响
-- 不修改数据库 schema；
-- 仅调整在架详情页的目录来源与刷新流程，不影响非在架临时阅读链路；
-- 在线目录与本地目录不再混用，避免旧逻辑下的跨源索引错位。
-
-## 2026-02-14（搜索结果列表封面显示修复）
-
-### 已完成
-- `lib/features/search/views/search_view.dart`
-  - 在搜索结果卡片中接入统一封面组件 `AppCoverImage`（`ShadCard.leading`）：
-    - 使用 `result.coverUrl` 渲染封面；
-    - 封面尺寸 `40x56`，圆角 `6`，保持当前列表密度；
-    - 无封面或加载失败时自动回退占位，不再出现“封面空白”。
-  - 保持原有标题/作者/简介/来源与点击跳转逻辑不变，仅补齐封面展示能力。
-
-### 为什么
-- 搜索解析链路已能产出 `coverUrl`，但搜索列表项 UI 没有任何封面控件，导致图片始终不显示。
-- 统一使用 `AppCoverImage` 可与书架/详情页保持一致的缓存与占位策略，稳定性更高。
-
-### 如何验证
-- 命令：`flutter analyze`
-- 手工路径：
-  - 输入关键词搜索，确认结果列表每项出现封面区域；
-  - 对有 `coverUrl` 的结果显示网络封面；
-  - 对无 `coverUrl` 或失效地址结果显示占位封面；
-  - 点击条目进入详情页流程保持正常。
-
-### 兼容影响
-- 不涉及数据结构、数据库或书源规则变更；
-- 仅变更搜索结果列表的展示层，不影响搜索结果去重与详情跳转行为。
-
-## 2026-02-14（发现列表封面渲染统一到 AppCoverImage）
-
-### 已完成
-- `lib/features/discovery/views/discovery_view.dart`
-  - 将发现列表结果卡片封面从 `Container + NetworkImage` 迁移为统一组件 `AppCoverImage`：
-    - 统一远程封面缓存能力；
-    - 统一加载态/失败态占位回退；
-    - 封面尺寸保持 `40x56`，不改变列表信息密度。
-  - 清理旧实现依赖的局部变量（`radius`、`coverBg`），避免冗余。
-
-### 为什么
-- 搜索列表已改为 `AppCoverImage`，发现列表仍保留旧封面实现，会导致同类页面体验与容错策略不一致。
-- 统一组件后可减少封面渲染分叉，降低后续维护成本。
-
-### 如何验证
-- 命令：`flutter analyze`
-- 手工路径：
-  - 进入发现页，确认结果列表封面正常显示；
-  - 无封面或无效封面地址时显示占位封面；
-  - 点击条目进入详情流程不受影响。
-
-### 兼容影响
-- 仅变更发现列表展示层封面组件，不影响发现链路解析与书架操作。
-
-## 2026-02-14（阅读菜单滑块 NaN/Infinity 崩溃修复）
-
-### 已完成
-- `lib/features/reader/widgets/reader_bottom_menu.dart`
-  - 修复章节页码滑块在 `totalPages <= 1` 时 `min == max` 导致的语义层崩溃风险：
-    - 新增安全范围处理，确保 `CupertinoSlider.max > min`；
-    - 无有效滑动范围时禁用 `onChanged/onChangeEnd`，防止无意义跳转；
-    - `onChangeEnd` 目标页索引增加 `clamp + toInt` 约束。
-  - 增加亮度滑块的非有限值兜底（`NaN/Infinity` 回退到 `1.0`）。
-- `lib/features/reader/widgets/reader_menus.dart`
-  - 修复旧版底部菜单章节滑块同类问题：
-    - 章节总数不足时使用安全滑块范围并禁用拖动回调；
-    - 章节索引回调统一 `round + clamp + toInt`；
-    - 亮度滑块增加非有限值兜底。
-
-### 为什么
-- 线上错误显示：`Unsupported operation: Infinity or NaN toInt`，堆栈位于 `_RenderCupertinoSlider.describeSemanticsConfiguration`。
-- 根因是动态滑块在边界场景可能出现 `min == max`（语义计算分母为 0），以及极端情况下 `value` 非有限值。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 打开仅 1 页或分页尚未完成的章节，展开阅读底部菜单，确认不再触发崩溃；
-  - 打开旧版底部菜单路径（若可达），确认章节滑块与亮度滑块行为正常；
-  - 验证多页章节仍可拖动跳页。
-
-### 兼容影响
-- 仅修复阅读菜单滑块边界与容错，不改阅读内容解析与翻页业务流程。
-
-## 2026-02-14（书架图墙模式对齐 legado：两行书名 + 右上角状态层）
-
-### 已完成
-- `lib/features/bookshelf/views/bookshelf_view.dart`
-  - 图墙卡片结构按 legado `item_bookshelf_grid.xml` 语义调整：
-    - 移除图墙作者行，仅保留书名；
-    - 书名改为两行、居中、省略展示（`maxLines: 2` + `textAlign.center`）；
-    - 图墙卡片封面区域改为 `Stack`，右上角加入状态层。
-  - 新增右上角状态层（与 legado `BooksAdapterGrid.upRefresh` 语义一致）：
-    - “更新中”与“未读角标”互斥；
-    - 未读角标文案支持 `99+`；
-    - 未读章节计算改为 legado 同款公式：`max(total - current - 1, 0)`。
-  - 网格密度与间距微调为更接近 legado 的图墙观感（更紧凑的列间距/行间距与外边距）。
-  - 预留 `_updatingBookIds` 状态集合，便于后续接入真实“更新任务流”后直接驱动 loading 角标。
-
-### 为什么
-- 用户反馈书架图墙排版与 legado 差异明显（存在作者行、标题层级与状态层不一致）。
-- 依据 legado 实现，图墙重点是封面与两行书名，右上角使用未读/更新中状态层表达刷新状态与阅读负载。
-
-### 如何验证
-- 命令：`flutter analyze`
-- 手工路径：
-  - 进入书架 -> 切换“图墙模式”，确认每个卡片仅显示两行居中书名；
-  - 有章节数据的书籍应显示右上角未读角标，角标数量超过 99 时显示 `99+`；
-  - 本地书籍不应显示“更新中”状态（与 legado 逻辑一致的前置条件）。
-
-### 兼容影响
-- 不涉及数据库结构和书源规则；
-- 仅调整书架图墙展示层；
-- 当前“更新中”角标已预留状态入口，待后续接入实际更新任务状态后可自动生效。
-
-## 2026-02-14（搜索页功能回归：并发搜索 + 可取消 + 封面兜底）
-
-### 已完成
-- `lib/features/search/views/search_view.dart`
-  - 搜索流程从串行改为受控并发（默认并发 6），缩短多书源搜索总耗时。
-  - 新增搜索会话控制（session id）：
-    - 新搜索会先取消上一次会话；
-    - 旧会话异步返回结果会被丢弃，避免串写污染当前 UI。
-  - “停止”按钮改为真正取消 in-flight 请求：
-    - 不再仅设置 `_isSearching=false`；
-    - 改为统一取消当前所有请求 token，并立即结束搜索状态展示。
-  - 结果分组展示优化：
-    - 新增展示封面兜底逻辑：同名同作者聚合后，优先取首个可用封面 URL；
-    - 聚合结果增加稳定排序：先按来源数降序，再按书名/作者升序。
-- `lib/features/source/services/rule_parser_engine.dart`
-  - 为 `searchDebug` 增加可选 `cancelToken` 参数，并透传到网络请求层：
-    - `searchDebug(..., {CancelToken? cancelToken})`
-    - `_fetchDebug(..., {CancelToken? cancelToken})`
-    - `_requestBytesWithRetry(..., {CancelToken? cancelToken})`
-  - 底层 `dio.request` 接入 `cancelToken`，支持搜索页即时取消。
-
-### 为什么
-- 用户反馈“再检查搜索页”，当前实现存在两个核心体验问题：
-  - 点击“停止”不能立即中断当前请求；
-  - 多源聚合结果在首来源无封面时表现为“像没有图片”。
-- legacy（legado）搜索链路支持中断与实时更新；本次按该语义收敛。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 进入搜索页，发起多源搜索后点击“停止”，确认状态面板立即退出“正在搜索”；
-  - 连续快速搜索两个不同关键词，确认不会混入上一轮结果；
-  - 同名同作者多来源结果里若任一来源有封面，列表卡片可显示封面；
-  - 点击结果进入详情流程保持正常。
-
-### 兼容影响
-- `searchDebug` 新增可选参数，属于向后兼容扩展，旧调用不受影响。
-- 搜索结果展示顺序会更稳定（来源数优先），属于 UI 行为优化，不影响书源解析语义。
-
-## 2026-02-14（阅读页眉分割线延时下移修复：对齐 legado 稳定布局语义）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 新增“稳定系统安全区基线”机制：
-    - 引入 `_resolveStableSystemPadding(...)`，在同一视口尺寸下固定使用首次采样的 `MediaQuery.padding`；
-    - 仅在视口尺寸变化或页眉/页脚显隐配置变化时刷新基线。
-  - 页眉/页脚绘制与正文顶部偏移统一改为使用稳定基线，不再每次重绘直接跟随瞬时 `padding.top`。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 收敛系统 UI 模式切换触发：
-    - 新增 `_applySystemUiMode(...)`，仅在目标模式变化时调用 `SystemChrome.setEnabledSystemUIMode`；
-    - 菜单显隐统一走 `_setReaderMenuVisible(...)` / `_toggleReaderMenuVisible()`，避免重复触发沉浸模式切换导致的二次 metrics 抖动。
-
-### 为什么
-- 用户反馈翻页后约 1 秒页眉分割线会下移一小段。
-- 排查发现分割线位置依赖即时安全区，系统栏 inset 延迟变化会触发二次重绘，导致可见位移。
-- legado 的页眉分割线绑定在固定布局层级上，语义是“稳定布局”，不是“实时跟随瞬时 inset”，本次按该语义对齐。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 翻页模式进入章节后翻到下一页，静置 2~3 秒，确认页眉分割线不再延时下移；
-  - 打开/关闭菜单后返回阅读，页眉分割线位置保持稳定；
-  - 切换横竖屏后分割线仍与页眉区域对齐。
-
-### 兼容影响
-- 仅调整阅读器页眉/页脚坐标计算与系统 UI 切换时机，不涉及数据库与书源解析逻辑。
-- 不改变现有阅读交互语义（菜单开关、翻页动作、章节加载流程保持不变）。
-
-## 2026-02-15（正文排版对齐 legado：逐行两端对齐替代 Flutter 默认 justify）
-
-### 已完成
-- `lib/features/reader/widgets/legacy_justified_text.dart`
-  - 新增 legado 风格逐行排版组件与算法：
-    - `LegacyJustifiedTextBlock`：按段落拆分并逐行渲染；
-    - `LegacyJustifyComposer.composeParagraph(...)`：逐行判定“末行自然排版 / 中间行扩展间距”；
-    - `LegacyJustifyComposer.paintContentOnCanvas(...)`：用于翻页预渲染（PictureRecorder）与屏幕渲染同算法。
-  - 对齐规则：
-    - 非末行才执行两端拉伸；
-    - 有多个空格优先扩展空格间距；
-    - 否则按字符间隙均分剩余宽度；
-    - 首行缩进与正文扩展间距分离处理，避免缩进字符被二次拉伸。
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 翻页正文静态渲染由 `TextAlign.justify` 改为 `LegacyJustifiedTextBlock`。
-  - 翻页预渲染 `_recordPage(...)` 同步改为调用 `LegacyJustifyComposer.paintContentOnCanvas(...)`，确保动画前后排版一致。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 滚动模式正文段落渲染接入 `LegacyJustifiedTextBlock`，不再依赖 Flutter 默认 `justify`。
-  - 移除旧的 `WidgetSpan + TextAlign.justify` 段首缩进实现与宽度测量函数。
-
-### 为什么
-- 用户反馈默认设置下正文存在“有些行字距被拉开、有些行不拉开”的割裂感。
-- 根因是原实现依赖 Flutter `TextAlign.justify` 的黑盒行为；而 legado 使用自定义逐行分配算法，行级控制更稳定。
-- 本次将滚动与翻页统一到同一行级排版策略，按 legado 语义收敛。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 默认设置进入阅读（滚动/翻页各验证），观察正文多行段落中间行字距分配更稳定；
-  - 切换“两端对齐”开关，确认关闭后回退自然排版；
-  - 翻页动画前后同页文字排版一致，不出现切换瞬间样式跳变。
-
-### 兼容影响
-- 仅调整正文排版/绘制策略，不改数据库与书源解析规则。
-- 由于两端对齐由“系统默认行为”改为“显式逐行算法”，个别章节断行位置可能与旧版本存在细微差异，但整体语义与 legado 一致性更高。
-
-## 2026-02-15（翻页时页眉页脚延迟更新修复：对齐 legado 目标页上下文）
-
-### 已完成
-- `lib/features/reader/widgets/page_factory.dart`
-  - 新增渲染位置信息模型：
-    - `PageRenderSlot`（`prev/current/next`）
-    - `PageRenderPosition`（`chapterIndex/pageIndex/totalPages/chapterTitle`）
-  - 新增 `resolveRenderPosition(PageRenderSlot slot)`，用于在不改动当前阅读状态的前提下，获取“目标页”应显示的章节/页码信息（含跨章场景）。
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - `Picture` 预渲染接入页上下文：
-    - `_recordPage(...)` 新增 `slot` 参数；
-    - `cur/prev/next` 预渲染分别传入 `current/prev/next` 渲染位置信息。
-  - 页眉页脚文本计算改为基于渲染上下文：
-    - `_tipText*`、`_pageText`、章节进度/全书进度计算不再直接依赖 `_factory.currentPageIndex`；
-    - 静止页、滑动页、覆盖页、无动画页均按“当前渲染页”显示对应页眉页脚。
-  - `_buildRecordedPage` / `_buildPageWidget` / `_buildOverlay` 增加 `slot` 传递，确保 fallback 渲染路径也使用正确上下文。
-
-### 为什么
-- 用户反馈翻页时页眉页脚信息（页码/章节）会晚一拍更新。
-- 根因是目标页正文已切换到 `prev/next`，但页眉页脚仍按“当前页索引”计算，直到动画完成后才同步。
-- legado 的页眉页脚是按当前绘制页上下文显示，本次按该语义对齐。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 同章翻页：动画中页码应即时显示目标页（例如 `10/20` -> 动画中显示 `11/20`）；
-  - 跨章翻页：动画中页眉章节名应显示目标章节；
-  - 在 slide/cover/none/simulation/simulation2 模式下分别验证一次页眉页脚同步性。
-
-### 兼容影响
-- 仅调整翻页渲染期页眉页脚上下文来源，不影响章节解析、目录、正文内容或数据库结构。
-- 展示行为更接近 legado：翻页过程中页眉页脚与当前可见正文保持一致。
-
-## 2026-02-15（阅读设置数值归一化 + Slider 防 NaN 崩溃收口）
-
-### 已完成
-- `lib/features/reader/models/reading_settings.dart`
-  - 为阅读设置补充统一安全解析与归一化能力：
-    - 新增 `_toDouble/_toInt/_toBool` 安全解析；
-    - 新增 `sanitize()`，对亮度、排版参数、翻页参数、页眉页脚枚举等进行有界归一化；
-    - `fromJson(...)` 改为安全解析并在返回前执行 `.sanitize()`；
-    - `copyWith(...)` 返回值改为 `.sanitize()`，防止运行期脏值继续扩散。
-  - 修复高风险点：`pageTurnMode/pageDirection` 读取 `NaN/Infinity` 时不再直接 `toInt()` 崩溃。
-- `lib/core/services/settings_service.dart`
-  - `saveReadingSettings(...)` 改为先 `sanitize()` 再落盘，保证持久化层不再写入非法数值。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 新增 `_safeBrightnessValue(...)`、`_safeSliderValue(...)`；
-  - 亮度同步到系统前强制归一化（`0.0..1.0`）；
-  - 亮度遮罩与亮度滑条改为安全值渲染；
-  - 通用 `_buildSliderSetting(...)` 统一加入 `isFinite + clamp + min/max 兜底`，并在无有效范围时禁用拖动；
-  - 初始读取设置改为 `sanitize()`。
-- `lib/features/settings/views/reading_preferences_view.dart`
-  - 初始设置和 `_update(...)` 全量改为 `sanitize()`；
-  - 手动亮度百分比展示改为安全值计算；
-  - `_SliderTile` 增加安全 `min/max/value` 计算与 `canSlide` 防护。
-- `lib/features/reader/widgets/reader_quick_settings_sheet.dart`
-  - `_SliderRow` 统一加入 `isFinite + clamp + min/max 兜底`，并将显示值改为基于安全值计算。
-- `lib/features/reader/widgets/typography_settings_dialog.dart`
-  - 初始设置与回调设置统一 `sanitize()`；
-  - `_buildSliderRow` 加入安全 `min/max/value` 逻辑，`+/-` 按钮与滑条都使用安全值。
-
-### 为什么
-- 用户现场日志显示 Flutter 语义层在 `CupertinoSlider` 报错：
-  - `Unsupported operation: Infinity or NaN toInt`
-- 根因是阅读设置存在历史脏值（`NaN/Infinity`）时，滑条渲染/语义计算可能直接触发异常。
-- legado 在对应场景下采用“稳定可用优先”的策略（亮度与进度均通过有界数值路径处理）；本次按该语义对齐，确保脏值自动回落到可渲染范围。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 进入阅读器设置面板，连续调节亮度/字号/行距/边距，确认滑条可正常拖动且无崩溃；
-  - 切换“跟随系统亮度”后再次进入阅读页，确认不报错；
-  - 翻页过程中页眉页脚即时更新行为保持不变（上轮修复不回退）。
-
-### 兼容影响
-- 旧版本遗留的非法阅读设置值会在读取/保存/交互时被自动归一化，属于向前兼容修复。
-- 不改变书源解析、目录、正文抓取逻辑，仅提升阅读设置与 UI 渲染稳定性。
-
-## 2026-02-15（翻页后页眉线/正文突变与阴影残留修复：渲染链路对齐 legado）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 为 `slide/cover/none` 三种模式新增静止态统一入口 `_buildStaticRecordedPage(...)`：
-    - 静止态优先使用 `Picture`（`_buildRecordedPage`）渲染当前页；
-    - 进入静止态时主动 `ensure` 当前页 Picture，避免“动画态用 Picture，静止态回退 Widget”导致的视觉切换。
-  - 将 `slide/cover/none` 的 `!isRunning` 分支统一切到 `_buildStaticRecordedPage(...)`。
-  - 覆盖翻页阴影改为 legado 风格窄边缘梯度：
-    - 移除原 `BoxShadow(blurRadius/spreadRadius)` 全页模糊阴影；
-    - 新增 `_buildCoverPageWithEdgeShadow(...)`，按翻页方向在移动页边缘绘制窄条渐变阴影；
-    - 阴影仅在有效位移区间显示，动画结束立即消失。
-
-### 为什么
-- 用户反馈翻页完成后约 1 秒出现“页眉分割线下移、正文字体像被重绘、左右阴影残留后消失”的二次变化。
-- 根因是静止态与动画态存在两套渲染路径（Widget vs Picture）以及覆盖模式使用了大范围模糊阴影。
-- legado 的覆盖翻页是页快照 + 窄梯度边缘阴影，本次按该语义收敛，减少翻页收尾阶段视觉跳变。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - `cover` 模式连续翻下页/翻上页，确认阴影只在翻页中存在，结束即消失；
-  - `slide/none` 模式翻页后静置 1~2 秒，确认页眉分割线与正文不再“二次突变”；
-  - 跨章翻页时页眉/页脚与正文仍保持同步。
-
-### 兼容影响
-- 仅调整阅读器翻页渲染实现，不影响书源解析、目录/正文抓取与数据库结构。
-- 展示语义更贴近 legado：静止态与动画态视觉一致性更高，覆盖阴影更克制。
-
-## 2026-02-15（翻页收尾二次重绘修复：动画期延迟失效并锁定快照渲染）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 新增交互状态判定与延迟失效门闩：
-    - 增加 `_pendingPictureInvalidation`；
-    - 增加 `_isInteractionRunning`（统一识别拖拽/动画进行中）；
-    - `PageFactory` 内容变化回调在交互期不再立即 `_invalidatePictures()`，改为仅标记 pending。
-  - 新增 `_flushPendingPictureInvalidationIfIdle(...)`：
-    - 在 `_stopScroll()` 收尾阶段统一提交 pending 失效；
-    - 在“按下后未触发有效拖拽”的 `onDragEnd` 路径补充提交，避免遗留脏状态。
-  - 调整 `_stopScroll()`：
-    - 收尾阶段先重置交互状态，再统一处理 pending 失效，再 `setState + _schedulePrecache`。
-  - 调整 `_buildRecordedPage(...)` 的缓存 miss 策略：
-    - 动画/拖拽期间若目标 `Picture` 缺失，优先回退到可用快照 `Picture`（`prev/current/next` 兜底）；
-    - 仅在确无快照可用时回退到 Widget 渲染，降低 “Picture -> Widget -> Picture” 的切换概率。
-
-### 为什么
-- 用户反馈翻页后约 1 秒出现页眉分割线位置变化、正文观感变化、边缘阴影延后消失，表现为“二次重绘”。
-- 根因是换页回调在动画收尾阶段立即清空缓存，导致渲染路径瞬时回退并在后续预渲染后再次切回。
-- legado 的翻页语义是动画期间保持稳定快照路径，本次按该语义收敛缓存失效时机。
-
-### 如何验证
-- 命令：`flutter analyze`
-- 手工路径：
-  - 同章连续翻页（`slide/cover/none`），确认翻页完成后不再出现 1 秒后二次变化；
-  - 翻上页/翻下页各测试一次，确认左右边缘无延迟残影突变；
-  - 跨章翻页确认无“仅标题无正文”回归。
-
-### 兼容影响
-- 仅调整阅读器渲染时序与缓存回退策略，不改书源解析、章节数据、目录结构与数据库。
-- 视觉行为更接近 legado：动画与静止态之间的渲染连续性更高。
-
-## 2026-02-15（覆盖翻页收尾稳定性二次修复：快照前移复用与目标页预热）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 新增快照缓存粒度控制：
-    - `_ensurePictureCacheSize(...)`
-    - `_syncAdjacentPictureAvailability(...)`
-    - `_ensureCurrentPagePicture(...)`
-    - `_ensureDirectionTargetPicture(...)`
-  - 调整 `slide/cover/none` 动画中的快照策略：
-    - 动画帧仅确保“当前页 + 翻页目标页”快照，不再每帧尝试全量 `prev/cur/next`。
-    - `startTurnAnimation` 前强制预热目标快照，避免首帧回退渲染路径。
-  - 调整静止态快照策略：
-    - `_buildStaticRecordedPage(...)` 仅同步确保当前页快照；
-    - 相邻页交给 `_schedulePrecache()` 分帧补齐，减少收尾同步重录抖动。
-  - 新增翻页完成后的快照前移复用：
-    - `_promoteCachedPicturesOnPageFilled(...)`
-    - `_flushPendingPictureInvalidationAfterSettle(...)`
-    - 在 `_stopScroll(...)` 收尾阶段优先将目标快照提升为当前页快照（next->cur / prev->cur），仅在无法提升时才全量失效重录。
-  - `_onAnimComplete(...)` 与 `_stopScroll(...)` 调整为传递 `direction + wasCancel`，确保收尾按真实翻页结果执行。
-
-### 为什么
-- 用户反馈覆盖翻页后仍存在“短延迟后页眉线/正文观感变化、边缘阴影延迟消失”的二次重绘感。
-- 根因之一是收尾阶段仍可能走“全量失效 + 同步重录”路径，与 legado 的“目标快照前移复用”语义不一致。
-- 本次改为优先复用动画期目标快照，避免 `Picture -> 重录/回退 -> Picture` 的额外切换。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 覆盖模式连续翻下页/翻上页，观察翻页完成后 1~2 秒内是否仍出现二次突变；
-  - 首次进入章节后立即翻页，确认不出现“先有阴影残留再整体重绘”；
-  - 同章与跨章各验证一次，确认页眉页脚/正文同步且无空白回归。
-
-### 兼容影响
-- 仅调整阅读器翻页渲染时序与快照复用逻辑，不影响书源解析、目录抓取、正文抓取和数据库。
-- 行为进一步贴近 legado：覆盖翻页收尾更稳定，减少延迟重绘体感。
-
-## 2026-02-15（iOS 覆盖翻页稳定性三次修复：系统安全区锁定 + 覆盖动画禁 Widget 回退）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 新增会话级系统安全区控制：
-    - 新增 `_stablePaddingOrientation`、`_pendingSystemPaddingRefresh`；
-    - 新增 `_applyStableSystemPadding(...)` 与 `_flushPendingSystemPaddingRefresh()`；
-    - `_resolveStableSystemPadding(...)` 改为：
-      - 默认按“方向变化 + 页眉页脚显示配置变化”刷新；
-      - 交互进行中（拖拽/动画）若需要刷新则延后，避免翻页中途受 iOS 系统栏 inset 波动影响。
-  - 覆盖动画渲染路径收敛：
-    - `_buildRecordedPage(...)` 在 `cover + running` 场景下禁止回退到 `_buildPageWidget(...)`；
-    - 当目标快照缺失时优先用现有快照兜底绘制，彻底降低 `Picture -> Widget -> Picture` 切换概率。
-  - 收尾阶段补强：
-    - `_stopScroll(...)` 在 pending 处理后，先尝试刷新延迟的系统安全区，再同步确保当前页快照，然后统一 `setState`。
-  - 电量更新异步回调去抖：
-    - 新增 `_applyBatteryLevel(...)`（值变化判定 + 交互期间抑制重建）；
-    - `battery` 监听去掉“先 `setState` 再异步更新”的双重重建，仅在实际变化时刷新。
-  - Shader 异步回调门控：
-    - `_ensureShaderImages(...)` 的异步 `then` 中增加 `_needsShaderImages` 再检查，模式切换后不再触发无关重绘。
-
-### 为什么
-- 用户在 iOS 覆盖翻页下反馈“页眉分割线延迟下移 + 正文二次重绘感”仍存在。
-- 该现象与两类抖动叠加相关：
-  - 交互后系统安全区（含 Home 指示条区域）变化带来的延迟布局刷新；
-  - 覆盖动画阶段快照缺失时回退到 Widget 渲染导致的渲染基底切换。
-- 本次将两条链路同时收敛，进一步对齐 legado 的“动画期稳定快照优先”语义。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - iOS 设备覆盖模式连续翻页（上/下各多次），确认翻页后 1~2 秒内页眉线与正文不再二次变化；
-  - 首次进入章节后立即翻页，确认无“短延迟后整体重绘”；
-  - 同章/跨章翻页各验证一次，确认正文不回退为空白、页眉页脚与正文同步。
-
-### 兼容影响
-- 仅影响阅读器翻页渲染时序与 UI 刷新策略，不影响书源、目录、正文解析与数据库结构。
-- iOS 下系统栏 inset 波动对阅读排版的影响被显著收敛，行为更贴近 legado 稳定表现。
-
-## 2026-02-15（覆盖翻页对齐 legado 三次收敛：方向绘制语义 + 收尾轻量化）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 覆盖翻页绘制改为按 legado 方向语义拆分：
-    - `NEXT`：使用目标页右侧裁剪暴露（`ClipRect`）+ 当前页平移 + seam 阴影；
-    - `PREV`：保持当前页为底，上一页从左侧平移进入 + seam 阴影。
-  - 新增 `_CoverNextRevealClipper`，用于对齐 legado 的 `nextRecorder` 裁剪显示行为。
-  - 覆盖阴影改为 legado 同向线性梯度（`0x66111111 -> transparent`），并按 seam 位置绘制。
-  - 收尾时序收敛：
-    - `_stopScroll(...)` 移除收尾阶段“同步刷新安全区 + 同步 ensure 当前页快照”的重工作，仅保留状态复位、pending 处理、`setState + _schedulePrecache`。
-  - 电量更新与快照一致性补齐：
-    - `_applyBatteryLevel(...)` 在显示电量且需要快照缓存时，触发快照失效与预渲染调度；
-    - 交互进行中仅标记 pending，避免中途强刷。
-  - 系统安全区接口简化：
-    - `_resolveStableSystemPadding(...)` 改为无参读取，消除无效参数与分支噪音。
-
-### 为什么
-- 用户要求与 legado 保持一致，且覆盖翻页仍有“延迟重绘感”。
-- 核查发现 `soupreader` 的 cover 路径此前是统一底图策略，与 legado 的 `NEXT/PREV` 差异较大；同时收尾阶段存在额外同步操作，增加了“下一拍变化”的概率。
-- 本次优先回归 legado 的方向绘制语义，并把收尾降到轻量化路径，减少二次变化触发面。
-
-### 如何验证
-- 命令：`flutter analyze --no-pub`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 覆盖模式同章连续翻下页/翻上页，观察 seam 阴影与页面暴露方向是否与 legado 一致；
-  - 翻页完成后静置 1~2 秒，确认页眉分割线与正文不再额外跳变；
-  - 跨章翻页确认无“仅标题无正文”回归。
-
-### 兼容影响
-- 仅调整阅读器覆盖翻页渲染与收尾策略，不影响书源解析、目录/正文抓取和数据库结构。
-- 展示行为更靠近 legado：`NEXT/PREV` 页面暴露顺序和阴影位置更一致。
-
-## 2026-02-15（翻页后延迟变动回归修复：仿真资源时序与静止态渲染路径收敛）
-
-### 已完成
-- `lib/features/reader/widgets/paged_reader_widget.dart`
-  - 仿真资源加载时序收敛：
-    - `_ensureShaderImages(...)` 新增 `requestVisualUpdate` 参数；
-    - 异步图片转换完成后默认仅更新缓存，不在交互结束后强制 `setState`；
-    - 仅在交互进行中或仿真翻页准备阶段触发可见重建，避免翻页完成后“下一拍”二次刷新。
-  - 仿真模式静止态统一快照渲染：
-    - `PageTurnMode.simulation` / `PageTurnMode.simulation2` 在静止态统一走 `_buildStaticRecordedPage(...)`；
-    - 不再回落到 `_buildPageWidget(...)` 造成渲染基线切换。
-  - 去除 build 阶段的仿真异步触发：
-    - 移除 `simulation` 分支中每帧 `_ensureShaderImages(...)` 的 build 内触发；
-    - 改为在交互生命周期（`_onDragStart`、`_setDirection`、`_prepareSimulationTurnFrames`、空闲预渲染）进行准备。
-  - 收尾同帧刷新补齐：
-    - `_stopScroll(...)` 在最终 `setState` 前执行 `_flushPendingSystemPaddingRefresh()`，降低页眉分割线延迟位移。
-  - 空闲预渲染补齐仿真缓存：
-    - `_schedulePrecache(...)` 在空闲帧补齐 `Shader` 依赖图片，但默认不触发可见重建。
-
-### 为什么
-- 用户反馈“以前所有模式都没有翻页后延迟变动”，当前行为属于回归。
-- 根因链路是：翻页结束后仍有异步资源回调触发 `setState`，并叠加仿真静止态渲染路径切换，导致页眉/页脚与正文出现延迟变化体感。
-- 本次按 legado 的收尾语义收敛到“翻页完成即稳定”，减少交互完成后的额外重绘。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 覆盖/滑动/仿真/仿真2/无动画分别连续翻页，观察翻页后 1~2 秒内无页眉线与正文二次跳变；
-  - 首次进入章节立即翻页，确认不出现“先稳定后再变化”；
-  - 上下翻页各验证一次，确认无阴影残留延迟消失问题。
-
-### 兼容影响
-- 仅调整阅读器翻页渲染时序与缓存更新策略，不影响书源解析、目录/正文抓取、数据库结构。
-- 行为与 legado 更一致：翻页收尾后界面稳定性更高，减少异步补帧导致的可见抖动。
-
-## 2026-02-15（目录自动定位修复 + 阅读设置分组对齐 legado）
-
-### 已完成
-- `lib/features/reader/widgets/reader_catalog_sheet.dart`
-  - 目录自动定位改为“索引定位优先 + 一次精对齐”两段式流程：
-    - 先按目标章节可见索引估算偏移并 `jumpTo`；
-    - 下一帧再尝试 `Scrollable.ensureVisible` 微调；
-    - 避免懒加载列表下目标 item 未构建导致 `currentContext == null` 时直接定位失败。
-  - 补充自动定位状态重置与触发时机：切换目录 Tab、搜索关键字变化、正倒序切换、刷新目录后都会重新定位。
-  - 增加目录项最小高度约束，提升索引偏移估算稳定性。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 阅读设置面板信息架构收敛：
-    - “翻页模式与动画”从“界面”分组迁移到“翻页”分组；
-    - “排版”首屏新增字距滑杆，形成字号/行距/段距/字距高频集中区；
-    - “界面”分组亮度显示补充百分比，减少盲调；
-    - “其他”分组增加“恢复默认阅读配置（legado 风格默认）”入口与确认弹窗。
-  - 从侧边快捷入口打开“界面”设置时，默认落在“界面”Tab（不再落在排版 Tab）。
-  - 设置弹层高度与数值列宽优化，降低内容拥挤和数值截断。
-- `lib/features/reader/widgets/reader_quick_settings_sheet.dart`
-  - 快捷设置标签语义对齐：`设置 -> 翻页`、`更多 -> 其他`。
-  - 排版页新增字距滑杆，保持与完整设置高频项一致。
-
-### 为什么
-- 目录“偶发不自动定位当前章节”的根因是旧实现依赖 `GlobalKey.currentContext + ensureVisible`，在 `ListView.builder` 懒加载场景下，远端目标项未构建时定位链路会提前返回。
-- 阅读设置入口虽然已有分组，但“界面/翻页”内容有交叉，高频参数不够集中，导致调参路径偏长；与 legado 的分组语义存在偏差。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 进入阅读页 -> 打开目录面板（正序/倒序、带搜索/不带搜索）-> 验证均可自动落到当前章节附近；
-  - 打开阅读设置 -> 验证“排版/界面/翻页/其他”分组内容语义一致；
-  - 在“其他”中恢复默认后，设置立即生效且可继续阅读。
-
-### 兼容影响
-- 仅涉及阅读器目录面板与阅读设置 UI/交互，不影响书源解析、目录抓取、正文抓取和数据库结构。
-- 对旧书源兼容性无影响。
-
-## 2026-02-15（搜索结果封面加载对齐 legado：书源上下文 + CookieJar + coverDecodeJs）
-
-### 已完成
-- `lib/features/source/services/rule_parser_engine.dart`
-  - 新增 `fetchCoverBytes(...)`：按书源上下文请求封面二进制，复用 legado 语义的请求链路：
-    - 书源 header + 登录 header + URL option headers 合并；
-    - `Origin/Referer` 补齐；
-    - `enabledCookieJar` 与并发率限制生效；
-    - 非 4xx/5xx 响应读取二进制封面。
-  - 新增封面解密桥接：`coverDecodeJs` 支持通过 JS 返回 Base64 / dataURL / JSON byte array，并回写为图片字节。
-  - 封面请求异常接入 `ExceptionLogService`（node: `source.cover`），便于问题排查。
-- `lib/features/source/services/source_cover_loader.dart`
-  - 新增封面加载器：
-    - 内存 LRU 缓存；
-    - in-flight 去重；
-    - 失败短期负缓存，避免滚动列表重复打失败请求。
-- `lib/app/widgets/source_aware_cover_image.dart`
-  - 新增“书源感知封面组件”：
-    - 有 source 且远程 URL 时，走 `SourceCoverLoader`；
-    - 其余场景保持原 `AppCoverImage` 逻辑；
-    - 失败回退占位，不阻塞列表渲染。
-- `lib/features/search/views/search_view.dart`
-  - 搜索聚合结果新增封面来源书源字段 `displayCoverSourceUrl`；
-  - 列表封面从 `AppCoverImage` 切换为 `SourceAwareCoverImage`，将封面 URL 对应的 source 一并传入。
-
-### 为什么
-- 搜索结果页此前是“裸 URL 直连”，未携带书源 header/Cookie/解密规则，导致防盗链或加密封面场景下列表无图。
-- legado 搜索页封面加载会带 `origin` 并走统一图片请求链路，本次按该行为对齐。
-
-### 如何验证
-- 命令：`flutter analyze --no-pub`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 使用需要 Referer/Cookie/coverDecodeJs 的书源进行搜索，检查结果列表封面是否显示；
-  - 对比同一本书“搜索列表封面”与“详情页封面”是否一致；
-  - 快速滚动搜索列表，确认封面加载稳定且失败项不会频繁重复请求。
-
-### 兼容影响
-- 变更仅作用于搜索结果封面加载链路，不影响 search/bookInfo/toc/content 规则解析语义。
-- 对旧书源兼容：无 source 或无封面规则时仍走原占位回退逻辑。
-
-## 2026-02-15（阅读器滚动模式对齐 legado：按页滚动保留一行 + 滚轮翻页链路）
-
-### 已完成
-- `lib/features/reader/widgets/scroll_page_step_calculator.dart`
-  - 新增滚动步进计算器，提供：
-    - 章节文本布局快照构建（标题/正文行位置信息）；
-    - 下一页/上一页滚动步长计算；
-    - 当不可计算可视行时回退整视口步长。
-  - 步进语义对齐 legado `ScrollPageDelegate`：优先按可视首末行计算位移，默认保留一行上下文。
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 滚动模式点击翻页从固定 `viewport ± 40` 改为“按可视行计算步进”。
-  - 新增滚动布局快照缓存与失效机制（章节/排版参数变化时自动失效）。
-  - 鼠标滚轮事件改为统一进入翻页动作链路（含滚动模式），对齐 legado `mouseWheelPage -> keyTurnPage` 语义。
-  - 滚动模式跨章边界行为修正：
-    - 下一页到章末 -> 下一章开头；
-    - 上一页到章首 -> 上一章末尾（`goToLastPage: true`）。
-  - 手动滚动翻页时与自动阅读联动：动作前暂停，动作完成后恢复，降低冲突跳动。
-
-### 为什么
-- 原实现滚动模式使用固定像素步长，无法复刻 legado 的“按可视内容翻页并保留一行”体验。
-- 原实现在滚动模式下忽略滚轮翻页动作，与 legado 行为不一致。
-- 章首上一页未跳转至上一章末尾，阅读连续性与 legado 存在差异。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 阅读器切到“滚动”模式，点击下一页/上一页，观察为按页滚动且保留一行上下文；
-  - 在桌面端使用鼠标滚轮，确认触发翻页动作而非仅自由滚动；
-  - 在章首点击上一页应进入上一章末尾，在章末点击下一页进入下一章开头；
-  - 开启自动阅读后手动触发翻页，确认不会出现明显冲突跳动。
-
-### 兼容影响
-- 变更仅作用于阅读器滚动模式翻页行为，不影响书源解析、搜索/发现/详情/目录/正文链路。
-- 对旧书源兼容性无破坏；若正文中存在复杂图文混排，当前按“不可测时整页回退”策略处理，行为稳定但仍可能与 legado 图片特例存在细微差异。
-
-## 2026-02-15（搜索列表封面补全修复：同源同书结果改为增量合并）
-
-### 已完成
-- `lib/features/search/views/search_view.dart`
-  - 将搜索结果去重策略从“仅保留首个命中（丢弃重复 key）”改为“同 key 增量合并（upsert）”。
-  - 新增同 key 标识与合并逻辑：
-    - 结果 key：`sourceUrl|bookUrl`；
-    - 实时搜索结果命中已存在 key 时，不再丢弃，而是用非空字段覆盖旧字段（重点覆盖 `coverUrl`）。
-  - 搜索会话初始化时，缓存结果先进入 upsert 流程，生成去重后的基线列表，再叠加实时结果。
-  - 实时结果回流后会更新 `_results` 并重建展示列表，确保封面可被后到数据修复。
-
-### 为什么
-- 原实现先加载缓存后建立 `seenResultKeys`，实时搜索若返回同 `sourceUrl|bookUrl` 会被直接跳过。
-- 当缓存条目缺失封面（或封面为空）时，即使实时结果带回了正确封面，也无法回填，最终列表持续显示占位图。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found! (ran in 188.8s)`
-- 手工路径：
-  - 使用同关键词重复搜索，确认实时结果可补全缓存中同一本书的封面；
-  - 对比“搜索列表封面”和“详情页封面”，确认列表不再长期停留占位；
-  - 退出并重新进入搜索页，验证修复后的结果可被缓存复用。
-
-### 兼容影响
-- 仅调整搜索页结果合并策略，不影响搜索请求、书源规则解析、详情/目录/正文链路。
-- 对旧书源兼容性无破坏；只会提升同 key 结果的字段完整度（尤其封面字段）。
-
-## 2026-02-15（搜索链路对齐 legado：多源合并 + 滚底分页 page++）
-
-### 已完成
-- `lib/features/search/views/search_view.dart`
-  - 搜索结果聚合改为 legado 语义：
-    - 新增 `_LegadoSearchAggregator`，按 `name+author` 聚合跨书源结果；
-    - 维护来源集合（按 source 去重）并统计“X 源”；
-    - 主记录保持首见源，不再用 `sourceName` 字典序选主。
-  - 排序改为 legado 分桶：
-    - 完全匹配（书名/作者等于关键字）；
-    - 包含匹配（书名/作者包含关键字）；
-    - 其他（仅非精准模式保留）；
-    - 桶内按来源数倒序，再按首见顺序稳定排序。
-  - 新增滚底连续分页：
-    - 新增搜索会话状态：`currentPage` / `hasMore` / `sessionSources`；
-    - 列表到底部自动触发下一页（`page++`）并发搜索；
-    - 任一书源当页有结果则继续可翻页，否则停止翻页。
-- `lib/features/source/services/rule_parser_engine.dart`
-  - `search(...)` 与 `searchDebug(...)` 新增可选参数 `page`；
-  - 构建 URL 时注入 `{{page}}` 变量（`page` 占位对齐 legado 翻页语义）；
-  - 异常日志附带 `page`，便于定位分页问题。
-
-### 为什么
-- 旧实现是“按 `sourceUrl|bookUrl` 聚合 + UI 层再分组”，与 legado 的“数据层按 `name+author` 合并来源”语义不一致。
-- 旧实现无 legado 同款滚底翻页，搜索仅停留在第一页，影响结果覆盖与体验连续性。
-
-### 如何验证
-- 命令：`flutter analyze`
-- 手工路径：
-  - 搜索同名书（多个书源）确认折叠为单卡片且显示正确来源数；
-  - 滚动到列表底部，确认自动继续搜索下一页并增量追加；
-  - 切换“精准过滤/普通过滤”确认结果集合与排序符合预期；
-  - 检查搜索结果封面仍可显示（保持书源上下文加载链路）。
-
-### 兼容影响
-- 搜索结果排序与聚合展示会发生变化（向 legado 行为对齐）。
-- 仅影响搜索链路，不影响详情/目录/正文解析与数据库结构。
-
-## 2026-02-15（阅读器滚动模式对齐 legado：跨章节连续滚动接线）
-
-### 已完成
-- `lib/features/reader/views/simple_reader_view.dart`
-  - 滚动模式目录/翻页语义改为“跨章节连续流”：
-    - 新增并接通 `_ScrollSegment` 连续段数据结构；
-    - `_buildScrollContent()` 从单章节渲染改为多段章节连续渲染；
-    - 每段绑定 `GlobalKey`，用于可见章节定位与进度同步。
-  - 滚动通知链路补齐：
-    - 在 `ScrollUpdateNotification/OverscrollNotification` 中按边界预加载前后章节；
-    - 滚动结束时同步当前可见章节并持久化进度。
-  - `_loadChapter()` 在滚动模式下改为初始化连续段窗口（中心章 + 邻章），不再走旧的“单章硬切”分支。
-  - `_scrollPage()` 边界行为改为先扩展连续段再滚动，不再直接 `_loadChapter(next/prev)`，减少翻页断层。
-  - 章节进度改为使用当前可见章节进度 `_currentScrollChapterProgress`，对齐连续流语义。
-  - 模式切换对齐：从翻页模式切到滚动模式时，按章节进度重建连续流并定位到对应进度位置。
-
-### 为什么
-- 之前虽然引入了滚动段数据结构，但主渲染和事件通知仍是单章节逻辑，导致行为会回退到“章切换式滚动”，与 legado 的连续滚动语义不一致。
-- 在章首/章末翻页时直接硬切章节，会出现明显跳变与体验中断。
-
-### 如何验证
-- 命令：`flutter analyze`
-  - 结果：`No issues found!`
-- 手工路径：
-  - 阅读器切到滚动模式，连续下翻/上翻，确认可跨章节连续阅读；
-  - 在章节边界反复翻页，确认不再出现硬切到下一章/上一章导致的断层；
-  - 从其他翻页模式切到滚动模式，确认定位大体保持在当前章节对应进度；
-  - 打开目录后返回阅读继续滚动，确认当前章节定位与进度显示同步。
-
-### 兼容影响
-- 仅调整阅读器滚动模式的数据流与翻页行为，不影响书源解析链路（search/explore/bookInfo/toc/content）。
-- 对旧书源无规则层兼容性破坏；仅改变阅读器滚动模式交互语义，使其向 legado 对齐。
+- **无功能语义新增**（仅测试覆盖增强）。
+- **风险下降**：分组排序回归被更早发现，降低旧书源显示顺序漂移风险。

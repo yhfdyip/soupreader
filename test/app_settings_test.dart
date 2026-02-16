@@ -12,6 +12,7 @@ void main() {
       autoUpdateSources: false,
       bookshelfViewMode: BookshelfViewMode.list,
       bookshelfSortMode: BookshelfSortMode.title,
+      searchScope: '玄幻,男频',
     );
 
     final decoded = AppSettings.fromJson(settings.toJson());
@@ -20,6 +21,14 @@ void main() {
     expect(decoded.autoUpdateSources, false);
     expect(decoded.bookshelfViewMode, BookshelfViewMode.list);
     expect(decoded.bookshelfSortMode, BookshelfSortMode.title);
+    expect(decoded.searchScope, '玄幻,男频');
+  });
+
+  test('AppSettings migrates legacy single source scope urls', () {
+    final decoded = AppSettings.fromJson({
+      'searchScopeSourceUrls': ['https://example.com/source'],
+    });
+    expect(decoded.searchScope, '::https://example.com/source');
   });
 
   test('SettingsService persists app settings', () async {
