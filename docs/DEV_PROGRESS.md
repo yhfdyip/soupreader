@@ -766,3 +766,38 @@
 
 ### 兼容影响
 - **有兼容影响（正向）**：新增与 legacy 同名语义的书源变量存储，不影响已有书源 JSON 结构。
+
+## 2026-02-17 - 滚动模式卡帧修复（legacy 对齐：偏移驱动同步 + 动画回归）
+
+### 做了什么
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 滚动章节同步从“每次遍历 RenderBox + localToGlobal”改为“偏移区间驱动”:
+    - 新增 `_scrollSegmentOffsetRanges`，基于章节高度构建 `start/end` 区间；
+    - `_syncCurrentChapterFromScroll()` 改为以 `scrollOffset + anchorWithinViewport` 直接命中区间，减少滚动期布局树读取。
+  - 滚动监听链路调整：
+    - 新增 `_scrollController` listener 统一处理预加载与 UI 同步；
+    - `NotificationListener` 仅保留 `ScrollEndNotification` 的落盘兜底。
+  - 点击翻页动画对齐 legacy 手感：
+    - `animateTo` 曲线改为 `Curves.linear`；
+    - 时长改为直接使用 `pageAnimDuration`（仅保底 `>=1ms`），移除 100~600 的 clamp。
+  - 回退“章节加载时预切分段落”:
+    - `_ScrollSegment` 移除 `paragraphs` 缓存字段；
+    - 构建阶段恢复按内容分段渲染，避免跨章加载时的同步拆分峰值。
+  - 节流参数回调至更接近流畅优先：
+    - UI 同步间隔 `120ms -> 16ms`；
+    - 预加载检查间隔 `160ms -> 80ms`。
+
+### 为什么
+- 用户反馈滚动模式“拖动与点击都卡”，且要求与 legado 体验一致。
+- 原实现在滚动同步阶段存在高频 RenderBox 扫描，叠加节流门控后会出现“非连续更新”体感；点击翻页动画曲线也与 legado 存在偏差。
+
+### 如何验证
+- 相关测试：
+  - `flutter test test/scroll_runtime_helper_test.dart`
+  - `flutter test test/paged_reader_widget_non_simulation_test.dart test/reading_settings_test.dart`
+- 静态检查：
+  - `flutter analyze`
+
+### 兼容影响
+- **有兼容影响（正向）**：滚动模式章节同步实现改为偏移驱动，滚动期更少布局计算，预期掉帧与卡顿降低。
+- 不涉及书源数据结构与解析语义，旧书源兼容性无负面影响。

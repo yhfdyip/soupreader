@@ -152,9 +152,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _TipOption(8, '页码/总页'),
     _TipOption(9, '时间+电量'),
   ];
-  static const int _scrollUiSyncIntervalMs = 120;
+  static const int _scrollUiSyncIntervalMs = 16;
   static const int _scrollSaveProgressIntervalMs = 450;
-  static const int _scrollPreloadIntervalMs = 160;
+  static const int _scrollPreloadIntervalMs = 80;
   static const double _scrollPreloadExtent = 280.0;
 
   // 章节加载锁（用于翻页模式）
@@ -173,6 +173,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   final List<_ScrollSegment> _scrollSegments = <_ScrollSegment>[];
   final Map<int, GlobalKey> _scrollSegmentKeys = <int, GlobalKey>{};
   final Map<int, double> _scrollSegmentHeights = <int, double>{};
+  final List<_ScrollSegmentOffsetRange> _scrollSegmentOffsetRanges =
+      <_ScrollSegmentOffsetRange>[];
+  final GlobalKey _scrollViewportKey =
+      GlobalKey(debugLabel: 'reader_scroll_viewport');
   bool _scrollAppending = false;
   bool _scrollPrepending = false;
   bool _syncingScrollVisibleChapter = false;
@@ -185,6 +189,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   DateTime _lastScrollUiSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastScrollPreloadCheckAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _programmaticScrollInFlight = false;
+  double _scrollAnchorWithinViewport = 32.0;
 
   @override
   void initState() {
@@ -224,6 +229,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     // 初始化自动翻页器
     _autoPager.setScrollController(_scrollController);
+    _scrollController.addListener(_handleScrollControllerTick);
     _autoPager.setOnNextPage(() {
       if (_settings.pageTurnMode == PageTurnMode.scroll) {
         unawaited(_scrollPage(up: false));
@@ -292,6 +298,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void dispose() {
     _pageFactory.removeContentChangedListener(_handlePageFactoryContentChanged);
     _saveProgress();
+    _scrollController.removeListener(_handleScrollControllerTick);
     _scrollController.dispose();
     _keyboardFocusNode.dispose();
     _autoPager.dispose();
@@ -459,14 +466,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       rawContent: content,
     );
     final processedContent = _postProcessContent(stage.content, stage.title);
-    final paragraphs = ScrollRuntimeHelper.splitParagraphs(processedContent);
 
     return _ScrollSegment(
       chapterIndex: chapterIndex,
       chapterId: chapter.id,
       title: stage.title,
       content: processedContent,
-      paragraphs: paragraphs,
     );
   }
 
@@ -598,6 +603,62 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _scrollSegmentHeights[segment.chapterIndex] = renderObject.size.height;
       }
     }
+    _rebuildScrollSegmentOffsetRanges();
+    _refreshScrollAnchorWithinViewport();
+  }
+
+  void _rebuildScrollSegmentOffsetRanges() {
+    _scrollSegmentOffsetRanges.clear();
+    if (_scrollSegments.isEmpty) return;
+    final fallbackHeight = _scrollController.hasClients
+        ? _scrollController.position.viewportDimension
+            .clamp(1.0, double.infinity)
+            .toDouble()
+        : 600.0;
+    var cursor = 0.0;
+    for (final segment in _scrollSegments) {
+      final measuredHeight = _scrollSegmentHeights[segment.chapterIndex];
+      final height = (measuredHeight != null && measuredHeight > 1.0)
+          ? measuredHeight
+          : fallbackHeight;
+      final end = cursor + height;
+      _scrollSegmentOffsetRanges.add(
+        _ScrollSegmentOffsetRange(
+          segment: segment,
+          start: cursor,
+          end: end,
+          height: height,
+        ),
+      );
+      cursor = end;
+    }
+  }
+
+  void _refreshScrollAnchorWithinViewport() {
+    if (!mounted) return;
+    final viewportContext = _scrollViewportKey.currentContext;
+    final viewportRenderObject = viewportContext?.findRenderObject();
+    if (viewportRenderObject is! RenderBox || !viewportRenderObject.hasSize) {
+      return;
+    }
+    final topInset = MediaQuery.of(context).padding.top;
+    final targetGlobalAnchor = topInset + 110.0;
+    final viewportTop = viewportRenderObject.localToGlobal(Offset.zero).dy;
+    final withinViewport = (targetGlobalAnchor - viewportTop)
+        .clamp(0.0, viewportRenderObject.size.height)
+        .toDouble();
+    _scrollAnchorWithinViewport = withinViewport;
+  }
+
+  void _handleScrollControllerTick() {
+    if (!mounted) return;
+    if (_settings.pageTurnMode != PageTurnMode.scroll) return;
+    if (!_scrollController.hasClients) return;
+
+    _scheduleScrollPreload();
+    if (!_programmaticScrollInFlight && _shouldSyncScrollUiNow()) {
+      _syncCurrentChapterFromScroll();
+    }
   }
 
   bool _shouldSyncScrollUiNow() {
@@ -624,8 +685,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return true;
   }
 
-  void _scheduleScrollPreload(ScrollMetrics metrics) {
-    if (!_shouldCheckScrollPreloadNow()) return;
+  void _scheduleScrollPreload() {
+    if (!_scrollController.hasClients || !_shouldCheckScrollPreloadNow()) {
+      return;
+    }
+    final metrics = _scrollController.position;
     if (metrics.maxScrollExtent - metrics.pixels <= _scrollPreloadExtent) {
       unawaited(_appendNextScrollSegmentIfNeeded());
     }
@@ -635,44 +699,54 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _syncCurrentChapterFromScroll({bool saveProgress = false}) {
-    if (!mounted || _scrollSegments.isEmpty || _syncingScrollVisibleChapter) {
+    if (!mounted ||
+        !_scrollController.hasClients ||
+        _scrollSegments.isEmpty ||
+        _syncingScrollVisibleChapter) {
       return;
     }
     _syncingScrollVisibleChapter = true;
     try {
-      final topInset = MediaQuery.of(context).padding.top;
-      final anchorY = topInset + 110.0;
+      if (_scrollSegmentOffsetRanges.length != _scrollSegments.length) {
+        _rebuildScrollSegmentOffsetRanges();
+      }
+      if (_scrollSegmentOffsetRanges.isEmpty) return;
 
-      _ScrollSegment? chosen;
+      final position = _scrollController.position;
+      final anchorOffset =
+          (_scrollController.offset + _scrollAnchorWithinViewport)
+              .clamp(
+                position.minScrollExtent,
+                position.maxScrollExtent + position.viewportDimension,
+              )
+              .toDouble();
+
+      _ScrollSegmentOffsetRange? chosenRange;
       double chosenProgress = _currentScrollChapterProgress;
       double bestDistance = double.infinity;
 
-      for (final segment in _scrollSegments) {
-        final segmentContext =
-            _scrollSegmentKeyFor(segment.chapterIndex).currentContext;
-        final renderObject = segmentContext?.findRenderObject();
-        if (renderObject is! RenderBox || !renderObject.hasSize) continue;
-        final top = renderObject.localToGlobal(Offset.zero).dy;
-        final height = renderObject.size.height;
-        final bottom = top + height;
-        if (height <= 1) continue;
-
-        if (top <= anchorY && bottom >= anchorY) {
-          chosen = segment;
-          chosenProgress =
-              ((anchorY - top) / height).clamp(0.0, 1.0).toDouble();
+      for (final range in _scrollSegmentOffsetRanges) {
+        if (anchorOffset >= range.start && anchorOffset <= range.end) {
+          chosenRange = range;
+          chosenProgress = ((anchorOffset - range.start) / range.height)
+              .clamp(0.0, 1.0)
+              .toDouble();
           break;
         }
 
-        final distance = (top - anchorY).abs();
+        final distance = anchorOffset < range.start
+            ? (range.start - anchorOffset)
+            : (anchorOffset - range.end);
         if (distance < bestDistance) {
           bestDistance = distance;
-          chosen = segment;
-          chosenProgress =
-              ((anchorY - top) / height).clamp(0.0, 1.0).toDouble();
+          chosenRange = range;
+          chosenProgress = ((anchorOffset - range.start) / range.height)
+              .clamp(0.0, 1.0)
+              .toDouble();
         }
       }
 
+      final chosen = chosenRange?.segment;
       if (chosen == null) return;
 
       final chapterChanged = chosen.chapterIndex != _currentChapterIndex;
@@ -681,7 +755,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       if (!chapterChanged && !progressChanged) return;
 
       setState(() {
-        _currentChapterIndex = chosen!.chapterIndex;
+        _currentChapterIndex = chosen.chapterIndex;
         _currentTitle = chosen.title;
         _currentContent = chosen.content;
         _currentScrollChapterProgress = chosenProgress;
@@ -807,6 +881,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       changed = true;
     }
     if (changed && mounted) {
+      _rebuildScrollSegmentOffsetRanges();
       setState(() {});
     }
   }
@@ -1654,9 +1729,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         await _scrollController.animateTo(
           clampedOffset,
           duration: Duration(
-            milliseconds: _settings.pageAnimDuration.clamp(100, 600),
+            milliseconds: _settings.pageAnimDuration <= 0
+                ? 1
+                : _settings.pageAnimDuration,
           ),
-          curve: Curves.linearToEaseOut,
+          curve: Curves.linear,
         );
       }
     } finally {
@@ -2097,15 +2174,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             return false;
           }
 
-          if (notification is ScrollUpdateNotification ||
-              notification is OverscrollNotification) {
-            final metrics = notification.metrics;
-            _scheduleScrollPreload(metrics);
-            if (!_programmaticScrollInFlight && _shouldSyncScrollUiNow()) {
-              _syncCurrentChapterFromScroll();
-            }
-          }
-
           if (notification is ScrollEndNotification && !_isRestoringProgress) {
             _syncCurrentChapterFromScroll(saveProgress: true);
             unawaited(_saveProgress());
@@ -2113,6 +2181,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           return false;
         },
         child: SingleChildScrollView(
+          key: _scrollViewportKey,
           controller: _scrollController,
           physics: const BouncingScrollPhysics(),
           child: Column(
@@ -2134,6 +2203,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _ScrollSegment segment, {
     required bool isTailSegment,
   }) {
+    final paragraphs = segment.content.split(RegExp(r'\n\s*\n|\n'));
     final paragraphStyle = TextStyle(
       fontSize: _settings.fontSize,
       height: _settings.lineHeight,
@@ -2180,7 +2250,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     : _settings.paragraphSpacing * 1.5,
               ),
             ],
-            ...segment.paragraphs.map((paragraphText) {
+            ...paragraphs.map((paragraph) {
+              final paragraphText = paragraph.trimRight();
+              if (paragraphText.trim().isEmpty) {
+                return const SizedBox.shrink();
+              }
               return Padding(
                 padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
                 child: _buildParagraphWithFirstLineIndent(
@@ -4825,13 +4899,25 @@ class _ScrollSegment {
   final String chapterId;
   final String title;
   final String content;
-  final List<String> paragraphs;
 
   const _ScrollSegment({
     required this.chapterIndex,
     required this.chapterId,
     required this.title,
     required this.content,
-    required this.paragraphs,
+  });
+}
+
+class _ScrollSegmentOffsetRange {
+  final _ScrollSegment segment;
+  final double start;
+  final double end;
+  final double height;
+
+  const _ScrollSegmentOffsetRange({
+    required this.segment,
+    required this.start,
+    required this.end,
+    required this.height,
   });
 }
