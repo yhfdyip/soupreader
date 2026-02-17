@@ -49,6 +49,7 @@ class ReadingSettings {
   final int pageAnimDuration; // 翻页动画时长 (100-600ms)
   final PageDirection pageDirection; // 翻页方向 (水平/垂直)
   final int pageTouchSlop; // 翻页触发灵敏度 (0-100, 百分比)
+  final bool noAnimScrollPage; // 滚动翻页无动画（对标 legado）
   final bool volumeKeyPage; // 音量键翻页
 
   // === 页眉/页脚配置 ===
@@ -112,6 +113,8 @@ class ReadingSettings {
     // 产品约束：除“滚动”以外的翻页模式一律水平；滚动模式由渲染层决定纵向滚动
     this.pageDirection = PageDirection.horizontal,
     this.pageTouchSlop = 0,
+    // 对标 legado：滚动翻页默认保留动画
+    this.noAnimScrollPage = false,
     this.volumeKeyPage = true,
     // 页眉/页脚配置默认值
     this.hideHeader = false,
@@ -275,6 +278,7 @@ class ReadingSettings {
       pageAnimDuration: _toInt(json['pageAnimDuration'], 300),
       pageDirection: PageDirection.values[safePageDirectionIndex],
       pageTouchSlop: _toInt(json['pageTouchSlop'], 0),
+      noAnimScrollPage: _toBool(json['noAnimScrollPage'], false),
       volumeKeyPage: _toBool(json['volumeKeyPage'], true),
       // 页眉/页脚配置
       hideHeader: _toBool(json['hideHeader'], false),
@@ -335,6 +339,7 @@ class ReadingSettings {
       'pageAnimDuration': pageAnimDuration,
       'pageDirection': pageDirection.index,
       'pageTouchSlop': pageTouchSlop,
+      'noAnimScrollPage': noAnimScrollPage,
       'volumeKeyPage': volumeKeyPage,
       // 页眉/页脚配置
       'hideHeader': hideHeader,
@@ -459,6 +464,7 @@ class ReadingSettings {
           _safeInt(pageAnimDuration, min: 100, max: 600, fallback: 300),
       pageDirection: pageDirection,
       pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 100, fallback: 0),
+      noAnimScrollPage: noAnimScrollPage,
       volumeKeyPage: volumeKeyPage,
       hideHeader: hideHeader,
       hideFooter: hideFooter,
@@ -522,6 +528,7 @@ class ReadingSettings {
     int? pageAnimDuration,
     PageDirection? pageDirection,
     int? pageTouchSlop,
+    bool? noAnimScrollPage,
     bool? volumeKeyPage,
     // 页眉/页脚配置
     bool? hideHeader,
@@ -579,6 +586,7 @@ class ReadingSettings {
       pageAnimDuration: pageAnimDuration ?? this.pageAnimDuration,
       pageDirection: pageDirection ?? this.pageDirection,
       pageTouchSlop: pageTouchSlop ?? this.pageTouchSlop,
+      noAnimScrollPage: noAnimScrollPage ?? this.noAnimScrollPage,
       volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
       // 页眉/页脚配置
       hideHeader: hideHeader ?? this.hideHeader,
@@ -715,7 +723,7 @@ extension PageTurnModeExtension on PageTurnMode {
   }
 }
 
-/// 翻页模式在 UI 中的展示顺序（对标专业阅读器习惯）
+/// 翻页模式在 UI 中的展示顺序（对标 legado）
 ///
 /// 约定：
 /// - `simulation2` 默认隐藏（不出现在可选项里）
@@ -729,15 +737,15 @@ class PageTurnModeUi {
   ///   以避免“当前选中值在 UI 里消失”的困惑。
   static List<PageTurnMode> values({required PageTurnMode current}) {
     final list = <PageTurnMode>[
+      PageTurnMode.cover,
       PageTurnMode.slide,
       PageTurnMode.simulation,
-      PageTurnMode.cover,
       PageTurnMode.scroll,
       PageTurnMode.none, // 放最后
     ];
 
     if (current == PageTurnMode.simulation2) {
-      list.insert(2, PageTurnMode.simulation2);
+      list.insert(3, PageTurnMode.simulation2);
     }
 
     return list;

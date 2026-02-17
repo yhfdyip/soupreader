@@ -532,3 +532,126 @@
 
 ### 兼容影响
 - **有兼容影响**：历史提交哈希已整体变更，依赖旧 commit hash 的本地分支/PR 需要 rebase 或重拉。
+
+## 2026-02-17 - 非仿真翻页对齐 legado（最小偏差修复）
+
+### 做了什么
+- `lib/features/reader/models/reading_settings.dart`
+  - 新增设置项 `noAnimScrollPage`（默认 `false`，对标 legado `AppConfig.noAnimScrollPage`）。
+  - 打通 `fromJson/toJson/sanitize/copyWith`，保证冷启动与持久化一致。
+  - 调整 `PageTurnModeUi.values(...)` 展示顺序为：
+    - `cover -> slide -> simulation -> scroll -> none`
+  - 保留 `simulation2` 隐藏策略；当当前值为 `simulation2` 时，仍插入列表用于可见但不可选。
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 在滚动翻页逻辑 `_scrollPage(...)` 中接入 `noAnimScrollPage`：
+    - 开启时使用 `jumpTo`（无动画）；
+    - 关闭时保留 `animateTo`（现有动画时长）。
+  - 在阅读设置面板新增“滚动翻页无动画”开关（仅 `scroll` 模式显示）。
+- `test/reading_settings_test.dart`
+  - 新增回归测试覆盖：
+    - `PageTurnModeUi` legacy 顺序；
+    - `simulation2` 选中时的可见插入；
+    - `noAnimScrollPage` 默认值与 JSON 往返。
+
+### 为什么
+- 按 legado 语义对齐“非仿真翻页”中的明显偏差：
+  - 当前项目翻页模式展示顺序与 legado 不一致；
+  - 当前项目滚动翻页缺少 legacy 的“无动画点击翻页”能力。
+
+### 如何验证
+- 静态检查：`flutter analyze`
+- 相关测试：
+  - `flutter test test/reading_settings_test.dart`
+
+### 兼容影响
+- **有兼容影响（正向）**：
+  - 翻页模式选项顺序将与 legado 更一致。
+  - scroll 模式新增可选“无动画翻页”行为，默认关闭，不影响旧配置体验。
+
+## 2026-02-17 - 协作规范调整：`flutter analyze` 触发时机
+
+### 做了什么
+- `AGENTS.md`
+  - 将测试与验收章节标题从“提交前检查”明确为“提交推送前检查”。
+  - 将执行条件从“修改代码后”调整为“在提交推送前”，命令仍为 `flutter analyze`。
+
+### 为什么
+- 对齐当前协作流程，避免在开发中间态频繁执行静态检查，统一在提交推送前做最终把关。
+
+### 如何验证
+- 手工检查 `AGENTS.md` 第 3 节文案，确认触发时机已改为“提交推送前”。
+
+### 兼容影响
+- 无运行时兼容影响（仅流程文档调整）。
+
+## 2026-02-17 - 非仿真翻页视觉对齐（none 真无动画 + 交互期快照兜底）
+
+### 做了什么
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 新增 `_isLegacyNonSimulationMode`，统一识别 `slide/cover/none`。
+  - `none` 模式在 `_startTurnAnimation()` 中改为 legacy 语义：
+    - 直接执行 `_completeNoAnimationTurn()`；
+    - 不再启动 `_startScroll()` 动画链路。
+  - 新增 `_completeNoAnimationTurn()`：
+    - 非取消场景立即 `fillPage`；
+    - 直接走 `_stopScroll(...)` 收尾，确保状态一致。
+  - `_buildRecordedPage(...)` 在交互期间（`slide/cover/none`）统一禁止回退到 widget 重排路径：
+    - 优先使用快照兜底；
+    - 无可用快照时返回纯背景，避免单帧重排造成抖动。
+  - `_buildNoAnimation(...)` 调整为始终显示当前页快照，不渲染中间过渡帧。
+- `test/paged_reader_widget_non_simulation_test.dart`
+  - 新增回归：`none` 模式点击翻页应立即生效，不依赖动画时长。
+
+### 为什么
+- 用户要求“除仿真外，翻页视觉效果与 legado 一致，过渡帧不能卡顿”。
+- 现状中 `none` 模式仍共享通用动画链，并且非仿真模式交互时存在回退到 widget 重排路径的可能，易导致观感抖动。
+
+### 如何验证
+- 相关测试：
+  - `flutter test test/paged_reader_widget_non_simulation_test.dart`
+  - `flutter test test/reading_settings_test.dart`
+
+### 兼容影响
+- **有兼容影响（正向）**：
+  - `none` 模式不再显示中间过渡效果，改为 legacy 风格“立即切页”。
+  - 非仿真模式交互期间渲染路径更稳定，降低卡顿与闪动风险。
+
+## 2026-02-17 - 非仿真翻页实现对齐 legado（slide/cover 公式、曲线、阴影）
+
+### 做了什么
+- `lib/features/reader/widgets/paged_reader_widget.dart`
+  - 在 `_startTurnAnimation()` 中为 `slide/cover` 单独走 `_onAnimStartHorizontalLegacy()`，不再复用仿真翻页位移公式。
+  - 新增 `_onAnimStartHorizontalLegacy()`，按 legado `SlidePageDelegate/CoverPageDelegate` 的 `distanceX` 计算完成/取消翻页位移。
+  - `_nextPageByAnim()` / `_prevPageByAnim()` 对齐 legado 触发起点：
+    - next: `x=0.9w`，`y` 按起点是否在下半区取 `0.9h` 或 `1`；
+    - prev: `x=0`，`y=h`。
+  - `_startScroll()` 去除时长 clamp，保留 legacy 距离比例时长计算。
+  - `_computeScroll()` 改为线性进度（`AnimationController.value`），对齐 legado `LinearInterpolator` 语义。
+  - `_buildSlideAnimation()`：
+    - 增加 legado 同款“反向位移直接返回当前帧”保护；
+    - 位移布局改为 `distanceX` 模型（`next`/`prev` 两支与 legado 一致）。
+  - `_buildCoverAnimation()`：
+    - 改为 legacy `distanceX` 驱动；
+    - 对齐 next 分支的 reveal + 当前页平移；
+    - 对齐 prev 分支的 `offsetX <= width` 与 `> width` 语义。
+  - `_buildLegacyCoverShadow()` 改为 legado 同款 `addShadow(left)` 语义（`left<0` 时右移 `+width`）。
+- `test/paged_reader_widget_non_simulation_test.dart`
+  - 补充 `slide/cover` 回归：
+    - 拖拽取消不翻页；
+    - 点击触发可前进并返回；
+  - 保留 `none` 模式“立即翻页”回归，确保无动画语义不回退。
+
+### 为什么
+- 用户要求“除仿真翻页外，其它翻页方式实现与 legado 完全一致”，重点是动画轨迹、阴影与过渡帧行为。
+- 当前实现虽已接近，但在 `slide/cover` 的动画公式、曲线、时长策略与边界渲染分支仍存在 legacy 偏差，需要做实现层收敛。
+
+### 如何验证
+- 相关测试：
+  - `flutter test test/paged_reader_widget_non_simulation_test.dart test/reading_settings_test.dart`
+- `flutter analyze`：
+  - 按项目协作规范，保留在提交推送前执行。
+
+### 兼容影响
+- **有兼容影响（正向）**：
+  - `slide/cover` 的完成/取消翻页手感、阴影位置和过渡帧更接近 legado。
+  - 不涉及数据结构与书源规则变更，对旧书源解析兼容性无负面影响。

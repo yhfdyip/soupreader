@@ -1601,13 +1601,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final latestMaxOffset = _scrollController.position.maxScrollExtent;
     final clampedOffset =
         targetOffset.clamp(minOffset, latestMaxOffset).toDouble();
-    await _scrollController.animateTo(
-      clampedOffset,
-      duration: Duration(
-        milliseconds: _settings.pageAnimDuration.clamp(100, 600),
-      ),
-      curve: Curves.easeOut,
-    );
+    if (_settings.noAnimScrollPage) {
+      _scrollController.jumpTo(clampedOffset);
+    } else {
+      await _scrollController.animateTo(
+        clampedOffset,
+        duration: Duration(
+          milliseconds: _settings.pageAnimDuration.clamp(100, 600),
+        ),
+        curve: Curves.easeOut,
+      );
+    }
 
     if (mounted) {
       _syncCurrentChapterFromScroll(saveProgress: true);
@@ -4001,6 +4005,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(volumeKeyPage: value),
                   );
                 }),
+                if (_settings.pageTurnMode == PageTurnMode.scroll)
+                  _buildSwitchRow(
+                    '滚动翻页无动画',
+                    _settings.noAnimScrollPage,
+                    (value) {
+                      _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(noAnimScrollPage: value),
+                      );
+                    },
+                  ),
                 _buildSwitchRow('净化章节标题', _settings.cleanChapterTitle, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
