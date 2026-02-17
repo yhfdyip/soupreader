@@ -801,3 +801,27 @@
 ### 兼容影响
 - **有兼容影响（正向）**：滚动模式章节同步实现改为偏移驱动，滚动期更少布局计算，预期掉帧与卡顿降低。
 - 不涉及书源数据结构与解析语义，旧书源兼容性无负面影响。
+
+## 2026-02-17 - 滚动模式二次优化（仅绘制可见行 + 文本绘制缓存）
+
+### 做了什么
+- 更新 `lib/features/reader/widgets/scroll_segment_paint_view.dart`：
+  - `CustomPainter` 绘制从“遍历整章所有行”改为“按当前可见裁剪区只绘制可见行”；
+  - 新增首可见行二分查找，避免每帧从第 1 行线性扫描；
+  - 引入全局 LRU `TextPainter` 缓存（按 `style + text`），减少重复创建 `TextPainter`；
+  - 增加 `CustomPaint(isComplex: true, willChange: false)`，帮助 Flutter 栅格缓存判定。
+
+### 为什么
+- 用户继续反馈“滚动模式仍卡顿”。
+- 之前已降低滚动期 `setState` 与布局树读取，但正文绘制阶段仍存在长章节每帧全量循环，CPU 开销偏高。
+- 该改动对齐 legado 的“预排版后按可见内容渲染”的思路，优先削减滚动帧内重复计算。
+
+### 如何验证
+- `flutter test test/scroll_text_layout_engine_test.dart`
+- `flutter test test/scroll_runtime_helper_test.dart`
+- `flutter test test/paged_reader_widget_non_simulation_test.dart test/reading_settings_test.dart`
+- `flutter analyze`
+
+### 兼容影响
+- **有兼容影响（正向）**：滚动模式长章节绘制负载显著下降，预期拖动连续性更好、卡帧概率降低。
+- 不涉及书源解析与翻页语义，不影响旧书源兼容性。

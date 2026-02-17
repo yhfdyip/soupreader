@@ -21,7 +21,6 @@ import '../services/reader_source_switch_helper.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/click_action_config_dialog.dart';
-import '../widgets/legacy_justified_text.dart';
 import '../widgets/paged_reader_widget.dart';
 import '../widgets/page_factory.dart';
 import '../widgets/reader_menus.dart';
@@ -29,6 +28,8 @@ import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
 import '../widgets/reader_catalog_sheet.dart';
 import '../widgets/scroll_page_step_calculator.dart';
+import '../widgets/scroll_segment_paint_view.dart';
+import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/typography_settings_dialog.dart';
 
@@ -91,6 +92,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ScreenBrightnessService.instance;
   final KeepScreenOnService _keepScreenOnService = KeepScreenOnService.instance;
   final RuleParserEngine _ruleEngine = RuleParserEngine();
+  final ScrollTextLayoutEngine _scrollTextLayoutEngine =
+      ScrollTextLayoutEngine.instance;
 
   List<Chapter> _chapters = [];
   int _currentChapterIndex = 0;
@@ -439,6 +442,94 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  double _scrollBodyWidth() {
+    if (!mounted) return 320.0;
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) return 320.0;
+    final screenSize = mediaQuery.size;
+    final safePadding = mediaQuery.padding;
+    return (screenSize.width -
+            safePadding.left -
+            safePadding.right -
+            _settings.paddingLeft -
+            _settings.paddingRight)
+        .clamp(1.0, double.infinity)
+        .toDouble();
+  }
+
+  TextStyle _scrollParagraphStyle() {
+    return TextStyle(
+      fontSize: _settings.fontSize,
+      height: _settings.lineHeight,
+      color: _currentTheme.text,
+      letterSpacing: _settings.letterSpacing,
+      fontFamily: _currentFontFamily,
+      fontWeight: _currentFontWeight,
+      decoration: _currentTextDecoration,
+    );
+  }
+
+  ScrollTextLayoutKey _scrollLayoutKeyFor({
+    required _ScrollSegmentSeed seed,
+    required double maxWidth,
+    required TextStyle style,
+  }) {
+    return ScrollTextLayoutKey(
+      chapterId: seed.chapterId,
+      contentHash: seed.content.hashCode,
+      widthPx: maxWidth.round(),
+      fontSizeX100: ((style.fontSize ?? 16.0) * 100).round(),
+      lineHeightX100: ((style.height ?? 1.2) * 100).round(),
+      letterSpacingX100: ((style.letterSpacing ?? 0.0) * 100).round(),
+      fontFamily: style.fontFamily,
+      fontWeight: style.fontWeight,
+      fontStyle: style.fontStyle,
+      justify: _settings.textFullJustify,
+      paragraphIndent: _settings.paragraphIndent,
+      paragraphSpacingX100: (_settings.paragraphSpacing * 100).round(),
+    );
+  }
+
+  ScrollTextLayout _resolveScrollTextLayout({
+    required _ScrollSegmentSeed seed,
+    required double maxWidth,
+    required TextStyle style,
+  }) {
+    return _scrollTextLayoutEngine.compose(
+      key: _scrollLayoutKeyFor(
+        seed: seed,
+        maxWidth: maxWidth,
+        style: style,
+      ),
+      content: seed.content,
+      style: style,
+      maxWidth: maxWidth,
+      justify: _settings.textFullJustify,
+      paragraphIndent: _settings.paragraphIndent,
+      paragraphSpacing: _settings.paragraphSpacing,
+    );
+  }
+
+  double _estimateScrollSegmentHeight({
+    required ScrollTextLayout layout,
+    required bool hasTitle,
+  }) {
+    final titleLineHeight = (_settings.fontSize + _settings.titleSize) *
+        ((_scrollParagraphStyle().height ?? 1.2).clamp(1.0, 2.5));
+    final titleExtra = hasTitle
+        ? (_settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20) +
+            titleLineHeight +
+            (_settings.titleBottomSpacing > 0
+                ? _settings.titleBottomSpacing
+                : _settings.paragraphSpacing * 1.5)
+        : 0.0;
+    return _settings.paddingTop +
+        _settings.paddingBottom +
+        titleExtra +
+        layout.bodyHeight +
+        24.0;
+  }
+
   Future<_ScrollSegment> _loadScrollSegment(
     int chapterIndex, {
     bool showLoading = false,
@@ -466,12 +557,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       rawContent: content,
     );
     final processedContent = _postProcessContent(stage.content, stage.title);
-
-    return _ScrollSegment(
-      chapterIndex: chapterIndex,
+    final seed = _ScrollSegmentSeed(
       chapterId: chapter.id,
       title: stage.title,
       content: processedContent,
+    );
+    final paragraphStyle = _scrollParagraphStyle();
+    final bodyWidth = _scrollBodyWidth();
+    final layout = _resolveScrollTextLayout(
+      seed: seed,
+      maxWidth: bodyWidth,
+      style: paragraphStyle,
+    );
+
+    return _ScrollSegment(
+      chapterIndex: chapterIndex,
+      chapterId: seed.chapterId,
+      title: seed.title,
+      content: seed.content,
+      estimatedHeight: _estimateScrollSegmentHeight(
+        layout: layout,
+        hasTitle: _settings.titleMode != 2,
+      ),
     );
   }
 
@@ -610,17 +717,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _rebuildScrollSegmentOffsetRanges() {
     _scrollSegmentOffsetRanges.clear();
     if (_scrollSegments.isEmpty) return;
-    final fallbackHeight = _scrollController.hasClients
-        ? _scrollController.position.viewportDimension
-            .clamp(1.0, double.infinity)
-            .toDouble()
-        : 600.0;
     var cursor = 0.0;
     for (final segment in _scrollSegments) {
       final measuredHeight = _scrollSegmentHeights[segment.chapterIndex];
-      final height = (measuredHeight != null && measuredHeight > 1.0)
-          ? measuredHeight
-          : fallbackHeight;
+      final fallbackHeight = segment.estimatedHeight > 1.0
+          ? segment.estimatedHeight
+          : (_scrollController.hasClients
+              ? _scrollController.position.viewportDimension
+                  .clamp(1.0, double.infinity)
+                  .toDouble()
+              : 600.0);
+      final height =
+          (measuredHeight != null && measuredHeight > 1.0) ? measuredHeight : fallbackHeight;
       final end = cursor + height;
       _scrollSegmentOffsetRanges.add(
         _ScrollSegmentOffsetRange(
@@ -754,12 +862,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           (chosenProgress - _currentScrollChapterProgress).abs() > 0.02;
       if (!chapterChanged && !progressChanged) return;
 
-      setState(() {
-        _currentChapterIndex = chosen.chapterIndex;
-        _currentTitle = chosen.title;
-        _currentContent = chosen.content;
+      if (chapterChanged || saveProgress) {
+        setState(() {
+          _currentChapterIndex = chosen.chapterIndex;
+          _currentTitle = chosen.title;
+          _currentContent = chosen.content;
+          _currentScrollChapterProgress = chosenProgress;
+        });
+      } else {
         _currentScrollChapterProgress = chosenProgress;
-      });
+      }
       if (chapterChanged) {
         _updateBookmarkStatus();
       }
@@ -2203,15 +2315,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _ScrollSegment segment, {
     required bool isTailSegment,
   }) {
-    final paragraphs = segment.content.split(RegExp(r'\n\s*\n|\n'));
-    final paragraphStyle = TextStyle(
-      fontSize: _settings.fontSize,
-      height: _settings.lineHeight,
-      color: _currentTheme.text,
-      letterSpacing: _settings.letterSpacing,
-      fontFamily: _currentFontFamily,
-      fontWeight: _currentFontWeight,
-      decoration: _currentTextDecoration,
+    final paragraphStyle = _scrollParagraphStyle();
+    final layout = _resolveScrollTextLayout(
+      seed: _ScrollSegmentSeed(
+        chapterId: segment.chapterId,
+        title: segment.title,
+        content: segment.content,
+      ),
+      maxWidth: _scrollBodyWidth(),
+      style: paragraphStyle,
     );
 
     return KeyedSubtree(
@@ -2250,19 +2362,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     : _settings.paragraphSpacing * 1.5,
               ),
             ],
-            ...paragraphs.map((paragraph) {
-              final paragraphText = paragraph.trimRight();
-              if (paragraphText.trim().isEmpty) {
-                return const SizedBox.shrink();
-              }
-              return Padding(
-                padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
-                child: _buildParagraphWithFirstLineIndent(
-                  paragraphText,
-                  style: paragraphStyle,
-                ),
-              );
-            }),
+            ScrollSegmentPaintView(
+              layout: layout,
+              style: paragraphStyle,
+            ),
             SizedBox(height: isTailSegment ? 80 : 24),
           ],
         ),
@@ -2310,21 +2413,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
         );
       }).toList(),
-    );
-  }
-
-  /// 段落渲染（首行缩进，对标 legado 的 `paragraphIndent` 体验）
-  Widget _buildParagraphWithFirstLineIndent(
-    String paragraph, {
-    required TextStyle style,
-  }) {
-    return LegacyJustifiedTextBlock(
-      content: paragraph,
-      style: style,
-      justify: _settings.textFullJustify,
-      paragraphIndent: _settings.paragraphIndent,
-      applyParagraphIndent: true,
-      preserveEmptyLines: false,
     );
   }
 
@@ -4894,17 +4982,31 @@ class _ReaderSearchHit {
   });
 }
 
+class _ScrollSegmentSeed {
+  final String chapterId;
+  final String title;
+  final String content;
+
+  const _ScrollSegmentSeed({
+    required this.chapterId,
+    required this.title,
+    required this.content,
+  });
+}
+
 class _ScrollSegment {
   final int chapterIndex;
   final String chapterId;
   final String title;
   final String content;
+  final double estimatedHeight;
 
   const _ScrollSegment({
     required this.chapterIndex,
     required this.chapterId,
     required this.title,
     required this.content,
+    required this.estimatedHeight,
   });
 }
 
