@@ -57,7 +57,7 @@ class SourceDebugParseResult {
   bool get ok => intent != null;
 }
 
-/// 对标 legado Debug.startDebug 的 key 语义解析：
+/// 调试 key 语义解析：
 /// - 绝对 URL: 详情调试
 /// - 包含 :: : 发现调试（substringAfter("::")）
 /// - ++ 开头: 目录调试

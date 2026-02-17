@@ -855,3 +855,42 @@
   - 旧书源 JSON 缺失 `enabledCookieJar` 字段时，运行默认从 `true` 改为 `false`；
   - 主编辑页保存后规则字段结构更稳定（不再因“空规则”被折叠为 `null`）。
 - “分享二维码”当前无原生二维码分享能力，采用“复制 JSON”兜底并提示，已在菜单文案明确。
+
+## 2026-02-17 - 书源管理文案收敛（仅业务短句）
+
+### 做了什么
+- 更新 `lib/features/source/views/source_edit_view.dart`：
+  - 调试页中包含技术来源说明的标题/说明文案改为纯业务表达：
+    - “菜单（…）” -> “菜单”
+    - “快捷（…）” -> “快捷”
+    - “调试帮助（…）” -> “调试帮助”
+    - 输入区说明改为“关键字/URL/前缀调试；完整语法见工具菜单里的调试帮助”。
+- 更新 `lib/features/source/constants/source_help_texts.dart`：
+  - 调试帮助标题从带技术来源说明改为“调试输入规则：”。
+- 更新 `lib/features/source/services/rule_parser_engine.dart`：
+  - 请求编码决策文本从“请求参数按 legacy escape 编码”改为“请求参数按 escape 编码”。
+- 更新 `lib/features/source/services/source_rule_lint_service.dart`：
+  - 体检提示“数量不一致”改为“数量不同”。
+- 同步清理书源模块相关注释中的迁移口吻（仅文字层，不改逻辑）：
+  - `lib/core/services/source_variable_store.dart`
+  - `lib/core/services/source_login_store.dart`
+  - `lib/features/source/services/source_cover_loader.dart`
+  - `lib/features/source/services/source_explore_kinds_service.dart`
+  - `lib/features/source/services/source_debug_key_parser.dart`
+  - `lib/features/source/services/source_availability_check_task_service.dart`
+  - `lib/features/source/views/source_list_view.dart`
+  - `lib/features/source/views/source_edit_legacy_view.dart`
+- 更新测试断言 `test/rule_parser_engine_url_option_compat_test.dart` 以匹配新文案。
+
+### 为什么
+- 用户要求书源管理界面只保留业务语义短句，不出现技术来源、迁移状态或实现口径说明。
+- 之前调试页与帮助文案仍包含这类说明，影响界面表达统一性。
+
+### 如何验证
+- `flutter test test/source_rule_lint_service_test.dart test/rule_parser_engine_url_option_compat_test.dart`
+- `flutter test test/source_legacy_save_service_test.dart test/source_rule_complete_test.dart test/source_variable_store_test.dart test/source_login_store_test.dart`
+- `flutter analyze`
+
+### 兼容影响
+- **无功能语义变更**：本次主要是文案与注释收敛，不改变书源处理流程与规则解析行为。
+- 调试输出中的请求编码说明文本有变更，依赖该固定文案的外部解析需同步更新。

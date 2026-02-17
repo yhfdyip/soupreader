@@ -1127,7 +1127,7 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     return CupertinoListSection.insetGrouped(
       header: const Text('快速输入'),
-      footer: const Text('关键字/URL/前缀调试；完整语法见“工具 -> 菜单（对标 Legado）-> 调试帮助”。'),
+      footer: const Text('关键字/URL/前缀调试；完整语法见“工具 -> 菜单 -> 调试帮助”。'),
       children: [
         CupertinoListTile.notched(
           title: const Text('Key'),
@@ -1153,7 +1153,7 @@ class _SourceEditViewState extends State<SourceEditView> {
               ),
               const SizedBox(height: 8),
               Text(
-                '对标 legado：输入后即按对应链路执行（搜索/详情/发现/目录/正文）。',
+                '输入后按对应链路执行（搜索/详情/发现/目录/正文）。',
                 style: theme.textTheme.small.copyWith(
                   color: scheme.mutedForeground,
                 ),
@@ -1186,7 +1186,7 @@ class _SourceEditViewState extends State<SourceEditView> {
           },
         ),
         CupertinoListTile.notched(
-          title: const Text('菜单（对标 Legado）'),
+          title: const Text('菜单'),
           subtitle: const Text('扫码/查看源码/刷新发现/调试帮助'),
           additionalInfo:
               _refreshingExploreQuickActions ? const Text('刷新中…') : null,
@@ -1291,7 +1291,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         }
 
         return CupertinoActionSheet(
-          title: const Text('菜单（对标 Legado）'),
+          title: const Text('菜单'),
           actions: [
             CupertinoActionSheetAction(
               onPressed: () => closeThen(() {
@@ -1586,7 +1586,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     ];
 
     return CupertinoListSection.insetGrouped(
-      header: const Text('快捷（对标 Legado）'),
+      header: const Text('快捷'),
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1971,7 +1971,7 @@ class _SourceEditViewState extends State<SourceEditView> {
 
   Future<void> _showDebugHelp() async {
     await _openDebugText(
-      title: '调试帮助（对标 Legado）',
+      title: '调试帮助',
       text: _debugHelpText(),
     );
   }

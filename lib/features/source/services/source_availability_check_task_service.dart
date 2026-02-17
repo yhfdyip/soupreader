@@ -129,7 +129,7 @@ class SourceCheckStartResult {
   });
 }
 
-/// 对标 legado CheckSourceService 的“任务化”语义：
+/// 书源可用性检测任务服务：
 /// - 检测任务脱离页面生命周期，页面退出后可继续运行；
 /// - 再次进入检测页可恢复当前任务状态；
 /// - 提供 start/stop 任务控制，并输出统一快照供 UI 订阅。

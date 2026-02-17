@@ -69,7 +69,7 @@ class SourceRuleLintService {
         add(
           RuleLintLevel.warning,
           field,
-          '模板占位符可能不平衡（{{ 与 }} 数量不一致）',
+          '模板占位符可能不平衡（{{ 与 }} 数量不同）',
           suggestion: '检查是否缺失右大括号或多写了模板起始符。',
         );
       }

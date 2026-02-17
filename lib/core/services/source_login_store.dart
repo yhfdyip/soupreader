@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 书源登录态存储（对标 legado BaseSource 登录相关缓存语义）
+/// 书源登录态存储（按书源键缓存登录信息）
 ///
 /// - loginHeader: 用于请求时自动附加的头部信息
 /// - loginInfo:   登录表单或脚本使用的用户信息文本

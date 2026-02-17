@@ -160,7 +160,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       },
       clearExploreKindsCache: _exploreKindsService.clearExploreKindsCache,
       clearJsLibScope: (_) {
-        // Flutter 侧当前无跨源共享 JS Scope，保留回调以对齐 legado 语义。
+        // Flutter 侧当前无跨源共享 JS Scope，保留回调位以维持行为完整性。
       },
     );
 

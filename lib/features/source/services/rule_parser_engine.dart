@@ -3111,7 +3111,7 @@ class RuleParserEngine {
     final requestCharsetDecision = normalizedOptionCharset.isEmpty
         ? '未指定 charset，URL/表单按原值（默认 UTF-8）处理'
         : normalizedOptionCharset == 'escape'
-            ? '请求参数按 legacy escape 编码'
+            ? '请求参数按 escape 编码'
             : '请求参数按 $normalizedOptionCharset 编码';
 
     var finalUrl = _encodeUrlQueryByCharset(url, optionCharset);

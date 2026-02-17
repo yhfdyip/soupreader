@@ -95,7 +95,7 @@ class _ImportDecision {
   const _ImportDecision({required this.entries, required this.policy});
 }
 
-/// 书源管理页面（复刻 legado 管理语义）
+/// 书源管理页面
 class SourceListView extends StatefulWidget {
   const SourceListView({super.key});
 

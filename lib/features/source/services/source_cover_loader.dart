@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import '../models/book_source.dart';
 import 'rule_parser_engine.dart';
 
-/// 搜索/发现封面的书源感知加载器（对齐 legado 封面请求语义）。
+/// 搜索/发现封面的书源感知加载器。
 class SourceCoverLoader {
   SourceCoverLoader._();
   static final SourceCoverLoader instance = SourceCoverLoader._();

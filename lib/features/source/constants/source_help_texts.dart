@@ -4,7 +4,7 @@ class SourceHelpTexts {
       '2. 导入支持：剪贴板/文件/网络/扫码；支持 sourceUrls 聚合导入。\n'
       '3. 校验前可设置关键词，便于快速复现搜索链路问题。';
 
-  static const String debug = '调试输入规则（对标 Legado）：\n'
+  static const String debug = '调试输入规则：\n'
       '\n'
       '1. 搜索调试：\n'
       '直接输入关键字，例如：我的、系统\n'

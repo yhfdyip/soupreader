@@ -160,7 +160,7 @@ void main() {
 
       expect(resolved.url,
           'https://example.com/search?k=%u4e2d%u6587%20%u7a7a%u683c');
-      expect(resolved.requestCharsetDecision, '请求参数按 legacy escape 编码');
+      expect(resolved.requestCharsetDecision, '请求参数按 escape 编码');
     });
 
     test('already encoded query is kept when charset is empty', () {

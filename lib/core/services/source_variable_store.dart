@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 书源变量存储（对标 legado BaseSource.setVariable/getVariable）
+/// 书源变量存储（按书源键持久化）
 ///
 /// 键格式：`sourceVariable_{bookSourceUrl}`
 class SourceVariableStore {

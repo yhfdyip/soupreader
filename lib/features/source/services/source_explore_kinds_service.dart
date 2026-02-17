@@ -40,7 +40,7 @@ class SourceExploreKindStyle {
   }
 }
 
-/// 对标 legado `BookSource.exploreKinds()`：
+/// 发现分类解析与缓存：
 /// - 支持 `exploreUrl` 普通文本 / JSON 数组 / `@js:` / `<js>`
 /// - `@js:` 与 `<js>` 结果持久化缓存（以 sourceUrl+exploreUrl 为键）
 /// - `clearExploreKindsCache` 语义：清理持久化 + 内存缓存
