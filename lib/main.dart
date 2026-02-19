@@ -9,6 +9,8 @@ import 'app/theme/cupertino_theme.dart';
 import 'app/theme/shadcn_theme.dart';
 import 'core/database/database_service.dart';
 import 'core/database/repositories/book_repository.dart';
+import 'core/database/repositories/rss_article_repository.dart';
+import 'core/database/repositories/rss_source_repository.dart';
 import 'core/database/repositories/replace_rule_repository.dart';
 import 'core/database/repositories/source_repository.dart';
 import 'core/models/app_settings.dart';
@@ -81,6 +83,15 @@ Future<BootFailure?> _bootstrapApp() async {
     });
     await _runBootStep('SourceRepository.bootstrap', () async {
       await SourceRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('RssSourceRepository.bootstrap', () async {
+      await RssSourceRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('RssArticleRepository.bootstrap', () async {
+      await RssArticleRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('RssReadRecordRepository.bootstrap', () async {
+      await RssReadRecordRepository.bootstrap(DatabaseService());
     });
     await _runBootStep('BookRepository.bootstrap', () async {
       await BookRepository.bootstrap(DatabaseService());

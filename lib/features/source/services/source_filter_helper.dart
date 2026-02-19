@@ -1,4 +1,5 @@
 import '../models/book_source.dart';
+import 'source_check_source_state_helper.dart';
 
 enum SourceEnabledFilter {
   all,
@@ -30,7 +31,12 @@ class SourceFilterHelper {
   ) {
     if (activeGroup == '全部') return sources;
     if (activeGroup == '失效') {
-      return sources.where((s) => !s.enabled).toList(growable: false);
+      return sources.where((source) {
+        final groups = SourceCheckSourceStateHelper.splitGroups(
+          source.bookSourceGroup,
+        );
+        return groups.any(SourceCheckSourceStateHelper.isInvalidGroup);
+      }).toList(growable: false);
     }
     return sources.where((s) {
       final raw = s.bookSourceGroup;

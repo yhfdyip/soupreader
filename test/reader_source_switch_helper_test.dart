@@ -191,9 +191,39 @@ void main() {
     final index = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
       newChapters: chapters,
       currentChapterTitle: '第2章-风起云涌',
-      currentChapterIndex: 0,
+      currentChapterIndex: 1,
     );
     expect(index, 1);
+  });
+
+  test('resolveTargetChapterIndex supports chapter number fallback', () {
+    final chapters = <Chapter>[
+      _chapter(index: 0, title: '第11章 前夜'),
+      _chapter(index: 1, title: '第12章 雨夜突围'),
+      _chapter(index: 2, title: '第13章 尾声'),
+    ];
+
+    final index = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+      newChapters: chapters,
+      currentChapterTitle: '第十二章 雨夜突圍',
+      currentChapterIndex: 1,
+    );
+    expect(index, 1);
+  });
+
+  test('resolveTargetChapterIndex honors old chapter count window', () {
+    final chapters = List<Chapter>.generate(
+      100,
+      (i) => _chapter(index: i, title: '第${i + 1}章 标题${i + 1}'),
+    );
+
+    final index = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+      newChapters: chapters,
+      currentChapterTitle: '第5章',
+      currentChapterIndex: 40,
+      oldChapterCount: 10,
+    );
+    expect(index, 4);
   });
 
   test('resolveTargetChapterIndex falls back to nearest index', () {

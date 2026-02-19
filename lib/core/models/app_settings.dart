@@ -21,9 +21,17 @@ enum BookshelfSortMode {
 }
 
 enum SearchFilterMode {
+  /// 历史兼容值：旧版本曾暴露“不过滤”入口。
+  /// legado 仅有“精准搜索开关”，因此运行时会归一为 `normal`。
   none,
   normal,
   precise,
+}
+
+SearchFilterMode normalizeSearchFilterMode(SearchFilterMode mode) {
+  return mode == SearchFilterMode.precise
+      ? SearchFilterMode.precise
+      : SearchFilterMode.normal;
 }
 
 class AppSettings {
@@ -94,9 +102,10 @@ class AppSettings {
           : raw is num
               ? raw.toInt()
               : null;
-      if (index == null) return SearchFilterMode.normal;
-      return SearchFilterMode
-          .values[index.clamp(0, SearchFilterMode.values.length - 1)];
+      if (index == SearchFilterMode.precise.index) {
+        return SearchFilterMode.precise;
+      }
+      return SearchFilterMode.normal;
     }
 
     int parseIntWithDefault(dynamic raw, int fallback) {
@@ -137,7 +146,8 @@ class AppSettings {
       autoUpdateSources: json['autoUpdateSources'] as bool? ?? true,
       bookshelfViewMode: parseViewMode(json['bookshelfViewMode']),
       bookshelfSortMode: parseSortMode(json['bookshelfSortMode']),
-      searchFilterMode: parseSearchFilterMode(json['searchFilterMode']),
+      searchFilterMode: normalizeSearchFilterMode(
+          parseSearchFilterMode(json['searchFilterMode'])),
       searchConcurrency:
           parseIntWithDefault(json['searchConcurrency'], 8).clamp(2, 12),
       searchCacheRetentionDays:
@@ -155,7 +165,7 @@ class AppSettings {
       'autoUpdateSources': autoUpdateSources,
       'bookshelfViewMode': bookshelfViewMode.index,
       'bookshelfSortMode': bookshelfSortMode.index,
-      'searchFilterMode': searchFilterMode.index,
+      'searchFilterMode': normalizeSearchFilterMode(searchFilterMode).index,
       'searchConcurrency': searchConcurrency,
       'searchCacheRetentionDays': searchCacheRetentionDays,
       'searchScope': searchScope,

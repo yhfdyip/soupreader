@@ -59,12 +59,11 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
             header: const Text('文本处理'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('繁体显示'),
-                trailing: CupertinoSwitch(
-                  value: _settings.chineseTraditional,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(chineseTraditional: v)),
-                ),
+                title: const Text('简繁转换'),
+                additionalInfo: Text(
+                    ChineseConverterType.label(_settings.chineseConverterType)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickChineseConverterType,
               ),
               CupertinoListTile.notched(
                 title: const Text('净化章节标题'),
@@ -115,5 +114,27 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
     );
     if (result == null) return;
     _update(_settings.copyWith(autoReadSpeed: result.clamp(1, 100)));
+  }
+
+  Future<void> _pickChineseConverterType() async {
+    final selected = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('简繁转换'),
+        actions: [
+          for (final mode in ChineseConverterType.values)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(context, mode),
+              child: Text(ChineseConverterType.label(mode)),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    _update(_settings.copyWith(chineseConverterType: selected));
   }
 }

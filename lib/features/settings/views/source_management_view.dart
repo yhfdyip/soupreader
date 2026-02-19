@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../rss/views/rss_source_manage_view.dart';
 import '../../source/views/source_list_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_ui_tokens.dart';
@@ -33,15 +34,15 @@ class SourceManagementView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('订阅管理'),
-                additionalInfo: const Text(
-                  SettingsUiTokens.plannedLabel,
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
-                ),
+                additionalInfo: const Text('搜索/分组/启停'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '订阅管理暂未实现',
-                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute<void>(
+                      builder: (context) => const RssSourceManageView(),
+                    ),
+                  );
+                },
               ),
               CupertinoListTile.notched(
                 title: const Text('语音管理'),

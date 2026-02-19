@@ -3948,6 +3948,7 @@ class RuleParserEngine {
     BookSource source,
     String key, {
     required void Function(SourceDebugEvent event) onEvent,
+    CancelToken? cancelToken,
   }) async {
     final started = DateTime.now();
 
@@ -3997,6 +3998,7 @@ class RuleParserEngine {
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
         concurrentRate: source.concurrentRate,
+        cancelToken: cancelToken,
       );
       if (res.headersWarning != null && res.headersWarning!.trim().isNotEmpty) {
         log('└请求头解析提示：${res.headersWarning}', state: 1, showTime: false);
@@ -4197,6 +4199,11 @@ class RuleParserEngine {
       );
       if (!ok) return;
       log('︽解析完成', state: 1000);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) {
+        return;
+      }
+      log('调试异常: $e', state: -1);
     } catch (e, st) {
       log('调试异常: $e', state: -1);
       log(st.toString(), state: -1, showTime: false);

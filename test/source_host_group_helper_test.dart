@@ -31,5 +31,25 @@ void main() {
       '127.0.0.1',
     );
     expect(SourceHostGroupHelper.groupHost('not-a-url'), '#');
+    expect(SourceHostGroupHelper.groupHost('https://[240e:390:abcd::1]/a'),
+        '240e:390:abcd::1');
+  });
+
+  test('only accepts http and https like legacy', () {
+    expect(
+      SourceHostGroupHelper.groupHost('ftp://sub.a.example.com/path'),
+      '#',
+    );
+    expect(
+      SourceHostGroupHelper.groupHost('ws://sub.a.example.com/path'),
+      '#',
+    );
+  });
+
+  test('comma suffix url falls back to #', () {
+    expect(
+      SourceHostGroupHelper.groupHost('https://example.com,{{key}}'),
+      '#',
+    );
   });
 }

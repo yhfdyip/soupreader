@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
@@ -12,16 +14,19 @@ import '../../../core/services/qr_scan_service.dart';
 import '../../../core/services/source_variable_store.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../search/views/search_view.dart';
+import '../../search/models/search_scope_group_helper.dart';
 import '../constants/source_help_texts.dart';
 import '../models/book_source.dart';
+import '../services/source_cookie_scope_resolver.dart';
 import '../services/source_explore_kinds_service.dart';
 import '../services/source_import_export_service.dart';
 import '../services/source_legacy_save_service.dart';
 import '../services/source_login_ui_helper.dart';
 import '../services/source_login_url_resolver.dart';
 import '../services/source_rule_complete.dart';
-import 'source_edit_view.dart';
+import 'source_debug_legacy_view.dart';
 import 'source_login_form_view.dart';
+import 'source_qr_share_view.dart';
 import 'source_web_verify_view.dart';
 
 class SourceEditLegacyView extends StatefulWidget {
@@ -56,6 +61,58 @@ class SourceEditLegacyView extends StatefulWidget {
 }
 
 class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
+  static const String _prefRuleHelpShown = 'source_edit_rule_help_shown_v1';
+  static const Map<String, String> _fieldLabels = <String, String>{
+    'bookSourceUrl': '书源地址',
+    'bookSourceName': '书源名称',
+    'bookSourceGroup': '书源分组',
+    'bookSourceComment': '备注',
+    'loginUrl': '登录地址',
+    'loginUi': '登录界面',
+    'loginCheckJs': '登录校验JS',
+    'coverDecodeJs': '封面解码JS',
+    'bookUrlPattern': '书籍地址匹配',
+    'header': '请求头',
+    'variableComment': '变量说明',
+    'concurrentRate': '并发率',
+    'jsLib': 'JS库',
+    'searchUrl': '搜索地址',
+    'checkKeyWord': '关键词',
+    'bookList': '书籍列表',
+    'name': '书名',
+    'author': '作者',
+    'kind': '分类',
+    'wordCount': '字数',
+    'lastChapter': '最新章节',
+    'intro': '简介',
+    'coverUrl': '封面地址',
+    'bookUrl': '书籍地址',
+    'exploreUrl': '发现地址',
+    'init': '详情初始化',
+    'tocUrl': '目录地址',
+    'canReName': '书名可改',
+    'downloadUrls': '下载地址规则',
+    'preUpdateJs': '目录预处理JS',
+    'chapterList': '章节列表',
+    'chapterName': '章节名',
+    'chapterUrl': '章节地址',
+    'formatJs': '格式化JS',
+    'isVolume': '卷标记',
+    'updateTime': '更新时间',
+    'isVip': 'VIP标记',
+    'isPay': '付费标记',
+    'nextTocUrl': '下一页目录',
+    'content': '正文内容',
+    'title': '正文标题',
+    'nextContentUrl': '下一页正文',
+    'webJs': 'WebView JS',
+    'sourceRegex': '替换源正则',
+    'replaceRegex': '替换规则',
+    'imageStyle': '图片样式',
+    'imageDecode': '图片解码',
+    'payAction': '购买动作',
+  };
+
   late final DatabaseService _db;
   late final SourceRepository _repo;
   late final SourceExploreKindsService _exploreKindsService;
@@ -73,6 +130,8 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   bool _enabledExplore = true;
   bool _enabledCookieJar = true;
   int _bookSourceType = 0;
+  String? _activeFieldKey;
+  TextEditingController? _activeFieldController;
 
   late final TextEditingController _bookSourceUrlCtrl;
   late final TextEditingController _bookSourceNameCtrl;
@@ -165,6 +224,9 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       clearJsLibScope: (_) {
         // Flutter 侧当前无跨源共享 JS Scope，保留回调位以维持行为完整性。
       },
+      removeSourceVariable: (sourceUrl) {
+        return SourceVariableStore.removeVariable(sourceUrl);
+      },
     );
 
     _tab = (widget.initialTab ?? 0).clamp(0, 5);
@@ -177,6 +239,10 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     _setupControllers(source);
     _savedSource = source;
     _savedSnapshot = _snapshotFor(source);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowRuleHelp();
+    });
   }
 
   @override
@@ -277,6 +343,12 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
             CupertinoButton(
               padding: EdgeInsets.zero,
               minimumSize: const Size(30, 30),
+              onPressed: _saveAndOpenDebug,
+              child: const Text('调试'),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(30, 30),
               onPressed: _showMore,
               child: const Icon(CupertinoIcons.ellipsis),
             ),
@@ -319,7 +391,11 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
                   },
                   onValueChanged: (value) {
                     if (value == null) return;
-                    setState(() => _tab = value);
+                    setState(() {
+                      _tab = value;
+                      _activeFieldKey = null;
+                      _activeFieldController = null;
+                    });
                   },
                 ),
               ),
@@ -344,36 +420,70 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Widget _buildTopSettings() {
-    return CupertinoListSection.insetGrouped(
-      header: const Text('开关与类型'),
-      children: [
-        CupertinoListTile.notched(
-          title: const Text('启用书源'),
-          trailing: CupertinoSwitch(
-            value: _enabled,
-            onChanged: (value) => setState(() => _enabled = value),
+    return Container(
+      color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            const Text('书源类型'),
+            const SizedBox(width: 8),
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              color: CupertinoColors.systemGrey5.resolveFrom(context),
+              borderRadius: BorderRadius.circular(14),
+              onPressed: _pickBookSourceType,
+              child: Text(_typeLabel(_bookSourceType)),
+            ),
+            const SizedBox(width: 8),
+            _buildTopSwitchItem(
+              text: '启用书源',
+              value: _enabled,
+              onChanged: (value) => setState(() => _enabled = value),
+            ),
+            const SizedBox(width: 8),
+            _buildTopSwitchItem(
+              text: '启用发现',
+              value: _enabledExplore,
+              onChanged: (value) => setState(() => _enabledExplore = value),
+            ),
+            const SizedBox(width: 8),
+            _buildTopSwitchItem(
+              text: '自动保存Cookie',
+              value: _enabledCookieJar,
+              onChanged: (value) => setState(() => _enabledCookieJar = value),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopSwitchItem({
+    required String text,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Text(text),
+          const SizedBox(width: 6),
+          Transform.scale(
+            scale: 0.82,
+            child: CupertinoSwitch(
+              value: value,
+              onChanged: onChanged,
+            ),
           ),
-        ),
-        CupertinoListTile.notched(
-          title: const Text('启用发现'),
-          trailing: CupertinoSwitch(
-            value: _enabledExplore,
-            onChanged: (value) => setState(() => _enabledExplore = value),
-          ),
-        ),
-        CupertinoListTile.notched(
-          title: const Text('启用 CookieJar'),
-          trailing: CupertinoSwitch(
-            value: _enabledCookieJar,
-            onChanged: (value) => setState(() => _enabledCookieJar = value),
-          ),
-        ),
-        CupertinoListTile.notched(
-          title: const Text('书源类型'),
-          additionalInfo: Text(_typeLabel(_bookSourceType)),
-          onTap: _pickBookSourceType,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -409,7 +519,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     return ListView(
       children: [
         CupertinoListSection.insetGrouped(
-          header: const Text('搜索（ruleSearch）'),
+          header: const Text('搜索规则'),
           children: [
             _buildTextFieldTile('searchUrl', _searchUrlCtrl),
             _buildTextFieldTile('checkKeyWord', _searchCheckKeyWordCtrl),
@@ -432,7 +542,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     return ListView(
       children: [
         CupertinoListSection.insetGrouped(
-          header: const Text('发现（ruleExplore）'),
+          header: const Text('发现规则'),
           children: [
             _buildTextFieldTile('exploreUrl', _exploreUrlCtrl),
             _buildTextFieldTile('bookList', _exploreBookListCtrl),
@@ -454,7 +564,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     return ListView(
       children: [
         CupertinoListSection.insetGrouped(
-          header: const Text('详情（ruleBookInfo）'),
+          header: const Text('详情规则'),
           children: [
             _buildTextFieldTile('init', _infoInitCtrl),
             _buildTextFieldTile('name', _infoNameCtrl),
@@ -477,7 +587,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     return ListView(
       children: [
         CupertinoListSection.insetGrouped(
-          header: const Text('目录（ruleToc）'),
+          header: const Text('目录规则'),
           children: [
             _buildTextFieldTile('preUpdateJs', _tocPreUpdateJsCtrl,
                 maxLines: 3),
@@ -500,7 +610,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     return ListView(
       children: [
         CupertinoListSection.insetGrouped(
-          header: const Text('正文（ruleContent）'),
+          header: const Text('正文规则'),
           children: [
             _buildTextFieldTile('content', _contentContentCtrl, maxLines: 4),
             _buildTextFieldTile('title', _contentTitleCtrl),
@@ -523,17 +633,51 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   CupertinoListTile _buildTextFieldTile(
-    String title,
+    String key,
     TextEditingController controller, {
     int maxLines = 1,
   }) {
+    final isActiveField = identical(_activeFieldController, controller);
     return CupertinoListTile.notched(
-      title: Text(title),
+      title: Text(_labelForField(key)),
       subtitle: CupertinoTextField(
         controller: controller,
         maxLines: maxLines,
+        onTap: () => _markActiveField(key, controller),
+        onChanged: (_) => _markActiveField(key, controller),
       ),
+      trailing: isActiveField
+          ? CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(28, 28),
+              onPressed: () {
+                _markActiveField(key, controller);
+                _showInsertActions();
+              },
+              child: const Icon(CupertinoIcons.wand_stars, size: 18),
+            )
+          : null,
     );
+  }
+
+  String _labelForField(String key) {
+    return _fieldLabels[key] ?? key;
+  }
+
+  void _markActiveField(String key, TextEditingController controller) {
+    if (identical(_activeFieldController, controller) &&
+        _activeFieldKey == key) {
+      return;
+    }
+    if (!mounted) {
+      _activeFieldKey = key;
+      _activeFieldController = controller;
+      return;
+    }
+    setState(() {
+      _activeFieldKey = key;
+      _activeFieldController = controller;
+    });
   }
 
   Future<void> _pickBookSourceType() async {
@@ -572,13 +716,6 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _saveAndOpenDebug();
-            },
-            child: const Text('调试'),
-          ),
           if (_loginUrlCtrl.text.trim().isNotEmpty)
             CupertinoActionSheetAction(
               onPressed: () {
@@ -604,13 +741,6 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _setSourceVariable();
-            },
-            child: const Text('设置源变量'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
               setState(() => _autoComplete = !_autoComplete);
               _showMessage('自动补全已${_autoComplete ? '开启' : '关闭'}');
             },
@@ -626,23 +756,16 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _shareSourceJsonText();
-            },
-            child: const Text('分享文本'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _shareSourceJsonQrFallback();
-            },
-            child: const Text('分享二维码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
               _pasteSourceJson();
             },
             child: const Text('粘贴书源'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _setSourceVariable();
+            },
+            child: const Text('设置源变量'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
@@ -654,7 +777,21 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _showMessage(SourceHelpTexts.manage);
+              _shareSourceJsonQrFallback();
+            },
+            child: const Text('分享二维码'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _shareSourceJsonText();
+            },
+            child: const Text('分享文本'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _showMessage(SourceHelpTexts.ruleHelp);
             },
             child: const Text('帮助'),
           ),
@@ -664,6 +801,320 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           child: const Text('取消'),
         ),
       ),
+    );
+  }
+
+  Future<void> _maybeShowRuleHelp() async {
+    final prefs = await SharedPreferences.getInstance();
+    final shown = prefs.getBool(_prefRuleHelpShown) ?? false;
+    if (shown) return;
+    await prefs.setBool(_prefRuleHelpShown, true);
+    if (!mounted) return;
+    _showMessage(SourceHelpTexts.ruleHelp);
+  }
+
+  Future<void> _showInsertActions() async {
+    final fieldKey = _activeFieldKey;
+    final onGroupField = fieldKey == 'bookSourceGroup';
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (popupContext) => CupertinoActionSheet(
+        title: const Text('编辑工具'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _insertUrlOption();
+            },
+            child: const Text('插入URL参数'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _showMessage(SourceHelpTexts.ruleHelp);
+            },
+            child: const Text('书源教程'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _showMessage(SourceHelpTexts.jsHelp);
+            },
+            child: const Text('js教程'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _showMessage(SourceHelpTexts.regexHelp);
+            },
+            child: const Text('正则教程'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              if (onGroupField) {
+                _insertGroup();
+              } else {
+                _insertFilePath();
+              }
+            },
+            child: Text(onGroupField ? '插入分组' : '选择文件'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(popupContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _insertUrlOption() async {
+    if (!_ensureActiveFieldSelected()) return;
+    final methodCtrl = TextEditingController();
+    final charsetCtrl = TextEditingController();
+    final headersCtrl = TextEditingController();
+    final bodyCtrl = TextEditingController();
+    final typeCtrl = TextEditingController();
+    final retryCtrl = TextEditingController();
+    final webJsCtrl = TextEditingController();
+    final jsCtrl = TextEditingController();
+    var useWebView = false;
+
+    final text = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (popupContext) {
+        return StatefulBuilder(
+          builder: (context, setPopupState) {
+            return CupertinoPopupSurface(
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.72,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: Row(
+                          children: [
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () => Navigator.pop(popupContext),
+                              child: const Text('取消'),
+                            ),
+                            const Expanded(
+                              child: Center(
+                                child: Text(
+                                  'URL参数',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ),
+                            ),
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                final option = <String, dynamic>{};
+                                void setText(String key, String value) {
+                                  final v = value.trim();
+                                  if (v.isNotEmpty) {
+                                    option[key] = v;
+                                  }
+                                }
+
+                                if (useWebView) {
+                                  option['useWebView'] = true;
+                                }
+                                setText('method', methodCtrl.text);
+                                setText('charset', charsetCtrl.text);
+                                setText('headers', headersCtrl.text);
+                                setText('body', bodyCtrl.text);
+                                setText('type', typeCtrl.text);
+                                setText('retry', retryCtrl.text);
+                                setText('webJs', webJsCtrl.text);
+                                setText('js', jsCtrl.text);
+
+                                Navigator.pop(popupContext, jsonEncode(option));
+                              },
+                              child: const Text('插入'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        height: 1,
+                        color: CupertinoColors.separator.resolveFrom(context),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(child: Text('useWebView')),
+                                CupertinoSwitch(
+                                  value: useWebView,
+                                  onChanged: (value) {
+                                    setPopupState(() => useWebView = value);
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _buildUrlOptionField(
+                              controller: methodCtrl,
+                              placeholder: 'method',
+                            ),
+                            _buildUrlOptionField(
+                              controller: charsetCtrl,
+                              placeholder: 'charset',
+                            ),
+                            _buildUrlOptionField(
+                              controller: headersCtrl,
+                              placeholder: 'headers',
+                            ),
+                            _buildUrlOptionField(
+                              controller: bodyCtrl,
+                              placeholder: 'body',
+                            ),
+                            _buildUrlOptionField(
+                              controller: typeCtrl,
+                              placeholder: 'type',
+                            ),
+                            _buildUrlOptionField(
+                              controller: retryCtrl,
+                              placeholder: 'retry',
+                              keyboardType: TextInputType.number,
+                            ),
+                            _buildUrlOptionField(
+                              controller: webJsCtrl,
+                              placeholder: 'webJs',
+                              maxLines: 3,
+                            ),
+                            _buildUrlOptionField(
+                              controller: jsCtrl,
+                              placeholder: 'js',
+                              maxLines: 3,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    methodCtrl.dispose();
+    charsetCtrl.dispose();
+    headersCtrl.dispose();
+    bodyCtrl.dispose();
+    typeCtrl.dispose();
+    retryCtrl.dispose();
+    webJsCtrl.dispose();
+    jsCtrl.dispose();
+
+    if (text == null || text.trim().isEmpty) return;
+    _insertTextToActiveField(text.trim());
+  }
+
+  Widget _buildUrlOptionField({
+    required TextEditingController controller,
+    required String placeholder,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: CupertinoTextField(
+        controller: controller,
+        placeholder: placeholder,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+      ),
+    );
+  }
+
+  Future<void> _insertGroup() async {
+    if (!_ensureActiveFieldSelected()) return;
+    final groups = _collectAllGroups();
+    if (groups.isEmpty) {
+      _showMessage('暂无可选分组');
+      return;
+    }
+
+    final selected = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (popupContext) => CupertinoActionSheet(
+        title: const Text('选择分组'),
+        actions: [
+          for (final group in groups)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(popupContext, group),
+              child: Text(group),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(popupContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null || selected.trim().isEmpty) return;
+    _insertTextToActiveField(selected);
+  }
+
+  Future<void> _insertFilePath() async {
+    if (!_ensureActiveFieldSelected()) return;
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      withData: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final path = (file.path ?? file.name).trim();
+    if (path.isEmpty) {
+      _showMessage('未获取到文件路径');
+      return;
+    }
+    _insertTextToActiveField(path);
+  }
+
+  List<String> _collectAllGroups() {
+    final rawGroups = _repo
+        .getAllSources()
+        .map((source) => source.bookSourceGroup?.trim() ?? '')
+        .where((raw) => raw.isNotEmpty);
+    return SearchScopeGroupHelper.dealGroups(rawGroups);
+  }
+
+  bool _ensureActiveFieldSelected() {
+    if (_activeFieldController != null) return true;
+    _showMessage('请先选中输入框');
+    return false;
+  }
+
+  void _insertTextToActiveField(String text) {
+    final controller = _activeFieldController;
+    if (controller == null) {
+      _showMessage('请先选中输入框');
+      return;
+    }
+    final value = controller.value;
+    final start = value.selection.start;
+    final end = value.selection.end;
+    final hasSelection = start >= 0 && end >= 0;
+    final replaceStart =
+        hasSelection ? (start < end ? start : end) : value.text.length;
+    final replaceEnd =
+        hasSelection ? (start < end ? end : start) : value.text.length;
+    final nextText = value.text.replaceRange(replaceStart, replaceEnd, text);
+    controller.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: replaceStart + text.length),
     );
   }
 
@@ -693,9 +1144,17 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   Future<void> _shareSourceJsonQrFallback() async {
     final source = _buildSourceFromFields();
     final text = LegadoJson.encode(source.toJson());
-    await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    _showMessage('当前版本暂不支持二维码分享，已复制书源 JSON');
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceQrShareView(
+          text: text,
+          subject: source.bookSourceName.trim().isEmpty
+              ? '书源二维码'
+              : source.bookSourceName.trim(),
+        ),
+      ),
+    );
   }
 
   Future<void> _pasteSourceJson() async {
@@ -747,22 +1206,20 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Future<void> _saveAndOpenDebug() async {
-    final saved = await _saveInternal();
+    final saved = await _saveInternal(showSuccessMessage: false);
     if (saved == null || !mounted) return;
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView.fromSource(
-          saved,
-          rawJson: LegadoJson.encode(saved.toJson()),
-          initialTab: 3,
+        builder: (_) => SourceDebugLegacyView(
+          source: saved,
         ),
       ),
     );
   }
 
   Future<void> _saveAndOpenLogin() async {
-    final saved = await _saveInternal();
+    final saved = await _saveInternal(showSuccessMessage: false);
     if (saved == null || !mounted) return;
 
     if (SourceLoginUiHelper.hasLoginUi(saved.loginUi)) {
@@ -797,14 +1254,13 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Future<void> _saveAndSearch() async {
-    final saved = await _saveInternal();
+    final saved = await _saveInternal(showSuccessMessage: false);
     if (saved == null || !mounted) return;
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (_) => SearchView.scoped(
           sourceUrls: <String>[saved.bookSourceUrl],
-          autoSearchOnOpen: false,
         ),
       ),
     );
@@ -875,22 +1331,54 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       _showMessage('请先填写 bookSourceUrl');
       return;
     }
-    final uri = Uri.tryParse(url);
-    if (uri == null || uri.host.isEmpty) {
+
+    final allCandidates = <Uri>[];
+    final seen = <String>{};
+    void addAll(Iterable<Uri> uris) {
+      for (final uri in uris) {
+        final key = uri.toString();
+        if (seen.add(key)) {
+          allCandidates.add(uri);
+        }
+      }
+    }
+
+    addAll(SourceCookieScopeResolver.resolveClearCandidates(url));
+    if (allCandidates.isEmpty) {
       _showMessage('bookSourceUrl 不是有效 URL');
       return;
     }
 
+    var cleared = 0;
+    Object? lastError;
     try {
-      await CookieStore.jar.delete(uri, true);
-      _showMessage('已清理该书源 Cookie');
+      for (final uri in allCandidates) {
+        try {
+          await CookieStore.jar.delete(uri, true);
+          cleared += 1;
+        } catch (e) {
+          lastError = e;
+        }
+      }
     } catch (e) {
-      _showMessage('清理 Cookie 失败：$e');
+      lastError = e;
     }
+
+    if (cleared > 0) {
+      _showMessage('已清理该书源 Cookie');
+      return;
+    }
+    if (lastError != null) {
+      _showMessage('清理 Cookie 失败：$lastError');
+      return;
+    }
+    _showMessage('未找到可清理的 Cookie');
   }
 
   Future<void> _save() async {
-    await _saveInternal(showSuccessMessage: true);
+    final saved = await _saveInternal(showSuccessMessage: false);
+    if (saved == null || !mounted) return;
+    Navigator.of(context).pop(saved.bookSourceUrl);
   }
 
   Future<BookSource?> _saveInternal({bool showSuccessMessage = true}) async {

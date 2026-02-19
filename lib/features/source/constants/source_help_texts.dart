@@ -4,6 +4,42 @@ class SourceHelpTexts {
       '2. 导入支持：剪贴板/文件/网络/扫码；支持 sourceUrls 聚合导入。\n'
       '3. 校验前可设置关键词，便于快速复现搜索链路问题。';
 
+  static const String ruleHelp = '规则帮助：\n'
+      '\n'
+      '1. URL 参数：\n'
+      '可使用 {key}/{page} 占位，或通过 URL 参数片段拼接请求。\n'
+      '\n'
+      '2. 规则语法：\n'
+      '支持 XPath、CSS、JSONPath、正则与规则串联。\n'
+      '\n'
+      '3. JS 处理：\n'
+      '可在搜索、详情、目录、正文链路编写 JS 做前后处理。\n'
+      '\n'
+      '4. 正则替换：\n'
+      'replaceRegex 使用 regex##replacement##... 格式。\n'
+      '\n'
+      '5. 调试建议：\n'
+      '先验证搜索，再逐段验证详情、目录、正文。';
+
+  static const String jsHelp = 'JS 使用说明：\n'
+      '\n'
+      '1. 可在 webJs、preUpdateJs、formatJs 等字段编写脚本。\n'
+      '\n'
+      '2. 脚本建议先做小步输出，再逐步拼接完整逻辑。\n'
+      '\n'
+      '3. 涉及请求头、变量、返回值处理时，先在调试页验证结果。'
+      '\n'
+      '\n'
+      '4. 复杂脚本建议拆分为 jsLib 复用。';
+
+  static const String regexHelp = '正则使用说明：\n'
+      '\n'
+      '1. 基础匹配：可使用分组、非贪婪、边界断言等常见语法。\n'
+      '\n'
+      '2. 替换规则：replaceRegex 使用 regex##replacement##... 格式。\n'
+      '\n'
+      '3. 多条替换按顺序执行，建议先在小样本上验证再应用。';
+
   static const String debug = '调试输入规则：\n'
       '\n'
       '1. 搜索调试：\n'

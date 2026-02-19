@@ -27,6 +27,9 @@ class SourceDriftService {
     if (_db == null) return;
     await _db!.transaction(() async {
       await _db!.delete(_db!.sourceRecords).go();
+      await _db!.delete(_db!.rssSourceRecords).go();
+      await _db!.delete(_db!.rssArticleRecords).go();
+      await _db!.delete(_db!.rssReadRecordRecords).go();
       await _db!.delete(_db!.bookRecords).go();
       await _db!.delete(_db!.chapterRecords).go();
       await _db!.delete(_db!.replaceRuleRecords).go();

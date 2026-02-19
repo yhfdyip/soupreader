@@ -1,10 +1,11 @@
-import 'dart:convert';
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'
     show ReorderableDragStartListener, ReorderableListView;
+import 'package:flutter/rendering.dart' show RenderBox;
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -13,19 +14,23 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
+import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../search/views/search_view.dart';
 import '../constants/source_help_texts.dart';
 import '../models/book_source.dart';
 import '../services/source_availability_check_task_service.dart';
+import '../services/source_check_source_state_helper.dart';
 import '../services/source_host_group_helper.dart';
+import '../services/source_import_commit_service.dart';
 import '../services/source_import_export_service.dart';
+import '../services/source_import_selection_helper.dart';
 import '../services/source_login_url_resolver.dart';
 import '../services/source_login_ui_helper.dart';
 import '../../search/models/search_scope_group_helper.dart';
+import 'source_debug_legacy_view.dart';
 import 'source_edit_legacy_view.dart';
-import 'source_edit_view.dart';
 import 'source_login_form_view.dart';
 import 'source_web_verify_view.dart';
 
@@ -39,60 +44,48 @@ enum _SourceSortMode {
   enabled,
 }
 
-class _ImportPolicy {
-  final bool keepOriginalName;
-  final bool keepGroup;
-  final bool keepEnabled;
-  final String customGroup;
-  final bool appendGroup;
-
-  const _ImportPolicy({
-    required this.keepOriginalName,
-    required this.keepGroup,
-    required this.keepEnabled,
-    required this.customGroup,
-    required this.appendGroup,
-  });
-}
-
-class _ImportEntry {
-  BookSource incoming;
-  BookSource? existing;
-  String rawJson;
-  bool selected;
-  bool edited = false;
-  bool duplicateInImport = false;
-
-  _ImportEntry({
-    required this.incoming,
-    required this.existing,
-    required this.rawJson,
-    required this.selected,
+class _ImportSelectionDecision {
+  const _ImportSelectionDecision({
+    required this.candidates,
+    required this.policy,
   });
 
-  bool get isNew => existing == null;
-
-  bool get isUpdate {
-    final local = existing;
-    if (local == null) return false;
-    return incoming.lastUpdateTime > local.lastUpdateTime;
-  }
-
-  bool get isExisting => !isNew && !isUpdate;
-
-  String get statusLabel {
-    if (duplicateInImport) return '重复';
-    if (isNew) return '新增';
-    if (isUpdate) return '更新';
-    return '已有';
-  }
+  final List<SourceImportCandidate> candidates;
+  final SourceImportSelectionPolicy policy;
 }
 
-class _ImportDecision {
-  final List<_ImportEntry> entries;
-  final _ImportPolicy policy;
+enum _CheckKeywordDialogAction {
+  cancel,
+  openSettings,
+  start,
+}
 
-  const _ImportDecision({required this.entries, required this.policy});
+class _CheckKeywordDialogResult {
+  const _CheckKeywordDialogResult({
+    required this.action,
+    required this.keyword,
+  });
+
+  final _CheckKeywordDialogAction action;
+  final String keyword;
+}
+
+class _CheckSettings {
+  const _CheckSettings({
+    required this.timeoutMs,
+    required this.checkSearch,
+    required this.checkDiscovery,
+    required this.checkInfo,
+    required this.checkCategory,
+    required this.checkContent,
+  });
+
+  final int timeoutMs;
+  final bool checkSearch;
+  final bool checkDiscovery;
+  final bool checkInfo;
+  final bool checkCategory;
+  final bool checkContent;
 }
 
 /// 书源管理页面
@@ -111,38 +104,65 @@ class _SourceListViewState extends State<SourceListView> {
 
   late final SourceRepository _sourceRepo;
   late final DatabaseService _db;
+  late final SourceImportCommitService _importCommitService;
+  final KeepScreenOnService _keepScreenOnService = KeepScreenOnService.instance;
   final SourceAvailabilityCheckTaskService _checkTaskService =
       SourceAvailabilityCheckTaskService.instance;
   final SourceImportExportService _importExportService =
       SourceImportExportService();
+  bool _checkTaskKeepScreenOn = false;
 
   final TextEditingController _urlController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _listScrollController = ScrollController();
 
   final Set<String> _selectedUrls = <String>{};
+  final Map<String, String> _hostMap = <String, String>{};
+  final Map<String, GlobalKey> _itemKeyByUrl = <String, GlobalKey>{};
+  final GlobalKey _listViewportKey = GlobalKey();
+  bool _dragSelecting = false;
+  bool _dragSelectValue = true;
+  int _dragLastIndex = -1;
 
-  static const String _prefImportKeepName = 'source_import_keep_name';
-  static const String _prefImportKeepGroup = 'source_import_keep_group';
-  static const String _prefImportKeepEnabled = 'source_import_keep_enabled';
-  static const String _prefImportCustomGroup = 'source_import_custom_group';
-  static const String _prefImportAppendGroup = 'source_import_append_group';
   static const String _prefImportOnlineHistory = 'source_import_online_history';
   static const String _prefCheckKeyword = 'source_check_keyword';
+  static const String _prefCheckTimeoutMs = 'source_check_timeout_ms';
+  static const String _prefCheckSearch = 'source_check_search';
+  static const String _prefCheckDiscovery = 'source_check_discovery';
+  static const String _prefCheckInfo = 'source_check_info';
+  static const String _prefCheckCategory = 'source_check_category';
+  static const String _prefCheckContent = 'source_check_content';
+  static const String _prefImportKeepName = 'source_import_keep_name';
+  static const String _prefImportKeepGroup = 'source_import_keep_group';
+  static const String _prefImportKeepEnable = 'source_import_keep_enable';
+  static const String _prefSourceManageHelpShown =
+      'source_manage_help_shown_v1';
 
   @override
   void initState() {
     super.initState();
     _db = DatabaseService();
     _sourceRepo = SourceRepository(_db);
+    _importCommitService = SourceImportCommitService(
+      upsertSourceRawJson: _sourceRepo.upsertSourceRawJson,
+      loadAllSources: _sourceRepo.getAllSources,
+      loadRawJsonByUrl: _sourceRepo.getRawJsonByUrl,
+    );
     _lastCheckSnapshot = _checkTaskService.snapshot;
     _checkTaskService.listenable.addListener(_onCheckTaskChanged);
+    _syncCheckKeepScreenOn(_lastCheckSnapshot);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowSourceManageHelpOnce();
+    });
   }
 
   @override
   void dispose() {
     _checkTaskService.listenable.removeListener(_onCheckTaskChanged);
+    _syncCheckKeepScreenOn(null, forceDisable: true);
     _urlController.dispose();
     _searchController.dispose();
+    _listScrollController.dispose();
     super.dispose();
   }
 
@@ -190,6 +210,7 @@ class _SourceListViewState extends State<SourceListView> {
 
             return Column(
               children: [
+                _buildCheckTaskBanner(),
                 Expanded(
                   child: filtered.isEmpty
                       ? _buildEmptyState()
@@ -216,6 +237,7 @@ class _SourceListViewState extends State<SourceListView> {
 
   void _cleanupSelection(List<BookSource> allSources) {
     final urls = allSources.map((s) => s.bookSourceUrl).toSet();
+    _itemKeyByUrl.removeWhere((url, _) => !urls.contains(url));
     if (_selectedUrls.isEmpty) return;
     final toRemove = _selectedUrls.where((url) => !urls.contains(url)).toList();
     if (toRemove.isEmpty) return;
@@ -227,29 +249,35 @@ class _SourceListViewState extends State<SourceListView> {
     final previous = _lastCheckSnapshot;
     final finished = previous?.running == true && current?.running != true;
     _lastCheckSnapshot = current;
+    _syncCheckKeepScreenOn(current);
     if (!mounted) return;
     setState(() {});
     if (!finished || current == null) return;
     _handleInlineCheckFinished(current);
   }
 
+  void _syncCheckKeepScreenOn(
+    SourceCheckTaskSnapshot? snapshot, {
+    bool forceDisable = false,
+  }) {
+    final shouldKeepOn = !forceDisable && snapshot?.running == true;
+    if (_checkTaskKeepScreenOn == shouldKeepOn) return;
+    _checkTaskKeepScreenOn = shouldKeepOn;
+    unawaited(_keepScreenOnService.setEnabled(shouldKeepOn));
+  }
+
   void _handleInlineCheckFinished(SourceCheckTaskSnapshot snapshot) {
-    final items = snapshot.items;
-    if (items.isEmpty) return;
-    final failed = items
-        .where((e) =>
-            e.status == SourceCheckStatus.fail ||
-            e.status == SourceCheckStatus.empty)
-        .length;
-    final ok = items.where((e) => e.status == SourceCheckStatus.ok).length;
-    final groups = _buildGroups(_sourceRepo.getAllSources());
-    final hasInvalidGroup = groups.any((g) => g.contains('失效'));
+    final allSources = _normalizeSources(_sourceRepo.getAllSources());
+    final hasInvalidGroup = allSources.any((source) {
+      final groups = SourceCheckSourceStateHelper.splitGroups(
+        source.bookSourceGroup,
+      );
+      return groups.any((group) => group.contains('失效'));
+    });
     if (_searchController.text.trim().isEmpty && hasInvalidGroup) {
       setState(() => _searchController.text = '失效');
-      _showMessage('发现有失效书源，已自动筛选');
-      return;
+      _showToastMessage('发现有失效书源，已自动筛选');
     }
-    _showMessage('校验完成：成功 $ok 条，失败/空列表 $failed 条');
   }
 
   SourceCheckItem? _findCheckItem(String bookSourceUrl) {
@@ -261,10 +289,19 @@ class _SourceListViewState extends State<SourceListView> {
     return null;
   }
 
+  SourceCheckStatus? _inlineCheckStatus(BookSource source) {
+    final item = _findCheckItem(source.bookSourceUrl);
+    if (item != null) return item.status;
+    final cached = _checkTaskService.lastResultFor(source.bookSourceUrl);
+    return cached?.status;
+  }
+
   String? _inlineCheckMessage(BookSource source) {
     final item = _findCheckItem(source.bookSourceUrl);
-    if (item == null) return null;
-    final base = switch (item.status) {
+    final cached = _checkTaskService.lastResultFor(source.bookSourceUrl);
+    final status = item?.status ?? cached?.status;
+    if (status == null) return null;
+    final base = switch (status) {
       SourceCheckStatus.pending => '待校验',
       SourceCheckStatus.running => '校验中',
       SourceCheckStatus.ok => '校验成功',
@@ -272,7 +309,7 @@ class _SourceListViewState extends State<SourceListView> {
       SourceCheckStatus.fail => '校验失败',
       SourceCheckStatus.skipped => '已跳过',
     };
-    final detail = (item.message ?? '').trim();
+    final detail = ((item?.message) ?? (cached?.message) ?? '').trim();
     if (detail.isEmpty || detail == base) return base;
     return '$base：$detail';
   }
@@ -301,6 +338,63 @@ class _SourceListViewState extends State<SourceListView> {
     return SearchScopeGroupHelper.dealGroups(rawGroups);
   }
 
+  Widget _buildCheckTaskBanner() {
+    final snapshot = _checkTaskService.snapshot;
+    if (snapshot == null || !snapshot.running) {
+      return const SizedBox.shrink();
+    }
+    final text = _buildCheckTaskProgressText(snapshot);
+    return Container(
+      width: double.infinity,
+      color: CupertinoColors.systemYellow.resolveFrom(context).withValues(
+            alpha: 0.14,
+          ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Row(
+        children: [
+          const CupertinoActivityIndicator(radius: 8),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            minimumSize: const Size(44, 28),
+            onPressed: snapshot.stopRequested
+                ? null
+                : () {
+                    _checkTaskService.requestStop();
+                    setState(() {});
+                  },
+            child: Text(snapshot.stopRequested ? '停止中' : '停止'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _buildCheckTaskProgressText(SourceCheckTaskSnapshot snapshot) {
+    final items = snapshot.items;
+    final total = items.length;
+    final done =
+        items.where((item) => item.status != SourceCheckStatus.pending).length;
+    final runningItem =
+        items.where((e) => e.status == SourceCheckStatus.running);
+    final runningName = runningItem.isEmpty
+        ? ''
+        : ' · ${runningItem.first.source.bookSourceName}';
+    if (snapshot.stopRequested) {
+      return '正在停止校验（$done/$total）$runningName';
+    }
+    return '校验进行中（$done/$total）$runningName';
+  }
+
   Widget _buildNavigationSearchField() {
     return SizedBox(
       height: 34,
@@ -321,40 +415,40 @@ class _SourceListViewState extends State<SourceListView> {
     }
 
     final sorted = filtered.toList(growable: false);
+    _hostMap.clear();
     _sortSources(sorted);
     return sorted;
   }
 
   List<BookSource> _applyQueryFilter(List<BookSource> input, String query) {
     final q = query.toLowerCase();
-    if (q == '启用' || q == 'enabled') {
+    if (q == '启用') {
       return input.where((s) => s.enabled).toList(growable: false);
     }
-    if (q == '禁用' || q == 'disabled') {
+    if (q == '禁用') {
       return input.where((s) => !s.enabled).toList(growable: false);
     }
-    if (q == '需登录' || q == 'need_login') {
+    if (q == '需登录') {
       return input
           .where((s) => (s.loginUrl ?? '').trim().isNotEmpty)
           .toList(growable: false);
     }
-    if (q == '无分组' || q == 'no_group') {
+    if (q == '无分组') {
       return input.where((s) {
-        final group = (s.bookSourceGroup ?? '').trim();
+        final group = s.bookSourceGroup ?? '';
         return group.isEmpty || group.contains('未分组');
       }).toList(growable: false);
     }
-    if (q == '启用发现' || q == 'enabled_explore') {
+    if (q == '启用发现') {
       return input.where((s) => s.enabledExplore).toList(growable: false);
     }
-    if (q == '禁用发现' || q == 'disabled_explore') {
+    if (q == '禁用发现') {
       return input.where((s) => !s.enabledExplore).toList(growable: false);
     }
-    if (q.startsWith('group:')) {
-      final key = query.substring(6).trim();
-      if (key.isEmpty) return input;
+    if (query.startsWith('group:')) {
+      final key = query.substring(6);
       return input
-          .where((s) => _extractGroups(s.bookSourceGroup).contains(key))
+          .where((s) => _matchesGroupQueryLegacy(s.bookSourceGroup, key))
           .toList(growable: false);
     }
 
@@ -423,7 +517,8 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   String _hostOf(String url) {
-    return SourceHostGroupHelper.groupHost(url);
+    return _hostMap.putIfAbsent(
+        url, () => SourceHostGroupHelper.groupHost(url));
   }
 
   bool get _canManualReorder {
@@ -439,6 +534,7 @@ class _SourceListViewState extends State<SourceListView> {
     Widget buildItem(BookSource source, int index) {
       final selected = _selectedUrls.contains(source.bookSourceUrl);
       final checkItem = _findCheckItem(source.bookSourceUrl);
+      final checkStatus = _inlineCheckStatus(source);
       final checkMessage = _inlineCheckMessage(source);
       final showHeader = _groupSourcesByDomain &&
           (index == 0 ||
@@ -467,12 +563,25 @@ class _SourceListViewState extends State<SourceListView> {
               ),
             ),
           Container(
+            key: _itemKeyForUrl(source.bookSourceUrl),
             color: CupertinoColors.systemBackground.resolveFrom(context),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onLongPress: () {
-                setState(() => _toggleSelection(source.bookSourceUrl));
+              onLongPressStart: (_) {
+                _startDragSelection(visible, index);
               },
+              onLongPressMoveUpdate: (details) {
+                _updateDragSelectionByGlobal(
+                  visible,
+                  details.globalPosition,
+                );
+                _autoScrollForDragSelection(
+                  visible,
+                  details.globalPosition,
+                );
+              },
+              onLongPressEnd: (_) => _endDragSelection(),
+              onLongPressCancel: _endDragSelection,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 10, 8),
                 child: Row(
@@ -541,7 +650,7 @@ class _SourceListViewState extends State<SourceListView> {
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: _inlineCheckColor(
-                                          checkItem?.status ??
+                                          checkStatus ??
                                               SourceCheckStatus.pending,
                                         ),
                                       ),
@@ -630,6 +739,8 @@ class _SourceListViewState extends State<SourceListView> {
 
     if (reorderEnabled) {
       return ReorderableListView.builder(
+        key: _listViewportKey,
+        scrollController: _listScrollController,
         buildDefaultDragHandles: false,
         padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
         itemCount: visible.length,
@@ -647,6 +758,8 @@ class _SourceListViewState extends State<SourceListView> {
     }
 
     return ListView.separated(
+      key: _listViewportKey,
+      controller: _listScrollController,
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
       itemCount: visible.length,
       separatorBuilder: (_, __) => Container(
@@ -915,14 +1028,6 @@ class _SourceListViewState extends State<SourceListView> {
               setState(() => _expandSelectionInterval(visibleSources));
             },
           ),
-          if (_checkTaskService.isRunning)
-            CupertinoActionSheetAction(
-              child: const Text('停止校验'),
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                _checkTaskService.requestStop();
-              },
-            ),
         ],
         cancelButton: CupertinoActionSheetAction(
           child: const Text('取消'),
@@ -971,13 +1076,6 @@ class _SourceListViewState extends State<SourceListView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('扫码导入'),
-            onPressed: () {
-              Navigator.pop(context);
-              _importFromQrCode();
-            },
-          ),
-          CupertinoActionSheetAction(
             child: const Text('从文件导入'),
             onPressed: () {
               Navigator.pop(context);
@@ -989,6 +1087,13 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () {
               Navigator.pop(context);
               _importFromUrl();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('扫码导入'),
+            onPressed: () {
+              Navigator.pop(context);
+              _importFromQrCode();
             },
           ),
           CupertinoActionSheetAction(
@@ -1074,7 +1179,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   void _showGroupFilterOptions() {
-    final groups = _buildGroups(_sourceRepo.getAllSources());
+    final groups = _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
     showCupertinoModalPopup<void>(
       context: context,
       builder: (context) => CupertinoActionSheet(
@@ -1312,7 +1417,10 @@ class _SourceListViewState extends State<SourceListView> {
             child: const Text('调试'),
             onPressed: () {
               Navigator.pop(context);
-              _openEditor(source.bookSourceUrl, initialTab: 3);
+              _openEditor(
+                source.bookSourceUrl,
+                initialTab: 3,
+              );
             },
           ),
           CupertinoActionSheetAction(
@@ -1432,12 +1540,23 @@ class _SourceListViewState extends State<SourceListView> {
     }
     final keyword = await _askCheckKeyword();
     if (keyword == null) return;
+    final checkSettings = _loadCheckSettings();
+    if (!checkSettings.checkSearch && !checkSettings.checkDiscovery) {
+      _showMessage('至少启用一种校验方式');
+      return;
+    }
     final startResult = await _checkTaskService.start(
       SourceCheckTaskConfig(
         includeDisabled: true,
         sourceUrls:
             selected.map((e) => e.bookSourceUrl).toList(growable: false),
         keywordOverride: keyword,
+        timeoutMs: checkSettings.timeoutMs,
+        checkSearch: checkSettings.checkSearch,
+        checkDiscovery: checkSettings.checkDiscovery,
+        checkInfo: checkSettings.checkInfo,
+        checkCategory: checkSettings.checkCategory,
+        checkContent: checkSettings.checkContent,
       ),
       forceRestart: true,
     );
@@ -1454,6 +1573,124 @@ class _SourceListViewState extends State<SourceListView> {
       return;
     }
     _showMessage('已开始校验（${selected.length} 条）');
+  }
+
+  GlobalKey _itemKeyForUrl(String url) {
+    return _itemKeyByUrl.putIfAbsent(
+      url,
+      () => GlobalKey(debugLabel: 'source-item-$url'),
+    );
+  }
+
+  void _startDragSelection(List<BookSource> visible, int index) {
+    if (index < 0 || index >= visible.length) return;
+    final url = visible[index].bookSourceUrl;
+    final nextValue = !_selectedUrls.contains(url);
+    setState(() {
+      _dragSelecting = true;
+      _dragSelectValue = nextValue;
+      _dragLastIndex = -1;
+      _applyDragSelectionAt(visible, index);
+    });
+  }
+
+  void _updateDragSelectionByGlobal(
+    List<BookSource> visible,
+    Offset globalPosition,
+  ) {
+    if (!_dragSelecting) return;
+    final hitIndex = _hitTestVisibleIndexByGlobal(visible, globalPosition);
+    if (hitIndex == null || hitIndex == _dragLastIndex) return;
+    setState(() {
+      _applyDragSelectionAt(visible, hitIndex);
+    });
+  }
+
+  void _autoScrollForDragSelection(
+    List<BookSource> visible,
+    Offset globalPosition,
+  ) {
+    if (!_dragSelecting || !_listScrollController.hasClients) return;
+    final viewportContext = _listViewportKey.currentContext;
+    if (viewportContext == null) return;
+    final viewportObject = viewportContext.findRenderObject();
+    if (viewportObject is! RenderBox ||
+        !viewportObject.hasSize ||
+        !viewportObject.attached) {
+      return;
+    }
+    final localOffset = viewportObject.globalToLocal(globalPosition);
+    final viewportHeight = viewportObject.size.height;
+    if (viewportHeight <= 0) return;
+
+    const edgePadding = 64.0;
+    const maxStep = 26.0;
+    var delta = 0.0;
+    if (localOffset.dy < edgePadding) {
+      final ratio =
+          ((edgePadding - localOffset.dy) / edgePadding).clamp(0.0, 1.0);
+      delta = -maxStep * ratio;
+    } else if (localOffset.dy > viewportHeight - edgePadding) {
+      final ratio =
+          ((localOffset.dy - (viewportHeight - edgePadding)) / edgePadding)
+              .clamp(0.0, 1.0);
+      delta = maxStep * ratio;
+    }
+    if (delta == 0) return;
+
+    final position = _listScrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if ((target - position.pixels).abs() < 0.5) return;
+    _listScrollController.jumpTo(target);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_dragSelecting) return;
+      _updateDragSelectionByGlobal(visible, globalPosition);
+    });
+  }
+
+  void _endDragSelection() {
+    if (!_dragSelecting) return;
+    setState(() {
+      _dragSelecting = false;
+      _dragLastIndex = -1;
+    });
+  }
+
+  int? _hitTestVisibleIndexByGlobal(
+    List<BookSource> visible,
+    Offset globalPosition,
+  ) {
+    for (var index = 0; index < visible.length; index++) {
+      final url = visible[index].bookSourceUrl;
+      final key = _itemKeyForUrl(url);
+      final context = key.currentContext;
+      if (context == null) continue;
+      final object = context.findRenderObject();
+      if (object is! RenderBox || !object.hasSize || !object.attached) {
+        continue;
+      }
+      final rect = object.localToGlobal(Offset.zero) & object.size;
+      if (rect.contains(globalPosition)) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  void _applyDragSelectionAt(List<BookSource> visible, int index) {
+    if (index < 0 || index >= visible.length) return;
+    final currentIndex = index;
+    _dragLastIndex = currentIndex;
+    final url = visible[currentIndex].bookSourceUrl;
+    if (_dragSelectValue) {
+      _selectedUrls.add(url);
+      return;
+    }
+    _selectedUrls.remove(url);
   }
 
   void _toggleSelection(String url) {
@@ -1600,42 +1837,78 @@ class _SourceListViewState extends State<SourceListView> {
     _showMessage('已删除 ${selected.length} 条书源');
   }
 
+  List<BookSource> _resolveExportShareSources(List<BookSource> visibleSources) {
+    final selected = _selectedSources(visibleSources);
+    if (selected.isEmpty || visibleSources.isEmpty) {
+      return const <BookSource>[];
+    }
+
+    // 规则：
+    // 全选 -> 导出当前筛选集；
+    // 低比例选中 -> 导出选中集；
+    // 中高比例选中 -> 按当前筛选顺序过滤选中键。
+    final selectedRate = selected.length / visibleSources.length;
+    if (selected.length == visibleSources.length) {
+      return visibleSources;
+    }
+    if (selectedRate < 0.3) {
+      return selected;
+    }
+    final selectedKeys = selected.map((source) => source.bookSourceUrl).toSet();
+    return visibleSources
+        .where((source) => selectedKeys.contains(source.bookSourceUrl))
+        .toList(growable: false);
+  }
+
   Future<void> _batchExportSelected(List<BookSource> allSources) async {
-    final selected = _selectedSources(allSources);
-    if (selected.isEmpty) {
+    final sources = _resolveExportShareSources(allSources);
+    if (sources.isEmpty) {
       _showMessage('当前未选择书源');
       return;
     }
-    final ok = await _importExportService.exportToFile(selected);
-    _showMessage(ok ? '导出成功' : '导出取消');
+    final result = await _importExportService.exportToFile(sources);
+    if (result.cancelled) {
+      _showMessage('导出取消');
+      return;
+    }
+    if (!result.success) {
+      _showMessage(result.errorMessage ?? '导出失败');
+      return;
+    }
+    final path = (result.outputPath ?? '').trim();
+    if (path.isEmpty) {
+      _showMessage('导出成功');
+      return;
+    }
+    await _showExportPathDialog(path);
   }
 
   Future<void> _batchShareSelected(List<BookSource> allSources) async {
-    final selected = _selectedSources(allSources);
-    if (selected.isEmpty) {
+    final sources = _resolveExportShareSources(allSources);
+    if (sources.isEmpty) {
       _showMessage('当前未选择书源');
       return;
     }
     try {
-      final file = await _importExportService.exportToShareFile(selected);
+      final file = await _importExportService.exportToShareFile(sources);
       if (file != null) {
         await SharePlus.instance.share(
           ShareParams(
             files: [XFile(file.path, mimeType: 'application/json')],
-            text: 'SoupReader 书源（${selected.length} 条）',
+            text: 'SoupReader 书源（${sources.length} 条）',
             subject: 'bookSource.json',
           ),
         );
-        _showMessage('已打开系统分享（${selected.length} 条书源）');
+        _showMessage('已打开系统分享（${sources.length} 条书源）');
         return;
       }
     } catch (_) {
       // ignore and fallback
     }
 
-    final text = LegadoJson.encode(selected.map((s) => s.toJson()).toList());
+    final text = LegadoJson.encode(sources.map((s) => s.toJson()).toList());
     await Clipboard.setData(ClipboardData(text: text));
-    _showMessage('系统分享不可用，已复制 ${selected.length} 条书源 JSON');
+    _showMessage('系统分享不可用，已复制 ${sources.length} 条书源 JSON');
   }
 
   Future<void> _assignGroupToNoGroupSources(String group) async {
@@ -1699,6 +1972,15 @@ class _SourceListViewState extends State<SourceListView> {
         .toList();
   }
 
+  bool _matchesGroupQueryLegacy(String? rawGroup, String key) {
+    final group = rawGroup ?? '';
+    if (group == key) return true;
+    if (group.startsWith('$key,')) return true;
+    if (group.endsWith(',$key')) return true;
+    if (group.contains(',$key,')) return true;
+    return false;
+  }
+
   String? _joinGroups(List<String> groups) {
     if (groups.isEmpty) return null;
     return groups.toSet().join(',');
@@ -1706,31 +1988,350 @@ class _SourceListViewState extends State<SourceListView> {
 
   Future<String?> _askGroupName(String title, {String? initialValue}) async {
     final controller = TextEditingController(text: initialValue ?? '');
+    final allGroups =
+        _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
     final value = await showCupertinoDialog<String>(
       context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: '输入分组名',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('确定'),
-          ),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final q = controller.text.trim().toLowerCase();
+          final quickGroups = allGroups
+              .where((group) {
+                if (q.isEmpty) return true;
+                return group.toLowerCase().contains(q);
+              })
+              .take(12)
+              .toList(growable: false);
+          return CupertinoAlertDialog(
+            title: Text(title),
+            content: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CupertinoTextField(
+                    controller: controller,
+                    placeholder: '输入分组名',
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  if (quickGroups.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: math.min(quickGroups.length * 34.0, 118),
+                        child: SingleChildScrollView(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: quickGroups.map((group) {
+                              return CupertinoButton(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                minimumSize: const Size(0, 26),
+                                onPressed: () {
+                                  controller.value = TextEditingValue(
+                                    text: group,
+                                    selection: TextSelection.collapsed(
+                                      offset: group.length,
+                                    ),
+                                  );
+                                  setDialogState(() {});
+                                },
+                                child: Text(
+                                  group,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              );
+                            }).toList(growable: false),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, controller.text),
+                child: const Text('确定'),
+              ),
+            ],
+          );
+        },
       ),
     );
     controller.dispose();
     return value;
+  }
+
+  _CheckSettings _loadCheckSettings() {
+    final timeout = _settingsGetInt(
+      _prefCheckTimeoutMs,
+      defaultValue: 180000,
+    );
+    final normalizedTimeout = timeout > 0 ? timeout : 180000;
+    final checkInfo = _settingsGetBool(_prefCheckInfo, defaultValue: true);
+    final checkCategory =
+        checkInfo && _settingsGetBool(_prefCheckCategory, defaultValue: true);
+    final checkContent = checkCategory &&
+        _settingsGetBool(_prefCheckContent, defaultValue: true);
+    return _CheckSettings(
+      timeoutMs: normalizedTimeout,
+      checkSearch: _settingsGetBool(_prefCheckSearch, defaultValue: true),
+      checkDiscovery: _settingsGetBool(_prefCheckDiscovery, defaultValue: true),
+      checkInfo: checkInfo,
+      checkCategory: checkCategory,
+      checkContent: checkContent,
+    );
+  }
+
+  Future<bool> _showCheckSettingsDialog() async {
+    if (!_ensureSettingsReady(actionName: '保存校验设置')) {
+      return false;
+    }
+    final current = _loadCheckSettings();
+    var checkSearch = current.checkSearch;
+    var checkDiscovery = current.checkDiscovery;
+    var checkInfo = current.checkInfo;
+    var checkCategory = current.checkCategory;
+    var checkContent = current.checkContent;
+    final timeoutCtrl = TextEditingController(
+      text: (current.timeoutMs ~/ 1000).toString(),
+    );
+
+    try {
+      final saved = await showCupertinoDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return CupertinoAlertDialog(
+                title: const Text('校验设置'),
+                content: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Column(
+                    children: [
+                      CupertinoTextField(
+                        controller: timeoutCtrl,
+                        keyboardType: TextInputType.number,
+                        placeholder: '超时时间（秒）',
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('校验搜索')),
+                          CupertinoSwitch(
+                            value: checkSearch,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                checkSearch = value;
+                                if (!checkSearch && !checkDiscovery) {
+                                  checkDiscovery = true;
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('校验发现')),
+                          CupertinoSwitch(
+                            value: checkDiscovery,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                checkDiscovery = value;
+                                if (!checkSearch && !checkDiscovery) {
+                                  checkSearch = true;
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('校验详情')),
+                          CupertinoSwitch(
+                            value: checkInfo,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                checkInfo = value;
+                                if (!checkInfo) {
+                                  checkCategory = false;
+                                  checkContent = false;
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('校验目录')),
+                          CupertinoSwitch(
+                            value: checkCategory,
+                            onChanged: !checkInfo
+                                ? null
+                                : (value) {
+                                    setDialogState(() {
+                                      checkCategory = value;
+                                      if (!checkCategory) {
+                                        checkContent = false;
+                                      }
+                                    });
+                                  },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('校验正文')),
+                          CupertinoSwitch(
+                            value: checkContent,
+                            onChanged: !checkCategory
+                                ? null
+                                : (value) {
+                                    setDialogState(() {
+                                      checkContent = value;
+                                    });
+                                  },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  CupertinoDialogAction(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('取消'),
+                  ),
+                  CupertinoDialogAction(
+                    onPressed: () async {
+                      final timeoutSeconds =
+                          int.tryParse(timeoutCtrl.text.trim()) ?? 0;
+                      if (timeoutSeconds <= 0) {
+                        _showMessage('超时时间需大于0秒');
+                        return;
+                      }
+                      if (!checkSearch && !checkDiscovery) {
+                        _showMessage('至少启用一种校验方式');
+                        return;
+                      }
+                      final timeoutSaved = await _settingsPut(
+                        _prefCheckTimeoutMs,
+                        timeoutSeconds * 1000,
+                      );
+                      if (!timeoutSaved) return;
+                      final searchSaved =
+                          await _settingsPut(_prefCheckSearch, checkSearch);
+                      if (!searchSaved) return;
+                      final discoverySaved = await _settingsPut(
+                        _prefCheckDiscovery,
+                        checkDiscovery,
+                      );
+                      if (!discoverySaved) return;
+                      final infoSaved =
+                          await _settingsPut(_prefCheckInfo, checkInfo);
+                      if (!infoSaved) return;
+                      final categorySaved = await _settingsPut(
+                        _prefCheckCategory,
+                        checkInfo && checkCategory,
+                      );
+                      if (!categorySaved) return;
+                      final contentSaved = await _settingsPut(
+                        _prefCheckContent,
+                        checkInfo && checkCategory && checkContent,
+                      );
+                      if (!contentSaved) return;
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx, true);
+                    },
+                    child: const Text('保存'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      return saved == true;
+    } finally {
+      timeoutCtrl.dispose();
+    }
+  }
+
+  Future<_CheckKeywordDialogResult?> _showCheckKeywordDialog(
+    String initialKeyword,
+  ) async {
+    final controller = TextEditingController(text: initialKeyword);
+    try {
+      return await showCupertinoDialog<_CheckKeywordDialogResult>(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('校验关键词'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: CupertinoTextField(
+              controller: controller,
+              placeholder: '输入搜索关键词',
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.pop(
+                  ctx,
+                  _CheckKeywordDialogResult(
+                    action: _CheckKeywordDialogAction.cancel,
+                    keyword: controller.text,
+                  ),
+                );
+              },
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.pop(
+                  ctx,
+                  _CheckKeywordDialogResult(
+                    action: _CheckKeywordDialogAction.openSettings,
+                    keyword: controller.text,
+                  ),
+                );
+              },
+              child: const Text('校验设置'),
+            ),
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.pop(
+                  ctx,
+                  _CheckKeywordDialogResult(
+                    action: _CheckKeywordDialogAction.start,
+                    keyword: controller.text,
+                  ),
+                );
+              },
+              child: const Text('开始校验'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<String?> _askCheckKeyword() async {
@@ -1739,43 +2340,41 @@ class _SourceListViewState extends State<SourceListView> {
     }
     final cached = (_settingsGet(_prefCheckKeyword, defaultValue: '我的') ?? '我的')
         .toString();
-    final controller = TextEditingController(text: cached);
-    final value = await showCupertinoDialog<String>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('校验关键词'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: '输入搜索关键词',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('开始校验'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value == null) return null;
-
-    final normalized = value.trim();
-    final keyword = normalized.isNotEmpty
-        ? normalized
-        : (cached.trim().isNotEmpty ? cached.trim() : '我的');
-    await _settingsPut(_prefCheckKeyword, keyword);
-    return keyword;
+    var draft = cached;
+    while (mounted) {
+      final dialogResult = await _showCheckKeywordDialog(draft);
+      if (dialogResult == null ||
+          dialogResult.action == _CheckKeywordDialogAction.cancel) {
+        return null;
+      }
+      draft = dialogResult.keyword;
+      if (dialogResult.action == _CheckKeywordDialogAction.openSettings) {
+        await _showCheckSettingsDialog();
+        continue;
+      }
+      final normalized = dialogResult.keyword.trim();
+      final keyword = normalized.isNotEmpty
+          ? normalized
+          : (cached.trim().isNotEmpty ? cached.trim() : '我的');
+      await _settingsPut(_prefCheckKeyword, keyword);
+      return keyword;
+    }
+    return null;
   }
 
   void _showSourceManageHelp() {
     _showMessage(SourceHelpTexts.manage);
+  }
+
+  Future<void> _maybeShowSourceManageHelpOnce() async {
+    final shown = _settingsGetBool(
+      _prefSourceManageHelpShown,
+      defaultValue: false,
+    );
+    if (shown) return;
+    await _settingsPut(_prefSourceManageHelpShown, true);
+    if (!mounted) return;
+    _showSourceManageHelp();
   }
 
   Future<void> _createNewSource() async {
@@ -1822,10 +2421,8 @@ class _SourceListViewState extends State<SourceListView> {
         builder: (_) {
           final raw = _sourceRepo.getRawJsonByUrl(source.bookSourceUrl);
           if (initialTab == 3 || (initialDebugKey ?? '').trim().isNotEmpty) {
-            return SourceEditView.fromSource(
-              source,
-              rawJson: raw,
-              initialTab: initialTab,
+            return SourceDebugLegacyView(
+              source: source,
               initialDebugKey: initialDebugKey,
             );
           }
@@ -1966,19 +2563,6 @@ class _SourceListViewState extends State<SourceListView> {
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: history.isEmpty
-                                ? null
-                                : () async {
-                                    history.clear();
-                                    await _saveOnlineImportHistory(history);
-                                    if (mounted) {
-                                      setDialogState(() {});
-                                    }
-                                  },
-                            child: const Text('清空'),
-                          ),
                         ],
                       ),
                     ),
@@ -2060,14 +2644,16 @@ class _SourceListViewState extends State<SourceListView> {
 
     final normalizedUrl = url?.trim();
     if (normalizedUrl == null || normalizedUrl.isEmpty) return;
-    if (!normalizedUrl.startsWith('http://') &&
-        !normalizedUrl.startsWith('https://')) {
-      _showMessage('链接格式无效，请输入 http:// 或 https:// 开头');
-      return;
+
+    final isHttpUrl = normalizedUrl.startsWith('http://') ||
+        normalizedUrl.startsWith('https://');
+    if (isHttpUrl) {
+      await _pushImportHistory(normalizedUrl);
     }
 
-    await _pushImportHistory(normalizedUrl);
-    final result = await _importExportService.importFromUrl(normalizedUrl);
+    final result = isHttpUrl
+        ? await _importExportService.importFromUrl(normalizedUrl)
+        : await _importExportService.importFromText(normalizedUrl);
     await _commitImportResult(result);
   }
 
@@ -2104,8 +2690,536 @@ class _SourceListViewState extends State<SourceListView> {
     final history = _loadOnlineImportHistory();
     history.remove(url);
     history.insert(0, url);
-    final capped = history.take(20).toList(growable: true);
-    await _saveOnlineImportHistory(capped);
+    await _saveOnlineImportHistory(history);
+  }
+
+  String _importStateLabel(SourceImportCandidateState state) {
+    return switch (state) {
+      SourceImportCandidateState.newSource => '新增',
+      SourceImportCandidateState.update => '更新',
+      SourceImportCandidateState.existing => '已有',
+    };
+  }
+
+  Color _importStateColor(SourceImportCandidateState state) {
+    return switch (state) {
+      SourceImportCandidateState.newSource =>
+        CupertinoColors.systemGreen.resolveFrom(context),
+      SourceImportCandidateState.update =>
+        CupertinoColors.systemOrange.resolveFrom(context),
+      SourceImportCandidateState.existing =>
+        CupertinoColors.secondaryLabel.resolveFrom(context),
+    };
+  }
+
+  Future<_ImportSelectionDecision?> _showImportSelectionDialog(
+    List<SourceImportCandidate> candidates,
+  ) async {
+    final dialogCandidates = candidates.toList(growable: true);
+    final selectedIndexes = <int>{};
+    final defaultUrls =
+        SourceImportSelectionHelper.defaultSelectedUrls(dialogCandidates);
+    for (var index = 0; index < dialogCandidates.length; index++) {
+      final candidate = dialogCandidates[index];
+      if (defaultUrls.contains(candidate.url)) {
+        selectedIndexes.add(index);
+      }
+    }
+    var keepName = _settingsGetBool(_prefImportKeepName, defaultValue: false);
+    var keepGroup = _settingsGetBool(_prefImportKeepGroup, defaultValue: false);
+    var keepEnable =
+        _settingsGetBool(_prefImportKeepEnable, defaultValue: false);
+    var appendCustomGroup = false;
+    final groupController = TextEditingController();
+
+    try {
+      return await showCupertinoModalPopup<_ImportSelectionDecision>(
+        context: context,
+        builder: (popupContext) {
+          return CupertinoPopupSurface(
+            isSurfacePainted: true,
+            child: StatefulBuilder(
+              builder: (context, setDialogState) {
+                final selectedCount = selectedIndexes.length;
+                final totalCount = dialogCandidates.length;
+                return SizedBox(
+                  height: math.min(
+                    MediaQuery.of(context).size.height * 0.86,
+                    680,
+                  ),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                '导入书源',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            CupertinoButton(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              onPressed: () => Navigator.pop(popupContext),
+                              child: const Text('取消'),
+                            ),
+                            CupertinoButton.filled(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              onPressed: selectedCount == 0
+                                  ? null
+                                  : () async {
+                                      await Future.wait([
+                                        _settingsPut(
+                                          _prefImportKeepName,
+                                          keepName,
+                                        ),
+                                        _settingsPut(
+                                          _prefImportKeepGroup,
+                                          keepGroup,
+                                        ),
+                                        _settingsPut(
+                                          _prefImportKeepEnable,
+                                          keepEnable,
+                                        ),
+                                      ]);
+                                      if (!context.mounted) return;
+                                      Navigator.pop(
+                                        context,
+                                        _ImportSelectionDecision(
+                                          candidates: dialogCandidates.toList(
+                                              growable: false),
+                                          policy: SourceImportSelectionPolicy(
+                                            selectedUrls: selectedIndexes
+                                                .map((index) =>
+                                                    dialogCandidates[index].url)
+                                                .toSet(),
+                                            selectedIndexes:
+                                                selectedIndexes.toSet(),
+                                            keepName: keepName,
+                                            keepGroup: keepGroup,
+                                            keepEnabled: keepEnable,
+                                            customGroup: groupController.text,
+                                            appendCustomGroup:
+                                                appendCustomGroup,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                              child: Text('导入($selectedCount)'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            CupertinoButton(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              color: CupertinoColors.systemGrey5
+                                  .resolveFrom(context),
+                              onPressed: () {
+                                setDialogState(() {
+                                  if (selectedIndexes.length ==
+                                      dialogCandidates.length) {
+                                    selectedIndexes.clear();
+                                  } else {
+                                    selectedIndexes
+                                      ..clear()
+                                      ..addAll(
+                                        List<int>.generate(
+                                          dialogCandidates.length,
+                                          (index) => index,
+                                        ),
+                                      );
+                                  }
+                                });
+                              },
+                              child: Text(
+                                selectedIndexes.length ==
+                                        dialogCandidates.length
+                                    ? '取消全选'
+                                    : '全选',
+                              ),
+                            ),
+                            CupertinoButton(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              color: CupertinoColors.systemGrey5
+                                  .resolveFrom(context),
+                              onPressed: () {
+                                setDialogState(() {
+                                  final targetIndexes = <int>{
+                                    for (var index = 0;
+                                        index < dialogCandidates.length;
+                                        index++)
+                                      if (dialogCandidates[index].state ==
+                                          SourceImportCandidateState.newSource)
+                                        index,
+                                  };
+                                  final allTargetSelected = targetIndexes
+                                      .every(selectedIndexes.contains);
+                                  if (allTargetSelected) {
+                                    selectedIndexes.removeWhere(
+                                      targetIndexes.contains,
+                                    );
+                                  } else {
+                                    selectedIndexes.addAll(targetIndexes);
+                                  }
+                                });
+                              },
+                              child: const Text('选择新增'),
+                            ),
+                            CupertinoButton(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              color: CupertinoColors.systemGrey5
+                                  .resolveFrom(context),
+                              onPressed: () {
+                                setDialogState(
+                                  () {
+                                    final targetIndexes = <int>{
+                                      for (var index = 0;
+                                          index < dialogCandidates.length;
+                                          index++)
+                                        if (dialogCandidates[index].state ==
+                                            SourceImportCandidateState.update)
+                                          index,
+                                    };
+                                    final allTargetSelected = targetIndexes
+                                        .every(selectedIndexes.contains);
+                                    if (allTargetSelected) {
+                                      selectedIndexes.removeWhere(
+                                        targetIndexes.contains,
+                                      );
+                                    } else {
+                                      selectedIndexes.addAll(targetIndexes);
+                                    }
+                                  },
+                                );
+                              },
+                              child: const Text('选择更新'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                        decoration: BoxDecoration(
+                          color:
+                              CupertinoColors.systemGrey6.resolveFrom(context),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildPolicySwitchRow(
+                              title: '保留本地名称',
+                              value: keepName,
+                              onChanged: (value) {
+                                setDialogState(() => keepName = value);
+                              },
+                            ),
+                            _buildPolicySwitchRow(
+                              title: '保留本地分组',
+                              value: keepGroup,
+                              onChanged: (value) {
+                                setDialogState(() => keepGroup = value);
+                              },
+                            ),
+                            _buildPolicySwitchRow(
+                              title: '保留启用状态',
+                              value: keepEnable,
+                              onChanged: (value) {
+                                setDialogState(() => keepEnable = value);
+                              },
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: CupertinoTextField(
+                                    controller: groupController,
+                                    placeholder: '自定义分组（可选）',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                CupertinoButton(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      appendCustomGroup = !appendCustomGroup;
+                                    });
+                                  },
+                                  child: Text(
+                                    appendCustomGroup ? '追加' : '覆盖',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                        child: Row(
+                          children: [
+                            Text(
+                              '待导入：$selectedCount/$totalCount',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          itemCount: dialogCandidates.length,
+                          separatorBuilder: (_, __) => Container(
+                            height: 0.5,
+                            color: CupertinoColors.systemGrey4
+                                .resolveFrom(context),
+                          ),
+                          itemBuilder: (context, index) {
+                            final candidate = dialogCandidates[index];
+                            final selected = selectedIndexes.contains(index);
+                            final stateColor =
+                                _importStateColor(candidate.state);
+                            return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                setDialogState(() {
+                                  if (selected) {
+                                    selectedIndexes.remove(index);
+                                  } else {
+                                    selectedIndexes.add(index);
+                                  }
+                                });
+                              },
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 2, right: 8),
+                                      child: Icon(
+                                        selected
+                                            ? CupertinoIcons
+                                                .check_mark_circled_solid
+                                            : CupertinoIcons.circle,
+                                        color: selected
+                                            ? CupertinoTheme.of(context)
+                                                .primaryColor
+                                            : CupertinoColors.systemGrey,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        candidate.incoming.bookSourceName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        left: 8,
+                                        top: 2,
+                                      ),
+                                      child: Text(
+                                        _importStateLabel(candidate.state),
+                                        style: TextStyle(
+                                          color: stateColor,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    CupertinoButton(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 0,
+                                      ),
+                                      minimumSize: const Size(40, 28),
+                                      onPressed: () async {
+                                        final updated =
+                                            await _editImportCandidateRawJson(
+                                          candidate: candidate,
+                                        );
+                                        if (updated == null) return;
+                                        if (!context.mounted) return;
+                                        setDialogState(() {
+                                          dialogCandidates[index] = updated;
+                                        });
+                                      },
+                                      child: const Text('打开'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      );
+    } finally {
+      groupController.dispose();
+    }
+  }
+
+  Widget _buildPolicySwitchRow({
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<SourceImportCandidate?> _editImportCandidateRawJson({
+    required SourceImportCandidate candidate,
+  }) async {
+    final editedText = await _editImportRawJsonText(
+      title: candidate.incoming.bookSourceName,
+      initialText: candidate.rawJson,
+    );
+    if (editedText == null) return null;
+    final updated = SourceImportSelectionHelper.tryReplaceCandidateRawJson(
+      candidate: candidate,
+      rawJson: editedText,
+    );
+    return updated;
+  }
+
+  Future<String?> _editImportRawJsonText({
+    required String title,
+    required String initialText,
+  }) async {
+    final controller = TextEditingController(text: initialText);
+    try {
+      return await showCupertinoModalPopup<String>(
+        context: context,
+        builder: (popupContext) {
+          return CupertinoPopupSurface(
+            isSurfacePainted: true,
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: math.min(
+                  MediaQuery.of(popupContext).size.height * 0.88,
+                  760,
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                      child: Row(
+                        children: [
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            onPressed: () => Navigator.pop(popupContext),
+                            child: const Text('取消'),
+                          ),
+                          Expanded(
+                            child: Text(
+                              title.trim().isEmpty ? '编辑书源' : title,
+                              maxLines: 1,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            onPressed: () => Navigator.pop(
+                              popupContext,
+                              controller.text,
+                            ),
+                            child: const Text('保存'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      height: 0.5,
+                      color:
+                          CupertinoColors.separator.resolveFrom(popupContext),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                        child: CupertinoTextField(
+                          controller: controller,
+                          minLines: null,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          placeholder: '输入书源 JSON',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<void> _commitImportResult(SourceImportResult result) async {
@@ -2116,84 +3230,46 @@ class _SourceListViewState extends State<SourceListView> {
         }
         return;
       }
-      if (!_ensureSettingsReady(actionName: '导入书源')) {
-        return;
-      }
-
-      final entries = <_ImportEntry>[];
-      final localMap = _localSourceMap();
-      for (final source in result.sources) {
-        final url = source.bookSourceUrl.trim();
-        if (url.isEmpty) continue;
-        final existing = localMap[url];
-        // 对齐 legado：默认仅勾选“新增/有更新”的条目，已有且未更新默认不勾选。
-        final shouldSelect =
-            existing == null || source.lastUpdateTime > existing.lastUpdateTime;
-        final rawJson = result.rawJsonForSourceUrl(url) ??
-            LegadoJson.encode(source.toJson());
-        entries.add(
-          _ImportEntry(
-            incoming: source,
-            existing: existing,
-            rawJson: rawJson,
-            selected: shouldSelect,
-          ),
-        );
-      }
-
-      _refreshImportEntries(entries, localMap);
-
-      if (entries.isEmpty) {
+      final candidates = SourceImportSelectionHelper.buildCandidates(
+        result: result,
+        localMap: _localSourceMap(),
+      );
+      if (candidates.isEmpty) {
         _showMessage('没有可导入的书源');
         return;
       }
 
-      final decision = await _showImportSelectionDialog(entries);
-      if (decision == null) {
-        _showMessage('已取消导入');
+      final decision = await _showImportSelectionDialog(candidates);
+      if (decision == null) return;
+      final plan = SourceImportSelectionHelper.buildCommitPlan(
+        candidates: decision.candidates,
+        policy: decision.policy,
+      );
+      if (plan.imported <= 0) {
+        _showMessage('未选择可导入书源');
         return;
       }
 
-      final selectedEntries =
-          decision.entries.where((e) => e.selected).toList();
-      if (selectedEntries.isEmpty) {
-        _showMessage('未选择任何书源，导入取消');
-        return;
-      }
-
-      // 导入时按 URL 去重，保留最后一个被选中的条目（与 legado 重复覆盖语义一致）。
-      final dedupSelected = <String, _ImportEntry>{};
-      for (final entry in selectedEntries) {
-        dedupSelected[entry.incoming.bookSourceUrl.trim()] = entry;
-      }
-      final finalEntries = dedupSelected.values.toList(growable: false);
-
-      var imported = 0;
-      var newCount = 0;
-      var updateCount = 0;
-      var keepCount = 0;
-
-      for (final entry in finalEntries) {
-        final isNew = entry.isNew;
-        if (isNew) {
-          newCount++;
-        } else if (entry.isUpdate) {
-          updateCount++;
-        } else {
-          keepCount++;
+      final commitResult = await _importCommitService.commit(plan.items);
+      if (commitResult.imported <= 0) {
+        final blockedCount = commitResult.blockedCount;
+        if (blockedCount > 0) {
+          final blockedPreview = commitResult.blockedNames.take(3).join('、');
+          final extra = blockedCount > 3 ? ' 等$blockedCount条' : '';
+          _showMessage('未导入书源\n已拦截：$blockedPreview$extra');
+          return;
         }
-
-        final mergedRaw = _buildMergedRawJson(entry, decision.policy);
-        await _sourceRepo.upsertSourceRawJson(rawJson: mergedRaw);
-        imported++;
+        _showMessage('未选择可导入书源');
+        return;
       }
 
       _showImportSummary(
         result,
-        imported: imported,
-        newCount: newCount,
-        updateCount: updateCount,
-        existingCount: keepCount,
+        imported: commitResult.imported,
+        newCount: commitResult.newCount,
+        updateCount: commitResult.updateCount,
+        existingCount: commitResult.existingCount,
+        blockedNames: commitResult.blockedNames,
       );
     } catch (e, st) {
       debugPrint('[source-import] 导入流程异常: $e');
@@ -2208,636 +3284,9 @@ class _SourceListViewState extends State<SourceListView> {
     }
   }
 
-  BookSource _mergeWithPolicy(_ImportEntry entry, _ImportPolicy policy) {
-    var merged = entry.incoming;
-    final local = entry.existing;
-
-    if (local != null) {
-      // 对齐 legado：冲突合并时始终保留本地 customOrder（手动排序）。
-      merged = merged.copyWith(customOrder: local.customOrder);
-      if (policy.keepOriginalName) {
-        merged = merged.copyWith(bookSourceName: local.bookSourceName);
-      }
-      if (policy.keepGroup) {
-        merged = merged.copyWith(bookSourceGroup: local.bookSourceGroup);
-      }
-      if (policy.keepEnabled) {
-        merged = merged.copyWith(
-          enabled: local.enabled,
-          enabledExplore: local.enabledExplore,
-        );
-      }
-    }
-
-    final customGroup = policy.customGroup.trim();
-    if (customGroup.isNotEmpty) {
-      if (policy.appendGroup) {
-        final groups = _extractGroups(merged.bookSourceGroup);
-        groups.add(customGroup);
-        merged = merged.copyWith(bookSourceGroup: _joinGroups(groups));
-      } else {
-        merged = merged.copyWith(bookSourceGroup: customGroup);
-      }
-    }
-
-    return merged;
-  }
-
   Map<String, BookSource> _localSourceMap() {
     final all = _sourceRepo.getAllSources();
     return {for (final source in all) source.bookSourceUrl: source};
-  }
-
-  void _refreshImportEntries(
-    List<_ImportEntry> entries,
-    Map<String, BookSource> localMap,
-  ) {
-    final urlCount = <String, int>{};
-    for (final entry in entries) {
-      final url = entry.incoming.bookSourceUrl.trim();
-      if (url.isEmpty) continue;
-      urlCount[url] = (urlCount[url] ?? 0) + 1;
-    }
-
-    for (final entry in entries) {
-      final url = entry.incoming.bookSourceUrl.trim();
-      entry.existing = localMap[url];
-      entry.duplicateInImport = url.isNotEmpty && (urlCount[url] ?? 0) > 1;
-    }
-  }
-
-  Map<String, dynamic>? _decodeJsonMap(String text) {
-    try {
-      final decoded = json.decode(text);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) {
-        return decoded.map((key, value) => MapEntry('$key', value));
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  String _buildMergedRawJson(_ImportEntry entry, _ImportPolicy policy) {
-    final merged = _mergeWithPolicy(entry, policy);
-    final map = _decodeJsonMap(entry.rawJson) ?? merged.toJson();
-    map['bookSourceUrl'] = merged.bookSourceUrl;
-    map['bookSourceName'] = merged.bookSourceName;
-    map['bookSourceGroup'] = merged.bookSourceGroup;
-    map['enabled'] = merged.enabled;
-    map['enabledExplore'] = merged.enabledExplore;
-    return LegadoJson.encode(map);
-  }
-
-  Future<bool> _editImportEntryJson(_ImportEntry entry) async {
-    final controller = TextEditingController(text: _prettyJson(entry.rawJson));
-    String? errorText;
-
-    final saved = await showCupertinoModalPopup<bool>(
-      context: context,
-      builder: (context) {
-        return CupertinoPopupSurface(
-          isSurfacePainted: true,
-          child: SizedBox(
-            height: math.min(MediaQuery.of(context).size.height * 0.88, 760),
-            child: StatefulBuilder(
-              builder: (context, setDialogState) {
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              '编辑导入 JSON',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('取消'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (errorText != null)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            errorText!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: CupertinoColors.systemRed.resolveFrom(
-                                context,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                        child: CupertinoTextField(
-                          controller: controller,
-                          maxLines: null,
-                          minLines: 18,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: CupertinoButton(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              onPressed: () {
-                                final map = _decodeJsonMap(controller.text);
-                                if (map == null) {
-                                  setDialogState(() => errorText = 'JSON 格式错误');
-                                  return;
-                                }
-                                final normalized = LegadoJson.encode(map);
-                                controller.text = _prettyJson(normalized);
-                                controller.selection =
-                                    TextSelection.fromPosition(
-                                  TextPosition(offset: controller.text.length),
-                                );
-                                setDialogState(() => errorText = null);
-                              },
-                              child: const Text('格式化'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: CupertinoButton.filled(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              onPressed: () {
-                                final map = _decodeJsonMap(controller.text);
-                                if (map == null) {
-                                  setDialogState(() => errorText = 'JSON 格式错误');
-                                  return;
-                                }
-                                final source = BookSource.fromJson(map);
-                                if (source.bookSourceUrl.trim().isEmpty) {
-                                  setDialogState(
-                                    () => errorText = 'bookSourceUrl 不能为空',
-                                  );
-                                  return;
-                                }
-                                if (source.bookSourceName.trim().isEmpty) {
-                                  setDialogState(
-                                    () => errorText = 'bookSourceName 不能为空',
-                                  );
-                                  return;
-                                }
-                                entry.incoming = source;
-                                entry.rawJson = LegadoJson.encode(map);
-                                entry.edited = true;
-                                Navigator.pop(context, true);
-                              },
-                              child: const Text('保存'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-
-    controller.dispose();
-    return saved == true;
-  }
-
-  String _prettyJson(String text) {
-    try {
-      final decoded = json.decode(text);
-      return const JsonEncoder.withIndent('  ').convert(decoded);
-    } catch (_) {
-      return text;
-    }
-  }
-
-  Future<_ImportDecision?> _showImportSelectionDialog(
-    List<_ImportEntry> entries,
-  ) async {
-    final localMap = _localSourceMap();
-    _refreshImportEntries(entries, localMap);
-    var keepName =
-        _settingsGet(_prefImportKeepName, defaultValue: false) == true;
-    var keepGroup =
-        _settingsGet(_prefImportKeepGroup, defaultValue: false) == true;
-    var keepEnabled =
-        _settingsGet(_prefImportKeepEnabled, defaultValue: false) == true;
-    var customGroup =
-        (_settingsGet(_prefImportCustomGroup, defaultValue: '') ?? '')
-            .toString();
-    var appendGroup =
-        _settingsGet(_prefImportAppendGroup, defaultValue: true) == true;
-
-    void markAll(bool selected) {
-      for (final entry in entries) {
-        entry.selected = selected;
-      }
-    }
-
-    void markNewOnly() {
-      for (final entry in entries) {
-        entry.selected = entry.isNew;
-      }
-    }
-
-    void markUpdateOnly() {
-      for (final entry in entries) {
-        entry.selected = entry.isUpdate;
-      }
-    }
-
-    final customGroupCtrl = TextEditingController(text: customGroup);
-    final result = await showCupertinoModalPopup<_ImportDecision>(
-      context: context,
-      builder: (context) {
-        return CupertinoPopupSurface(
-          isSurfacePainted: true,
-          child: SizedBox(
-            height: math.min(MediaQuery.of(context).size.height * 0.85, 680),
-            child: StatefulBuilder(
-              builder: (context, setDialogState) {
-                final selectedCount = entries.where((e) => e.selected).length;
-                final totalCount = entries.length;
-                final newCount = entries.where((e) => e.isNew).length;
-                final updateCount = entries.where((e) => e.isUpdate).length;
-
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              '导入书源',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('取消'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '已选 $selectedCount / $totalCount · 新增 $newCount · 更新 $updateCount',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: CupertinoColors.secondaryLabel
-                                .resolveFrom(context),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            color: CupertinoTheme.of(context).primaryColor,
-                            onPressed: () =>
-                                setDialogState(() => markAll(true)),
-                            child: const Text('全选'),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            color: CupertinoTheme.of(context).primaryColor,
-                            onPressed: () =>
-                                setDialogState(() => markAll(false)),
-                            child: const Text('全不选'),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            color: CupertinoTheme.of(context).primaryColor,
-                            onPressed: () => setDialogState(markNewOnly),
-                            child: const Text('仅新增'),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            color: CupertinoTheme.of(context).primaryColor,
-                            onPressed: () => setDialogState(markUpdateOnly),
-                            child: const Text('仅更新'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemGrey6.resolveFrom(context),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildPolicySwitch(
-                            title: '保留原名称',
-                            value: keepName,
-                            onChanged: (v) =>
-                                setDialogState(() => keepName = v),
-                          ),
-                          _buildPolicySwitch(
-                            title: '保留原分组',
-                            value: keepGroup,
-                            onChanged: (v) =>
-                                setDialogState(() => keepGroup = v),
-                          ),
-                          _buildPolicySwitch(
-                            title: '保留原启用状态',
-                            value: keepEnabled,
-                            onChanged: (v) =>
-                                setDialogState(() => keepEnabled = v),
-                          ),
-                          _buildPolicySwitch(
-                            title: '分组追加模式',
-                            value: appendGroup,
-                            onChanged: (v) =>
-                                setDialogState(() => appendGroup = v),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
-                            child: CupertinoTextField(
-                              controller: customGroupCtrl,
-                              placeholder: '自定义分组（可选）',
-                              onChanged: (value) {
-                                customGroup = value;
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        itemCount: entries.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 6),
-                        itemBuilder: (context, index) {
-                          final entry = entries[index];
-                          final statusColor = entry.duplicateInImport
-                              ? CupertinoColors.systemRed
-                              : entry.isNew
-                                  ? CupertinoColors.systemGreen
-                                  : entry.isUpdate
-                                      ? CupertinoColors.systemOrange
-                                      : CupertinoColors.systemGrey;
-                          return GestureDetector(
-                            onTap: () {
-                              setDialogState(
-                                  () => entry.selected = !entry.selected);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                              decoration: BoxDecoration(
-                                color: CupertinoColors.systemGrey6
-                                    .resolveFrom(context),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    entry.selected
-                                        ? CupertinoIcons
-                                            .check_mark_circled_solid
-                                        : CupertinoIcons.circle,
-                                    color: entry.selected
-                                        ? CupertinoTheme.of(context)
-                                            .primaryColor
-                                        : CupertinoColors.systemGrey,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          entry.incoming.bookSourceName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          entry.incoming.bookSourceUrl,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: CupertinoColors
-                                                .secondaryLabel
-                                                .resolveFrom(context),
-                                          ),
-                                        ),
-                                        if (entry.duplicateInImport)
-                                          Padding(
-                                            padding:
-                                                const EdgeInsets.only(top: 2),
-                                            child: Text(
-                                              '与导入列表其他条目 URL 重复（后项会覆盖前项）',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: CupertinoColors.systemRed
-                                                    .resolveFrom(context),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: statusColor
-                                              .resolveFrom(context)
-                                              .withValues(alpha: 0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          entry.statusLabel,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: statusColor.resolveFrom(
-                                              context,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      CupertinoButton(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(28, 28),
-                                        onPressed: () async {
-                                          final changed =
-                                              await _editImportEntryJson(entry);
-                                          if (!changed) return;
-                                          _refreshImportEntries(
-                                            entries,
-                                            localMap,
-                                          );
-                                          if (mounted) {
-                                            setDialogState(() {});
-                                          }
-                                        },
-                                        child: Text(
-                                          entry.edited ? '已编辑' : '编辑JSON',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: entry.edited
-                                                ? CupertinoColors.systemGreen
-                                                    .resolveFrom(context)
-                                                : CupertinoColors.activeBlue
-                                                    .resolveFrom(context),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: CupertinoButton.filled(
-                              onPressed: () async {
-                                final savedKeepName = await _settingsPut(
-                                  _prefImportKeepName,
-                                  keepName,
-                                );
-                                if (!savedKeepName) return;
-                                final savedKeepGroup = await _settingsPut(
-                                  _prefImportKeepGroup,
-                                  keepGroup,
-                                );
-                                if (!savedKeepGroup) return;
-                                final savedKeepEnabled = await _settingsPut(
-                                  _prefImportKeepEnabled,
-                                  keepEnabled,
-                                );
-                                if (!savedKeepEnabled) return;
-                                final savedCustomGroup = await _settingsPut(
-                                  _prefImportCustomGroup,
-                                  customGroup,
-                                );
-                                if (!savedCustomGroup) return;
-                                final savedAppendGroup = await _settingsPut(
-                                  _prefImportAppendGroup,
-                                  appendGroup,
-                                );
-                                if (!savedAppendGroup) return;
-
-                                if (!context.mounted) return;
-                                Navigator.pop(
-                                  context,
-                                  _ImportDecision(
-                                    entries: entries,
-                                    policy: _ImportPolicy(
-                                      keepOriginalName: keepName,
-                                      keepGroup: keepGroup,
-                                      keepEnabled: keepEnabled,
-                                      customGroup: customGroup,
-                                      appendGroup: appendGroup,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: const Text('开始导入'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-    customGroupCtrl.dispose();
-    return result;
-  }
-
-  Widget _buildPolicySwitch({
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: Row(
-        children: [
-          Expanded(child: Text(title)),
-          CupertinoSwitch(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
   }
 
   void _showImportError(SourceImportResult result) {
@@ -2868,6 +3317,7 @@ class _SourceListViewState extends State<SourceListView> {
     required int newCount,
     required int updateCount,
     required int existingCount,
+    List<String> blockedNames = const <String>[],
   }) {
     final lines = <String>[
       '成功导入 $imported 条书源',
@@ -2875,6 +3325,12 @@ class _SourceListViewState extends State<SourceListView> {
       '更新：$updateCount',
       '已有覆盖：$existingCount',
     ];
+    if (blockedNames.isNotEmpty) {
+      lines.add('已拦截：${blockedNames.length}');
+      lines.add('拦截项：${blockedNames.take(3).join('、')}');
+      final more = blockedNames.length - 3;
+      if (more > 0) lines.add('…其余 $more 条省略');
+    }
     if (result.totalInputCount > 0) {
       lines.add('输入条数：${result.totalInputCount}');
       if (result.invalidCount > 0) lines.add('跳过无效：${result.invalidCount}');
@@ -2929,6 +3385,34 @@ class _SourceListViewState extends State<SourceListView> {
     }
   }
 
+  bool _settingsGetBool(
+    String key, {
+    required bool defaultValue,
+  }) {
+    final value = _settingsGet(key, defaultValue: defaultValue);
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final lower = value.trim().toLowerCase();
+      if (lower == 'true' || lower == '1') return true;
+      if (lower == 'false' || lower == '0') return false;
+    }
+    return defaultValue;
+  }
+
+  int _settingsGetInt(
+    String key, {
+    required int defaultValue,
+  }) {
+    final value = _settingsGet(key, defaultValue: defaultValue);
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      return int.tryParse(value.trim()) ?? defaultValue;
+    }
+    return defaultValue;
+  }
+
   Future<bool> _settingsPut(
     String key,
     dynamic value,
@@ -2964,6 +3448,83 @@ class _SourceListViewState extends State<SourceListView> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showExportPathDialog(String outputPath) async {
+    final path = outputPath.trim();
+    final uri = Uri.tryParse(path);
+    final isHttpPath = uri != null &&
+        (uri.scheme.toLowerCase() == 'http' ||
+            uri.scheme.toLowerCase() == 'https');
+    final lines = <String>[
+      '导出路径：',
+      path,
+      if (isHttpPath) '',
+      if (isHttpPath) '检测到网络链接，可直接复制后分享。',
+    ];
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('导出成功'),
+        content: Text('\n${lines.join('\n')}'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('关闭'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: path));
+              if (!dialogContext.mounted) return;
+              Navigator.pop(dialogContext);
+              _showToastMessage('已复制导出路径');
+            },
+            child: const Text('复制路径'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showToastMessage(String message) {
+    if (!mounted) return;
+    showCupertinoModalPopup<void>(
+      context: context,
+      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
+      builder: (toastContext) {
+        final navigator = Navigator.of(toastContext);
+        unawaited(Future<void>.delayed(const Duration(milliseconds: 1100), () {
+          if (navigator.mounted && navigator.canPop()) {
+            navigator.pop();
+          }
+        }));
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemBackground
+                    .resolveFrom(context)
+                    .withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+              ),
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

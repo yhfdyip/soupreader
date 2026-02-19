@@ -13,6 +13,7 @@ import '../../import/import_service.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../../search/views/search_book_info_view.dart';
 import '../services/bookshelf_booklist_import_service.dart';
+import '../services/bookshelf_catalog_update_service.dart';
 import '../services/bookshelf_import_export_service.dart';
 import '../views/reading_history_view.dart';
 import '../models/book.dart';
@@ -27,16 +28,18 @@ class BookshelfView extends StatefulWidget {
 
 class _BookshelfViewState extends State<BookshelfView> {
   bool _isGridView = true;
-  // 与 legado 一致：图墙右上角支持“更新中”状态；当前先预留状态集等待任务流接入。
+  // 与 legado 一致：图墙/列表都可展示“更新中”状态。
   final Set<String> _updatingBookIds = <String>{};
   late final BookRepository _bookRepo;
   late final ImportService _importService;
   late final SettingsService _settingsService;
   late final BookshelfImportExportService _bookshelfIo;
   late final BookshelfBooklistImportService _booklistImporter;
+  late final BookshelfCatalogUpdateService _catalogUpdater;
   StreamSubscription<List<Book>>? _booksSubscription;
   List<Book> _books = [];
   bool _isImporting = false;
+  bool _isUpdatingCatalog = false;
   String? _initError;
 
   @override
@@ -44,11 +47,16 @@ class _BookshelfViewState extends State<BookshelfView> {
     super.initState();
     try {
       debugPrint('[bookshelf] init start');
-      _bookRepo = BookRepository(DatabaseService());
+      final db = DatabaseService();
+      _bookRepo = BookRepository(db);
       _importService = ImportService();
       _settingsService = SettingsService();
       _bookshelfIo = BookshelfImportExportService();
       _booklistImporter = BookshelfBooklistImportService();
+      _catalogUpdater = BookshelfCatalogUpdateService(
+        database: db,
+        bookRepo: _bookRepo,
+      );
       _isGridView = _settingsService.appSettings.bookshelfViewMode ==
           BookshelfViewMode.grid;
       _loadBooks();
@@ -75,7 +83,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   void _loadBooks() {
     setState(() {
-      _books = _bookRepo.getAllBooks();
+      _books = List<Book>.from(_bookRepo.getAllBooks());
       _sortBooks(_settingsService.appSettings.bookshelfSortMode);
     });
   }
@@ -309,6 +317,73 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
+  String _buildCatalogUpdateSummaryMessage(
+      BookshelfCatalogUpdateSummary summary) {
+    final lines = <String>[];
+    if (summary.updateCandidateCount <= 0) {
+      return '当前书架没有可更新的网络书籍';
+    }
+
+    lines.add(
+      '目录更新完成：成功 ${summary.successCount} 本，失败 ${summary.failedCount} 本'
+      '${summary.skippedCount > 0 ? '，跳过 ${summary.skippedCount} 本' : ''}',
+    );
+    if (summary.failedDetails.isNotEmpty) {
+      lines.add('');
+      lines.add('失败详情（最多 5 条）：');
+      lines.addAll(summary.failedDetails.take(5));
+    }
+    return lines.join('\n');
+  }
+
+  Future<void> _updateBookshelfCatalog() async {
+    if (_isImporting || _isUpdatingCatalog) return;
+
+    final snapshot = _books.toList(growable: false);
+    final hasRemote = snapshot.any((book) => !book.isLocal);
+    if (!hasRemote) {
+      _showMessage('当前书架没有可更新的网络书籍');
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isUpdatingCatalog = true;
+      _updatingBookIds.clear();
+    });
+
+    try {
+      final summary = await _catalogUpdater.updateBooks(
+        snapshot,
+        onBookUpdatingChanged: (bookId, updating) {
+          if (!mounted) return;
+          setState(() {
+            if (updating) {
+              _updatingBookIds.add(bookId);
+            } else {
+              _updatingBookIds.remove(bookId);
+            }
+          });
+        },
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isUpdatingCatalog = false;
+        _updatingBookIds.clear();
+      });
+      _loadBooks();
+      _showMessage(_buildCatalogUpdateSummaryMessage(summary));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isUpdatingCatalog = false;
+        _updatingBookIds.clear();
+      });
+      _showMessage('更新目录失败：$e');
+    }
+  }
+
   void _showMoreMenu() {
     showCupertinoModalPopup(
       context: context,
@@ -334,6 +409,13 @@ class _BookshelfViewState extends State<BookshelfView> {
             onPressed: () {
               Navigator.pop(context);
               _showSortMenu();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: Text(_isUpdatingCatalog ? '更新目录（进行中）' : '更新目录'),
+            onPressed: () {
+              Navigator.pop(context);
+              _updateBookshelfCatalog();
             },
           ),
           CupertinoActionSheetAction(
@@ -608,6 +690,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       itemBuilder: (context, index) {
         final book = _books[index];
         final readAgo = _formatReadAgo(book.lastReadTime);
+        final isUpdating = _isUpdating(book);
         return GestureDetector(
           onTap: () => _openReader(book),
           onLongPress: () => _onBookLongPress(book),
@@ -741,11 +824,13 @@ class _BookshelfViewState extends State<BookshelfView> {
                 const SizedBox(width: 6),
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Icon(
-                    LucideIcons.chevronRight,
-                    size: 16,
-                    color: scheme.mutedForeground,
-                  ),
+                  child: isUpdating
+                      ? const CupertinoActivityIndicator(radius: 8)
+                      : Icon(
+                          LucideIcons.chevronRight,
+                          size: 16,
+                          color: scheme.mutedForeground,
+                        ),
                 ),
               ],
             ),

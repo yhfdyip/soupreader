@@ -97,6 +97,33 @@ void main() {
       expect(clearedJsLib, 'function a(){}');
     });
 
+    test('URL 变更时清理旧源变量', () async {
+      String? removedVariableUrl;
+
+      final service = SourceLegacySaveService(
+        upsertSourceRawJson: ({String? originalUrl, required String rawJson}) {
+          return Future.value();
+        },
+        clearExploreKindsCache: (_) => Future.value(),
+        removeSourceVariable: (sourceUrl) {
+          removedVariableUrl = sourceUrl;
+          return Future.value();
+        },
+      );
+
+      const oldSource = BookSource(
+        bookSourceUrl: 'https://old.example.com',
+        bookSourceName: '旧源',
+      );
+      const newSource = BookSource(
+        bookSourceUrl: 'https://new.example.com',
+        bookSourceName: '新源',
+      );
+
+      await service.save(source: newSource, originalSource: oldSource);
+      expect(removedVariableUrl, 'https://old.example.com');
+    });
+
     test('name/url 为空时抛出异常', () async {
       final service = SourceLegacySaveService(
         upsertSourceRawJson: ({String? originalUrl, required String rawJson}) {

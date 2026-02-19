@@ -760,6 +760,66 @@ class _SwitchRow extends StatelessWidget {
   }
 }
 
+class _ChineseConverterTypeRow extends StatelessWidget {
+  final int currentType;
+  final ValueChanged<int> onChanged;
+
+  const _ChineseConverterTypeRow({
+    required this.currentType,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final safeType = ChineseConverterType.values.contains(currentType)
+        ? currentType
+        : ChineseConverterType.off;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '简繁转换',
+          style: TextStyle(
+            color: isDark ? CupertinoColors.white : AppDesignTokens.textStrong,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 6),
+        CupertinoSlidingSegmentedControl<int>(
+          groupValue: safeType,
+          backgroundColor: isDark
+              ? CupertinoColors.white.withValues(alpha: 0.08)
+              : AppDesignTokens.pageBgLight,
+          thumbColor: isDark
+              ? AppDesignTokens.brandSecondary
+              : AppDesignTokens.brandPrimary,
+          children: {
+            for (final mode in ChineseConverterType.values)
+              mode: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text(
+                  ChineseConverterType.label(mode),
+                  style: TextStyle(
+                    color: isDark
+                        ? CupertinoColors.white.withValues(alpha: 0.84)
+                        : AppDesignTokens.textStrong,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+          },
+          onValueChanged: (value) {
+            if (value == null) return;
+            onChanged(value);
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _MoreTab extends StatelessWidget {
   final ReadingSettings settings;
   final ValueChanged<ReadingSettings> onSettingsChanged;
@@ -804,11 +864,10 @@ class _MoreTab extends StatelessWidget {
                     onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
               ),
               const SizedBox(height: 8),
-              _SwitchRow(
-                label: '繁体显示',
-                value: settings.chineseTraditional,
-                onChanged: (v) => onSettingsChanged(
-                  settings.copyWith(chineseTraditional: v),
+              _ChineseConverterTypeRow(
+                currentType: settings.chineseConverterType,
+                onChanged: (value) => onSettingsChanged(
+                  settings.copyWith(chineseConverterType: value),
                 ),
               ),
             ],

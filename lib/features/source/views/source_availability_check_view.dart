@@ -8,7 +8,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../services/source_availability_check_task_service.dart';
 import '../services/source_debug_export_service.dart';
 import 'source_debug_text_view.dart';
-import 'source_edit_view.dart';
+import 'source_debug_legacy_view.dart';
 
 enum _ResultFilter {
   all,
@@ -467,10 +467,8 @@ class _SourceAvailabilityCheckViewState
     }
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView.fromSource(
-          source,
-          rawJson: _repo.getRawJsonByUrl(source.bookSourceUrl),
-          initialTab: 3,
+        builder: (_) => SourceDebugLegacyView(
+          source: source,
           initialDebugKey: item.debugKey,
         ),
       ),
@@ -626,7 +624,7 @@ class _SourceAvailabilityCheckViewState
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: Text(
-              '提示：长按某条书源可直接打开编辑器并跳到调试 Tab。',
+              '提示：长按某条书源可直接打开调试页。',
               style: TextStyle(fontSize: 12.5),
             ),
           ),

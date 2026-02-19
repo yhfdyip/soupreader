@@ -9,21 +9,25 @@ typedef SourceRawUpsert = Future<void> Function({
 typedef SourceClearExploreKindsCache = Future<void> Function(BookSource source);
 
 typedef SourceClearJsLibScope = void Function(String? jsLib);
+typedef SourceRemoveSourceVariable = Future<void> Function(String sourceUrl);
 
 class SourceLegacySaveService {
   SourceLegacySaveService({
     required SourceRawUpsert upsertSourceRawJson,
     required SourceClearExploreKindsCache clearExploreKindsCache,
     SourceClearJsLibScope? clearJsLibScope,
+    SourceRemoveSourceVariable? removeSourceVariable,
     int Function()? nowMillis,
   })  : _upsertSourceRawJson = upsertSourceRawJson,
         _clearExploreKindsCache = clearExploreKindsCache,
         _clearJsLibScope = clearJsLibScope,
+        _removeSourceVariable = removeSourceVariable,
         _nowMillis = nowMillis ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   final SourceRawUpsert _upsertSourceRawJson;
   final SourceClearExploreKindsCache _clearExploreKindsCache;
   final SourceClearJsLibScope? _clearJsLibScope;
+  final SourceRemoveSourceVariable? _removeSourceVariable;
   final int Function() _nowMillis;
 
   Future<BookSource> save({
@@ -33,7 +37,7 @@ class SourceLegacySaveService {
     final name = source.bookSourceName.trim();
     final url = source.bookSourceUrl.trim();
     if (name.isEmpty || url.isEmpty) {
-      throw const FormatException('bookSourceName 与 bookSourceUrl 不能为空');
+      throw const FormatException('书源名称和书源地址不能为空');
     }
 
     final normalizedSource = source.copyWith(
@@ -60,6 +64,13 @@ class SourceLegacySaveService {
       originalUrl: oldSource?.bookSourceUrl,
       rawJson: LegadoJson.encode(saving.toJson()),
     );
+    if (oldSource != null) {
+      final oldUrl = oldSource.bookSourceUrl.trim();
+      final nextUrl = saving.bookSourceUrl.trim();
+      if (oldUrl.isNotEmpty && oldUrl != nextUrl) {
+        await _removeSourceVariable?.call(oldUrl);
+      }
+    }
 
     return saving;
   }

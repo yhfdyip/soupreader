@@ -577,7 +577,7 @@ class SourceImportExportService {
   }
 
   /// 导出书源到文件
-  Future<bool> exportToFile(List<BookSource> sources) async {
+  Future<SourceExportFileResult> exportToFile(List<BookSource> sources) async {
     try {
       final jsonString = exportToJson(sources);
 
@@ -590,15 +590,22 @@ class SourceImportExportService {
         type: FileType.custom,
       );
 
-      if (outputPath == null) {
-        return false; // 用户取消
+      if (outputPath == null || outputPath.trim().isEmpty) {
+        return const SourceExportFileResult(cancelled: true);
       }
 
-      await File(outputPath).writeAsString(jsonString);
-      return true;
+      final normalizedPath = outputPath.trim();
+      await File(normalizedPath).writeAsString(jsonString);
+      return SourceExportFileResult(
+        success: true,
+        outputPath: normalizedPath,
+      );
     } catch (e) {
       debugPrint('导出失败: $e');
-      return false;
+      return SourceExportFileResult(
+        success: false,
+        errorMessage: '导出失败：$e',
+      );
     }
   }
 
@@ -617,6 +624,20 @@ class SourceImportExportService {
       return null;
     }
   }
+}
+
+class SourceExportFileResult {
+  final bool success;
+  final bool cancelled;
+  final String? outputPath;
+  final String? errorMessage;
+
+  const SourceExportFileResult({
+    this.success = false,
+    this.cancelled = false,
+    this.outputPath,
+    this.errorMessage,
+  });
 }
 
 /// 导入结果

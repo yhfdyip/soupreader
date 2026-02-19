@@ -31,15 +31,20 @@ void main() {
     expect(groups, containsAll(<String>['玄幻', '男频', '女频', '完本']));
   });
 
-  test('filterByGroup supports all and disabled virtual groups', () {
+  test('filterByGroup supports all and invalid virtual groups', () {
     final sources = <BookSource>[
       _source(url: 'u1', name: 'A', group: '玄幻', enabled: true),
-      _source(url: 'u2', name: 'B', group: '女频', enabled: false),
-      _source(url: 'u3', name: 'C', group: '玄幻,女频', enabled: false),
+      _source(url: 'u2', name: 'B', group: '女频,搜索失效', enabled: true),
+      _source(url: 'u3', name: 'C', group: '玄幻,女频,校验超时', enabled: true),
     ];
 
     expect(SourceFilterHelper.filterByGroup(sources, '全部').length, 3);
-    expect(SourceFilterHelper.filterByGroup(sources, '失效').length, 2);
+    final invalid = SourceFilterHelper.filterByGroup(sources, '失效');
+    expect(invalid.length, 2);
+    expect(
+      invalid.map((item) => item.bookSourceUrl).toSet(),
+      {'u2', 'u3'},
+    );
     expect(SourceFilterHelper.filterByGroup(sources, '玄幻').length, 2);
     expect(SourceFilterHelper.filterByGroup(sources, '女频').length, 2);
   });

@@ -16,6 +16,7 @@ import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_edit_legacy_view.dart';
 import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_web_verify_view.dart';
+import '../services/discovery_filter_helper.dart';
 import 'discovery_explore_results_view.dart';
 
 /// 发现页（对标 legado ExploreFragment）：
@@ -125,45 +126,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return eligible;
   }
 
-  List<BookSource> _applyQueryFilter(
-    List<BookSource> input,
-    String query,
-  ) {
-    final raw = query.trim();
-    if (raw.isEmpty) return input;
-
-    final q = raw.toLowerCase();
-    if (q.startsWith('group:')) {
-      final key = raw.substring(6).trim();
-      if (key.isEmpty) return input;
-      return input
-          .where((s) => _extractGroups(s.bookSourceGroup).contains(key))
-          .toList(growable: false);
-    }
-
-    return input.where((source) {
-      final name = source.bookSourceName.toLowerCase();
-      final url = source.bookSourceUrl.toLowerCase();
-      final group = (source.bookSourceGroup ?? '').toLowerCase();
-      return name.contains(q) || url.contains(q) || group.contains(q);
-    }).toList(growable: false);
-  }
-
-  List<String> _extractGroups(String? raw) {
-    final text = raw?.trim();
-    if (text == null || text.isEmpty) return <String>[];
-    return text
-        .split(RegExp(r'[,;，；]'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList(growable: false);
-  }
-
   List<String> _buildGroups(List<BookSource> sources) {
     final groups = <String>{};
     for (final source in sources) {
-      groups.addAll(_extractGroups(source.bookSourceGroup));
+      groups
+          .addAll(DiscoveryFilterHelper.extractGroups(source.bookSourceGroup));
     }
     final sorted = groups.toList()..sort();
     return sorted;
@@ -410,54 +377,13 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _searchInSource(BookSource source) async {
-    final keyword = await _askSearchKeyword(source);
-    if (!mounted || keyword == null || keyword.trim().isEmpty) return;
-
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (_) => SearchView.scoped(
           sourceUrls: <String>[source.bookSourceUrl],
-          initialKeyword: keyword.trim(),
-          autoSearchOnOpen: true,
         ),
       ),
     );
-  }
-
-  Future<String?> _askSearchKeyword(BookSource source) async {
-    final defaultKeyword = source.ruleSearch?.checkKeyWord?.trim();
-    final controller = TextEditingController(
-      text: (defaultKeyword == null || defaultKeyword.isEmpty)
-          ? '我的'
-          : defaultKeyword,
-    );
-
-    final value = await showCupertinoDialog<String>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('单源搜索'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: '输入搜索关键词',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('搜索'),
-          ),
-        ],
-      ),
-    );
-
-    controller.dispose();
-    return value;
   }
 
   Future<void> _refreshSourceKinds(BookSource source) async {
@@ -523,7 +449,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final scheme = theme.colorScheme;
 
     final eligible = _eligibleSources(_allSources);
-    final visible = _applyQueryFilter(eligible, _searchController.text);
+    final visible = DiscoveryFilterHelper.applyQueryFilter(
+        eligible, _searchController.text);
     final query = _searchController.text.trim();
 
     return AppCupertinoPageScaffold(

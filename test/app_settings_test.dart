@@ -31,6 +31,29 @@ void main() {
     expect(decoded.searchScope, '::https://example.com/source');
   });
 
+  test('AppSettings migrates legacy search filter mode to precision toggle',
+      () {
+    final legacyNone = AppSettings.fromJson({
+      'searchFilterMode': SearchFilterMode.none.index,
+    });
+    final legacyNormal = AppSettings.fromJson({
+      'searchFilterMode': SearchFilterMode.normal.index,
+    });
+    final legacyPrecise = AppSettings.fromJson({
+      'searchFilterMode': SearchFilterMode.precise.index,
+    });
+
+    expect(legacyNone.searchFilterMode, SearchFilterMode.normal);
+    expect(legacyNormal.searchFilterMode, SearchFilterMode.normal);
+    expect(legacyPrecise.searchFilterMode, SearchFilterMode.precise);
+
+    const normalized = AppSettings(searchFilterMode: SearchFilterMode.none);
+    expect(
+      normalized.toJson()['searchFilterMode'],
+      SearchFilterMode.normal.index,
+    );
+  });
+
   test('SettingsService persists app settings', () async {
     SharedPreferences.setMockInitialValues({});
     final service = SettingsService();

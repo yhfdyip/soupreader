@@ -48,12 +48,11 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
                 ),
               ),
               CupertinoListTile.notched(
-                title: const Text('繁体显示'),
-                trailing: CupertinoSwitch(
-                  value: _settings.chineseTraditional,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(chineseTraditional: v)),
-                ),
+                title: const Text('简繁转换'),
+                additionalInfo: Text(
+                    ChineseConverterType.label(_settings.chineseConverterType)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickChineseConverterType,
               ),
             ],
           ),
@@ -85,5 +84,27 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
         builder: (context) => const ReplaceRuleListView(),
       ),
     );
+  }
+
+  Future<void> _pickChineseConverterType() async {
+    final selected = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('简繁转换'),
+        actions: [
+          for (final mode in ChineseConverterType.values)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(context, mode),
+              child: Text(ChineseConverterType.label(mode)),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    _update(_settings.copyWith(chineseConverterType: selected));
   }
 }

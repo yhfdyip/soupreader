@@ -68,7 +68,11 @@ class SearchCacheService {
         .toSet()
         .toList(growable: false)
       ..sort();
-    return '${filterMode.name}|$normalizedKeyword|${normalizedScope.join(",")}';
+    final normalizedFilterMode =
+        normalizeSearchFilterMode(filterMode) == SearchFilterMode.precise
+            ? 'precise'
+            : 'normal';
+    return '$normalizedFilterMode|$normalizedKeyword|${normalizedScope.join(",")}';
   }
 
   Future<SearchCacheEntry?> readCache({

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
@@ -6,11 +8,11 @@ import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../bookshelf/models/book.dart';
 
-/// 阅读器目录/书签/笔记面板（对标同类阅读器的“目录抽屉”交互）
+/// 阅读器目录/书签面板（对标 legado 目录抽屉交互）
 ///
 /// - 暖色背景（类似 Legado）
 /// - 顶部展示书籍信息
-/// - Tab：目录 / 书签 / 笔记
+/// - Tab：目录 / 书签
 /// - 工具按钮：清缓存、刷新（检查更新/重新拉取目录由外部注入）
 class ReaderCatalogSheet extends StatefulWidget {
   final String bookId;
@@ -30,6 +32,8 @@ class ReaderCatalogSheet extends StatefulWidget {
   final ValueChanged<int> onChapterSelected;
   final ValueChanged<BookmarkEntity> onBookmarkSelected;
   final Future<void> Function(BookmarkEntity bookmark) onDeleteBookmark;
+  final Map<int, String> initialDisplayTitlesByIndex;
+  final Future<String> Function(Chapter chapter)? resolveDisplayTitle;
 
   const ReaderCatalogSheet({
     super.key,
@@ -45,6 +49,8 @@ class ReaderCatalogSheet extends StatefulWidget {
     required this.onChapterSelected,
     required this.onBookmarkSelected,
     required this.onDeleteBookmark,
+    this.initialDisplayTitlesByIndex = const <int, String>{},
+    this.resolveDisplayTitle,
   });
 
   @override
@@ -55,18 +61,20 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   static const double _chapterListItemExtent = 60;
   static const double _currentChapterAlignment = 0.08;
 
-  int _selectedTab = 0; // 0=目录, 1=书签, 2=笔记
+  int _selectedTab = 0; // 0=目录, 1=书签
   bool _isReversed = false;
   bool _busy = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _chapterItemKeys = <int, GlobalKey>{};
+  final Map<int, String> _displayTitlesByChapterIndex = <int, String>{};
 
   late List<Chapter> _chapters;
   late List<BookmarkEntity> _bookmarks;
   int? _lastAutoScrollTargetChapterIndex;
   bool _pendingPreciseScroll = false;
+  int _displayTitleResolverToken = 0;
 
   bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
 
@@ -96,12 +104,14 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     super.initState();
     _chapters = List<Chapter>.from(widget.chapters);
     _bookmarks = List<BookmarkEntity>.from(widget.bookmarks);
+    _primeDisplayTitles(reset: true);
 
     _scheduleScrollToCurrentChapter();
   }
 
   @override
   void dispose() {
+    _displayTitleResolverToken++;
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -111,8 +121,10 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   void didUpdateWidget(covariant ReaderCatalogSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (!identical(oldWidget.chapters, widget.chapters) ||
-        oldWidget.currentChapterIndex != widget.currentChapterIndex) {
+    final chapterListChanged = !identical(oldWidget.chapters, widget.chapters);
+    final currentChapterChanged =
+        oldWidget.currentChapterIndex != widget.currentChapterIndex;
+    if (chapterListChanged || currentChapterChanged) {
       _chapters = List<Chapter>.from(widget.chapters);
       _resetAutoScrollState();
       _scheduleScrollToCurrentChapter();
@@ -120,6 +132,111 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     if (!identical(oldWidget.bookmarks, widget.bookmarks)) {
       _bookmarks = List<BookmarkEntity>.from(widget.bookmarks);
     }
+
+    final resolverChanged =
+        oldWidget.resolveDisplayTitle != widget.resolveDisplayTitle;
+    final initialTitlesChanged = !identical(
+      oldWidget.initialDisplayTitlesByIndex,
+      widget.initialDisplayTitlesByIndex,
+    );
+    if (chapterListChanged || resolverChanged || initialTitlesChanged) {
+      _primeDisplayTitles(reset: true);
+    } else if (currentChapterChanged) {
+      _resolveDisplayTitlesAroundCurrent();
+    }
+  }
+
+  Map<int, String> _sanitizeInitialDisplayTitles() {
+    if (widget.initialDisplayTitlesByIndex.isEmpty || _chapters.isEmpty) {
+      return const <int, String>{};
+    }
+    final validIndexes = _chapters.map((chapter) => chapter.index).toSet();
+    final sanitized = <int, String>{};
+    for (final entry in widget.initialDisplayTitlesByIndex.entries) {
+      if (!validIndexes.contains(entry.key)) continue;
+      if (entry.value.trim().isEmpty) continue;
+      sanitized[entry.key] = entry.value;
+    }
+    return sanitized;
+  }
+
+  void _primeDisplayTitles({required bool reset}) {
+    final seeded = _sanitizeInitialDisplayTitles();
+    if (reset) {
+      _displayTitlesByChapterIndex
+        ..clear()
+        ..addAll(seeded);
+    } else {
+      _displayTitlesByChapterIndex.addAll(seeded);
+    }
+    _resolveDisplayTitlesAroundCurrent();
+  }
+
+  int _resolveCurrentChapterListPosition() {
+    for (var i = 0; i < _chapters.length; i++) {
+      if (_chapters[i].index == widget.currentChapterIndex) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  void _resolveDisplayTitlesAroundCurrent() {
+    final resolver = widget.resolveDisplayTitle;
+    if (resolver == null || _chapters.isEmpty) {
+      _displayTitleResolverToken++;
+      return;
+    }
+    final token = ++_displayTitleResolverToken;
+    final start = _resolveCurrentChapterListPosition();
+    unawaited(
+      _resolveDisplayTitlesInDirection(
+        resolver: resolver,
+        token: token,
+        start: start,
+        step: 1,
+      ),
+    );
+    unawaited(
+      _resolveDisplayTitlesInDirection(
+        resolver: resolver,
+        token: token,
+        start: start - 1,
+        step: -1,
+      ),
+    );
+  }
+
+  Future<void> _resolveDisplayTitlesInDirection({
+    required Future<String> Function(Chapter chapter) resolver,
+    required int token,
+    required int start,
+    required int step,
+  }) async {
+    if (step == 0) return;
+    for (var i = start; i >= 0 && i < _chapters.length; i += step) {
+      if (!mounted || token != _displayTitleResolverToken) return;
+      final chapter = _chapters[i];
+      if (_displayTitlesByChapterIndex.containsKey(chapter.index)) continue;
+      var resolved = chapter.title;
+      try {
+        final title = await resolver(chapter);
+        if (title.trim().isNotEmpty) {
+          resolved = title;
+        }
+      } catch (_) {
+        // 保持目录可用：单条解析失败时回退原始标题。
+      }
+      if (!mounted || token != _displayTitleResolverToken) return;
+      if (_displayTitlesByChapterIndex[chapter.index] == resolved) continue;
+      setState(() {
+        _displayTitlesByChapterIndex[chapter.index] = resolved;
+      });
+    }
+  }
+
+  String _displayTitleForChapter(Chapter chapter) {
+    return _displayTitlesByChapterIndex[chapter.index] ?? chapter.title;
   }
 
   GlobalKey _chapterKeyFor(int chapterIndex) {
@@ -203,6 +320,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     var list = _chapters;
     final q = _searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
+      // 对齐 legado：目录检索仍基于章节原始标题字段（BookChapter.title）。
       list = list
           .where((c) => c.title.toLowerCase().contains(q))
           .toList(growable: false);
@@ -330,7 +448,6 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         children: [
           _buildTab(0, '目录', count: chapterCount),
           _buildTab(1, '书签', count: bookmarkCount),
-          _buildTab(2, '笔记'),
           const Spacer(),
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -397,16 +514,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
 
   Widget _buildSearchAndSort() {
     final showSort = _selectedTab == 0;
-    final placeholder = switch (_selectedTab) {
-      0 => '输入关键字搜索目录',
-      1 => '搜索书签',
-      _ => '搜索',
-    };
-
-    // 笔记暂未实现，避免显示“可搜索但无内容”的假入口
-    if (_selectedTab == 2) {
-      return const SizedBox(height: 8);
-    }
+    final placeholder = _selectedTab == 0 ? '输入关键字搜索目录' : '搜索书签';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -490,11 +598,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   Widget _buildBody() {
-    return switch (_selectedTab) {
-      0 => _buildChapterList(),
-      1 => _buildBookmarkList(),
-      _ => _buildEmptyTab('暂无笔记'),
-    };
+    if (_selectedTab == 0) return _buildChapterList();
+    return _buildBookmarkList();
   }
 
   Widget _buildChapterList() {
@@ -547,7 +652,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                 ),
                 Expanded(
                   child: Text(
-                    chapter.title,
+                    _displayTitleForChapter(chapter),
                     style: TextStyle(
                       color: isCurrent ? _accent : _textStrong,
                       fontSize: 14,
@@ -831,6 +936,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         _chapters = List<Chapter>.from(updated);
         _resetAutoScrollState();
       });
+      _primeDisplayTitles(reset: true);
       _scheduleScrollToCurrentChapter();
 
       final diff = _chapters.length - oldCount;

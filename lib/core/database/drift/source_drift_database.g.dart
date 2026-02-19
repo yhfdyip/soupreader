@@ -799,6 +799,1560 @@ class SourceRecordsCompanion extends UpdateCompanion<SourceRecord> {
   }
 }
 
+class $RssSourceRecordsTable extends RssSourceRecords
+    with TableInfo<$RssSourceRecordsTable, RssSourceRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RssSourceRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceUrlMeta =
+      const VerificationMeta('sourceUrl');
+  @override
+  late final GeneratedColumn<String> sourceUrl = GeneratedColumn<String>(
+      'source_url', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sourceNameMeta =
+      const VerificationMeta('sourceName');
+  @override
+  late final GeneratedColumn<String> sourceName = GeneratedColumn<String>(
+      'source_name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _sourceIconMeta =
+      const VerificationMeta('sourceIcon');
+  @override
+  late final GeneratedColumn<String> sourceIcon = GeneratedColumn<String>(
+      'source_icon', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sourceGroupMeta =
+      const VerificationMeta('sourceGroup');
+  @override
+  late final GeneratedColumn<String> sourceGroup = GeneratedColumn<String>(
+      'source_group', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sourceCommentMeta =
+      const VerificationMeta('sourceComment');
+  @override
+  late final GeneratedColumn<String> sourceComment = GeneratedColumn<String>(
+      'source_comment', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _enabledMeta =
+      const VerificationMeta('enabled');
+  @override
+  late final GeneratedColumn<bool> enabled = GeneratedColumn<bool>(
+      'enabled', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("enabled" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _loginUrlMeta =
+      const VerificationMeta('loginUrl');
+  @override
+  late final GeneratedColumn<String> loginUrl = GeneratedColumn<String>(
+      'login_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sortUrlMeta =
+      const VerificationMeta('sortUrl');
+  @override
+  late final GeneratedColumn<String> sortUrl = GeneratedColumn<String>(
+      'sort_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _singleUrlMeta =
+      const VerificationMeta('singleUrl');
+  @override
+  late final GeneratedColumn<bool> singleUrl = GeneratedColumn<bool>(
+      'single_url', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("single_url" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _customOrderMeta =
+      const VerificationMeta('customOrder');
+  @override
+  late final GeneratedColumn<int> customOrder = GeneratedColumn<int>(
+      'custom_order', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _lastUpdateTimeMeta =
+      const VerificationMeta('lastUpdateTime');
+  @override
+  late final GeneratedColumn<int> lastUpdateTime = GeneratedColumn<int>(
+      'last_update_time', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _rawJsonMeta =
+      const VerificationMeta('rawJson');
+  @override
+  late final GeneratedColumn<String> rawJson = GeneratedColumn<String>(
+      'raw_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns => [
+        sourceUrl,
+        sourceName,
+        sourceIcon,
+        sourceGroup,
+        sourceComment,
+        enabled,
+        loginUrl,
+        sortUrl,
+        singleUrl,
+        customOrder,
+        lastUpdateTime,
+        rawJson,
+        updatedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'rss_source_records';
+  @override
+  VerificationContext validateIntegrity(Insertable<RssSourceRecord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('source_url')) {
+      context.handle(_sourceUrlMeta,
+          sourceUrl.isAcceptableOrUnknown(data['source_url']!, _sourceUrlMeta));
+    } else if (isInserting) {
+      context.missing(_sourceUrlMeta);
+    }
+    if (data.containsKey('source_name')) {
+      context.handle(
+          _sourceNameMeta,
+          sourceName.isAcceptableOrUnknown(
+              data['source_name']!, _sourceNameMeta));
+    }
+    if (data.containsKey('source_icon')) {
+      context.handle(
+          _sourceIconMeta,
+          sourceIcon.isAcceptableOrUnknown(
+              data['source_icon']!, _sourceIconMeta));
+    }
+    if (data.containsKey('source_group')) {
+      context.handle(
+          _sourceGroupMeta,
+          sourceGroup.isAcceptableOrUnknown(
+              data['source_group']!, _sourceGroupMeta));
+    }
+    if (data.containsKey('source_comment')) {
+      context.handle(
+          _sourceCommentMeta,
+          sourceComment.isAcceptableOrUnknown(
+              data['source_comment']!, _sourceCommentMeta));
+    }
+    if (data.containsKey('enabled')) {
+      context.handle(_enabledMeta,
+          enabled.isAcceptableOrUnknown(data['enabled']!, _enabledMeta));
+    }
+    if (data.containsKey('login_url')) {
+      context.handle(_loginUrlMeta,
+          loginUrl.isAcceptableOrUnknown(data['login_url']!, _loginUrlMeta));
+    }
+    if (data.containsKey('sort_url')) {
+      context.handle(_sortUrlMeta,
+          sortUrl.isAcceptableOrUnknown(data['sort_url']!, _sortUrlMeta));
+    }
+    if (data.containsKey('single_url')) {
+      context.handle(_singleUrlMeta,
+          singleUrl.isAcceptableOrUnknown(data['single_url']!, _singleUrlMeta));
+    }
+    if (data.containsKey('custom_order')) {
+      context.handle(
+          _customOrderMeta,
+          customOrder.isAcceptableOrUnknown(
+              data['custom_order']!, _customOrderMeta));
+    }
+    if (data.containsKey('last_update_time')) {
+      context.handle(
+          _lastUpdateTimeMeta,
+          lastUpdateTime.isAcceptableOrUnknown(
+              data['last_update_time']!, _lastUpdateTimeMeta));
+    }
+    if (data.containsKey('raw_json')) {
+      context.handle(_rawJsonMeta,
+          rawJson.isAcceptableOrUnknown(data['raw_json']!, _rawJsonMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sourceUrl};
+  @override
+  RssSourceRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RssSourceRecord(
+      sourceUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source_url'])!,
+      sourceName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source_name'])!,
+      sourceIcon: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source_icon']),
+      sourceGroup: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source_group']),
+      sourceComment: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source_comment']),
+      enabled: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}enabled'])!,
+      loginUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}login_url']),
+      sortUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sort_url']),
+      singleUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}single_url'])!,
+      customOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}custom_order'])!,
+      lastUpdateTime: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}last_update_time'])!,
+      rawJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}raw_json']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $RssSourceRecordsTable createAlias(String alias) {
+    return $RssSourceRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RssSourceRecord extends DataClass implements Insertable<RssSourceRecord> {
+  final String sourceUrl;
+  final String sourceName;
+  final String? sourceIcon;
+  final String? sourceGroup;
+  final String? sourceComment;
+  final bool enabled;
+  final String? loginUrl;
+  final String? sortUrl;
+  final bool singleUrl;
+  final int customOrder;
+  final int lastUpdateTime;
+  final String? rawJson;
+  final int updatedAt;
+  const RssSourceRecord(
+      {required this.sourceUrl,
+      required this.sourceName,
+      this.sourceIcon,
+      this.sourceGroup,
+      this.sourceComment,
+      required this.enabled,
+      this.loginUrl,
+      this.sortUrl,
+      required this.singleUrl,
+      required this.customOrder,
+      required this.lastUpdateTime,
+      this.rawJson,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['source_url'] = Variable<String>(sourceUrl);
+    map['source_name'] = Variable<String>(sourceName);
+    if (!nullToAbsent || sourceIcon != null) {
+      map['source_icon'] = Variable<String>(sourceIcon);
+    }
+    if (!nullToAbsent || sourceGroup != null) {
+      map['source_group'] = Variable<String>(sourceGroup);
+    }
+    if (!nullToAbsent || sourceComment != null) {
+      map['source_comment'] = Variable<String>(sourceComment);
+    }
+    map['enabled'] = Variable<bool>(enabled);
+    if (!nullToAbsent || loginUrl != null) {
+      map['login_url'] = Variable<String>(loginUrl);
+    }
+    if (!nullToAbsent || sortUrl != null) {
+      map['sort_url'] = Variable<String>(sortUrl);
+    }
+    map['single_url'] = Variable<bool>(singleUrl);
+    map['custom_order'] = Variable<int>(customOrder);
+    map['last_update_time'] = Variable<int>(lastUpdateTime);
+    if (!nullToAbsent || rawJson != null) {
+      map['raw_json'] = Variable<String>(rawJson);
+    }
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  RssSourceRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RssSourceRecordsCompanion(
+      sourceUrl: Value(sourceUrl),
+      sourceName: Value(sourceName),
+      sourceIcon: sourceIcon == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceIcon),
+      sourceGroup: sourceGroup == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceGroup),
+      sourceComment: sourceComment == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceComment),
+      enabled: Value(enabled),
+      loginUrl: loginUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(loginUrl),
+      sortUrl: sortUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sortUrl),
+      singleUrl: Value(singleUrl),
+      customOrder: Value(customOrder),
+      lastUpdateTime: Value(lastUpdateTime),
+      rawJson: rawJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rawJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RssSourceRecord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RssSourceRecord(
+      sourceUrl: serializer.fromJson<String>(json['sourceUrl']),
+      sourceName: serializer.fromJson<String>(json['sourceName']),
+      sourceIcon: serializer.fromJson<String?>(json['sourceIcon']),
+      sourceGroup: serializer.fromJson<String?>(json['sourceGroup']),
+      sourceComment: serializer.fromJson<String?>(json['sourceComment']),
+      enabled: serializer.fromJson<bool>(json['enabled']),
+      loginUrl: serializer.fromJson<String?>(json['loginUrl']),
+      sortUrl: serializer.fromJson<String?>(json['sortUrl']),
+      singleUrl: serializer.fromJson<bool>(json['singleUrl']),
+      customOrder: serializer.fromJson<int>(json['customOrder']),
+      lastUpdateTime: serializer.fromJson<int>(json['lastUpdateTime']),
+      rawJson: serializer.fromJson<String?>(json['rawJson']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'sourceUrl': serializer.toJson<String>(sourceUrl),
+      'sourceName': serializer.toJson<String>(sourceName),
+      'sourceIcon': serializer.toJson<String?>(sourceIcon),
+      'sourceGroup': serializer.toJson<String?>(sourceGroup),
+      'sourceComment': serializer.toJson<String?>(sourceComment),
+      'enabled': serializer.toJson<bool>(enabled),
+      'loginUrl': serializer.toJson<String?>(loginUrl),
+      'sortUrl': serializer.toJson<String?>(sortUrl),
+      'singleUrl': serializer.toJson<bool>(singleUrl),
+      'customOrder': serializer.toJson<int>(customOrder),
+      'lastUpdateTime': serializer.toJson<int>(lastUpdateTime),
+      'rawJson': serializer.toJson<String?>(rawJson),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  RssSourceRecord copyWith(
+          {String? sourceUrl,
+          String? sourceName,
+          Value<String?> sourceIcon = const Value.absent(),
+          Value<String?> sourceGroup = const Value.absent(),
+          Value<String?> sourceComment = const Value.absent(),
+          bool? enabled,
+          Value<String?> loginUrl = const Value.absent(),
+          Value<String?> sortUrl = const Value.absent(),
+          bool? singleUrl,
+          int? customOrder,
+          int? lastUpdateTime,
+          Value<String?> rawJson = const Value.absent(),
+          int? updatedAt}) =>
+      RssSourceRecord(
+        sourceUrl: sourceUrl ?? this.sourceUrl,
+        sourceName: sourceName ?? this.sourceName,
+        sourceIcon: sourceIcon.present ? sourceIcon.value : this.sourceIcon,
+        sourceGroup: sourceGroup.present ? sourceGroup.value : this.sourceGroup,
+        sourceComment:
+            sourceComment.present ? sourceComment.value : this.sourceComment,
+        enabled: enabled ?? this.enabled,
+        loginUrl: loginUrl.present ? loginUrl.value : this.loginUrl,
+        sortUrl: sortUrl.present ? sortUrl.value : this.sortUrl,
+        singleUrl: singleUrl ?? this.singleUrl,
+        customOrder: customOrder ?? this.customOrder,
+        lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
+        rawJson: rawJson.present ? rawJson.value : this.rawJson,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  RssSourceRecord copyWithCompanion(RssSourceRecordsCompanion data) {
+    return RssSourceRecord(
+      sourceUrl: data.sourceUrl.present ? data.sourceUrl.value : this.sourceUrl,
+      sourceName:
+          data.sourceName.present ? data.sourceName.value : this.sourceName,
+      sourceIcon:
+          data.sourceIcon.present ? data.sourceIcon.value : this.sourceIcon,
+      sourceGroup:
+          data.sourceGroup.present ? data.sourceGroup.value : this.sourceGroup,
+      sourceComment: data.sourceComment.present
+          ? data.sourceComment.value
+          : this.sourceComment,
+      enabled: data.enabled.present ? data.enabled.value : this.enabled,
+      loginUrl: data.loginUrl.present ? data.loginUrl.value : this.loginUrl,
+      sortUrl: data.sortUrl.present ? data.sortUrl.value : this.sortUrl,
+      singleUrl: data.singleUrl.present ? data.singleUrl.value : this.singleUrl,
+      customOrder:
+          data.customOrder.present ? data.customOrder.value : this.customOrder,
+      lastUpdateTime: data.lastUpdateTime.present
+          ? data.lastUpdateTime.value
+          : this.lastUpdateTime,
+      rawJson: data.rawJson.present ? data.rawJson.value : this.rawJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssSourceRecord(')
+          ..write('sourceUrl: $sourceUrl, ')
+          ..write('sourceName: $sourceName, ')
+          ..write('sourceIcon: $sourceIcon, ')
+          ..write('sourceGroup: $sourceGroup, ')
+          ..write('sourceComment: $sourceComment, ')
+          ..write('enabled: $enabled, ')
+          ..write('loginUrl: $loginUrl, ')
+          ..write('sortUrl: $sortUrl, ')
+          ..write('singleUrl: $singleUrl, ')
+          ..write('customOrder: $customOrder, ')
+          ..write('lastUpdateTime: $lastUpdateTime, ')
+          ..write('rawJson: $rawJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      sourceUrl,
+      sourceName,
+      sourceIcon,
+      sourceGroup,
+      sourceComment,
+      enabled,
+      loginUrl,
+      sortUrl,
+      singleUrl,
+      customOrder,
+      lastUpdateTime,
+      rawJson,
+      updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RssSourceRecord &&
+          other.sourceUrl == this.sourceUrl &&
+          other.sourceName == this.sourceName &&
+          other.sourceIcon == this.sourceIcon &&
+          other.sourceGroup == this.sourceGroup &&
+          other.sourceComment == this.sourceComment &&
+          other.enabled == this.enabled &&
+          other.loginUrl == this.loginUrl &&
+          other.sortUrl == this.sortUrl &&
+          other.singleUrl == this.singleUrl &&
+          other.customOrder == this.customOrder &&
+          other.lastUpdateTime == this.lastUpdateTime &&
+          other.rawJson == this.rawJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RssSourceRecordsCompanion extends UpdateCompanion<RssSourceRecord> {
+  final Value<String> sourceUrl;
+  final Value<String> sourceName;
+  final Value<String?> sourceIcon;
+  final Value<String?> sourceGroup;
+  final Value<String?> sourceComment;
+  final Value<bool> enabled;
+  final Value<String?> loginUrl;
+  final Value<String?> sortUrl;
+  final Value<bool> singleUrl;
+  final Value<int> customOrder;
+  final Value<int> lastUpdateTime;
+  final Value<String?> rawJson;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const RssSourceRecordsCompanion({
+    this.sourceUrl = const Value.absent(),
+    this.sourceName = const Value.absent(),
+    this.sourceIcon = const Value.absent(),
+    this.sourceGroup = const Value.absent(),
+    this.sourceComment = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.loginUrl = const Value.absent(),
+    this.sortUrl = const Value.absent(),
+    this.singleUrl = const Value.absent(),
+    this.customOrder = const Value.absent(),
+    this.lastUpdateTime = const Value.absent(),
+    this.rawJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RssSourceRecordsCompanion.insert({
+    required String sourceUrl,
+    this.sourceName = const Value.absent(),
+    this.sourceIcon = const Value.absent(),
+    this.sourceGroup = const Value.absent(),
+    this.sourceComment = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.loginUrl = const Value.absent(),
+    this.sortUrl = const Value.absent(),
+    this.singleUrl = const Value.absent(),
+    this.customOrder = const Value.absent(),
+    this.lastUpdateTime = const Value.absent(),
+    this.rawJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : sourceUrl = Value(sourceUrl);
+  static Insertable<RssSourceRecord> custom({
+    Expression<String>? sourceUrl,
+    Expression<String>? sourceName,
+    Expression<String>? sourceIcon,
+    Expression<String>? sourceGroup,
+    Expression<String>? sourceComment,
+    Expression<bool>? enabled,
+    Expression<String>? loginUrl,
+    Expression<String>? sortUrl,
+    Expression<bool>? singleUrl,
+    Expression<int>? customOrder,
+    Expression<int>? lastUpdateTime,
+    Expression<String>? rawJson,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sourceUrl != null) 'source_url': sourceUrl,
+      if (sourceName != null) 'source_name': sourceName,
+      if (sourceIcon != null) 'source_icon': sourceIcon,
+      if (sourceGroup != null) 'source_group': sourceGroup,
+      if (sourceComment != null) 'source_comment': sourceComment,
+      if (enabled != null) 'enabled': enabled,
+      if (loginUrl != null) 'login_url': loginUrl,
+      if (sortUrl != null) 'sort_url': sortUrl,
+      if (singleUrl != null) 'single_url': singleUrl,
+      if (customOrder != null) 'custom_order': customOrder,
+      if (lastUpdateTime != null) 'last_update_time': lastUpdateTime,
+      if (rawJson != null) 'raw_json': rawJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RssSourceRecordsCompanion copyWith(
+      {Value<String>? sourceUrl,
+      Value<String>? sourceName,
+      Value<String?>? sourceIcon,
+      Value<String?>? sourceGroup,
+      Value<String?>? sourceComment,
+      Value<bool>? enabled,
+      Value<String?>? loginUrl,
+      Value<String?>? sortUrl,
+      Value<bool>? singleUrl,
+      Value<int>? customOrder,
+      Value<int>? lastUpdateTime,
+      Value<String?>? rawJson,
+      Value<int>? updatedAt,
+      Value<int>? rowid}) {
+    return RssSourceRecordsCompanion(
+      sourceUrl: sourceUrl ?? this.sourceUrl,
+      sourceName: sourceName ?? this.sourceName,
+      sourceIcon: sourceIcon ?? this.sourceIcon,
+      sourceGroup: sourceGroup ?? this.sourceGroup,
+      sourceComment: sourceComment ?? this.sourceComment,
+      enabled: enabled ?? this.enabled,
+      loginUrl: loginUrl ?? this.loginUrl,
+      sortUrl: sortUrl ?? this.sortUrl,
+      singleUrl: singleUrl ?? this.singleUrl,
+      customOrder: customOrder ?? this.customOrder,
+      lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
+      rawJson: rawJson ?? this.rawJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sourceUrl.present) {
+      map['source_url'] = Variable<String>(sourceUrl.value);
+    }
+    if (sourceName.present) {
+      map['source_name'] = Variable<String>(sourceName.value);
+    }
+    if (sourceIcon.present) {
+      map['source_icon'] = Variable<String>(sourceIcon.value);
+    }
+    if (sourceGroup.present) {
+      map['source_group'] = Variable<String>(sourceGroup.value);
+    }
+    if (sourceComment.present) {
+      map['source_comment'] = Variable<String>(sourceComment.value);
+    }
+    if (enabled.present) {
+      map['enabled'] = Variable<bool>(enabled.value);
+    }
+    if (loginUrl.present) {
+      map['login_url'] = Variable<String>(loginUrl.value);
+    }
+    if (sortUrl.present) {
+      map['sort_url'] = Variable<String>(sortUrl.value);
+    }
+    if (singleUrl.present) {
+      map['single_url'] = Variable<bool>(singleUrl.value);
+    }
+    if (customOrder.present) {
+      map['custom_order'] = Variable<int>(customOrder.value);
+    }
+    if (lastUpdateTime.present) {
+      map['last_update_time'] = Variable<int>(lastUpdateTime.value);
+    }
+    if (rawJson.present) {
+      map['raw_json'] = Variable<String>(rawJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssSourceRecordsCompanion(')
+          ..write('sourceUrl: $sourceUrl, ')
+          ..write('sourceName: $sourceName, ')
+          ..write('sourceIcon: $sourceIcon, ')
+          ..write('sourceGroup: $sourceGroup, ')
+          ..write('sourceComment: $sourceComment, ')
+          ..write('enabled: $enabled, ')
+          ..write('loginUrl: $loginUrl, ')
+          ..write('sortUrl: $sortUrl, ')
+          ..write('singleUrl: $singleUrl, ')
+          ..write('customOrder: $customOrder, ')
+          ..write('lastUpdateTime: $lastUpdateTime, ')
+          ..write('rawJson: $rawJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RssArticleRecordsTable extends RssArticleRecords
+    with TableInfo<$RssArticleRecordsTable, RssArticleRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RssArticleRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+      'origin', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _linkMeta = const VerificationMeta('link');
+  @override
+  late final GeneratedColumn<String> link = GeneratedColumn<String>(
+      'link', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sortMeta = const VerificationMeta('sort');
+  @override
+  late final GeneratedColumn<String> sort = GeneratedColumn<String>(
+      'sort', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _orderValueMeta =
+      const VerificationMeta('orderValue');
+  @override
+  late final GeneratedColumn<int> orderValue = GeneratedColumn<int>(
+      'order_value', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _pubDateMeta =
+      const VerificationMeta('pubDate');
+  @override
+  late final GeneratedColumn<String> pubDate = GeneratedColumn<String>(
+      'pub_date', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _contentMeta =
+      const VerificationMeta('content');
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+      'content', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _imageMeta = const VerificationMeta('image');
+  @override
+  late final GeneratedColumn<String> image = GeneratedColumn<String>(
+      'image', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _groupNameMeta =
+      const VerificationMeta('groupName');
+  @override
+  late final GeneratedColumn<String> groupName = GeneratedColumn<String>(
+      'group_name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('默认分组'));
+  static const VerificationMeta _variableMeta =
+      const VerificationMeta('variable');
+  @override
+  late final GeneratedColumn<String> variable = GeneratedColumn<String>(
+      'variable', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns => [
+        origin,
+        link,
+        sort,
+        title,
+        orderValue,
+        pubDate,
+        description,
+        content,
+        image,
+        groupName,
+        variable,
+        updatedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'rss_article_records';
+  @override
+  VerificationContext validateIntegrity(Insertable<RssArticleRecord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('origin')) {
+      context.handle(_originMeta,
+          origin.isAcceptableOrUnknown(data['origin']!, _originMeta));
+    } else if (isInserting) {
+      context.missing(_originMeta);
+    }
+    if (data.containsKey('link')) {
+      context.handle(
+          _linkMeta, link.isAcceptableOrUnknown(data['link']!, _linkMeta));
+    } else if (isInserting) {
+      context.missing(_linkMeta);
+    }
+    if (data.containsKey('sort')) {
+      context.handle(
+          _sortMeta, sort.isAcceptableOrUnknown(data['sort']!, _sortMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    }
+    if (data.containsKey('order_value')) {
+      context.handle(
+          _orderValueMeta,
+          orderValue.isAcceptableOrUnknown(
+              data['order_value']!, _orderValueMeta));
+    }
+    if (data.containsKey('pub_date')) {
+      context.handle(_pubDateMeta,
+          pubDate.isAcceptableOrUnknown(data['pub_date']!, _pubDateMeta));
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+          _descriptionMeta,
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
+    }
+    if (data.containsKey('content')) {
+      context.handle(_contentMeta,
+          content.isAcceptableOrUnknown(data['content']!, _contentMeta));
+    }
+    if (data.containsKey('image')) {
+      context.handle(
+          _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
+    }
+    if (data.containsKey('group_name')) {
+      context.handle(_groupNameMeta,
+          groupName.isAcceptableOrUnknown(data['group_name']!, _groupNameMeta));
+    }
+    if (data.containsKey('variable')) {
+      context.handle(_variableMeta,
+          variable.isAcceptableOrUnknown(data['variable']!, _variableMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {origin, link};
+  @override
+  RssArticleRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RssArticleRecord(
+      origin: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}origin'])!,
+      link: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}link'])!,
+      sort: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sort'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      orderValue: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}order_value'])!,
+      pubDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pub_date']),
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
+      content: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}content']),
+      image: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}image']),
+      groupName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}group_name'])!,
+      variable: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}variable']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $RssArticleRecordsTable createAlias(String alias) {
+    return $RssArticleRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RssArticleRecord extends DataClass
+    implements Insertable<RssArticleRecord> {
+  final String origin;
+  final String link;
+  final String sort;
+  final String title;
+  final int orderValue;
+  final String? pubDate;
+  final String? description;
+  final String? content;
+  final String? image;
+  final String groupName;
+  final String? variable;
+  final int updatedAt;
+  const RssArticleRecord(
+      {required this.origin,
+      required this.link,
+      required this.sort,
+      required this.title,
+      required this.orderValue,
+      this.pubDate,
+      this.description,
+      this.content,
+      this.image,
+      required this.groupName,
+      this.variable,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['origin'] = Variable<String>(origin);
+    map['link'] = Variable<String>(link);
+    map['sort'] = Variable<String>(sort);
+    map['title'] = Variable<String>(title);
+    map['order_value'] = Variable<int>(orderValue);
+    if (!nullToAbsent || pubDate != null) {
+      map['pub_date'] = Variable<String>(pubDate);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || content != null) {
+      map['content'] = Variable<String>(content);
+    }
+    if (!nullToAbsent || image != null) {
+      map['image'] = Variable<String>(image);
+    }
+    map['group_name'] = Variable<String>(groupName);
+    if (!nullToAbsent || variable != null) {
+      map['variable'] = Variable<String>(variable);
+    }
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  RssArticleRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RssArticleRecordsCompanion(
+      origin: Value(origin),
+      link: Value(link),
+      sort: Value(sort),
+      title: Value(title),
+      orderValue: Value(orderValue),
+      pubDate: pubDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pubDate),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      content: content == null && nullToAbsent
+          ? const Value.absent()
+          : Value(content),
+      image:
+          image == null && nullToAbsent ? const Value.absent() : Value(image),
+      groupName: Value(groupName),
+      variable: variable == null && nullToAbsent
+          ? const Value.absent()
+          : Value(variable),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RssArticleRecord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RssArticleRecord(
+      origin: serializer.fromJson<String>(json['origin']),
+      link: serializer.fromJson<String>(json['link']),
+      sort: serializer.fromJson<String>(json['sort']),
+      title: serializer.fromJson<String>(json['title']),
+      orderValue: serializer.fromJson<int>(json['orderValue']),
+      pubDate: serializer.fromJson<String?>(json['pubDate']),
+      description: serializer.fromJson<String?>(json['description']),
+      content: serializer.fromJson<String?>(json['content']),
+      image: serializer.fromJson<String?>(json['image']),
+      groupName: serializer.fromJson<String>(json['groupName']),
+      variable: serializer.fromJson<String?>(json['variable']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'origin': serializer.toJson<String>(origin),
+      'link': serializer.toJson<String>(link),
+      'sort': serializer.toJson<String>(sort),
+      'title': serializer.toJson<String>(title),
+      'orderValue': serializer.toJson<int>(orderValue),
+      'pubDate': serializer.toJson<String?>(pubDate),
+      'description': serializer.toJson<String?>(description),
+      'content': serializer.toJson<String?>(content),
+      'image': serializer.toJson<String?>(image),
+      'groupName': serializer.toJson<String>(groupName),
+      'variable': serializer.toJson<String?>(variable),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  RssArticleRecord copyWith(
+          {String? origin,
+          String? link,
+          String? sort,
+          String? title,
+          int? orderValue,
+          Value<String?> pubDate = const Value.absent(),
+          Value<String?> description = const Value.absent(),
+          Value<String?> content = const Value.absent(),
+          Value<String?> image = const Value.absent(),
+          String? groupName,
+          Value<String?> variable = const Value.absent(),
+          int? updatedAt}) =>
+      RssArticleRecord(
+        origin: origin ?? this.origin,
+        link: link ?? this.link,
+        sort: sort ?? this.sort,
+        title: title ?? this.title,
+        orderValue: orderValue ?? this.orderValue,
+        pubDate: pubDate.present ? pubDate.value : this.pubDate,
+        description: description.present ? description.value : this.description,
+        content: content.present ? content.value : this.content,
+        image: image.present ? image.value : this.image,
+        groupName: groupName ?? this.groupName,
+        variable: variable.present ? variable.value : this.variable,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  RssArticleRecord copyWithCompanion(RssArticleRecordsCompanion data) {
+    return RssArticleRecord(
+      origin: data.origin.present ? data.origin.value : this.origin,
+      link: data.link.present ? data.link.value : this.link,
+      sort: data.sort.present ? data.sort.value : this.sort,
+      title: data.title.present ? data.title.value : this.title,
+      orderValue:
+          data.orderValue.present ? data.orderValue.value : this.orderValue,
+      pubDate: data.pubDate.present ? data.pubDate.value : this.pubDate,
+      description:
+          data.description.present ? data.description.value : this.description,
+      content: data.content.present ? data.content.value : this.content,
+      image: data.image.present ? data.image.value : this.image,
+      groupName: data.groupName.present ? data.groupName.value : this.groupName,
+      variable: data.variable.present ? data.variable.value : this.variable,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssArticleRecord(')
+          ..write('origin: $origin, ')
+          ..write('link: $link, ')
+          ..write('sort: $sort, ')
+          ..write('title: $title, ')
+          ..write('orderValue: $orderValue, ')
+          ..write('pubDate: $pubDate, ')
+          ..write('description: $description, ')
+          ..write('content: $content, ')
+          ..write('image: $image, ')
+          ..write('groupName: $groupName, ')
+          ..write('variable: $variable, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(origin, link, sort, title, orderValue,
+      pubDate, description, content, image, groupName, variable, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RssArticleRecord &&
+          other.origin == this.origin &&
+          other.link == this.link &&
+          other.sort == this.sort &&
+          other.title == this.title &&
+          other.orderValue == this.orderValue &&
+          other.pubDate == this.pubDate &&
+          other.description == this.description &&
+          other.content == this.content &&
+          other.image == this.image &&
+          other.groupName == this.groupName &&
+          other.variable == this.variable &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RssArticleRecordsCompanion extends UpdateCompanion<RssArticleRecord> {
+  final Value<String> origin;
+  final Value<String> link;
+  final Value<String> sort;
+  final Value<String> title;
+  final Value<int> orderValue;
+  final Value<String?> pubDate;
+  final Value<String?> description;
+  final Value<String?> content;
+  final Value<String?> image;
+  final Value<String> groupName;
+  final Value<String?> variable;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const RssArticleRecordsCompanion({
+    this.origin = const Value.absent(),
+    this.link = const Value.absent(),
+    this.sort = const Value.absent(),
+    this.title = const Value.absent(),
+    this.orderValue = const Value.absent(),
+    this.pubDate = const Value.absent(),
+    this.description = const Value.absent(),
+    this.content = const Value.absent(),
+    this.image = const Value.absent(),
+    this.groupName = const Value.absent(),
+    this.variable = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RssArticleRecordsCompanion.insert({
+    required String origin,
+    required String link,
+    this.sort = const Value.absent(),
+    this.title = const Value.absent(),
+    this.orderValue = const Value.absent(),
+    this.pubDate = const Value.absent(),
+    this.description = const Value.absent(),
+    this.content = const Value.absent(),
+    this.image = const Value.absent(),
+    this.groupName = const Value.absent(),
+    this.variable = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : origin = Value(origin),
+        link = Value(link);
+  static Insertable<RssArticleRecord> custom({
+    Expression<String>? origin,
+    Expression<String>? link,
+    Expression<String>? sort,
+    Expression<String>? title,
+    Expression<int>? orderValue,
+    Expression<String>? pubDate,
+    Expression<String>? description,
+    Expression<String>? content,
+    Expression<String>? image,
+    Expression<String>? groupName,
+    Expression<String>? variable,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (origin != null) 'origin': origin,
+      if (link != null) 'link': link,
+      if (sort != null) 'sort': sort,
+      if (title != null) 'title': title,
+      if (orderValue != null) 'order_value': orderValue,
+      if (pubDate != null) 'pub_date': pubDate,
+      if (description != null) 'description': description,
+      if (content != null) 'content': content,
+      if (image != null) 'image': image,
+      if (groupName != null) 'group_name': groupName,
+      if (variable != null) 'variable': variable,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RssArticleRecordsCompanion copyWith(
+      {Value<String>? origin,
+      Value<String>? link,
+      Value<String>? sort,
+      Value<String>? title,
+      Value<int>? orderValue,
+      Value<String?>? pubDate,
+      Value<String?>? description,
+      Value<String?>? content,
+      Value<String?>? image,
+      Value<String>? groupName,
+      Value<String?>? variable,
+      Value<int>? updatedAt,
+      Value<int>? rowid}) {
+    return RssArticleRecordsCompanion(
+      origin: origin ?? this.origin,
+      link: link ?? this.link,
+      sort: sort ?? this.sort,
+      title: title ?? this.title,
+      orderValue: orderValue ?? this.orderValue,
+      pubDate: pubDate ?? this.pubDate,
+      description: description ?? this.description,
+      content: content ?? this.content,
+      image: image ?? this.image,
+      groupName: groupName ?? this.groupName,
+      variable: variable ?? this.variable,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (link.present) {
+      map['link'] = Variable<String>(link.value);
+    }
+    if (sort.present) {
+      map['sort'] = Variable<String>(sort.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (orderValue.present) {
+      map['order_value'] = Variable<int>(orderValue.value);
+    }
+    if (pubDate.present) {
+      map['pub_date'] = Variable<String>(pubDate.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (image.present) {
+      map['image'] = Variable<String>(image.value);
+    }
+    if (groupName.present) {
+      map['group_name'] = Variable<String>(groupName.value);
+    }
+    if (variable.present) {
+      map['variable'] = Variable<String>(variable.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssArticleRecordsCompanion(')
+          ..write('origin: $origin, ')
+          ..write('link: $link, ')
+          ..write('sort: $sort, ')
+          ..write('title: $title, ')
+          ..write('orderValue: $orderValue, ')
+          ..write('pubDate: $pubDate, ')
+          ..write('description: $description, ')
+          ..write('content: $content, ')
+          ..write('image: $image, ')
+          ..write('groupName: $groupName, ')
+          ..write('variable: $variable, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RssReadRecordRecordsTable extends RssReadRecordRecords
+    with TableInfo<$RssReadRecordRecordsTable, RssReadRecordRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RssReadRecordRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _recordMeta = const VerificationMeta('record');
+  @override
+  late final GeneratedColumn<String> record = GeneratedColumn<String>(
+      'record', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _readTimeMeta =
+      const VerificationMeta('readTime');
+  @override
+  late final GeneratedColumn<int> readTime = GeneratedColumn<int>(
+      'read_time', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _readMeta = const VerificationMeta('read');
+  @override
+  late final GeneratedColumn<bool> read = GeneratedColumn<bool>(
+      'read', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("read" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [record, title, readTime, read, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'rss_read_record_records';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<RssReadRecordRecord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('record')) {
+      context.handle(_recordMeta,
+          record.isAcceptableOrUnknown(data['record']!, _recordMeta));
+    } else if (isInserting) {
+      context.missing(_recordMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    }
+    if (data.containsKey('read_time')) {
+      context.handle(_readTimeMeta,
+          readTime.isAcceptableOrUnknown(data['read_time']!, _readTimeMeta));
+    }
+    if (data.containsKey('read')) {
+      context.handle(
+          _readMeta, read.isAcceptableOrUnknown(data['read']!, _readMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {record};
+  @override
+  RssReadRecordRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RssReadRecordRecord(
+      record: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}record'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title']),
+      readTime: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}read_time']),
+      read: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}read'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $RssReadRecordRecordsTable createAlias(String alias) {
+    return $RssReadRecordRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RssReadRecordRecord extends DataClass
+    implements Insertable<RssReadRecordRecord> {
+  final String record;
+  final String? title;
+  final int? readTime;
+  final bool read;
+  final int updatedAt;
+  const RssReadRecordRecord(
+      {required this.record,
+      this.title,
+      this.readTime,
+      required this.read,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['record'] = Variable<String>(record);
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    if (!nullToAbsent || readTime != null) {
+      map['read_time'] = Variable<int>(readTime);
+    }
+    map['read'] = Variable<bool>(read);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  RssReadRecordRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RssReadRecordRecordsCompanion(
+      record: Value(record),
+      title:
+          title == null && nullToAbsent ? const Value.absent() : Value(title),
+      readTime: readTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readTime),
+      read: Value(read),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RssReadRecordRecord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RssReadRecordRecord(
+      record: serializer.fromJson<String>(json['record']),
+      title: serializer.fromJson<String?>(json['title']),
+      readTime: serializer.fromJson<int?>(json['readTime']),
+      read: serializer.fromJson<bool>(json['read']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'record': serializer.toJson<String>(record),
+      'title': serializer.toJson<String?>(title),
+      'readTime': serializer.toJson<int?>(readTime),
+      'read': serializer.toJson<bool>(read),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  RssReadRecordRecord copyWith(
+          {String? record,
+          Value<String?> title = const Value.absent(),
+          Value<int?> readTime = const Value.absent(),
+          bool? read,
+          int? updatedAt}) =>
+      RssReadRecordRecord(
+        record: record ?? this.record,
+        title: title.present ? title.value : this.title,
+        readTime: readTime.present ? readTime.value : this.readTime,
+        read: read ?? this.read,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  RssReadRecordRecord copyWithCompanion(RssReadRecordRecordsCompanion data) {
+    return RssReadRecordRecord(
+      record: data.record.present ? data.record.value : this.record,
+      title: data.title.present ? data.title.value : this.title,
+      readTime: data.readTime.present ? data.readTime.value : this.readTime,
+      read: data.read.present ? data.read.value : this.read,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssReadRecordRecord(')
+          ..write('record: $record, ')
+          ..write('title: $title, ')
+          ..write('readTime: $readTime, ')
+          ..write('read: $read, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(record, title, readTime, read, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RssReadRecordRecord &&
+          other.record == this.record &&
+          other.title == this.title &&
+          other.readTime == this.readTime &&
+          other.read == this.read &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RssReadRecordRecordsCompanion
+    extends UpdateCompanion<RssReadRecordRecord> {
+  final Value<String> record;
+  final Value<String?> title;
+  final Value<int?> readTime;
+  final Value<bool> read;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const RssReadRecordRecordsCompanion({
+    this.record = const Value.absent(),
+    this.title = const Value.absent(),
+    this.readTime = const Value.absent(),
+    this.read = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RssReadRecordRecordsCompanion.insert({
+    required String record,
+    this.title = const Value.absent(),
+    this.readTime = const Value.absent(),
+    this.read = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : record = Value(record);
+  static Insertable<RssReadRecordRecord> custom({
+    Expression<String>? record,
+    Expression<String>? title,
+    Expression<int>? readTime,
+    Expression<bool>? read,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (record != null) 'record': record,
+      if (title != null) 'title': title,
+      if (readTime != null) 'read_time': readTime,
+      if (read != null) 'read': read,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RssReadRecordRecordsCompanion copyWith(
+      {Value<String>? record,
+      Value<String?>? title,
+      Value<int?>? readTime,
+      Value<bool>? read,
+      Value<int>? updatedAt,
+      Value<int>? rowid}) {
+    return RssReadRecordRecordsCompanion(
+      record: record ?? this.record,
+      title: title ?? this.title,
+      readTime: readTime ?? this.readTime,
+      read: read ?? this.read,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (record.present) {
+      map['record'] = Variable<String>(record.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (readTime.present) {
+      map['read_time'] = Variable<int>(readTime.value);
+    }
+    if (read.present) {
+      map['read'] = Variable<bool>(read.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssReadRecordRecordsCompanion(')
+          ..write('record: $record, ')
+          ..write('title: $title, ')
+          ..write('readTime: $readTime, ')
+          ..write('read: $read, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $BookRecordsTable extends BookRecords
     with TableInfo<$BookRecordsTable, BookRecord> {
   @override
@@ -3459,6 +5013,12 @@ abstract class _$SourceDriftDatabase extends GeneratedDatabase {
   _$SourceDriftDatabase(QueryExecutor e) : super(e);
   $SourceDriftDatabaseManager get managers => $SourceDriftDatabaseManager(this);
   late final $SourceRecordsTable sourceRecords = $SourceRecordsTable(this);
+  late final $RssSourceRecordsTable rssSourceRecords =
+      $RssSourceRecordsTable(this);
+  late final $RssArticleRecordsTable rssArticleRecords =
+      $RssArticleRecordsTable(this);
+  late final $RssReadRecordRecordsTable rssReadRecordRecords =
+      $RssReadRecordRecordsTable(this);
   late final $BookRecordsTable bookRecords = $BookRecordsTable(this);
   late final $ChapterRecordsTable chapterRecords = $ChapterRecordsTable(this);
   late final $ReplaceRuleRecordsTable replaceRuleRecords =
@@ -3473,6 +5033,9 @@ abstract class _$SourceDriftDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         sourceRecords,
+        rssSourceRecords,
+        rssArticleRecords,
+        rssReadRecordRecords,
         bookRecords,
         chapterRecords,
         replaceRuleRecords,
@@ -3835,6 +5398,766 @@ typedef $$SourceRecordsTableProcessedTableManager = ProcessedTableManager<
     ),
     SourceRecord,
     PrefetchHooks Function()>;
+typedef $$RssSourceRecordsTableCreateCompanionBuilder
+    = RssSourceRecordsCompanion Function({
+  required String sourceUrl,
+  Value<String> sourceName,
+  Value<String?> sourceIcon,
+  Value<String?> sourceGroup,
+  Value<String?> sourceComment,
+  Value<bool> enabled,
+  Value<String?> loginUrl,
+  Value<String?> sortUrl,
+  Value<bool> singleUrl,
+  Value<int> customOrder,
+  Value<int> lastUpdateTime,
+  Value<String?> rawJson,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+typedef $$RssSourceRecordsTableUpdateCompanionBuilder
+    = RssSourceRecordsCompanion Function({
+  Value<String> sourceUrl,
+  Value<String> sourceName,
+  Value<String?> sourceIcon,
+  Value<String?> sourceGroup,
+  Value<String?> sourceComment,
+  Value<bool> enabled,
+  Value<String?> loginUrl,
+  Value<String?> sortUrl,
+  Value<bool> singleUrl,
+  Value<int> customOrder,
+  Value<int> lastUpdateTime,
+  Value<String?> rawJson,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+class $$RssSourceRecordsTableFilterComposer
+    extends Composer<_$SourceDriftDatabase, $RssSourceRecordsTable> {
+  $$RssSourceRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceUrl => $composableBuilder(
+      column: $table.sourceUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sourceName => $composableBuilder(
+      column: $table.sourceName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sourceIcon => $composableBuilder(
+      column: $table.sourceIcon, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sourceGroup => $composableBuilder(
+      column: $table.sourceGroup, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sourceComment => $composableBuilder(
+      column: $table.sourceComment, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get enabled => $composableBuilder(
+      column: $table.enabled, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get loginUrl => $composableBuilder(
+      column: $table.loginUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sortUrl => $composableBuilder(
+      column: $table.sortUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get singleUrl => $composableBuilder(
+      column: $table.singleUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get customOrder => $composableBuilder(
+      column: $table.customOrder, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get lastUpdateTime => $composableBuilder(
+      column: $table.lastUpdateTime,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get rawJson => $composableBuilder(
+      column: $table.rawJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$RssSourceRecordsTableOrderingComposer
+    extends Composer<_$SourceDriftDatabase, $RssSourceRecordsTable> {
+  $$RssSourceRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceUrl => $composableBuilder(
+      column: $table.sourceUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sourceName => $composableBuilder(
+      column: $table.sourceName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sourceIcon => $composableBuilder(
+      column: $table.sourceIcon, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sourceGroup => $composableBuilder(
+      column: $table.sourceGroup, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sourceComment => $composableBuilder(
+      column: $table.sourceComment,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get enabled => $composableBuilder(
+      column: $table.enabled, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get loginUrl => $composableBuilder(
+      column: $table.loginUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sortUrl => $composableBuilder(
+      column: $table.sortUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get singleUrl => $composableBuilder(
+      column: $table.singleUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get customOrder => $composableBuilder(
+      column: $table.customOrder, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get lastUpdateTime => $composableBuilder(
+      column: $table.lastUpdateTime,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get rawJson => $composableBuilder(
+      column: $table.rawJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$RssSourceRecordsTableAnnotationComposer
+    extends Composer<_$SourceDriftDatabase, $RssSourceRecordsTable> {
+  $$RssSourceRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceUrl =>
+      $composableBuilder(column: $table.sourceUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceName => $composableBuilder(
+      column: $table.sourceName, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceIcon => $composableBuilder(
+      column: $table.sourceIcon, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceGroup => $composableBuilder(
+      column: $table.sourceGroup, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceComment => $composableBuilder(
+      column: $table.sourceComment, builder: (column) => column);
+
+  GeneratedColumn<bool> get enabled =>
+      $composableBuilder(column: $table.enabled, builder: (column) => column);
+
+  GeneratedColumn<String> get loginUrl =>
+      $composableBuilder(column: $table.loginUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get sortUrl =>
+      $composableBuilder(column: $table.sortUrl, builder: (column) => column);
+
+  GeneratedColumn<bool> get singleUrl =>
+      $composableBuilder(column: $table.singleUrl, builder: (column) => column);
+
+  GeneratedColumn<int> get customOrder => $composableBuilder(
+      column: $table.customOrder, builder: (column) => column);
+
+  GeneratedColumn<int> get lastUpdateTime => $composableBuilder(
+      column: $table.lastUpdateTime, builder: (column) => column);
+
+  GeneratedColumn<String> get rawJson =>
+      $composableBuilder(column: $table.rawJson, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RssSourceRecordsTableTableManager extends RootTableManager<
+    _$SourceDriftDatabase,
+    $RssSourceRecordsTable,
+    RssSourceRecord,
+    $$RssSourceRecordsTableFilterComposer,
+    $$RssSourceRecordsTableOrderingComposer,
+    $$RssSourceRecordsTableAnnotationComposer,
+    $$RssSourceRecordsTableCreateCompanionBuilder,
+    $$RssSourceRecordsTableUpdateCompanionBuilder,
+    (
+      RssSourceRecord,
+      BaseReferences<_$SourceDriftDatabase, $RssSourceRecordsTable,
+          RssSourceRecord>
+    ),
+    RssSourceRecord,
+    PrefetchHooks Function()> {
+  $$RssSourceRecordsTableTableManager(
+      _$SourceDriftDatabase db, $RssSourceRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RssSourceRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RssSourceRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RssSourceRecordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> sourceUrl = const Value.absent(),
+            Value<String> sourceName = const Value.absent(),
+            Value<String?> sourceIcon = const Value.absent(),
+            Value<String?> sourceGroup = const Value.absent(),
+            Value<String?> sourceComment = const Value.absent(),
+            Value<bool> enabled = const Value.absent(),
+            Value<String?> loginUrl = const Value.absent(),
+            Value<String?> sortUrl = const Value.absent(),
+            Value<bool> singleUrl = const Value.absent(),
+            Value<int> customOrder = const Value.absent(),
+            Value<int> lastUpdateTime = const Value.absent(),
+            Value<String?> rawJson = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssSourceRecordsCompanion(
+            sourceUrl: sourceUrl,
+            sourceName: sourceName,
+            sourceIcon: sourceIcon,
+            sourceGroup: sourceGroup,
+            sourceComment: sourceComment,
+            enabled: enabled,
+            loginUrl: loginUrl,
+            sortUrl: sortUrl,
+            singleUrl: singleUrl,
+            customOrder: customOrder,
+            lastUpdateTime: lastUpdateTime,
+            rawJson: rawJson,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String sourceUrl,
+            Value<String> sourceName = const Value.absent(),
+            Value<String?> sourceIcon = const Value.absent(),
+            Value<String?> sourceGroup = const Value.absent(),
+            Value<String?> sourceComment = const Value.absent(),
+            Value<bool> enabled = const Value.absent(),
+            Value<String?> loginUrl = const Value.absent(),
+            Value<String?> sortUrl = const Value.absent(),
+            Value<bool> singleUrl = const Value.absent(),
+            Value<int> customOrder = const Value.absent(),
+            Value<int> lastUpdateTime = const Value.absent(),
+            Value<String?> rawJson = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssSourceRecordsCompanion.insert(
+            sourceUrl: sourceUrl,
+            sourceName: sourceName,
+            sourceIcon: sourceIcon,
+            sourceGroup: sourceGroup,
+            sourceComment: sourceComment,
+            enabled: enabled,
+            loginUrl: loginUrl,
+            sortUrl: sortUrl,
+            singleUrl: singleUrl,
+            customOrder: customOrder,
+            lastUpdateTime: lastUpdateTime,
+            rawJson: rawJson,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$RssSourceRecordsTableProcessedTableManager = ProcessedTableManager<
+    _$SourceDriftDatabase,
+    $RssSourceRecordsTable,
+    RssSourceRecord,
+    $$RssSourceRecordsTableFilterComposer,
+    $$RssSourceRecordsTableOrderingComposer,
+    $$RssSourceRecordsTableAnnotationComposer,
+    $$RssSourceRecordsTableCreateCompanionBuilder,
+    $$RssSourceRecordsTableUpdateCompanionBuilder,
+    (
+      RssSourceRecord,
+      BaseReferences<_$SourceDriftDatabase, $RssSourceRecordsTable,
+          RssSourceRecord>
+    ),
+    RssSourceRecord,
+    PrefetchHooks Function()>;
+typedef $$RssArticleRecordsTableCreateCompanionBuilder
+    = RssArticleRecordsCompanion Function({
+  required String origin,
+  required String link,
+  Value<String> sort,
+  Value<String> title,
+  Value<int> orderValue,
+  Value<String?> pubDate,
+  Value<String?> description,
+  Value<String?> content,
+  Value<String?> image,
+  Value<String> groupName,
+  Value<String?> variable,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+typedef $$RssArticleRecordsTableUpdateCompanionBuilder
+    = RssArticleRecordsCompanion Function({
+  Value<String> origin,
+  Value<String> link,
+  Value<String> sort,
+  Value<String> title,
+  Value<int> orderValue,
+  Value<String?> pubDate,
+  Value<String?> description,
+  Value<String?> content,
+  Value<String?> image,
+  Value<String> groupName,
+  Value<String?> variable,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+class $$RssArticleRecordsTableFilterComposer
+    extends Composer<_$SourceDriftDatabase, $RssArticleRecordsTable> {
+  $$RssArticleRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get origin => $composableBuilder(
+      column: $table.origin, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get link => $composableBuilder(
+      column: $table.link, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sort => $composableBuilder(
+      column: $table.sort, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get orderValue => $composableBuilder(
+      column: $table.orderValue, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pubDate => $composableBuilder(
+      column: $table.pubDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get groupName => $composableBuilder(
+      column: $table.groupName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get variable => $composableBuilder(
+      column: $table.variable, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$RssArticleRecordsTableOrderingComposer
+    extends Composer<_$SourceDriftDatabase, $RssArticleRecordsTable> {
+  $$RssArticleRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get origin => $composableBuilder(
+      column: $table.origin, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get link => $composableBuilder(
+      column: $table.link, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sort => $composableBuilder(
+      column: $table.sort, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get orderValue => $composableBuilder(
+      column: $table.orderValue, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pubDate => $composableBuilder(
+      column: $table.pubDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get groupName => $composableBuilder(
+      column: $table.groupName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get variable => $composableBuilder(
+      column: $table.variable, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$RssArticleRecordsTableAnnotationComposer
+    extends Composer<_$SourceDriftDatabase, $RssArticleRecordsTable> {
+  $$RssArticleRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
+  GeneratedColumn<String> get link =>
+      $composableBuilder(column: $table.link, builder: (column) => column);
+
+  GeneratedColumn<String> get sort =>
+      $composableBuilder(column: $table.sort, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get orderValue => $composableBuilder(
+      column: $table.orderValue, builder: (column) => column);
+
+  GeneratedColumn<String> get pubDate =>
+      $composableBuilder(column: $table.pubDate, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get image =>
+      $composableBuilder(column: $table.image, builder: (column) => column);
+
+  GeneratedColumn<String> get groupName =>
+      $composableBuilder(column: $table.groupName, builder: (column) => column);
+
+  GeneratedColumn<String> get variable =>
+      $composableBuilder(column: $table.variable, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RssArticleRecordsTableTableManager extends RootTableManager<
+    _$SourceDriftDatabase,
+    $RssArticleRecordsTable,
+    RssArticleRecord,
+    $$RssArticleRecordsTableFilterComposer,
+    $$RssArticleRecordsTableOrderingComposer,
+    $$RssArticleRecordsTableAnnotationComposer,
+    $$RssArticleRecordsTableCreateCompanionBuilder,
+    $$RssArticleRecordsTableUpdateCompanionBuilder,
+    (
+      RssArticleRecord,
+      BaseReferences<_$SourceDriftDatabase, $RssArticleRecordsTable,
+          RssArticleRecord>
+    ),
+    RssArticleRecord,
+    PrefetchHooks Function()> {
+  $$RssArticleRecordsTableTableManager(
+      _$SourceDriftDatabase db, $RssArticleRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RssArticleRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RssArticleRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RssArticleRecordsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> origin = const Value.absent(),
+            Value<String> link = const Value.absent(),
+            Value<String> sort = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<int> orderValue = const Value.absent(),
+            Value<String?> pubDate = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<String?> content = const Value.absent(),
+            Value<String?> image = const Value.absent(),
+            Value<String> groupName = const Value.absent(),
+            Value<String?> variable = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssArticleRecordsCompanion(
+            origin: origin,
+            link: link,
+            sort: sort,
+            title: title,
+            orderValue: orderValue,
+            pubDate: pubDate,
+            description: description,
+            content: content,
+            image: image,
+            groupName: groupName,
+            variable: variable,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String origin,
+            required String link,
+            Value<String> sort = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<int> orderValue = const Value.absent(),
+            Value<String?> pubDate = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<String?> content = const Value.absent(),
+            Value<String?> image = const Value.absent(),
+            Value<String> groupName = const Value.absent(),
+            Value<String?> variable = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssArticleRecordsCompanion.insert(
+            origin: origin,
+            link: link,
+            sort: sort,
+            title: title,
+            orderValue: orderValue,
+            pubDate: pubDate,
+            description: description,
+            content: content,
+            image: image,
+            groupName: groupName,
+            variable: variable,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$RssArticleRecordsTableProcessedTableManager = ProcessedTableManager<
+    _$SourceDriftDatabase,
+    $RssArticleRecordsTable,
+    RssArticleRecord,
+    $$RssArticleRecordsTableFilterComposer,
+    $$RssArticleRecordsTableOrderingComposer,
+    $$RssArticleRecordsTableAnnotationComposer,
+    $$RssArticleRecordsTableCreateCompanionBuilder,
+    $$RssArticleRecordsTableUpdateCompanionBuilder,
+    (
+      RssArticleRecord,
+      BaseReferences<_$SourceDriftDatabase, $RssArticleRecordsTable,
+          RssArticleRecord>
+    ),
+    RssArticleRecord,
+    PrefetchHooks Function()>;
+typedef $$RssReadRecordRecordsTableCreateCompanionBuilder
+    = RssReadRecordRecordsCompanion Function({
+  required String record,
+  Value<String?> title,
+  Value<int?> readTime,
+  Value<bool> read,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+typedef $$RssReadRecordRecordsTableUpdateCompanionBuilder
+    = RssReadRecordRecordsCompanion Function({
+  Value<String> record,
+  Value<String?> title,
+  Value<int?> readTime,
+  Value<bool> read,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+class $$RssReadRecordRecordsTableFilterComposer
+    extends Composer<_$SourceDriftDatabase, $RssReadRecordRecordsTable> {
+  $$RssReadRecordRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get record => $composableBuilder(
+      column: $table.record, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get readTime => $composableBuilder(
+      column: $table.readTime, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get read => $composableBuilder(
+      column: $table.read, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$RssReadRecordRecordsTableOrderingComposer
+    extends Composer<_$SourceDriftDatabase, $RssReadRecordRecordsTable> {
+  $$RssReadRecordRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get record => $composableBuilder(
+      column: $table.record, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get readTime => $composableBuilder(
+      column: $table.readTime, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get read => $composableBuilder(
+      column: $table.read, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$RssReadRecordRecordsTableAnnotationComposer
+    extends Composer<_$SourceDriftDatabase, $RssReadRecordRecordsTable> {
+  $$RssReadRecordRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get record =>
+      $composableBuilder(column: $table.record, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get readTime =>
+      $composableBuilder(column: $table.readTime, builder: (column) => column);
+
+  GeneratedColumn<bool> get read =>
+      $composableBuilder(column: $table.read, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RssReadRecordRecordsTableTableManager extends RootTableManager<
+    _$SourceDriftDatabase,
+    $RssReadRecordRecordsTable,
+    RssReadRecordRecord,
+    $$RssReadRecordRecordsTableFilterComposer,
+    $$RssReadRecordRecordsTableOrderingComposer,
+    $$RssReadRecordRecordsTableAnnotationComposer,
+    $$RssReadRecordRecordsTableCreateCompanionBuilder,
+    $$RssReadRecordRecordsTableUpdateCompanionBuilder,
+    (
+      RssReadRecordRecord,
+      BaseReferences<_$SourceDriftDatabase, $RssReadRecordRecordsTable,
+          RssReadRecordRecord>
+    ),
+    RssReadRecordRecord,
+    PrefetchHooks Function()> {
+  $$RssReadRecordRecordsTableTableManager(
+      _$SourceDriftDatabase db, $RssReadRecordRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RssReadRecordRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RssReadRecordRecordsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RssReadRecordRecordsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> record = const Value.absent(),
+            Value<String?> title = const Value.absent(),
+            Value<int?> readTime = const Value.absent(),
+            Value<bool> read = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssReadRecordRecordsCompanion(
+            record: record,
+            title: title,
+            readTime: readTime,
+            read: read,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String record,
+            Value<String?> title = const Value.absent(),
+            Value<int?> readTime = const Value.absent(),
+            Value<bool> read = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssReadRecordRecordsCompanion.insert(
+            record: record,
+            title: title,
+            readTime: readTime,
+            read: read,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$RssReadRecordRecordsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$SourceDriftDatabase,
+        $RssReadRecordRecordsTable,
+        RssReadRecordRecord,
+        $$RssReadRecordRecordsTableFilterComposer,
+        $$RssReadRecordRecordsTableOrderingComposer,
+        $$RssReadRecordRecordsTableAnnotationComposer,
+        $$RssReadRecordRecordsTableCreateCompanionBuilder,
+        $$RssReadRecordRecordsTableUpdateCompanionBuilder,
+        (
+          RssReadRecordRecord,
+          BaseReferences<_$SourceDriftDatabase, $RssReadRecordRecordsTable,
+              RssReadRecordRecord>
+        ),
+        RssReadRecordRecord,
+        PrefetchHooks Function()>;
 typedef $$BookRecordsTableCreateCompanionBuilder = BookRecordsCompanion
     Function({
   required String id,
@@ -5132,6 +7455,12 @@ class $SourceDriftDatabaseManager {
   $SourceDriftDatabaseManager(this._db);
   $$SourceRecordsTableTableManager get sourceRecords =>
       $$SourceRecordsTableTableManager(_db, _db.sourceRecords);
+  $$RssSourceRecordsTableTableManager get rssSourceRecords =>
+      $$RssSourceRecordsTableTableManager(_db, _db.rssSourceRecords);
+  $$RssArticleRecordsTableTableManager get rssArticleRecords =>
+      $$RssArticleRecordsTableTableManager(_db, _db.rssArticleRecords);
+  $$RssReadRecordRecordsTableTableManager get rssReadRecordRecords =>
+      $$RssReadRecordRecordsTableTableManager(_db, _db.rssReadRecordRecords);
   $$BookRecordsTableTableManager get bookRecords =>
       $$BookRecordsTableTableManager(_db, _db.bookRecords);
   $$ChapterRecordsTableTableManager get chapterRecords =>

@@ -17,7 +17,7 @@ class SearchScope {
 
   String get normalizedText => normalizeScopeText(scope);
 
-  String display({String allLabel = '所有书源'}) {
+  String display({String allLabel = '全部书源'}) {
     if (isSource) {
       final name = _substringBefore(scope, '::').trim();
       if (name.isNotEmpty) return name;
@@ -195,7 +195,7 @@ class SearchScopeResolveResult {
 
   bool get isSource => normalizedScope.contains('::');
 
-  String display({String allLabel = '所有书源'}) {
+  String display({String allLabel = '全部书源'}) {
     if (isSource) {
       if (sourceDisplayName.isNotEmpty) return sourceDisplayName;
       final selectedName = selectedSource?.bookSourceName.trim() ?? '';

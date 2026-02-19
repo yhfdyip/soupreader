@@ -7,9 +7,11 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/cookie_store.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../../core/services/source_login_store.dart';
+import '../../../core/services/source_variable_store.dart';
 import '../models/book_source.dart';
 import '../constants/source_help_texts.dart';
 import '../services/rule_parser_engine.dart';
@@ -17,6 +19,8 @@ import '../services/source_debug_export_service.dart';
 import '../services/source_debug_key_parser.dart';
 import '../services/source_debug_orchestrator.dart';
 import '../services/source_explore_kinds_service.dart';
+import '../services/source_cookie_scope_resolver.dart';
+import '../services/source_legacy_save_service.dart';
 import '../services/source_debug_summary_parser.dart';
 import '../services/source_debug_summary_store.dart';
 import '../services/source_quick_test_helper.dart';
@@ -62,7 +66,9 @@ class SourceEditView extends StatefulWidget {
 class _SourceEditViewState extends State<SourceEditView> {
   late final DatabaseService _db;
   late final SourceRepository _repo;
+  late final SourceLegacySaveService _saveService;
   String? _currentOriginalUrl;
+  BookSource? _savedSource;
   final RuleParserEngine _engine = RuleParserEngine();
   late final SourceDebugOrchestrator _debugOrchestrator;
   final SourceDebugExportService _debugExportService =
@@ -188,6 +194,24 @@ class _SourceEditViewState extends State<SourceEditView> {
     super.initState();
     _db = DatabaseService();
     _repo = SourceRepository(_db);
+    _saveService = SourceLegacySaveService(
+      upsertSourceRawJson: ({
+        String? originalUrl,
+        required String rawJson,
+      }) {
+        return _repo.upsertSourceRawJson(
+          originalUrl: originalUrl,
+          rawJson: rawJson,
+        );
+      },
+      clearExploreKindsCache: _exploreKindsService.clearExploreKindsCache,
+      clearJsLibScope: (_) {
+        // Flutter 侧当前无跨源共享 JS Scope，保留回调位以维持行为完整性。
+      },
+      removeSourceVariable: (sourceUrl) {
+        return SourceVariableStore.removeVariable(sourceUrl);
+      },
+    );
     _currentOriginalUrl = (widget.originalUrl ?? '').trim();
     if (_currentOriginalUrl?.isEmpty == true) {
       _currentOriginalUrl = null;
@@ -198,6 +222,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     _jsonCtrl = TextEditingController(text: _prettyJson(widget.initialRawJson));
     final initialMap = _tryDecodeJsonMap(_jsonCtrl.text);
     final source = initialMap != null ? BookSource.fromJson(initialMap) : null;
+    _savedSource = source;
 
     _nameCtrl = TextEditingController(text: source?.bookSourceName ?? '');
     _urlCtrl = TextEditingController(text: source?.bookSourceUrl ?? '');
@@ -3026,6 +3051,13 @@ class _SourceEditViewState extends State<SourceEditView> {
         title: const Text('更多'),
         actions: [
           CupertinoActionSheetAction(
+            child: const Text('清 Cookie'),
+            onPressed: () {
+              Navigator.pop(context);
+              _clearCookie();
+            },
+          ),
+          CupertinoActionSheetAction(
             child: const Text('复制 JSON'),
             onPressed: () {
               Navigator.pop(context);
@@ -3047,6 +3079,52 @@ class _SourceEditViewState extends State<SourceEditView> {
         ),
       ),
     );
+  }
+
+  Future<void> _clearCookie() async {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) {
+      _showMessage('请先填写 bookSourceUrl');
+      return;
+    }
+
+    final allCandidates = <Uri>[];
+    final seen = <String>{};
+    void addAll(Iterable<Uri> uris) {
+      for (final uri in uris) {
+        final key = uri.toString();
+        if (seen.add(key)) {
+          allCandidates.add(uri);
+        }
+      }
+    }
+
+    addAll(SourceCookieScopeResolver.resolveClearCandidates(url));
+    if (allCandidates.isEmpty) {
+      _showMessage('bookSourceUrl 不是有效 URL');
+      return;
+    }
+
+    var cleared = 0;
+    Object? lastError;
+    for (final uri in allCandidates) {
+      try {
+        await CookieStore.jar.delete(uri, true);
+        cleared += 1;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (cleared > 0) {
+      _showMessage('已清理该书源 Cookie');
+      return;
+    }
+    if (lastError != null) {
+      _showMessage('清理 Cookie 失败：$lastError');
+      return;
+    }
+    _showMessage('未找到可清理的 Cookie');
   }
 
   Future<void> _pasteJsonFromClipboard() async {
@@ -3446,15 +3524,20 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     try {
       final decoded = _tryDecodeJsonMap(_jsonCtrl.text);
-      final source = decoded != null ? BookSource.fromJson(decoded) : null;
-      await _repo.upsertSourceRawJson(
-        originalUrl: _currentOriginalUrl,
-        rawJson: _jsonCtrl.text,
-      );
-      final savedUrl = source?.bookSourceUrl.trim() ?? '';
-      if (savedUrl.isNotEmpty) {
-        _currentOriginalUrl = savedUrl;
+      if (decoded == null) {
+        _showMessage('JSON 格式错误');
+        return;
       }
+      final source = BookSource.fromJson(decoded);
+      final saved = await _saveService.save(
+        source: source,
+        originalSource: _savedSource,
+      );
+      _savedSource = saved;
+      _currentOriginalUrl = saved.bookSourceUrl;
+      _urlCtrl.text = saved.bookSourceUrl;
+      _jsonCtrl.text = _prettyJson(LegadoJson.encode(saved.toJson()));
+      _validateJson(silent: true);
       await _saveLoginState(showMessage: false);
       if (!mounted) return;
       _showMessage('保存成功');

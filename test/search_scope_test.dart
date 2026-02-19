@@ -29,7 +29,7 @@ void main() {
     final resolved = const SearchScope('').resolve(sources);
     expect(resolved.isAll, isTrue);
     expect(resolved.sources.map((item) => item.bookSourceUrl), ['u1', 'u2']);
-    expect(resolved.display(), '所有书源');
+    expect(resolved.display(), '全部书源');
   });
 
   test('source scope resolves single source and keeps source mode', () {

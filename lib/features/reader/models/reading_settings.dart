@@ -65,9 +65,13 @@ class ReadingSettings {
   final int footerRightContent; // 页脚右侧内容
 
   // === 其他功能开关 ===
-  final bool chineseTraditional; // 繁简体转换（true=繁体）
+  final int chineseConverterType; // 简繁转换（0=关闭 1=繁转简 2=简转繁）
   final bool cleanChapterTitle; // 净化正文章节名称
   final bool textBottomJustify; // 底部对齐（对标 legado）
+
+  static const int chineseConverterOff = 0;
+  static const int chineseConverterTraditionalToSimplified = 1;
+  static const int chineseConverterSimplifiedToTraditional = 2;
 
   const ReadingSettings({
     // 安装后默认值：尽量对齐 Legado 的阅读默认体验
@@ -128,10 +132,14 @@ class ReadingSettings {
     this.footerCenterContent = 4, // 无
     this.footerRightContent = 8, // 页码/总页
     // 其他功能开关
-    this.chineseTraditional = false,
+    this.chineseConverterType = chineseConverterOff,
     this.cleanChapterTitle = false,
     this.textBottomJustify = true,
   });
+
+  /// 兼容旧调用：`true` 等价于「简转繁」。
+  bool get chineseTraditional =>
+      chineseConverterType == chineseConverterSimplifiedToTraditional;
 
   /// 获取 padding（兼容旧代码）
   EdgeInsets get padding => EdgeInsets.symmetric(
@@ -232,6 +240,12 @@ class ReadingSettings {
         _toInt(rawPageDirection, defaultPageDirectionIndex);
     final safePageDirectionIndex =
         pageDirectionIndex.clamp(0, PageDirection.values.length - 1);
+    final legacyChineseTraditional = _toBool(json['chineseTraditional'], false);
+    final chineseConverterType = json.containsKey('chineseConverterType')
+        ? _toInt(json['chineseConverterType'], chineseConverterOff)
+        : (legacyChineseTraditional
+            ? chineseConverterSimplifiedToTraditional
+            : chineseConverterOff);
 
     return ReadingSettings(
       fontSize: _toDouble(json['fontSize'], 24.0),
@@ -292,7 +306,7 @@ class ReadingSettings {
       footerCenterContent: _toInt(json['footerCenterContent'], 4),
       footerRightContent: _toInt(json['footerRightContent'], 8),
       // 其他功能开关
-      chineseTraditional: _toBool(json['chineseTraditional'], false),
+      chineseConverterType: chineseConverterType,
       cleanChapterTitle: _toBool(json['cleanChapterTitle'], false),
       textBottomJustify: _toBool(json['textBottomJustify'], true),
     ).sanitize();
@@ -353,6 +367,7 @@ class ReadingSettings {
       'footerCenterContent': footerCenterContent,
       'footerRightContent': footerRightContent,
       // 其他功能开关
+      'chineseConverterType': chineseConverterType,
       'chineseTraditional': chineseTraditional,
       'cleanChapterTitle': cleanChapterTitle,
       'textBottomJustify': textBottomJustify,
@@ -482,7 +497,12 @@ class ReadingSettings {
           _safeInt(footerCenterContent, min: 0, max: 9, fallback: 4),
       footerRightContent:
           _safeInt(footerRightContent, min: 0, max: 9, fallback: 8),
-      chineseTraditional: chineseTraditional,
+      chineseConverterType: _safeInt(
+        chineseConverterType,
+        min: chineseConverterOff,
+        max: chineseConverterSimplifiedToTraditional,
+        fallback: chineseConverterOff,
+      ),
       cleanChapterTitle: cleanChapterTitle,
       textBottomJustify: textBottomJustify,
     );
@@ -542,10 +562,18 @@ class ReadingSettings {
     int? footerCenterContent,
     int? footerRightContent,
     // 其他功能开关
+    int? chineseConverterType,
     bool? chineseTraditional,
     bool? cleanChapterTitle,
     bool? textBottomJustify,
   }) {
+    final resolvedChineseConverterType = chineseConverterType ??
+        (chineseTraditional == null
+            ? this.chineseConverterType
+            : (chineseTraditional
+                ? chineseConverterSimplifiedToTraditional
+                : chineseConverterOff));
+
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
       lineHeight: lineHeight ?? this.lineHeight,
@@ -600,7 +628,7 @@ class ReadingSettings {
       footerCenterContent: footerCenterContent ?? this.footerCenterContent,
       footerRightContent: footerRightContent ?? this.footerRightContent,
       // 其他功能开关
-      chineseTraditional: chineseTraditional ?? this.chineseTraditional,
+      chineseConverterType: resolvedChineseConverterType,
       cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
       textBottomJustify: textBottomJustify ?? this.textBottomJustify,
     ).sanitize();
@@ -619,6 +647,32 @@ extension ProgressBarBehaviorExtension on ProgressBarBehavior {
         return '页内进度';
       case ProgressBarBehavior.chapter:
         return '章节进度';
+    }
+  }
+}
+
+class ChineseConverterType {
+  static const int off = ReadingSettings.chineseConverterOff;
+  static const int traditionalToSimplified =
+      ReadingSettings.chineseConverterTraditionalToSimplified;
+  static const int simplifiedToTraditional =
+      ReadingSettings.chineseConverterSimplifiedToTraditional;
+
+  static const List<int> values = <int>[
+    off,
+    traditionalToSimplified,
+    simplifiedToTraditional,
+  ];
+
+  static String label(int value) {
+    switch (value) {
+      case traditionalToSimplified:
+        return '繁转简';
+      case simplifiedToTraditional:
+        return '简转繁';
+      case off:
+      default:
+        return '关闭';
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../models/search_scope.dart';
 import '../models/search_scope_group_helper.dart';
+import '../services/search_scope_picker_helper.dart';
 import '../../source/models/book_source.dart';
 
 class SearchScopePickerView extends StatefulWidget {
@@ -25,7 +26,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
   late _SearchScopeMode _mode;
   late final List<BookSource> _sources;
   late final List<String> _groups;
-  final Set<String> _selectedGroups = <String>{};
+  final List<String> _selectedGroups = <String>[];
   BookSource? _selectedSource;
 
   @override
@@ -53,39 +54,26 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
   }
 
   List<BookSource> get _filteredSources {
-    final query = _queryController.text.trim().toLowerCase();
-    if (query.isEmpty) return _sources;
-    return _sources.where((source) {
-      final name = source.bookSourceName.toLowerCase();
-      final url = source.bookSourceUrl.toLowerCase();
-      final group = (source.bookSourceGroup ?? '').toLowerCase();
-      return name.contains(query) ||
-          url.contains(query) ||
-          group.contains(query);
-    }).toList(growable: false);
+    return SearchScopePickerHelper.filterSourcesByQuery(
+      _sources,
+      _queryController.text,
+    );
   }
 
   List<String> get _orderedSelectedGroups {
-    return _groups.where((group) => _selectedGroups.contains(group)).toList();
+    return SearchScopePickerHelper.orderedSelectedGroups(
+        _selectedGroups, _groups);
   }
 
   void _toggleGroup(String group) {
     setState(() {
-      if (_selectedGroups.contains(group)) {
-        _selectedGroups.remove(group);
-      } else {
-        _selectedGroups.add(group);
-      }
+      SearchScopePickerHelper.toggleGroupSelection(_selectedGroups, group);
     });
   }
 
   void _toggleSource(BookSource source) {
     setState(() {
-      if (_selectedSource?.bookSourceUrl == source.bookSourceUrl) {
-        _selectedSource = null;
-      } else {
-        _selectedSource = source;
-      }
+      _selectedSource = source;
     });
   }
 
@@ -105,12 +93,6 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
 
     return AppCupertinoPageScaffold(
       title: '搜索范围',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(30, 30),
-        onPressed: _submit,
-        child: const Text('确定'),
-      ),
       child: Column(
         children: [
           Padding(
@@ -146,38 +128,6 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(
-              children: [
-                Text(
-                  _mode == _SearchScopeMode.group
-                      ? '已选 ${_selectedGroups.length}/${_groups.length} 分组'
-                      : (_selectedSource == null
-                          ? '未选书源'
-                          : '已选：${_selectedSource!.bookSourceName}'),
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
-                ),
-                const Spacer(),
-                if (_mode == _SearchScopeMode.group)
-                  ShadButton.link(
-                    onPressed: _selectedGroups.isEmpty
-                        ? null
-                        : () => setState(_selectedGroups.clear),
-                    child: const Text('清空分组'),
-                  )
-                else
-                  ShadButton.link(
-                    onPressed: _selectedSource == null
-                        ? null
-                        : () => setState(() => _selectedSource = null),
-                    child: const Text('清空书源'),
-                  ),
-              ],
-            ),
-          ),
           Expanded(
             child: _mode == _SearchScopeMode.group
                 ? _buildGroupList(theme, scheme)
@@ -207,6 +157,13 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                   minimumSize: const Size(0, 34),
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('取消'),
+                ),
+                CupertinoButton(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: const Size(0, 34),
+                  onPressed: _submit,
+                  child: const Text('确定'),
                 ),
               ],
             ),
@@ -294,27 +251,13 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        source.bookSourceName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.p.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        source.bookSourceUrl,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.small.copyWith(
-                          color: scheme.mutedForeground,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    source.bookSourceName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.p.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),

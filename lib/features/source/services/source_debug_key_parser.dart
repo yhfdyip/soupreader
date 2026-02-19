@@ -83,6 +83,26 @@ class SourceDebugKeyParser {
       );
     }
 
+    if (raw.contains('::')) {
+      final separator = raw.indexOf('::');
+      final title = separator > 0 ? raw.substring(0, separator).trim() : '';
+      final url = raw.substring(separator + 2).trim();
+      if (url.isEmpty) {
+        return const SourceDebugParseResult.failure(
+            '发现调试 key 缺少 URL（格式：标题::url）');
+      }
+      final normalizedTitle = title.isEmpty ? '发现' : title;
+      return SourceDebugParseResult.success(
+        SourceDebugIntent(
+          type: SourceDebugIntentType.explore,
+          rawKey: raw,
+          runKey: '$normalizedTitle::$url',
+          url: url,
+          exploreTitle: normalizedTitle,
+        ),
+      );
+    }
+
     if (raw.startsWith('++')) {
       final url = raw.substring(2).trim();
       if (url.isEmpty) {
@@ -111,26 +131,6 @@ class SourceDebugKeyParser {
           rawKey: raw,
           runKey: '--$url',
           url: url,
-        ),
-      );
-    }
-
-    if (raw.contains('::')) {
-      final separator = raw.indexOf('::');
-      final title = separator > 0 ? raw.substring(0, separator).trim() : '';
-      final url = raw.substring(separator + 2).trim();
-      if (url.isEmpty) {
-        return const SourceDebugParseResult.failure(
-            '发现调试 key 缺少 URL（格式：标题::url）');
-      }
-      final normalizedTitle = title.isEmpty ? '发现' : title;
-      return SourceDebugParseResult.success(
-        SourceDebugIntent(
-          type: SourceDebugIntentType.explore,
-          rawKey: raw,
-          runKey: '$normalizedTitle::$url',
-          url: url,
-          exploreTitle: normalizedTitle,
         ),
       );
     }

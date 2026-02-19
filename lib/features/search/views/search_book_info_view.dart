@@ -9,10 +9,15 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/settings_service.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/book_add_service.dart';
+import '../../reader/models/reading_settings.dart';
+import '../../reader/services/chapter_title_display_helper.dart';
 import '../../reader/services/reader_source_switch_helper.dart';
 import '../../reader/views/simple_reader_view.dart';
+import '../../replace/services/replace_rule_service.dart';
+import '../services/search_book_toc_filter_helper.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 
@@ -69,6 +74,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   late final BookRepository _bookRepo;
   late final ChapterRepository _chapterRepo;
   late final BookAddService _addService;
+  late final SettingsService _settingsService;
+  late final ChapterTitleDisplayHelper _chapterTitleDisplayHelper;
 
   late SearchResult _activeResult;
   BookSource? _source;
@@ -101,6 +108,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _bookRepo = BookRepository(db);
     _chapterRepo = ChapterRepository(db);
     _addService = BookAddService(database: db, engine: _engine);
+    _settingsService = SettingsService();
+    _chapterTitleDisplayHelper = ChapterTitleDisplayHelper(
+      replaceRuleService: ReplaceRuleService(db),
+    );
     _activeResult = widget.result;
     _loadContext();
   }
@@ -406,6 +417,29 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     return sourceUrl.isNotEmpty ? sourceUrl : '未知来源';
   }
 
+  int _resolveChineseConverterType() {
+    try {
+      final rawType = _settingsService.readingSettings.chineseConverterType;
+      if (ChineseConverterType.values.contains(rawType)) {
+        return rawType;
+      }
+    } catch (_) {
+      // 启动异常或测试环境下回退为关闭。
+    }
+    return ChineseConverterType.off;
+  }
+
+  Future<List<String>> _buildTocDisplayTitles(List<TocItem> toc) async {
+    if (toc.isEmpty) return const <String>[];
+    final sourceUrl = _activeResult.sourceUrl.trim();
+    return _chapterTitleDisplayHelper.buildDisplayTitles(
+      rawTitles: toc.map((item) => item.name).toList(growable: false),
+      bookName: _displayName,
+      sourceUrl: sourceUrl.isEmpty ? null : sourceUrl,
+      chineseConverterType: _resolveChineseConverterType(),
+    );
+  }
+
   String? _pickFirstNonEmpty(List<String> candidates) {
     for (final raw in candidates) {
       final value = raw.trim();
@@ -552,11 +586,21 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       return;
     }
 
+    List<String> displayTitles;
+    try {
+      displayTitles = await _buildTocDisplayTitles(tocToOpen);
+    } catch (_) {
+      displayTitles =
+          tocToOpen.map((item) => item.name).toList(growable: false);
+    }
+    if (!mounted) return;
+
     final selected = await Navigator.of(context, rootNavigator: true).push<int>(
       CupertinoPageRoute(
         builder: (_) => _SearchBookTocView(
           bookTitle: _displayName,
           toc: tocToOpen,
+          displayTitles: displayTitles,
           sourceName: _displaySourceName,
         ),
       ),
@@ -1423,12 +1467,14 @@ class _SearchBookTocView extends StatefulWidget {
   final String bookTitle;
   final String sourceName;
   final List<TocItem> toc;
+  final List<String> displayTitles;
 
   const _SearchBookTocView({
     required this.bookTitle,
     required this.sourceName,
     required this.toc,
-  });
+    required this.displayTitles,
+  }) : assert(displayTitles.length == toc.length);
 
   @override
   State<_SearchBookTocView> createState() => _SearchBookTocViewState();
@@ -1446,17 +1492,11 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
   }
 
   List<MapEntry<int, TocItem>> get _filtered {
-    final q = _searchQuery.trim().toLowerCase();
-    var entries = widget.toc.asMap().entries.toList(growable: false);
-    if (q.isNotEmpty) {
-      entries = entries
-          .where((e) => e.value.name.toLowerCase().contains(q))
-          .toList(growable: false);
-    }
-    if (_reversed) {
-      entries = entries.reversed.toList(growable: false);
-    }
-    return entries;
+    return SearchBookTocFilterHelper.filterEntries(
+      toc: widget.toc,
+      rawQuery: _searchQuery,
+      reversed: _reversed,
+    );
   }
 
   @override
@@ -1531,7 +1571,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final entry = filtered[index];
-                final chapter = entry.value;
+                final displayTitle = widget.displayTitles[entry.key];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(
@@ -1556,7 +1596,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                           ),
                           Expanded(
                             child: Text(
-                              chapter.name,
+                              displayTitle,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.p.copyWith(

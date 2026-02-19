@@ -10,7 +10,7 @@ class SettingsPlaceholders {
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('计划中'),
+        title: const Text('扩展阶段'),
         content: Text('\n$normalized'),
         actions: [
           CupertinoDialogAction(

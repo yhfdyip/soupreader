@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
-import 'package:uuid/uuid.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
@@ -10,13 +9,16 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
+import '../../../core/utils/chinese_script_converter.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../bookshelf/models/book.dart';
+import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
 import '../../replace/services/replace_rule_service.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/reading_settings.dart';
+import '../services/chapter_title_display_helper.dart';
 import '../services/reader_source_switch_helper.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
@@ -86,7 +88,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   late final ChapterRepository _chapterRepo;
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
+  late final BookshelfCatalogUpdateService _catalogUpdateService;
   late final ReplaceRuleService _replaceService;
+  late final ChapterTitleDisplayHelper _chapterTitleDisplayHelper;
   late final SettingsService _settingsService;
   final ScreenBrightnessService _brightnessService =
       ScreenBrightnessService.instance;
@@ -94,6 +98,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   final RuleParserEngine _ruleEngine = RuleParserEngine();
   final ScrollTextLayoutEngine _scrollTextLayoutEngine =
       ScrollTextLayoutEngine.instance;
+  final ChineseScriptConverter _chineseScriptConverter =
+      ChineseScriptConverter.instance;
 
   List<Chapter> _chapters = [];
   int _currentChapterIndex = 0;
@@ -129,6 +135,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   final PageFactory _pageFactory = PageFactory();
 
   final _replaceStageCache = <String, _ReplaceStageCache>{};
+  final _catalogDisplayTitleCacheByChapterId = <String, String>{};
 
   static const List<_TipOption> _headerTipOptions = [
     _TipOption(0, '书名'),
@@ -201,7 +208,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _chapterRepo = ChapterRepository(db);
     _bookRepo = BookRepository(db);
     _sourceRepo = SourceRepository(db);
+    _catalogUpdateService = BookshelfCatalogUpdateService(
+      engine: _ruleEngine,
+      sourceRepo: _sourceRepo,
+      bookRepo: _bookRepo,
+      chapterRepo: _chapterRepo,
+    );
     _replaceService = ReplaceRuleService(db);
+    _chapterTitleDisplayHelper = ChapterTitleDisplayHelper(
+      replaceRuleService: _replaceService,
+    );
     _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
     _settings = _settingsService.readingSettings.sanitize();
@@ -277,7 +293,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       // 初始化 PageFactory：设置章节数据
       final chapterDataList = _chapters
           .map((c) => ChapterData(
-                title: c.title,
+                title: _postProcessTitle(c.title),
                 content: _postProcessContent(c.content ?? '', c.title),
               ))
           .toList();
@@ -556,10 +572,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       rawTitle: chapter.title,
       rawContent: content,
     );
+    final processedTitle = _postProcessTitle(stage.title);
     final processedContent = _postProcessContent(stage.content, stage.title);
     final seed = _ScrollSegmentSeed(
       chapterId: chapter.id,
-      title: stage.title,
+      title: processedTitle,
       content: processedContent,
     );
     final paragraphStyle = _scrollParagraphStyle();
@@ -727,8 +744,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   .clamp(1.0, double.infinity)
                   .toDouble()
               : 600.0);
-      final height =
-          (measuredHeight != null && measuredHeight > 1.0) ? measuredHeight : fallbackHeight;
+      final height = (measuredHeight != null && measuredHeight > 1.0)
+          ? measuredHeight
+          : fallbackHeight;
       final end = cursor + height;
       _scrollSegmentOffsetRanges.add(
         _ScrollSegmentOffsetRange(
@@ -1048,10 +1066,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       rawTitle: chapter.title,
       rawContent: content,
     );
+    final processedTitle = _postProcessTitle(stage.title);
     final processedContent = _postProcessContent(stage.content, stage.title);
     setState(() {
       _currentChapterIndex = index;
-      _currentTitle = stage.title;
+      _currentTitle = processedTitle;
       _currentContent = processedContent;
       _invalidateScrollLayoutSnapshot();
     });
@@ -1123,7 +1142,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       final title = cached?.title ?? chapter.title;
       final content = cached?.content ?? (chapter.content ?? '');
       return ChapterData(
-        title: title,
+        title: _postProcessTitle(title),
         content: _postProcessContent(content, title),
       );
     }).toList();
@@ -1389,6 +1408,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final oldMode = oldSettings.pageTurnMode;
     final newMode = newSettings.pageTurnMode;
     final modeChanged = oldMode != newMode;
+    if (oldSettings.chineseConverterType != newSettings.chineseConverterType) {
+      _catalogDisplayTitleCacheByChapterId.clear();
+    }
 
     double? desiredChapterProgress;
     if (modeChanged) {
@@ -1408,10 +1430,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 2. 也是翻页模式且排版参数变更
     bool needRepaginate = false;
 
-    final contentTransformChanged =
-        oldSettings.cleanChapterTitle != newSettings.cleanChapterTitle ||
-            oldSettings.chineseTraditional != newSettings.chineseTraditional ||
-            oldSettings.paragraphIndent != newSettings.paragraphIndent;
+    final contentTransformChanged = oldSettings.cleanChapterTitle !=
+            newSettings.cleanChapterTitle ||
+        oldSettings.chineseConverterType != newSettings.chineseConverterType ||
+        oldSettings.paragraphIndent != newSettings.paragraphIndent;
 
     if (oldSettings.pageTurnMode == PageTurnMode.scroll &&
         newSettings.pageTurnMode != PageTurnMode.scroll) {
@@ -1871,11 +1893,48 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (_settings.cleanChapterTitle) {
       processed = _removeDuplicateTitle(processed, processedTitle);
     }
-    if (_settings.chineseTraditional) {
-      processed = _convertToTraditional(processed);
-    }
+    processed = _convertByChineseConverterType(processed);
     processed = _formatContentLikeLegado(processed);
     return processed;
+  }
+
+  String _postProcessTitle(String title) {
+    return _convertByChineseConverterType(title);
+  }
+
+  String? _catalogDisplaySourceUrl() {
+    final sourceUrl = _currentSourceUrl?.trim();
+    if (sourceUrl == null || sourceUrl.isEmpty) return null;
+    return sourceUrl;
+  }
+
+  Map<int, String> _buildCatalogInitialDisplayTitlesByIndex() {
+    if (_chapters.isEmpty || _catalogDisplayTitleCacheByChapterId.isEmpty) {
+      return const <int, String>{};
+    }
+    final initial = <int, String>{};
+    for (final chapter in _chapters) {
+      final cached = _catalogDisplayTitleCacheByChapterId[chapter.id];
+      if (cached == null || cached.trim().isEmpty) continue;
+      initial[chapter.index] = cached;
+    }
+    return initial;
+  }
+
+  Future<String> _resolveCatalogDisplayTitle(Chapter chapter) async {
+    final cached = _catalogDisplayTitleCacheByChapterId[chapter.id];
+    if (cached != null && cached.trim().isNotEmpty) {
+      return cached;
+    }
+    final resolved = await _chapterTitleDisplayHelper.buildDisplayTitle(
+      rawTitle: chapter.title,
+      bookName: widget.bookTitle,
+      sourceUrl: _catalogDisplaySourceUrl(),
+      chineseConverterType: _settings.chineseConverterType,
+    );
+    final safeTitle = resolved.trim().isEmpty ? chapter.title : resolved;
+    _catalogDisplayTitleCacheByChapterId[chapter.id] = safeTitle;
+    return safeTitle;
   }
 
   Future<_ReplaceStageCache> _computeReplaceStage({
@@ -1995,9 +2054,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return lines.join('\n');
   }
 
-  String _convertToTraditional(String content) {
-    // TODO: 接入繁简转换库后替换为真实转换逻辑
-    return content;
+  String _convertByChineseConverterType(String text) {
+    switch (_settings.chineseConverterType) {
+      case ChineseConverterType.traditionalToSimplified:
+        return _chineseScriptConverter.traditionalToSimplified(text);
+      case ChineseConverterType.simplifiedToTraditional:
+        return _chineseScriptConverter.simplifiedToTraditional(text);
+      case ChineseConverterType.off:
+      default:
+        return text;
+    }
   }
 
   /// 计算章节内进度
@@ -3216,6 +3282,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         return;
       }
 
+      final previousRawTitle = previousChapters.isEmpty
+          ? previousTitle
+          : previousChapters[
+                  previousChapterIndex.clamp(0, previousChapters.length - 1)]
+              .title;
+
       if (!widget.isEphemeral) {
         await _chapterRepo.clearChaptersForBook(widget.bookId);
         await _chapterRepo.addChapters(newChapters);
@@ -3238,12 +3310,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
       final targetIndex = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
         newChapters: newChapters,
-        currentChapterTitle: previousTitle,
+        currentChapterTitle: previousRawTitle,
         currentChapterIndex: previousChapterIndex,
+        oldChapterCount: previousChapters.length,
       );
 
       if (!mounted) return;
       setState(() {
+        _catalogDisplayTitleCacheByChapterId.clear();
         _chapters = newChapters;
         _currentSourceUrl = source.bookSourceUrl;
         _currentSourceName = source.bookSourceName;
@@ -3281,6 +3355,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
       if (mounted) {
         setState(() {
+          _catalogDisplayTitleCacheByChapterId.clear();
           _chapters = previousChapters;
           _currentSourceUrl = previousSourceUrl;
           _currentSourceName = previousSourceName;
@@ -4348,12 +4423,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(keepScreenOn: value),
                   );
                 }),
-                _buildSwitchRow('繁体显示', _settings.chineseTraditional, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(chineseTraditional: value),
-                  );
-                }),
+                const SizedBox(height: 8),
+                _buildChineseConverterTypeSegment(
+                  currentType: _settings.chineseConverterType,
+                  onChanged: (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(chineseConverterType: value),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -4551,6 +4630,46 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  Widget _buildChineseConverterTypeSegment({
+    required int currentType,
+    required ValueChanged<int> onChanged,
+  }) {
+    final safeType = ChineseConverterType.values.contains(currentType)
+        ? currentType
+        : ChineseConverterType.off;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('简繁转换', style: TextStyle(color: _uiTextStrong, fontSize: 16)),
+        const SizedBox(height: 8),
+        CupertinoSlidingSegmentedControl<int>(
+          groupValue: safeType,
+          backgroundColor: _uiCardBg,
+          thumbColor: _uiAccent,
+          children: {
+            for (final mode in ChineseConverterType.values)
+              mode: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Text(
+                  ChineseConverterType.label(mode),
+                  style: TextStyle(
+                    color: _uiTextNormal,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          },
+          onValueChanged: (value) {
+            if (value == null) return;
+            onChanged(value);
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildToggleBtn(
       {required String label,
       required bool isActive,
@@ -4729,41 +4848,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return info;
   }
 
-  SearchResult? _pickBestUpdateTarget({
-    required Book book,
-    required List<SearchResult> results,
-  }) {
-    final titleKey = ReaderSourceSwitchHelper.normalizeForCompare(book.title);
-    final authorKey = ReaderSourceSwitchHelper.normalizeForCompare(book.author);
-
-    SearchResult? authorMatched;
-    SearchResult? fallback;
-
-    for (final item in results) {
-      final itemTitleKey =
-          ReaderSourceSwitchHelper.normalizeForCompare(item.name);
-      if (itemTitleKey != titleKey) continue;
-
-      fallback ??= item;
-      final itemAuthorKey =
-          ReaderSourceSwitchHelper.normalizeForCompare(item.author);
-      if (authorKey.isNotEmpty &&
-          itemAuthorKey.isNotEmpty &&
-          itemAuthorKey == authorKey) {
-        authorMatched = item;
-        break;
-      }
+  String _extractCatalogUpdateFailureReason(List<String> failedDetails) {
+    if (failedDetails.isEmpty) return '更新目录失败';
+    final raw = failedDetails.first.trim();
+    final separatorIndex = raw.indexOf('：');
+    if (separatorIndex <= -1 || separatorIndex >= raw.length - 1) {
+      return raw.isEmpty ? '更新目录失败' : raw;
     }
-
-    return authorMatched ?? fallback;
-  }
-
-  bool _isUrlPrefix(List<String> prefix, List<String> full) {
-    if (prefix.length > full.length) return false;
-    for (var i = 0; i < prefix.length; i++) {
-      if (prefix[i] != full[i]) return false;
-    }
-    return true;
+    final reason = raw.substring(separatorIndex + 1).trim();
+    return reason.isEmpty ? '更新目录失败' : reason;
   }
 
   Future<List<Chapter>> _refreshCatalogFromSource() async {
@@ -4775,124 +4868,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       throw StateError('本地书籍不支持检查更新');
     }
 
-    final sourceUrl = (book.sourceUrl ?? book.sourceId ?? '').trim();
-    if (sourceUrl.isEmpty) {
-      throw StateError('缺少书源信息，无法检查更新');
+    final summary = await _catalogUpdateService.updateBooks([book]);
+    if (summary.failedCount > 0) {
+      throw StateError(
+        _extractCatalogUpdateFailureReason(summary.failedDetails),
+      );
     }
-    final source = _sourceRepo.getSourceByUrl(sourceUrl);
-    if (source == null) {
-      throw StateError('书源不存在或已被删除');
-    }
-
-    final keyword = book.title.trim();
-    if (keyword.isEmpty) {
-      throw StateError('书名为空，无法检查更新');
+    if (summary.updateCandidateCount <= 0) {
+      throw StateError('本地书籍不支持更新目录');
     }
 
-    var targetBookUrl = (book.bookUrl ?? '').trim();
-    if (targetBookUrl.isEmpty) {
-      final results = await _ruleEngine.search(source, keyword);
-      final target = _pickBestUpdateTarget(book: book, results: results);
-      if (target == null) {
-        throw StateError('未在当前书源搜索到匹配书籍');
-      }
-      targetBookUrl = target.bookUrl.trim();
-    }
-    if (targetBookUrl.isEmpty) {
-      throw StateError('详情链接为空，无法检查更新');
-    }
-
-    final detail = await _ruleEngine.getBookInfo(
-      source,
-      targetBookUrl,
-      clearRuntimeVariables: true,
-    );
-    final tocUrl = detail?.tocUrl.trim().isNotEmpty == true
-        ? detail!.tocUrl.trim()
-        : targetBookUrl;
-    if (tocUrl.isEmpty) {
-      throw StateError('目录地址为空（可能详情解析失败）');
-    }
-
-    final toc = await _ruleEngine.getToc(
-      source,
-      tocUrl,
-      clearRuntimeVariables: false,
-    );
-    if (toc.isEmpty) {
+    final updated = _chapterRepo.getChaptersForBook(widget.bookId);
+    if (updated.isEmpty) {
       throw StateError('目录为空（可能是 ruleToc 不匹配）');
     }
 
-    final existing = _chapters;
-    final existingUrls = <String>[];
-    for (final chapter in existing) {
-      final url = (chapter.url ?? '').trim();
-      if (url.isEmpty) {
-        throw StateError('当前目录存在空章节链接，暂不支持自动检查更新');
-      }
-      existingUrls.add(url);
-    }
-
-    final newUrls = <String>[];
-    final newTitleByUrl = <String, String>{};
-    final seen = <String>{};
-    for (final item in toc) {
-      final url = item.url.trim();
-      if (url.isEmpty) continue;
-      if (!seen.add(url)) continue;
-      newUrls.add(url);
-      newTitleByUrl[url] = item.name.trim();
-    }
-    if (newUrls.isEmpty) {
-      throw StateError('目录解析失败：章节链接为空');
-    }
-
-    if (!_isUrlPrefix(existingUrls, newUrls)) {
-      throw StateError('目录结构变化较大，暂不自动合并（可尝试换源或重新加入书架）');
-    }
-
-    if (newUrls.length <= existingUrls.length) {
-      return _chapters;
-    }
-
-    final uuid = const Uuid();
-    final toAdd = <Chapter>[];
-    for (var i = existingUrls.length; i < newUrls.length; i++) {
-      final url = newUrls[i];
-      final title = (newTitleByUrl[url] ?? '').trim();
-      final safeTitle = title.isNotEmpty ? title : '第${i + 1}章';
-      final id = uuid.v5(Namespace.url.value, '${widget.bookId}|$i|$url');
-      toAdd.add(
-        Chapter(
-          id: id,
-          bookId: widget.bookId,
-          title: safeTitle,
-          url: url,
-          index: i,
-          isDownloaded: false,
-          content: null,
-        ),
-      );
-    }
-
-    if (toAdd.isEmpty) return _chapters;
-
-    await _chapterRepo.addChapters(toAdd);
-    final updated = _chapterRepo.getChaptersForBook(widget.bookId);
-
-    await _bookRepo.updateBook(
-      book.copyWith(
-        bookUrl: targetBookUrl,
-        totalChapters: updated.length,
-        latestChapter:
-            updated.isNotEmpty ? updated.last.title : book.latestChapter,
-      ),
-    );
-
     if (!mounted) return updated;
 
+    final maxChapter = updated.length - 1;
     setState(() {
       _chapters = updated;
+      _currentChapterIndex = _currentChapterIndex.clamp(0, maxChapter).toInt();
+      _currentTitle = _postProcessTitle(updated[_currentChapterIndex].title);
     });
     _syncPageFactoryChapters(
       keepPosition: _settings.pageTurnMode != PageTurnMode.scroll,
@@ -4932,6 +4929,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           await _bookmarkRepo.removeBookmark(bookmark.id);
           _updateBookmarkStatus();
         },
+        initialDisplayTitlesByIndex: _buildCatalogInitialDisplayTitlesByIndex(),
+        resolveDisplayTitle: _resolveCatalogDisplayTitle,
       ),
     );
   }

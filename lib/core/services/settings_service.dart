@@ -119,16 +119,29 @@ class SettingsService {
     double offset, {
     int? chapterIndex,
   }) async {
+    if (chapterIndex == null) {
+      await _prefs.setDouble(_scrollOffsetKey(bookId), offset);
+      return;
+    }
     await _prefs.setDouble(
       _scrollOffsetKey(bookId, chapterIndex: chapterIndex),
       offset,
     );
+    // 向前兼容：章节级偏移写入时，同步更新书籍级偏移。
+    await _prefs.setDouble(_scrollOffsetKey(bookId), offset);
   }
 
   double getScrollOffset(String bookId, {int? chapterIndex}) {
-    return _prefs
-            .getDouble(_scrollOffsetKey(bookId, chapterIndex: chapterIndex)) ??
-        0.0;
+    if (chapterIndex == null) {
+      return _prefs.getDouble(_scrollOffsetKey(bookId)) ?? 0.0;
+    }
+    final chapterOffset =
+        _prefs.getDouble(_scrollOffsetKey(bookId, chapterIndex: chapterIndex));
+    if (chapterOffset != null) {
+      return chapterOffset;
+    }
+    // 兼容旧键与未命中章节：回退到书籍级偏移。
+    return _prefs.getDouble(_scrollOffsetKey(bookId)) ?? 0.0;
   }
 
   Future<void> saveChapterPageProgress(
