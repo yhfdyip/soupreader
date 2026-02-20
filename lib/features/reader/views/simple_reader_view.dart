@@ -29,10 +29,13 @@ import '../../source/views/source_edit_legacy_view.dart';
 import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_web_verify_view.dart';
 import '../../search/views/search_book_info_view.dart';
+import '../../settings/views/exception_logs_view.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
+import '../services/reader_bookmark_export_service.dart';
 import '../services/reader_key_paging_helper.dart';
 import '../services/reader_legacy_quick_action_helper.dart';
+import '../services/reader_legacy_menu_helper.dart';
 import '../services/reader_source_action_helper.dart';
 import '../services/reader_source_switch_helper.dart';
 import '../services/reader_system_ui_helper.dart';
@@ -119,6 +122,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ScrollTextLayoutEngine.instance;
   final ChineseScriptConverter _chineseScriptConverter =
       ChineseScriptConverter.instance;
+  final ReaderBookmarkExportService _bookmarkExportService =
+      ReaderBookmarkExportService();
 
   List<Chapter> _chapters = [];
   int _currentChapterIndex = 0;
@@ -152,6 +157,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   String? _currentSourceName;
   final Map<String, bool> _chapterVipByUrl = <String, bool>{};
   final Map<String, bool> _chapterPayByUrl = <String, bool>{};
+  bool _tocUiUseReplace = false;
+  bool _tocUiLoadWordCount = false;
+  bool _tocUiSplitLongChapter = false;
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
@@ -2653,11 +2661,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _openInterfaceSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showReadingSettingsSheet(
-      title: '界面',
-      initialTab: 1,
-      allowedTabs: const [0, 1],
-    );
+    _showReadStyleDialog();
   }
 
   void _openBehaviorSettingsFromMenu() {
@@ -2751,64 +2755,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _showReaderActionsMenu() {
     _closeReaderMenuOverlay();
+    final isLocal = _isCurrentBookLocal();
+    final actions = ReaderLegacyMenuHelper.buildReadMenuActions(
+      isOnline: !isLocal,
+      isLocalTxt: _isCurrentBookLocalTxt(),
+      isEpub: _isCurrentBookEpub(),
+    );
     showCupertinoModalPopup<void>(
       context: context,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('阅读操作'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _showContentSearchDialog();
-            },
-            child: const Text('搜索正文'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              setState(() {
-                _showAutoReadPanel = true;
-              });
-              _autoPager.toggle();
-            },
-            child: Text(_autoPager.isRunning ? '停止自动翻页' : '开始自动翻页'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              unawaited(_toggleBookmark());
-            },
-            child: Text(_hasBookmarkAtCurrent ? '移除书签' : '添加书签'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _refreshChapter();
-            },
-            child: const Text('刷新当前章节'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _showSwitchSourceMenu();
-            },
-            child: const Text('换源'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              Navigator.pop(sheetContext);
-              try {
-                final updated = await _refreshCatalogFromSource();
-                if (!mounted) return;
-                _showToast('目录已更新，共 ${updated.length} 章');
-              } catch (e) {
-                if (!mounted) return;
-                _showToast('更新目录失败：$e');
-              }
-            },
-            child: const Text('更新目录'),
-          ),
-        ],
+        actions: actions
+            .map(
+              (action) => CupertinoActionSheetAction(
+                onPressed: () async {
+                  Navigator.pop(sheetContext);
+                  await _executeLegacyReadMenuAction(action);
+                },
+                child: Text(ReaderLegacyMenuHelper.readMenuLabel(action)),
+              ),
+            )
+            .toList(growable: false),
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(sheetContext),
           child: const Text('取消'),
@@ -3333,6 +3300,148 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _isCurrentBookLocal() {
     if (widget.isEphemeral) return false;
     return _bookRepo.getBookById(widget.bookId)?.isLocal ?? false;
+  }
+
+  bool _isCurrentBookLocalTxt() {
+    if (widget.isEphemeral) return false;
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null || !book.isLocal) return false;
+    final lower = ((book.localPath ?? book.bookUrl ?? '')).toLowerCase();
+    return lower.endsWith('.txt');
+  }
+
+  bool _isCurrentBookEpub() {
+    if (widget.isEphemeral) return false;
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null || !book.isLocal) return false;
+    final lower = ((book.localPath ?? book.bookUrl ?? '')).toLowerCase();
+    return lower.endsWith('.epub');
+  }
+
+  Future<void> _openExceptionLogsFromReader() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => const ExceptionLogsView(),
+      ),
+    );
+  }
+
+  void _showReaderActionUnavailable(
+    String label, {
+    String? reason,
+  }) {
+    final suffix =
+        reason?.trim().isNotEmpty == true ? '：${reason!.trim()}' : '：当前版本暂未支持';
+    _showToast('$label$suffix');
+  }
+
+  Future<void> _exportBookmarksFromReader({
+    required bool markdown,
+  }) async {
+    final bookmarks = _bookmarkRepo.getBookmarksForBook(widget.bookId);
+    final result = markdown
+        ? await _bookmarkExportService.exportMarkdown(
+            bookTitle: widget.bookTitle,
+            bookAuthor: _bookAuthor,
+            bookmarks: bookmarks,
+          )
+        : await _bookmarkExportService.exportJson(
+            bookTitle: widget.bookTitle,
+            bookAuthor: _bookAuthor,
+            bookmarks: bookmarks,
+          );
+    if (!mounted) return;
+    if (result.success) {
+      final path = result.outputPath?.trim();
+      if (path != null && path.isNotEmpty) {
+        _showToast('导出成功：$path');
+      } else {
+        _showToast(result.message ?? '导出成功');
+      }
+      return;
+    }
+    if (result.cancelled) return;
+    _showToast(result.message ?? '导出失败');
+  }
+
+  Future<void> _executeLegacyReadMenuAction(
+    ReaderLegacyReadMenuAction action,
+  ) async {
+    switch (action) {
+      case ReaderLegacyReadMenuAction.changeSource:
+        await _showSwitchSourceMenu();
+        return;
+      case ReaderLegacyReadMenuAction.refresh:
+        _refreshChapter();
+        return;
+      case ReaderLegacyReadMenuAction.download:
+        _showReaderActionUnavailable('离线缓存');
+        return;
+      case ReaderLegacyReadMenuAction.tocRule:
+        _showReaderActionUnavailable('TXT 目录规则');
+        return;
+      case ReaderLegacyReadMenuAction.setCharset:
+        _showReaderActionUnavailable('设置编码');
+        return;
+      case ReaderLegacyReadMenuAction.addBookmark:
+        await _toggleBookmark();
+        return;
+      case ReaderLegacyReadMenuAction.editContent:
+        _showReaderActionUnavailable('编辑正文');
+        return;
+      case ReaderLegacyReadMenuAction.pageAnim:
+        _openInterfaceSettingsFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.getProgress:
+        _showReaderActionUnavailable('获取进度');
+        return;
+      case ReaderLegacyReadMenuAction.coverProgress:
+        _showReaderActionUnavailable('覆盖进度');
+        return;
+      case ReaderLegacyReadMenuAction.reverseContent:
+        _showReaderActionUnavailable('正文倒序');
+        return;
+      case ReaderLegacyReadMenuAction.simulatedReading:
+        _showReaderActionUnavailable('模拟阅读');
+        return;
+      case ReaderLegacyReadMenuAction.enableReplace:
+        _showReaderActionUnavailable('启用替换规则');
+        return;
+      case ReaderLegacyReadMenuAction.sameTitleRemoved:
+        _showReaderActionUnavailable('同名标题去重');
+        return;
+      case ReaderLegacyReadMenuAction.reSegment:
+        _showReaderActionUnavailable('重新分段');
+        return;
+      case ReaderLegacyReadMenuAction.delRubyTag:
+        _showReaderActionUnavailable('删除 ruby 标签');
+        return;
+      case ReaderLegacyReadMenuAction.delHTag:
+        _showReaderActionUnavailable('删除 h 标签');
+        return;
+      case ReaderLegacyReadMenuAction.imageStyle:
+        _showReaderActionUnavailable('图片样式');
+        return;
+      case ReaderLegacyReadMenuAction.updateToc:
+        try {
+          final updated = await _refreshCatalogFromSource();
+          if (!mounted) return;
+          _showToast('目录已更新，共 ${updated.length} 章');
+        } catch (e) {
+          if (!mounted) return;
+          _showToast('更新目录失败：$e');
+        }
+        return;
+      case ReaderLegacyReadMenuAction.effectiveReplaces:
+        await _openReplaceRuleFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.log:
+        await _openExceptionLogsFromReader();
+        return;
+      case ReaderLegacyReadMenuAction.help:
+        _showToast('阅读菜单帮助：顶部为书籍与书源动作，底部可进入目录/朗读/界面/设置。');
+        return;
+    }
   }
 
   BookSource? _resolveCurrentSource() {
@@ -4016,6 +4125,550 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       if (!mounted) return;
       _showToast('换源失败：$e');
     }
+  }
+
+  int _legacyTextSizeProgress() {
+    return (_settings.fontSize.round() - 5).clamp(0, 45).toInt();
+  }
+
+  int _legacyLetterSpacingProgress() {
+    return ((_settings.letterSpacing * 100).round() + 50).clamp(0, 100).toInt();
+  }
+
+  int _legacyLineSpacingProgress() {
+    final mapped = ((_settings.lineHeight - 1.0) * 10 + 10).round();
+    return mapped.clamp(0, 20).toInt();
+  }
+
+  int _legacyParagraphSpacingProgress() {
+    return _settings.paragraphSpacing.round().clamp(0, 20).toInt();
+  }
+
+  int _nextTextBoldValue(int current) {
+    switch (current) {
+      case 2:
+        return 0;
+      case 0:
+        return 1;
+      case 1:
+      default:
+        return 2;
+    }
+  }
+
+  String _legacyLetterSpacingLabel(int progress) {
+    return ((progress - 50) / 100).toStringAsFixed(1);
+  }
+
+  String _legacyLineSpacingLabel(int progress) {
+    return ((progress - 10) / 10).toStringAsFixed(1);
+  }
+
+  String _legacyParagraphSpacingLabel(int progress) {
+    return (progress / 10).toStringAsFixed(1);
+  }
+
+  PageTurnMode _legacyStyleDialogPageAnimMode() {
+    switch (_settings.pageTurnMode) {
+      case PageTurnMode.cover:
+      case PageTurnMode.slide:
+      case PageTurnMode.simulation:
+      case PageTurnMode.scroll:
+      case PageTurnMode.none:
+        return _settings.pageTurnMode;
+      case PageTurnMode.simulation2:
+        return PageTurnMode.simulation;
+    }
+  }
+
+  void _showReadStyleDialog() {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (popupContext) => StatefulBuilder(
+        builder: (context, setPopupState) {
+          final textSizeProgress = _legacyTextSizeProgress();
+          final letterSpacingProgress = _legacyLetterSpacingProgress();
+          final lineSpacingProgress = _legacyLineSpacingProgress();
+          final paragraphSpacingProgress = _legacyParagraphSpacingProgress();
+          final pageAnimMode = _legacyStyleDialogPageAnimMode();
+          final pageAnimItems = const <MapEntry<PageTurnMode, String>>[
+            MapEntry(PageTurnMode.cover, '覆盖'),
+            MapEntry(PageTurnMode.slide, '滑动'),
+            MapEntry(PageTurnMode.simulation, '仿真'),
+            MapEntry(PageTurnMode.scroll, '滚动'),
+            MapEntry(PageTurnMode.none, '无'),
+          ];
+          final themeCount = AppColors.readingThemes.length;
+          final activeThemeIndex =
+              _settings.themeIndex.clamp(0, themeCount - 1);
+          final indentOptions = const <String>['', '　', '　　', '　　　'];
+          final currentIndentIndex =
+              indentOptions.indexOf(_settings.paragraphIndent);
+          final safeIndentIndex =
+              currentIndentIndex < 0 ? 2 : currentIndentIndex;
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.82,
+            ),
+            decoration: BoxDecoration(
+              color: _uiPanelBg,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Row(
+                        children: [
+                          _buildReadStyleActionChip(
+                            label: '粗细',
+                            onTap: () => _updateSettingsFromSheet(
+                              setPopupState,
+                              _settings.copyWith(
+                                textBold:
+                                    _nextTextBoldValue(_settings.textBold),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          _buildReadStyleActionChip(
+                            label: '字体',
+                            onTap: () => showCupertinoModalPopup<void>(
+                              context: context,
+                              builder: (_) =>
+                                  _buildFontSelectDialog(setPopupState),
+                            ),
+                          ),
+                          const Spacer(),
+                          _buildReadStyleActionChip(
+                            label: '缩进',
+                            onTap: () {
+                              final nextIndex =
+                                  (safeIndentIndex + 1) % indentOptions.length;
+                              _updateSettingsFromSheet(
+                                setPopupState,
+                                _settings.copyWith(
+                                  paragraphIndent: indentOptions[nextIndex],
+                                ),
+                              );
+                            },
+                          ),
+                          const Spacer(),
+                          _buildReadStyleActionChip(
+                            label: '简繁',
+                            onTap: () {
+                              final modes = ChineseConverterType.values;
+                              final currentModeIndex =
+                                  modes.indexOf(_settings.chineseConverterType);
+                              final safeModeIndex =
+                                  currentModeIndex < 0 ? 0 : currentModeIndex;
+                              final nextMode =
+                                  modes[(safeModeIndex + 1) % modes.length];
+                              _updateSettingsFromSheet(
+                                setPopupState,
+                                _settings.copyWith(
+                                  chineseConverterType: nextMode,
+                                ),
+                              );
+                            },
+                          ),
+                          const Spacer(),
+                          _buildReadStyleActionChip(
+                            label: '边距',
+                            onTap: () {
+                              Navigator.of(popupContext).pop();
+                              Future<void>.microtask(() {
+                                showTypographySettingsDialog(
+                                  this.context,
+                                  settings: _settings,
+                                  onSettingsChanged: _updateSettings,
+                                );
+                              });
+                            },
+                          ),
+                          const Spacer(),
+                          _buildReadStyleActionChip(
+                            label: '信息',
+                            onTap: () {
+                              Navigator.of(popupContext).pop();
+                              Future<void>.microtask(() {
+                                _showReadingSettingsSheet(
+                                  title: '信息',
+                                  initialTab: 1,
+                                  allowedTabs: const [1],
+                                );
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildReadStyleSeekBar(
+                      title: '字号',
+                      progress: textSizeProgress,
+                      max: 45,
+                      valueLabel: '${textSizeProgress + 5}',
+                      onChanged: (progress) => _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(fontSize: (progress + 5).toDouble()),
+                      ),
+                    ),
+                    _buildReadStyleSeekBar(
+                      title: '字距',
+                      progress: letterSpacingProgress,
+                      max: 100,
+                      valueLabel:
+                          _legacyLetterSpacingLabel(letterSpacingProgress),
+                      onChanged: (progress) => _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(
+                          letterSpacing: (progress - 50) / 100,
+                        ),
+                      ),
+                    ),
+                    _buildReadStyleSeekBar(
+                      title: '行距',
+                      progress: lineSpacingProgress,
+                      max: 20,
+                      valueLabel: _legacyLineSpacingLabel(lineSpacingProgress),
+                      onChanged: (progress) => _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(
+                          lineHeight: (1.0 + (progress - 10) / 10).toDouble(),
+                        ),
+                      ),
+                    ),
+                    _buildReadStyleSeekBar(
+                      title: '段距',
+                      progress: paragraphSpacingProgress,
+                      max: 20,
+                      valueLabel: _legacyParagraphSpacingLabel(
+                          paragraphSpacingProgress),
+                      onChanged: (progress) => _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(
+                          paragraphSpacing: progress.toDouble(),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      height: 0.8,
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      color: _uiBorder.withValues(alpha: 0.9),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                      child: Text(
+                        '翻页动画',
+                        style: TextStyle(
+                          color: _uiTextStrong.withValues(alpha: 0.75),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 11),
+                      child: Row(
+                        children: pageAnimItems.map((item) {
+                          final isSelected = pageAnimMode == item.key;
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: GestureDetector(
+                                onTap: () => _updateSettingsFromSheet(
+                                  setPopupState,
+                                  _settings.copyWith(pageTurnMode: item.key),
+                                ),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 5),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: _uiCardBg,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected ? _uiAccent : _uiBorder,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    item.value,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? _uiAccent
+                                          : _uiTextNormal,
+                                      fontSize: 13,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(growable: false),
+                      ),
+                    ),
+                    Container(
+                      height: 0.8,
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      color: _uiBorder.withValues(alpha: 0.9),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '背景文字样式',
+                              style: TextStyle(
+                                color: _uiTextStrong.withValues(alpha: 0.75),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '共享布局',
+                            style: TextStyle(
+                              color: _uiTextNormal,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => _updateSettingsFromSheet(
+                              setPopupState,
+                              _settings.copyWith(
+                                shareLayout: !_settings.shareLayout,
+                              ),
+                            ),
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: _settings.shareLayout
+                                    ? _uiAccent
+                                    : _uiCardBg,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: _settings.shareLayout
+                                      ? _uiAccent
+                                      : _uiBorder,
+                                ),
+                              ),
+                              child: _settings.shareLayout
+                                  ? const Icon(
+                                      CupertinoIcons.check_mark,
+                                      size: 14,
+                                      color: CupertinoColors.white,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 110,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                        itemCount: themeCount + 1,
+                        itemBuilder: (context, index) {
+                          if (index == themeCount) {
+                            return Container(
+                              width: 72,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: _uiCardBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: _uiBorder),
+                              ),
+                              alignment: Alignment.center,
+                              child: Icon(
+                                CupertinoIcons.add,
+                                color: _uiTextNormal,
+                                size: 20,
+                              ),
+                            );
+                          }
+
+                          final theme = AppColors.readingThemes[index];
+                          final isSelected = activeThemeIndex == index;
+                          return GestureDetector(
+                            onTap: () => _updateSettingsFromSheet(
+                              setPopupState,
+                              _settings.copyWith(themeIndex: index),
+                            ),
+                            child: Container(
+                              width: 72,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _uiCardBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected ? _uiAccent : _uiBorder,
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: theme.background,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  theme.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: theme.text,
+                                    fontSize: 12,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildReadStyleActionChip({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: _uiCardBg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: _uiBorder),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: _uiTextNormal,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadStyleSeekBar({
+    required String title,
+    required int progress,
+    required int max,
+    required String valueLabel,
+    required ValueChanged<int> onChanged,
+  }) {
+    final safeMax = max < 1 ? 1 : max;
+    final safeProgress = progress.clamp(0, safeMax).toInt();
+    final sliderValue = safeProgress.toDouble();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 60,
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: _uiTextStrong,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              minSize: 24,
+              onPressed:
+                  safeProgress > 0 ? () => onChanged(safeProgress - 1) : null,
+              child: Icon(
+                CupertinoIcons.minus,
+                size: 18,
+                color: safeProgress > 0 ? _uiTextStrong : _uiTextSubtle,
+              ),
+            ),
+          ),
+          Expanded(
+            child: CupertinoSlider(
+              value: sliderValue,
+              min: 0,
+              max: safeMax.toDouble(),
+              activeColor: _uiAccent,
+              onChanged: (value) => onChanged(value.round()),
+            ),
+          ),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              minSize: 24,
+              onPressed: safeProgress < safeMax
+                  ? () => onChanged(safeProgress + 1)
+                  : null,
+              child: Icon(
+                CupertinoIcons.add,
+                size: 18,
+                color: safeProgress < safeMax ? _uiTextStrong : _uiTextSubtle,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 60,
+            child: Text(
+              valueLabel,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: _uiTextNormal,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showReadingSettingsSheet({
@@ -5887,6 +6540,29 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         onDeleteBookmark: (bookmark) async {
           await _bookmarkRepo.removeBookmark(bookmark.id);
           _updateBookmarkStatus();
+        },
+        isLocalTxtBook: _isCurrentBookLocalTxt(),
+        initialUseReplace: _tocUiUseReplace,
+        initialLoadWordCount: _tocUiLoadWordCount,
+        initialSplitLongChapter: _tocUiSplitLongChapter,
+        onUseReplaceChanged: (value) {
+          _tocUiUseReplace = value;
+        },
+        onLoadWordCountChanged: (value) {
+          _tocUiLoadWordCount = value;
+        },
+        onSplitLongChapterChanged: (value) {
+          _tocUiSplitLongChapter = value;
+        },
+        onOpenLogs: _openExceptionLogsFromReader,
+        onExportBookmark: () async {
+          await _exportBookmarksFromReader(markdown: false);
+        },
+        onExportBookmarkMarkdown: () async {
+          await _exportBookmarksFromReader(markdown: true);
+        },
+        onEditTocRule: () {
+          _showReaderActionUnavailable('TXT 目录规则');
         },
         initialDisplayTitlesByIndex: _buildCatalogInitialDisplayTitlesByIndex(),
         resolveDisplayTitle: _resolveCatalogDisplayTitle,

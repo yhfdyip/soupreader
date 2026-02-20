@@ -63,4 +63,28 @@ void main() {
     );
     expect(DiscoveryFilterHelper.extractGroups('  '), isEmpty);
   });
+
+  test('shouldShowEmptyMessage 仅在查询为空且无结果时返回 true', () {
+    expect(
+      DiscoveryFilterHelper.shouldShowEmptyMessage(
+        visibleCount: 0,
+        query: '',
+      ),
+      isTrue,
+    );
+    expect(
+      DiscoveryFilterHelper.shouldShowEmptyMessage(
+        visibleCount: 0,
+        query: 'group:玄幻',
+      ),
+      isFalse,
+    );
+    expect(
+      DiscoveryFilterHelper.shouldShowEmptyMessage(
+        visibleCount: 2,
+        query: '',
+      ),
+      isFalse,
+    );
+  });
 }

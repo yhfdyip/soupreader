@@ -7,6 +7,7 @@ import '../../../app/widgets/app_cover_image.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../bookshelf/models/book.dart';
+import '../services/reader_legacy_menu_helper.dart';
 
 /// 阅读器目录/书签面板（对标 legado 目录抽屉交互）
 ///
@@ -34,6 +35,17 @@ class ReaderCatalogSheet extends StatefulWidget {
   final Future<void> Function(BookmarkEntity bookmark) onDeleteBookmark;
   final Map<int, String> initialDisplayTitlesByIndex;
   final Future<String> Function(Chapter chapter)? resolveDisplayTitle;
+  final bool isLocalTxtBook;
+  final bool initialUseReplace;
+  final bool initialLoadWordCount;
+  final bool initialSplitLongChapter;
+  final ValueChanged<bool>? onUseReplaceChanged;
+  final ValueChanged<bool>? onLoadWordCountChanged;
+  final ValueChanged<bool>? onSplitLongChapterChanged;
+  final Future<void> Function()? onOpenLogs;
+  final Future<void> Function()? onExportBookmark;
+  final Future<void> Function()? onExportBookmarkMarkdown;
+  final VoidCallback? onEditTocRule;
 
   const ReaderCatalogSheet({
     super.key,
@@ -51,6 +63,17 @@ class ReaderCatalogSheet extends StatefulWidget {
     required this.onDeleteBookmark,
     this.initialDisplayTitlesByIndex = const <int, String>{},
     this.resolveDisplayTitle,
+    this.isLocalTxtBook = false,
+    this.initialUseReplace = false,
+    this.initialLoadWordCount = false,
+    this.initialSplitLongChapter = false,
+    this.onUseReplaceChanged,
+    this.onLoadWordCountChanged,
+    this.onSplitLongChapterChanged,
+    this.onOpenLogs,
+    this.onExportBookmark,
+    this.onExportBookmarkMarkdown,
+    this.onEditTocRule,
   });
 
   @override
@@ -75,6 +98,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   int? _lastAutoScrollTargetChapterIndex;
   bool _pendingPreciseScroll = false;
   int _displayTitleResolverToken = 0;
+  bool _useReplace = false;
+  bool _loadWordCount = false;
+  bool _splitLongChapter = false;
 
   bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
 
@@ -104,6 +130,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     super.initState();
     _chapters = List<Chapter>.from(widget.chapters);
     _bookmarks = List<BookmarkEntity>.from(widget.bookmarks);
+    _useReplace = widget.initialUseReplace;
+    _loadWordCount = widget.initialLoadWordCount;
+    _splitLongChapter = widget.initialSplitLongChapter;
     _primeDisplayTitles(reset: true);
 
     _scheduleScrollToCurrentChapter();
@@ -131,6 +160,15 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     }
     if (!identical(oldWidget.bookmarks, widget.bookmarks)) {
       _bookmarks = List<BookmarkEntity>.from(widget.bookmarks);
+    }
+    if (oldWidget.initialUseReplace != widget.initialUseReplace) {
+      _useReplace = widget.initialUseReplace;
+    }
+    if (oldWidget.initialLoadWordCount != widget.initialLoadWordCount) {
+      _loadWordCount = widget.initialLoadWordCount;
+    }
+    if (oldWidget.initialSplitLongChapter != widget.initialSplitLongChapter) {
+      _splitLongChapter = widget.initialSplitLongChapter;
     }
 
     final resolverChanged =
@@ -451,6 +489,17 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           const Spacer(),
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 12),
+            onPressed: _busy ? null : _showTocActionsMenu,
+            child: Icon(
+              CupertinoIcons.ellipsis_circle,
+              size: 20,
+              color: _busy
+                  ? AppDesignTokens.textMuted.withValues(alpha: 0.55)
+                  : _textNormal,
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             onPressed: _busy ? null : _confirmClearCache,
             child: Icon(
               CupertinoIcons.trash,
@@ -600,6 +649,101 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   Widget _buildBody() {
     if (_selectedTab == 0) return _buildChapterList();
     return _buildBookmarkList();
+  }
+
+  void _showTocActionsMenu() {
+    final actions = ReaderLegacyMenuHelper.buildTocMenuActions(
+      bookmarkTab: _selectedTab == 1,
+      isLocalTxt: widget.isLocalTxtBook,
+    );
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('目录操作'),
+        actions: actions
+            .map(
+              (action) => CupertinoActionSheetAction(
+                onPressed: () async {
+                  Navigator.pop(sheetContext);
+                  await _runTocAction(action);
+                },
+                child: Text(_tocActionLabel(action)),
+              ),
+            )
+            .toList(growable: false),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  String _tocActionLabel(ReaderLegacyTocMenuAction action) {
+    final raw = ReaderLegacyMenuHelper.tocMenuLabel(action);
+    final checked = switch (action) {
+      ReaderLegacyTocMenuAction.reverseToc => _isReversed,
+      ReaderLegacyTocMenuAction.useReplace => _useReplace,
+      ReaderLegacyTocMenuAction.loadWordCount => _loadWordCount,
+      ReaderLegacyTocMenuAction.splitLongChapter => _splitLongChapter,
+      _ => false,
+    };
+    return checked ? '✓ $raw' : raw;
+  }
+
+  Future<void> _runTocAction(ReaderLegacyTocMenuAction action) async {
+    switch (action) {
+      case ReaderLegacyTocMenuAction.reverseToc:
+        setState(() {
+          _isReversed = !_isReversed;
+          _resetAutoScrollState();
+        });
+        _scheduleScrollToCurrentChapter();
+        return;
+      case ReaderLegacyTocMenuAction.useReplace:
+        setState(() => _useReplace = !_useReplace);
+        widget.onUseReplaceChanged?.call(_useReplace);
+        _showToast(_useReplace ? '已开启目录替换规则' : '已关闭目录替换规则');
+        return;
+      case ReaderLegacyTocMenuAction.loadWordCount:
+        setState(() => _loadWordCount = !_loadWordCount);
+        widget.onLoadWordCountChanged?.call(_loadWordCount);
+        _showToast(_loadWordCount ? '已开启目录字数显示' : '已关闭目录字数显示');
+        return;
+      case ReaderLegacyTocMenuAction.tocRule:
+        if (widget.onEditTocRule != null) {
+          widget.onEditTocRule!.call();
+        } else {
+          _showToast('当前书籍未接入 TXT 目录规则配置');
+        }
+        return;
+      case ReaderLegacyTocMenuAction.splitLongChapter:
+        setState(() => _splitLongChapter = !_splitLongChapter);
+        widget.onSplitLongChapterChanged?.call(_splitLongChapter);
+        _showToast(_splitLongChapter ? '已开启分割长章节' : '已关闭分割长章节');
+        return;
+      case ReaderLegacyTocMenuAction.exportBookmark:
+        if (widget.onExportBookmark != null) {
+          await widget.onExportBookmark!.call();
+        } else {
+          _showToast('当前书籍不支持导出书签');
+        }
+        return;
+      case ReaderLegacyTocMenuAction.exportMarkdown:
+        if (widget.onExportBookmarkMarkdown != null) {
+          await widget.onExportBookmarkMarkdown!.call();
+        } else {
+          _showToast('当前书籍不支持导出 Markdown');
+        }
+        return;
+      case ReaderLegacyTocMenuAction.log:
+        if (widget.onOpenLogs != null) {
+          await widget.onOpenLogs!.call();
+        } else {
+          _showToast('日志入口不可用');
+        }
+        return;
+    }
   }
 
   Widget _buildChapterList() {

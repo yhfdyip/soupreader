@@ -13,18 +13,59 @@ void main() {
       appearanceMode: AppAppearanceMode.dark,
       wifiOnlyDownload: false,
       autoUpdateSources: false,
+      showDiscovery: false,
+      showRss: true,
+      defaultHomePage: MainDefaultHomePage.rss,
       bookshelfViewMode: BookshelfViewMode.list,
       bookshelfSortMode: BookshelfSortMode.title,
       searchScope: '玄幻,男频',
+      bookInfoDeleteAlert: false,
+      webDavUrl: 'https://dav.example.com/root/',
+      webDavAccount: 'reader',
+      webDavPassword: 'secret',
+      webDavDir: 'sync',
     );
 
     final decoded = AppSettings.fromJson(settings.toJson());
     expect(decoded.appearanceMode, AppAppearanceMode.dark);
     expect(decoded.wifiOnlyDownload, false);
     expect(decoded.autoUpdateSources, false);
+    expect(decoded.showDiscovery, false);
+    expect(decoded.showRss, true);
+    expect(decoded.defaultHomePage, MainDefaultHomePage.rss);
     expect(decoded.bookshelfViewMode, BookshelfViewMode.list);
     expect(decoded.bookshelfSortMode, BookshelfSortMode.title);
     expect(decoded.searchScope, '玄幻,男频');
+    expect(decoded.bookInfoDeleteAlert, false);
+    expect(decoded.webDavUrl, 'https://dav.example.com/root/');
+    expect(decoded.webDavAccount, 'reader');
+    expect(decoded.webDavPassword, 'secret');
+    expect(decoded.webDavDir, 'sync');
+  });
+
+  test('AppSettings migrates main tab settings with legacy keys', () {
+    final fromLegacy = AppSettings.fromJson({
+      'showDiscovery': 0,
+      'showRSS': false,
+      'defaultHomePage': 'my',
+      'bookInfoDeleteAlert': 0,
+    });
+    expect(fromLegacy.showDiscovery, false);
+    expect(fromLegacy.showRss, false);
+    expect(fromLegacy.defaultHomePage, MainDefaultHomePage.my);
+    expect(fromLegacy.bookInfoDeleteAlert, false);
+
+    final fallback = AppSettings.fromJson({
+      'showRss': '1',
+      'defaultHomePage': 'unsupported_home',
+    });
+    expect(fallback.showRss, true);
+    expect(fallback.defaultHomePage, MainDefaultHomePage.bookshelf);
+    expect(fallback.bookInfoDeleteAlert, true);
+    expect(fallback.webDavUrl, AppSettings.defaultWebDavUrl);
+    expect(fallback.webDavAccount, isEmpty);
+    expect(fallback.webDavPassword, isEmpty);
+    expect(fallback.webDavDir, isEmpty);
   });
 
   test('AppSettings migrates legacy single source scope urls', () {
@@ -68,6 +109,7 @@ void main() {
       service.appSettings.copyWith(
         appearanceMode: AppAppearanceMode.light,
         wifiOnlyDownload: false,
+        bookInfoDeleteAlert: false,
       ),
     );
 
@@ -75,6 +117,7 @@ void main() {
     await service.init();
     expect(service.appSettings.appearanceMode, AppAppearanceMode.light);
     expect(service.appSettings.wifiOnlyDownload, false);
+    expect(service.appSettings.bookInfoDeleteAlert, false);
   });
 
   test('SettingsService stores scroll offsets by chapter with fallback',
@@ -117,6 +160,28 @@ void main() {
 
     expect(service.getChapterPageProgress('book-2', chapterIndex: 0), 1.0);
     expect(service.getChapterPageProgress('book-2', chapterIndex: 1), 0.0);
+  });
+
+  test('SettingsService persists remote upload url by book id', () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = SettingsService();
+    await service.init();
+
+    expect(service.getBookRemoteUploadUrl('book-1'), isNull);
+    await service.saveBookRemoteUploadUrl(
+      'book-1',
+      'https://dav.example.com/books/demo.txt',
+    );
+    expect(
+      service.getBookRemoteUploadUrl('book-1'),
+      'https://dav.example.com/books/demo.txt',
+    );
+
+    await service.init();
+    expect(
+      service.getBookRemoteUploadUrl('book-1'),
+      'https://dav.example.com/books/demo.txt',
+    );
   });
 
   test(
@@ -195,7 +260,7 @@ void main() {
     );
     expect(persisted.fontSize, 31.0);
     expect(persisted.pageDirection, PageDirection.vertical);
-    expect(prefs.getInt('reading_settings_schema_version'), 2);
+    expect(prefs.getInt('reading_settings_schema_version'), 3);
   });
 
   test('SettingsService repairs malformed reading settings json', () async {
@@ -240,6 +305,48 @@ void main() {
     expect(service.readingSettings.pageDirection, PageDirection.vertical);
 
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getInt('reading_settings_schema_version'), 2);
+    expect(prefs.getInt('reading_settings_schema_version'), 3);
+  });
+
+  test('SettingsService 持久化书籍级允许更新与分割长章节开关', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final service = SettingsService();
+    await service.init();
+
+    expect(service.getBookCanUpdate('book-1'), isTrue);
+    expect(service.getBookSplitLongChapter('book-1'), isTrue);
+
+    await service.saveBookCanUpdate('book-1', false);
+    await service.saveBookSplitLongChapter('book-1', false);
+
+    expect(service.getBookCanUpdate('book-1'), isFalse);
+    expect(service.getBookSplitLongChapter('book-1'), isFalse);
+
+    await service.init();
+    expect(service.getBookCanUpdate('book-1'), isFalse);
+    expect(service.getBookSplitLongChapter('book-1'), isFalse);
+    expect(service.getBookCanUpdate(''), isTrue);
+    expect(service.getBookSplitLongChapter(''), isTrue);
+  });
+
+  test('SettingsService 兼容旧格式书籍级开关映射', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'book_can_update_map':
+          '{"book-a":0,"book-b":"true","book-c":"0","book-d":1}',
+      'book_split_long_chapter_map':
+          '{"book-a":"false","book-b":"1","book-c":0,"book-d":true}',
+    });
+    final service = SettingsService();
+    await service.init();
+
+    expect(service.getBookCanUpdate('book-a'), isFalse);
+    expect(service.getBookCanUpdate('book-b'), isTrue);
+    expect(service.getBookCanUpdate('book-c'), isFalse);
+    expect(service.getBookCanUpdate('book-d'), isTrue);
+
+    expect(service.getBookSplitLongChapter('book-a'), isFalse);
+    expect(service.getBookSplitLongChapter('book-b'), isTrue);
+    expect(service.getBookSplitLongChapter('book-c'), isFalse);
+    expect(service.getBookSplitLongChapter('book-d'), isTrue);
   });
 }

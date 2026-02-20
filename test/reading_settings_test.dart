@@ -43,6 +43,19 @@ void main() {
     expect(legacyDecoded.noAnimScrollPage, isFalse);
   });
 
+  test('ReadingSettings keeps shareLayout defaults and survives json roundtrip',
+      () {
+    const defaults = ReadingSettings();
+    expect(defaults.shareLayout, isTrue);
+
+    final encoded = defaults.copyWith(shareLayout: false).toJson();
+    final decoded = ReadingSettings.fromJson(encoded);
+    expect(decoded.shareLayout, isFalse);
+
+    final legacyDecoded = ReadingSettings.fromJson(<String, dynamic>{});
+    expect(legacyDecoded.shareLayout, isTrue);
+  });
+
   test('ReadingSettings keeps legado-like pageTouchSlop range', () {
     final defaults = ReadingSettings.fromJson(<String, dynamic>{});
     expect(defaults.pageTouchSlop, 0);

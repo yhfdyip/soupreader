@@ -452,25 +452,18 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final visible = DiscoveryFilterHelper.applyQueryFilter(
         eligible, _searchController.text);
     final query = _searchController.text.trim();
+    final showEmptyMessage = DiscoveryFilterHelper.shouldShowEmptyMessage(
+      visibleCount: visible.length,
+      query: query,
+    );
 
     return AppCupertinoPageScaffold(
       title: '发现',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
-            onPressed: _showGroupFilterMenu,
-            child: const Icon(CupertinoIcons.square_grid_2x2),
-          ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
-            onPressed: _compressExplore,
-            child: const Icon(CupertinoIcons.arrow_up_to_line),
-          ),
-        ],
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(28, 28),
+        onPressed: _showGroupFilterMenu,
+        child: const Icon(CupertinoIcons.square_grid_2x2),
       ),
       child: Column(
         children: [
@@ -511,7 +504,12 @@ class _DiscoveryViewState extends State<DiscoveryView> {
           ),
           Expanded(
             child: visible.isEmpty
-                ? _buildEmptyState(eligibleCount: eligible.length, query: query)
+                ? (showEmptyMessage
+                    ? _buildEmptyState(
+                        eligibleCount: eligible.length,
+                        query: query,
+                      )
+                    : _buildFilteredNoResultBody())
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -522,6 +520,14 @@ class _DiscoveryViewState extends State<DiscoveryView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFilteredNoResultBody() {
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      children: const <Widget>[],
     );
   }
 

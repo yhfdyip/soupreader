@@ -39,4 +39,14 @@ class DiscoveryFilterHelper {
         .toSet()
         .toList(growable: false);
   }
+
+  /// 对齐 legado ExploreFragment:
+  /// 仅当“无结果 + 查询词为空”时展示空态文案。
+  static bool shouldShowEmptyMessage({
+    required int visibleCount,
+    required String query,
+  }) {
+    if (visibleCount > 0) return false;
+    return query.trim().isEmpty;
+  }
 }

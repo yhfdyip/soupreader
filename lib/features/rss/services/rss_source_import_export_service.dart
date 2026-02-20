@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/utils/legado_json.dart';
 import '../models/rss_source.dart';
@@ -559,6 +560,70 @@ class RssSourceImportExportService {
     }
     return value;
   }
+
+  /// 导出订阅源为 JSON
+  String exportToJson(List<RssSource> sources) {
+    final jsonList = sources.map((source) => source.toJson()).toList(growable: false);
+    return LegadoJson.encode(jsonList);
+  }
+
+  /// 导出订阅源到文件
+  Future<RssSourceExportFileResult> exportToFile(List<RssSource> sources) async {
+    try {
+      final jsonString = exportToJson(sources);
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: '导出订阅源',
+        fileName: 'soupreader_rss_${DateTime.now().millisecondsSinceEpoch}.json',
+        allowedExtensions: ['json'],
+        type: FileType.custom,
+      );
+
+      if (outputPath == null || outputPath.trim().isEmpty) {
+        return const RssSourceExportFileResult(cancelled: true);
+      }
+
+      final normalizedPath = outputPath.trim();
+      await File(normalizedPath).writeAsString(jsonString);
+      return RssSourceExportFileResult(
+        success: true,
+        outputPath: normalizedPath,
+      );
+    } catch (error) {
+      return RssSourceExportFileResult(
+        success: false,
+        errorMessage: '导出失败: $error',
+      );
+    }
+  }
+
+  /// 导出订阅源到临时文件，用于系统分享
+  Future<File?> exportToShareFile(List<RssSource> sources) async {
+    if (_isWeb) return null;
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final path =
+          '${tempDir.path}/share_rss_source_${DateTime.now().millisecondsSinceEpoch}.json';
+      final file = File(path);
+      await file.writeAsString(exportToJson(sources));
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class RssSourceExportFileResult {
+  const RssSourceExportFileResult({
+    this.success = false,
+    this.cancelled = false,
+    this.outputPath,
+    this.errorMessage,
+  });
+
+  final bool success;
+  final bool cancelled;
+  final String? outputPath;
+  final String? errorMessage;
 }
 
 class RssSourceImportResult {

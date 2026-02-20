@@ -25,5 +25,9 @@ void main() {
       ),
       returnsNormally,
     );
+    expect(
+      () => const RssFavoritesPlaceholderView(),
+      returnsNormally,
+    );
   });
 }

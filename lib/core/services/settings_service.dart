@@ -16,11 +16,19 @@ class SettingsService {
   static const String _keyAppSettings = 'app_settings';
   static const String _keyReaderChapterUrlOpenInBrowser =
       'reader_chapter_url_open_in_browser';
+  static const String _keyBookCanUpdateMap = 'book_can_update_map';
+  static const String _keyBookSplitLongChapterMap =
+      'book_split_long_chapter_map';
+  static const String _keyBookRemoteUploadUrlMap = 'book_remote_upload_url_map';
   static const int _readingSettingsSchemaVersion = 3;
 
   late SharedPreferences _prefs;
   late ReadingSettings _readingSettings;
   late AppSettings _appSettings;
+  bool _isInitialized = false;
+  Map<String, bool> _bookCanUpdateMap = <String, bool>{};
+  Map<String, bool> _bookSplitLongChapterMap = <String, bool>{};
+  Map<String, String> _bookRemoteUploadUrlMap = <String, String>{};
   final ValueNotifier<ReadingSettings> _readingSettingsNotifier =
       ValueNotifier(const ReadingSettings());
   final ValueNotifier<AppSettings> _appSettingsNotifier =
@@ -37,6 +45,7 @@ class SettingsService {
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    _isInitialized = true;
 
     var needsReadingSettingsRewrite = false;
     final jsonStr = _prefs.getString(_keyReadingSettings);
@@ -78,6 +87,139 @@ class SettingsService {
       _appSettings = const AppSettings();
     }
     _appSettingsNotifier.value = _appSettings;
+
+    _bookCanUpdateMap = _decodeBoolMap(_prefs.getString(_keyBookCanUpdateMap));
+    _bookSplitLongChapterMap =
+        _decodeBoolMap(_prefs.getString(_keyBookSplitLongChapterMap));
+    _bookRemoteUploadUrlMap =
+        _decodeStringMap(_prefs.getString(_keyBookRemoteUploadUrlMap));
+  }
+
+  Map<String, bool> _decodeBoolMap(String? rawJson) {
+    if (rawJson == null || rawJson.trim().isEmpty) {
+      return <String, bool>{};
+    }
+    try {
+      final decoded = json.decode(rawJson);
+      if (decoded is! Map) return <String, bool>{};
+      final out = <String, bool>{};
+      decoded.forEach((rawKey, rawValue) {
+        final key = '$rawKey'.trim();
+        if (key.isEmpty) return;
+        if (rawValue is bool) {
+          out[key] = rawValue;
+          return;
+        }
+        if (rawValue is num) {
+          out[key] = rawValue != 0;
+          return;
+        }
+        if (rawValue is String) {
+          final normalized = rawValue.trim().toLowerCase();
+          if (normalized == 'true' || normalized == '1') {
+            out[key] = true;
+            return;
+          }
+          if (normalized == 'false' || normalized == '0') {
+            out[key] = false;
+          }
+        }
+      });
+      return out;
+    } catch (_) {
+      return <String, bool>{};
+    }
+  }
+
+  Future<void> _persistBoolMap(String key, Map<String, bool> value) async {
+    if (!_isInitialized) return;
+    await _prefs.setString(key, json.encode(value));
+  }
+
+  Map<String, String> _decodeStringMap(String? rawJson) {
+    if (rawJson == null || rawJson.trim().isEmpty) {
+      return <String, String>{};
+    }
+    try {
+      final decoded = json.decode(rawJson);
+      if (decoded is! Map) return <String, String>{};
+      final out = <String, String>{};
+      decoded.forEach((rawKey, rawValue) {
+        final key = '$rawKey'.trim();
+        final value = '$rawValue'.trim();
+        if (key.isEmpty || value.isEmpty) return;
+        out[key] = value;
+      });
+      return out;
+    } catch (_) {
+      return <String, String>{};
+    }
+  }
+
+  Future<void> _persistStringMap(String key, Map<String, String> value) async {
+    if (!_isInitialized) return;
+    await _prefs.setString(key, json.encode(value));
+  }
+
+  bool getBookCanUpdate(String bookId, {bool fallback = true}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    return _bookCanUpdateMap[key] ?? fallback;
+  }
+
+  Future<void> saveBookCanUpdate(String bookId, bool canUpdate) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    _bookCanUpdateMap = Map<String, bool>.from(_bookCanUpdateMap)
+      ..[key] = canUpdate;
+    await _persistBoolMap(_keyBookCanUpdateMap, _bookCanUpdateMap);
+  }
+
+  bool getBookSplitLongChapter(String bookId, {bool fallback = true}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    return _bookSplitLongChapterMap[key] ?? fallback;
+  }
+
+  Future<void> saveBookSplitLongChapter(
+    String bookId,
+    bool splitLongChapter,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    _bookSplitLongChapterMap = Map<String, bool>.from(_bookSplitLongChapterMap)
+      ..[key] = splitLongChapter;
+    await _persistBoolMap(
+      _keyBookSplitLongChapterMap,
+      _bookSplitLongChapterMap,
+    );
+  }
+
+  String? getBookRemoteUploadUrl(String bookId) {
+    if (!_isInitialized) return null;
+    final key = bookId.trim();
+    if (key.isEmpty) return null;
+    final value = _bookRemoteUploadUrlMap[key]?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> saveBookRemoteUploadUrl(
+    String bookId,
+    String remoteUrl,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    final value = remoteUrl.trim();
+    if (key.isEmpty || value.isEmpty) return;
+    _bookRemoteUploadUrlMap = Map<String, String>.from(_bookRemoteUploadUrlMap)
+      ..[key] = value;
+    await _persistStringMap(
+        _keyBookRemoteUploadUrlMap, _bookRemoteUploadUrlMap);
   }
 
   Future<void> _migrateReadingSettingsSchema({

@@ -19,8 +19,7 @@ import 'core/services/exception_log_service.dart';
 import 'core/services/settings_service.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
 import 'features/discovery/views/discovery_view.dart';
-import 'features/search/views/search_view.dart';
-import 'features/source/views/source_list_view.dart';
+import 'features/rss/views/rss_subscription_view.dart';
 import 'features/settings/views/settings_view.dart';
 
 void main() {
@@ -308,7 +307,12 @@ class _SoupReaderAppState extends State<SoupReaderApp>
             Locale('en', 'US'),
           ],
           home: _bootFailure == null
-              ? MainScreen(brightness: brightness)
+              ? MainScreen(
+                  brightness: brightness,
+                  appSettings: _settingsReady
+                      ? _settingsService.appSettings
+                      : const AppSettings(),
+                )
               : _BootFailureView(
                   failure: _bootFailure!,
                   retrying: _bootRetrying,
@@ -324,8 +328,13 @@ class _SoupReaderAppState extends State<SoupReaderApp>
 /// 主屏幕（带底部导航）
 class MainScreen extends StatefulWidget {
   final Brightness brightness;
+  final AppSettings appSettings;
 
-  const MainScreen({super.key, required this.brightness});
+  const MainScreen({
+    super.key,
+    required this.brightness,
+    required this.appSettings,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -334,11 +343,18 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   late final CupertinoTabController _tabController;
   final ValueNotifier<int> _discoveryCompressSignal = ValueNotifier<int>(0);
+  late List<_MainTabSpec> _tabs;
 
   @override
   void initState() {
     super.initState();
-    _tabController = CupertinoTabController();
+    _tabs = _buildTabs(widget.appSettings);
+    _tabController = CupertinoTabController(
+      initialIndex: _resolveInitialTabIndex(
+        _tabs,
+        widget.appSettings.defaultHomePage,
+      ),
+    );
   }
 
   @override
@@ -348,10 +364,98 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant MainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTabs = _buildTabs(widget.appSettings);
+    if (_sameTabIds(_tabs, nextTabs)) return;
+
+    final currentIndex = _tabController.index.clamp(0, _tabs.length - 1);
+    final currentTabId = _tabs[currentIndex].id;
+    final carryIndex = _indexOfTab(nextTabs, currentTabId);
+    final nextIndex = carryIndex >= 0
+        ? carryIndex
+        : _resolveInitialTabIndex(nextTabs, widget.appSettings.defaultHomePage);
+    _tabs = nextTabs;
+    if (_tabController.index != nextIndex) {
+      _tabController.index = nextIndex;
+    }
+  }
+
   void _onTabTap(int index) {
-    if (index == _tabController.index && index == 1) {
+    if (index < 0 || index >= _tabs.length) return;
+    final tab = _tabs[index];
+    if (index == _tabController.index && tab.id == _MainTabId.discovery) {
       _discoveryCompressSignal.value++;
     }
+  }
+
+  List<_MainTabSpec> _buildTabs(AppSettings settings) {
+    return [
+      const _MainTabSpec(
+        id: _MainTabId.bookshelf,
+        item: BottomNavigationBarItem(
+          icon: Icon(CupertinoIcons.book),
+          activeIcon: Icon(CupertinoIcons.book_fill),
+          label: '书架',
+        ),
+      ),
+      if (settings.showDiscovery)
+        const _MainTabSpec(
+          id: _MainTabId.discovery,
+          item: BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.compass),
+            activeIcon: Icon(CupertinoIcons.compass_fill),
+            label: '发现',
+          ),
+        ),
+      if (settings.showRss)
+        const _MainTabSpec(
+          id: _MainTabId.rss,
+          item: BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.dot_radiowaves_left_right),
+            activeIcon: Icon(CupertinoIcons.dot_radiowaves_right),
+            label: 'RSS',
+          ),
+        ),
+      const _MainTabSpec(
+        id: _MainTabId.my,
+        item: BottomNavigationBarItem(
+          icon: Icon(CupertinoIcons.person),
+          activeIcon: Icon(CupertinoIcons.person_fill),
+          label: '我的',
+        ),
+      ),
+    ];
+  }
+
+  int _resolveInitialTabIndex(
+    List<_MainTabSpec> tabs,
+    MainDefaultHomePage homePage,
+  ) {
+    final target = switch (homePage) {
+      MainDefaultHomePage.bookshelf => _MainTabId.bookshelf,
+      MainDefaultHomePage.explore => _MainTabId.discovery,
+      MainDefaultHomePage.rss => _MainTabId.rss,
+      MainDefaultHomePage.my => _MainTabId.my,
+    };
+    final direct = _indexOfTab(tabs, target);
+    return direct >= 0 ? direct : 0;
+  }
+
+  int _indexOfTab(List<_MainTabSpec> tabs, _MainTabId id) {
+    for (var i = 0; i < tabs.length; i++) {
+      if (tabs[i].id == id) return i;
+    }
+    return -1;
+  }
+
+  bool _sameTabIds(List<_MainTabSpec> a, List<_MainTabSpec> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
   }
 
   @override
@@ -364,58 +468,47 @@ class _MainScreenState extends State<MainScreen> {
         inactiveColor: AppCupertinoTheme.tabBarInactive(widget.brightness),
         border: AppCupertinoTheme.tabBarBorder(widget.brightness),
         onTap: _onTabTap,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.book),
-            activeIcon: Icon(CupertinoIcons.book_fill),
-            label: '书架',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.compass),
-            activeIcon: Icon(CupertinoIcons.compass_fill),
-            label: '发现',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.search),
-            label: '搜索',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.cloud),
-            activeIcon: Icon(CupertinoIcons.cloud_fill),
-            label: '书源',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.gear),
-            activeIcon: Icon(CupertinoIcons.gear_solid),
-            label: '设置',
-          ),
-        ],
+        items: _tabs.map((tab) => tab.item).toList(growable: false),
       ),
       tabBuilder: (context, index) {
+        final tabId = _tabs[index].id;
         return CupertinoTabView(
           defaultTitle: 'SoupReader',
           builder: (context) {
-            switch (index) {
-              case 0:
+            switch (tabId) {
+              case _MainTabId.bookshelf:
                 return const BookshelfView();
-              case 1:
+              case _MainTabId.discovery:
                 return DiscoveryView(
                   compressSignal: _discoveryCompressSignal,
                 );
-              case 2:
-                return const SearchView();
-              case 3:
-                return const SourceListView();
-              case 4:
+              case _MainTabId.rss:
+                return const RssSubscriptionView();
+              case _MainTabId.my:
                 return const SettingsView();
-              default:
-                return const BookshelfView();
             }
           },
         );
       },
     );
   }
+}
+
+enum _MainTabId {
+  bookshelf,
+  discovery,
+  rss,
+  my,
+}
+
+class _MainTabSpec {
+  const _MainTabSpec({
+    required this.id,
+    required this.item,
+  });
+
+  final _MainTabId id;
+  final BottomNavigationBarItem item;
 }
 
 class _BootFailureView extends StatelessWidget {

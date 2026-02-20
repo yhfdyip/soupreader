@@ -33,6 +33,7 @@ class ReadingSettings {
   final double titleBottomSpacing; // 标题底部间距
   final bool textFullJustify; // 两端对齐
   final bool underline; // 下划线
+  final bool shareLayout; // 样式面板共享排版布局（对标 legado）
 
   // 精细化边距
   final double paddingTop;
@@ -136,6 +137,7 @@ class ReadingSettings {
     this.titleBottomSpacing = 0,
     this.textFullJustify = true,
     this.underline = false,
+    this.shareLayout = true,
     this.paddingTop = 5.0,
     this.paddingBottom = 4.0,
     this.paddingLeft = 22.0,
@@ -415,6 +417,7 @@ class ReadingSettings {
       titleBottomSpacing: _toDouble(json['titleBottomSpacing'], 0),
       textFullJustify: _toBool(json['textFullJustify'], true),
       underline: _toBool(json['underline'], false),
+      shareLayout: _toBool(json['shareLayout'], true),
       paddingTop: _toDouble(json['paddingTop'], 5.0),
       paddingBottom: _toDouble(json['paddingBottom'], 4.0),
       paddingLeft: _toDouble(json['paddingLeft'], 22.0),
@@ -490,6 +493,7 @@ class ReadingSettings {
       'titleBottomSpacing': titleBottomSpacing,
       'textFullJustify': textFullJustify,
       'underline': underline,
+      'shareLayout': shareLayout,
       'paddingTop': paddingTop,
       'paddingBottom': paddingBottom,
       'paddingLeft': paddingLeft,
@@ -618,6 +622,7 @@ class ReadingSettings {
       ),
       textFullJustify: textFullJustify,
       underline: underline,
+      shareLayout: shareLayout,
       paddingTop: _safeDouble(
         paddingTop,
         min: 0.0,
@@ -732,6 +737,7 @@ class ReadingSettings {
     double? titleBottomSpacing,
     bool? textFullJustify,
     bool? underline,
+    bool? shareLayout,
     double? paddingTop,
     double? paddingBottom,
     double? paddingLeft,
@@ -815,6 +821,7 @@ class ReadingSettings {
       titleBottomSpacing: titleBottomSpacing ?? this.titleBottomSpacing,
       textFullJustify: textFullJustify ?? this.textFullJustify,
       underline: underline ?? this.underline,
+      shareLayout: shareLayout ?? this.shareLayout,
       paddingTop: paddingTop ?? this.paddingTop,
       paddingBottom: paddingBottom ?? this.paddingBottom,
       paddingLeft: paddingLeft ?? this.paddingLeft,

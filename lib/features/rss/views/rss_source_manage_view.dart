@@ -10,7 +10,12 @@ import 'rss_subscription_view.dart';
 import 'rss_source_edit_view.dart';
 
 class RssSourceManageView extends StatefulWidget {
-  const RssSourceManageView({super.key});
+  const RssSourceManageView({
+    super.key,
+    this.repository,
+  });
+
+  final RssSourceRepository? repository;
 
   @override
   State<RssSourceManageView> createState() => _RssSourceManageViewState();
@@ -23,7 +28,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   @override
   void initState() {
     super.initState();
-    _repo = RssSourceRepository(DatabaseService());
+    _repo = widget.repository ?? RssSourceRepository(DatabaseService());
   }
 
   @override

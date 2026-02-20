@@ -71,6 +71,31 @@ class RssReadPlaceholderView extends StatelessWidget {
   }
 }
 
+class RssFavoritesPlaceholderView extends StatelessWidget {
+  const RssFavoritesPlaceholderView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCupertinoPageScaffold(
+      title: '收藏',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+        children: const [
+          _PlaceholderCard(
+            title: 'RSS 收藏（核心入口已迁移）',
+            message: '已按 legado 迁移 RSS 顶栏“收藏”入口；收藏分组、列表与删除逻辑将在后续阶段补齐。',
+          ),
+          SizedBox(height: 12),
+          _InfoCard(
+            label: '当前状态',
+            value: 'blocked：缺少 RssFavoritesActivity 对应的数据层与页面能力',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PlaceholderCard extends StatelessWidget {
   const _PlaceholderCard({
     required this.title,

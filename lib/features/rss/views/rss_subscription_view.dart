@@ -11,6 +11,7 @@ import '../services/rss_source_manage_helper.dart';
 import '../services/rss_subscription_helper.dart';
 import 'rss_articles_placeholder_view.dart';
 import 'rss_source_edit_view.dart';
+import 'rss_source_manage_view.dart';
 
 class RssSubscriptionView extends StatefulWidget {
   const RssSubscriptionView({
@@ -46,11 +47,28 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '订阅',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(28, 28),
-        onPressed: _openGroupFilterSheet,
-        child: const Icon(CupertinoIcons.folder),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(28, 28),
+            onPressed: _openFavorites,
+            child: const Icon(CupertinoIcons.star),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(28, 28),
+            onPressed: _openGroupFilterSheet,
+            child: const Icon(CupertinoIcons.folder),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(28, 28),
+            onPressed: _openSourceSettings,
+            child: const Icon(CupertinoIcons.settings),
+          ),
+        ],
       ),
       child: StreamBuilder<List<RssSource>>(
         stream: _repo.watchAllSources(),
@@ -240,6 +258,24 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
           onPressed: () => Navigator.of(ctx).pop(),
           child: const Text('取消'),
         ),
+      ),
+    );
+  }
+
+  Future<void> _openFavorites() async {
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) => const RssFavoritesPlaceholderView(),
+      ),
+    );
+  }
+
+  Future<void> _openSourceSettings() async {
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) => RssSourceManageView(repository: _repo),
       ),
     );
   }
