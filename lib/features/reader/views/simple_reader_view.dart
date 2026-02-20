@@ -222,6 +222,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _TipOption(ReadingSettings.screenOrientationSensor, '自动旋转'),
     _TipOption(ReadingSettings.screenOrientationReversePortrait, '反向竖屏'),
   ];
+  static const List<_TipOption> _keepLightOptions = [
+    _TipOption(ReadingSettings.keepLightFollowSystem, '默认'),
+    _TipOption(ReadingSettings.keepLightOneMinute, '1分钟'),
+    _TipOption(ReadingSettings.keepLightFiveMinutes, '5分钟'),
+    _TipOption(ReadingSettings.keepLightTenMinutes, '10分钟'),
+    _TipOption(ReadingSettings.keepLightAlways, '常亮'),
+  ];
+  static const List<_TipOption> _progressBarBehaviorOptions = [
+    _TipOption(0, '页内进度'),
+    _TipOption(1, '章节进度'),
+  ];
   static const List<_TipOption> _tipColorOptions = [
     _TipOption(ReadingSettings.tipColorFollowContent, '同正文颜色'),
     _TipOption(_customColorPickerValue, '自定义'),
@@ -270,6 +281,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _programmaticScrollInFlight = false;
   double _scrollAnchorWithinViewport = 32.0;
   String? _readStyleBackgroundDirectoryPath;
+  Timer? _keepLightTimer;
 
   @override
   void initState() {
@@ -320,7 +332,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _settings,
         force: true,
       );
-      unawaited(_syncNativeKeepScreenOn(_settings));
+      _screenOffTimerStart(force: true);
       unawaited(_applyPreferredOrientations(_settings, force: true));
       _syncSystemUiForOverlay(force: true);
     });
@@ -401,6 +413,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _scrollController.dispose();
     _keyboardFocusNode.dispose();
     _autoPager.dispose();
+    _keepLightTimer?.cancel();
+    _keepLightTimer = null;
     // 离开阅读器时恢复系统亮度（iOS 还原原始亮度；Android 还原窗口亮度为跟随系统）
     unawaited(_brightnessService.resetToSystem());
     unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
@@ -525,8 +539,55 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  int _effectiveKeepLightSeconds(ReadingSettings settings) {
+    final keepLight = settings.keepLightSeconds;
+    if (keepLight == ReadingSettings.keepLightFollowSystem ||
+        keepLight == ReadingSettings.keepLightOneMinute ||
+        keepLight == ReadingSettings.keepLightFiveMinutes ||
+        keepLight == ReadingSettings.keepLightTenMinutes ||
+        keepLight == ReadingSettings.keepLightAlways) {
+      return keepLight;
+    }
+    return settings.keepScreenOn
+        ? ReadingSettings.keepLightAlways
+        : ReadingSettings.keepLightFollowSystem;
+  }
+
   Future<void> _syncNativeKeepScreenOn(ReadingSettings settings) async {
-    await _keepScreenOnService.setEnabled(settings.keepScreenOn);
+    _keepLightTimer?.cancel();
+    _keepLightTimer = null;
+
+    if (!_keepScreenOnService.supportsNative) {
+      return;
+    }
+
+    if (_autoPager.isRunning) {
+      await _keepScreenOnService.setEnabled(true);
+      return;
+    }
+
+    final keepLightSeconds = _effectiveKeepLightSeconds(settings);
+    if (keepLightSeconds == ReadingSettings.keepLightAlways) {
+      await _keepScreenOnService.setEnabled(true);
+      return;
+    }
+
+    if (keepLightSeconds <= ReadingSettings.keepLightFollowSystem) {
+      await _keepScreenOnService.setEnabled(false);
+      return;
+    }
+
+    await _keepScreenOnService.setEnabled(true);
+    _keepLightTimer = Timer(Duration(seconds: keepLightSeconds), () {
+      _keepLightTimer = null;
+      unawaited(_keepScreenOnService.setEnabled(false));
+    });
+  }
+
+  void _screenOffTimerStart({bool force = false}) {
+    if (!_keepScreenOnService.supportsNative) return;
+    if (!mounted && !force) return;
+    unawaited(_syncNativeKeepScreenOn(_settings));
   }
 
   void _handleReadingSettingsChanged() {
@@ -583,9 +644,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (mediaQuery == null) return 320.0;
     final screenSize = mediaQuery.size;
     final safePadding = mediaQuery.padding;
+    final horizontalSafeInset = _settings.paddingDisplayCutouts
+        ? safePadding.left + safePadding.right
+        : 0.0;
     return (screenSize.width -
-            safePadding.left -
-            safePadding.right -
+            horizontalSafeInset -
             _settings.paddingLeft -
             _settings.paddingRight)
         .clamp(1.0, double.infinity)
@@ -1274,6 +1337,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _handlePageFactoryContentChanged() {
     if (!mounted || _chapters.isEmpty) return;
+    _screenOffTimerStart();
 
     final factoryChapterIndex = _pageFactory.currentChapterIndex;
     if (factoryChapterIndex < 0 || factoryChapterIndex >= _chapters.length) {
@@ -1456,10 +1520,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 仅执行分页计算逻辑，不触发 setState (用于在 setState 内部调用)
   void _paginateContentLogicOnly() {
-    // 获取屏幕可用尺寸
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final safeArea = MediaQuery.of(context).padding;
+    final mediaQuery = MediaQuery.of(context);
+    final screenHeight = mediaQuery.size.height;
+    final screenWidth = mediaQuery.size.width;
+    final safeArea = mediaQuery.padding;
+    final viewPadding = mediaQuery.viewPadding;
+    final topSafeInset = _settings.showStatusBar
+        ? safeArea.top
+        : (_settings.paddingDisplayCutouts ? viewPadding.top : 0.0);
+    final bottomSafeInset = _settings.hideNavigationBar
+        ? (_settings.paddingDisplayCutouts ? viewPadding.bottom : 0.0)
+        : safeArea.bottom;
+    final horizontalSafeInset =
+        _settings.paddingDisplayCutouts ? safeArea.left + safeArea.right : 0.0;
 
     // 对标 flutter_reader 的布局计算
     final showHeader =
@@ -1469,14 +1542,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final bottomOffset = showFooter ? PagedReaderWidget.bottomOffset : 0.0;
 
     final contentHeight = screenHeight -
-        safeArea.top -
+        topSafeInset -
         topOffset -
-        safeArea.bottom -
+        bottomSafeInset -
         bottomOffset -
         _settings.paddingTop -
         _settings.paddingBottom;
-    final contentWidth =
-        screenWidth - _settings.paddingLeft - _settings.paddingRight;
+    final contentWidth = screenWidth -
+        horizontalSafeInset -
+        _settings.paddingLeft -
+        _settings.paddingRight;
 
     // 防止宽度过小导致死循环或异常
     if (contentWidth < 50 || contentHeight < 100) return;
@@ -1618,7 +1693,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           : AutoPagerMode.page);
     }
     _syncNativeBrightnessForSettings(oldSettings, newSettings);
-    if (oldSettings.keepScreenOn != newSettings.keepScreenOn) {
+    if (oldSettings.keepLightSeconds != newSettings.keepLightSeconds ||
+        oldSettings.keepScreenOn != newSettings.keepScreenOn) {
       unawaited(_syncNativeKeepScreenOn(newSettings));
     }
     if (oldSettings.screenOrientation != newSettings.screenOrientation) {
@@ -1816,6 +1892,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 左右点击翻页处理
   void _handleTap(TapUpDetails details) {
+    _screenOffTimerStart();
     if (_showSearchMenu) {
       _setSearchMenuVisible(false);
       return;
@@ -1834,6 +1911,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final isKeyDown = event is KeyDownEvent || isRepeat;
     if (!isKeyDown) return;
     if (isRepeat && !_settings.keyPageOnLongPress) return;
+    _screenOffTimerStart();
 
     final action = ReaderKeyPagingHelper.resolveKeyDownAction(
       key: event.logicalKey,
@@ -1855,6 +1933,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (_showMenu || _showSearchMenu || _showAutoReadPanel) return;
     if (!_settings.mouseWheelPage) return;
     if (event is! PointerScrollEvent) return;
+    _screenOffTimerStart();
     GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
       final scrollEvent = resolved as PointerScrollEvent;
       final dy = scrollEvent.scrollDelta.dy;
@@ -1867,6 +1946,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _handlePageStep({required bool next}) {
+    _screenOffTimerStart();
     if (_settings.pageTurnMode == PageTurnMode.scroll) {
       _scrollPage(up: !next);
       return;
@@ -1891,6 +1971,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _handleClickAction(int action) {
+    _screenOffTimerStart();
     switch (action) {
       case ClickAction.off:
         break;
@@ -2440,6 +2521,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         chapterTitle: _currentTitle,
                         chapterUrl: _resolvedCurrentChapterUrlForTopMenu(),
                         sourceName: _currentSourceName,
+                        currentTheme: _currentTheme,
                         onOpenBookInfo: () =>
                             unawaited(_openBookInfoFromTopMenu()),
                         onOpenChapterLink: () =>
@@ -2456,6 +2538,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         cleanChapterTitleEnabled: _settings.cleanChapterTitle,
                         showSourceAction: !_isCurrentBookLocal(),
                         showChapterLink: !_isCurrentBookLocal(),
+                        showTitleAddition: _settings.showReadTitleAddition,
+                        readBarStyleFollowPage:
+                            _settings.readBarStyleFollowPage,
                       ),
 
                     // 右侧悬浮快捷栏（对标 legado 快捷动作区）
@@ -2488,6 +2573,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         onShowReadAloud: _openReadAloudFromMenu,
                         onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
                         onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
+                        readBarStyleFollowPage:
+                            _settings.readBarStyleFollowPage,
                       ),
 
                     if (_showSearchMenu) _buildSearchMenuOverlay(),
@@ -2688,6 +2775,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       },
       showStatusBar: _settings.showStatusBar,
       settings: _settings,
+      paddingDisplayCutouts: _settings.paddingDisplayCutouts,
       bookTitle: widget.bookTitle,
       // 对标 legado：翻页动画时长固定 300ms
       animDuration: ReadingSettings.legacyPageAnimDuration,
@@ -2700,8 +2788,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 滚动模式内容（跨章节连续滚动，对齐 legado）
   Widget _buildScrollContent() {
+    final applyCutoutPadding = _settings.paddingDisplayCutouts;
+    final safeAreaTop = _settings.showStatusBar || applyCutoutPadding;
     if (_scrollSegments.isEmpty) {
-      return const SafeArea(
+      return SafeArea(
+        top: safeAreaTop,
+        left: applyCutoutPadding,
+        right: applyCutoutPadding,
         bottom: false,
         child: Center(
           child: CupertinoActivityIndicator(),
@@ -2710,11 +2803,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
 
     return SafeArea(
+      top: safeAreaTop,
+      left: applyCutoutPadding,
+      right: applyCutoutPadding,
       bottom: false,
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
           if (notification.metrics.axis != Axis.vertical) {
             return false;
+          }
+
+          if (notification is ScrollStartNotification) {
+            _screenOffTimerStart();
           }
 
           if (notification is ScrollEndNotification && !_isRestoringProgress) {
@@ -2864,11 +2964,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _openBehaviorSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showReadingSettingsSheet(
-      title: '设置',
-      initialTab: 2,
-      allowedTabs: const [2, 3],
-    );
+    _showLegacyMoreConfigDialog();
   }
 
   void _openReadAloudFromMenu() {
@@ -2879,6 +2975,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _toggleAutoPageFromQuickAction() {
     _closeReaderMenuOverlay();
     _autoPager.toggle();
+    _screenOffTimerStart(force: true);
   }
 
   Future<void> _openReplaceRuleFromMenu() async {
@@ -3622,7 +3719,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _showReaderActionUnavailable('TXT 目录规则');
         return;
       case ReaderLegacyReadMenuAction.setCharset:
-        _showReaderActionUnavailable('设置编码');
+        _showReaderActionUnavailable(
+          '设置编码',
+          reason: '书籍级编码覆盖尚未接入正文解析链路',
+        );
         return;
       case ReaderLegacyReadMenuAction.addBookmark:
         await _toggleBookmark();
@@ -4539,14 +4639,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                           _buildReadStyleActionChip(
                             label: '信息',
                             onTap: () {
-                              Navigator.of(popupContext).pop();
-                              Future<void>.microtask(() {
-                                _showReadingSettingsSheet(
-                                  title: '信息',
-                                  initialTab: 1,
-                                  allowedTabs: const [1],
-                                );
-                              });
+                              _showLegacyTipConfigDialog();
                             },
                           ),
                         ],
@@ -5707,6 +5800,595 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  void _showLegacyMoreConfigDialog() {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (popupContext) => StatefulBuilder(
+        builder: (context, setPopupState) {
+          final bottomInset = MediaQuery.of(context).padding.bottom;
+          return Container(
+            height: 360 + bottomInset,
+            decoration: BoxDecoration(
+              color: _uiPanelBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(14),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: _buildLegacyMoreConfigPreferenceList(setPopupState),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showLegacyTipConfigDialog() {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (popupContext) => StatefulBuilder(
+        builder: (context, setPopupState) => Container(
+          height: MediaQuery.of(context).size.height * 0.78,
+          decoration: BoxDecoration(
+            color: _uiPanelBg,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(14),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _isUiDark
+                          ? CupertinoColors.white.withValues(alpha: 0.24)
+                          : AppDesignTokens.textMuted.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '信息',
+                          style: TextStyle(
+                            color: _uiTextStrong,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () => Navigator.pop(context),
+                        child: Icon(
+                          CupertinoIcons.xmark_circle_fill,
+                          color: _uiTextSubtle,
+                          size: 26,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: _buildLegacyTipConfigList(setPopupState),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegacyTipConfigList(StateSetter setPopupState) {
+    return SingleChildScrollView(
+      key: const ValueKey('legacy_tip_config'),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSettingsCard(
+            title: '正文标题',
+            child: Column(
+              children: [
+                _buildOptionRow(
+                  '显示隐藏',
+                  _titleModeLabel(_settings.titleMode),
+                  () {
+                    _showTipOptionPicker(
+                      title: '章节标题位置',
+                      options: _titleModeOptions,
+                      currentValue: _settings.titleMode,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(titleMode: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildSliderSetting(
+                  '标题字号',
+                  _settings.titleSize.toDouble(),
+                  0,
+                  10,
+                  (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(titleSize: value.round()),
+                    );
+                  },
+                  displayFormat: (value) => value.toInt().toString(),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '顶部间距',
+                  _settings.titleTopSpacing,
+                  0,
+                  100,
+                  (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(titleTopSpacing: value),
+                    );
+                  },
+                  displayFormat: (value) => value.toInt().toString(),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '底部间距',
+                  _settings.titleBottomSpacing,
+                  0,
+                  100,
+                  (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(titleBottomSpacing: value),
+                    );
+                  },
+                  displayFormat: (value) => value.toInt().toString(),
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
+            title: '页眉',
+            child: Column(
+              children: [
+                _buildOptionRow(
+                  '显示隐藏',
+                  _headerModeLabel(_settings.headerMode),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉显示',
+                      options: _headerModeOptions,
+                      currentValue: _settings.headerMode,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(headerMode: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '左边',
+                  _headerTipLabel(_settings.headerLeftContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉左侧',
+                      options: _headerTipOptions,
+                      currentValue: _settings.headerLeftContent,
+                      onSelected: (value) {
+                        _applyTipSelectionFromSheet(
+                          setPopupState,
+                          slot: ReaderTipSlot.headerLeft,
+                          value: value,
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '中间',
+                  _headerTipLabel(_settings.headerCenterContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉中间',
+                      options: _headerTipOptions,
+                      currentValue: _settings.headerCenterContent,
+                      onSelected: (value) {
+                        _applyTipSelectionFromSheet(
+                          setPopupState,
+                          slot: ReaderTipSlot.headerCenter,
+                          value: value,
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '右边',
+                  _headerTipLabel(_settings.headerRightContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉右侧',
+                      options: _headerTipOptions,
+                      currentValue: _settings.headerRightContent,
+                      onSelected: (value) {
+                        _applyTipSelectionFromSheet(
+                          setPopupState,
+                          slot: ReaderTipSlot.headerRight,
+                          value: value,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
+            title: '页脚',
+            child: Column(
+              children: [
+                _buildOptionRow(
+                  '显示隐藏',
+                  _footerModeLabel(_settings.footerMode),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚显示',
+                      options: _footerModeOptions,
+                      currentValue: _settings.footerMode,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(footerMode: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '左边',
+                  _footerTipLabel(_settings.footerLeftContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚左侧',
+                      options: _footerTipOptions,
+                      currentValue: _settings.footerLeftContent,
+                      onSelected: (value) {
+                        _applyTipSelectionFromSheet(
+                          setPopupState,
+                          slot: ReaderTipSlot.footerLeft,
+                          value: value,
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '中间',
+                  _footerTipLabel(_settings.footerCenterContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚中间',
+                      options: _footerTipOptions,
+                      currentValue: _settings.footerCenterContent,
+                      onSelected: (value) {
+                        _applyTipSelectionFromSheet(
+                          setPopupState,
+                          slot: ReaderTipSlot.footerCenter,
+                          value: value,
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '右边',
+                  _footerTipLabel(_settings.footerRightContent),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚右侧',
+                      options: _footerTipOptions,
+                      currentValue: _settings.footerRightContent,
+                      onSelected: (value) {
+                        _applyTipSelectionFromSheet(
+                          setPopupState,
+                          slot: ReaderTipSlot.footerRight,
+                          value: value,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
+            title: '页眉页脚',
+            child: Column(
+              children: [
+                _buildOptionRow(
+                  '文字颜色',
+                  _tipColorLabel(_settings.tipColor),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉页脚文字颜色',
+                      options: _tipColorOptions,
+                      currentValue: _settings.tipColor ==
+                              ReadingSettings.tipColorFollowContent
+                          ? ReadingSettings.tipColorFollowContent
+                          : _customColorPickerValue,
+                      onSelected: (value) {
+                        if (value == _customColorPickerValue) {
+                          unawaited(
+                            _showTipColorInputDialog(
+                              setPopupState,
+                              forDivider: false,
+                            ),
+                          );
+                          return;
+                        }
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(tipColor: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildOptionRow(
+                  '分割线颜色',
+                  _tipDividerColorLabel(_settings.tipDividerColor),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉页脚分割线颜色',
+                      options: _tipDividerColorOptions,
+                      currentValue: _settings.tipDividerColor ==
+                                  ReadingSettings.tipDividerColorDefault ||
+                              _settings.tipDividerColor ==
+                                  ReadingSettings.tipDividerColorFollowContent
+                          ? _settings.tipDividerColor
+                          : _customColorPickerValue,
+                      onSelected: (value) {
+                        if (value == _customColorPickerValue) {
+                          unawaited(
+                            _showTipColorInputDialog(
+                              setPopupState,
+                              forDivider: true,
+                            ),
+                          );
+                          return;
+                        }
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(tipDividerColor: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegacyMoreConfigPreferenceList(StateSetter setPopupState) {
+    final progressBehaviorValue =
+        _settings.progressBarBehavior == ProgressBarBehavior.chapter ? 1 : 0;
+    final keepLightValue = _effectiveKeepLightSeconds(_settings);
+    return SingleChildScrollView(
+      key: const ValueKey('legacy_more_config'),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _uiCardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _uiBorder),
+        ),
+        child: Column(
+          children: [
+            _buildOptionRow(
+              '屏幕方向',
+              ReaderScreenOrientation.label(_settings.screenOrientation),
+              () => _showTipOptionPicker(
+                title: '屏幕方向',
+                options: _screenOrientationOptions,
+                currentValue: _settings.screenOrientation,
+                onSelected: (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(screenOrientation: value),
+                  );
+                },
+              ),
+            ),
+            _buildOptionRow(
+              '亮屏时长',
+              _keepLightLabel(_settings.keepLightSeconds),
+              () => _showTipOptionPicker(
+                title: '亮屏时长',
+                options: _keepLightOptions,
+                currentValue: keepLightValue,
+                onSelected: (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(keepLightSeconds: value),
+                  );
+                },
+              ),
+            ),
+            _buildSwitchRow('隐藏状态栏', !_settings.showStatusBar, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(showStatusBar: !value),
+              );
+            }),
+            _buildSwitchRow('隐藏导航栏', _settings.hideNavigationBar, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(hideNavigationBar: value),
+              );
+            }),
+            _buildSwitchRow('刘海屏留边', _settings.paddingDisplayCutouts, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(paddingDisplayCutouts: value),
+              );
+            }),
+            _buildOptionRow(
+              '进度条行为',
+              _settings.progressBarBehavior.label,
+              () => _showTipOptionPicker(
+                title: '进度条行为',
+                options: _progressBarBehaviorOptions,
+                currentValue: progressBehaviorValue,
+                onSelected: (value) {
+                  final behavior = value == 1
+                      ? ProgressBarBehavior.chapter
+                      : ProgressBarBehavior.page;
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(progressBarBehavior: behavior),
+                  );
+                },
+              ),
+            ),
+            _buildSwitchRow('章节跳转确认', _settings.confirmSkipChapter, (value) {
+              if (!value) {
+                _chapterSeekConfirmed = false;
+              }
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(confirmSkipChapter: value),
+              );
+            }),
+            _buildSwitchRow('两端对齐', _settings.textFullJustify, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(textFullJustify: value),
+              );
+            }),
+            _buildSwitchRow('底部对齐', _settings.textBottomJustify, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(textBottomJustify: value),
+              );
+            }),
+            _buildSwitchRow('鼠标滚轮翻页', _settings.mouseWheelPage, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(mouseWheelPage: value),
+              );
+            }),
+            _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(volumeKeyPage: value),
+              );
+            }),
+            _buildSwitchRow(
+              '朗读时音量键翻页',
+              _settings.volumeKeyPageOnPlay,
+              (value) {
+                _updateSettingsFromSheet(
+                  setPopupState,
+                  _settings.copyWith(volumeKeyPageOnPlay: value),
+                );
+              },
+            ),
+            _buildSwitchRow('长按按键翻页', _settings.keyPageOnLongPress, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(keyPageOnLongPress: value),
+              );
+            }),
+            _buildOptionRow(
+              '翻页触发阈值',
+              _touchSlopLabel(_settings.pageTouchSlop),
+              () => _showPageTouchSlopPicker(setPopupState),
+            ),
+            _buildSwitchRow('显示亮度条', _settings.showBrightnessView, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(showBrightnessView: value),
+              );
+            }),
+            _buildSwitchRow(
+              '显示阅读标题附加信息',
+              _settings.showReadTitleAddition,
+              (value) {
+                _updateSettingsFromSheet(
+                  setPopupState,
+                  _settings.copyWith(showReadTitleAddition: value),
+                );
+              },
+            ),
+            _buildSwitchRow(
+              '阅读菜单样式随页面',
+              _settings.readBarStyleFollowPage,
+              (value) {
+                _updateSettingsFromSheet(
+                  setPopupState,
+                  _settings.copyWith(readBarStyleFollowPage: value),
+                );
+              },
+            ),
+            _buildSwitchRow('滚动翻页无动画', _settings.noAnimScrollPage, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(noAnimScrollPage: value),
+              );
+            }),
+            _buildOptionRow('点击区域', '配置', () {
+              showClickActionConfigDialog(
+                context,
+                currentConfig: _settings.clickActions,
+                onSave: (newConfig) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(clickActions: newConfig),
+                  );
+                },
+              );
+            }),
+            _buildSwitchRow('禁用返回键', _settings.disableReturnKey, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(disableReturnKey: value),
+              );
+            }),
+            _buildOptionRow('翻页按键', '配置', () {
+              _showReaderActionUnavailable(
+                '翻页按键',
+                reason: '当前平台按键映射能力待补齐',
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSettingsTabs(
     int selectedTab,
     List<int> tabs,
@@ -6808,10 +7490,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             title: '其他设置',
             child: Column(
               children: [
-                _buildSwitchRow('屏幕常亮', _settings.keepScreenOn, (value) {
+                _buildSwitchRow(
+                    '屏幕常亮',
+                    _settings.keepLightSeconds ==
+                        ReadingSettings.keepLightAlways, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
-                    _settings.copyWith(keepScreenOn: value),
+                    _settings.copyWith(
+                      keepLightSeconds: value
+                          ? ReadingSettings.keepLightAlways
+                          : ReadingSettings.keepLightFollowSystem,
+                    ),
                   );
                 }),
                 _buildOptionRow(
@@ -7001,6 +7690,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   String _touchSlopLabel(int value) {
     return value == 0 ? '系统默认' : value.toString();
+  }
+
+  String _keepLightLabel(int keepLightSeconds) {
+    switch (keepLightSeconds) {
+      case ReadingSettings.keepLightOneMinute:
+        return '1分钟';
+      case ReadingSettings.keepLightFiveMinutes:
+        return '5分钟';
+      case ReadingSettings.keepLightTenMinutes:
+        return '10分钟';
+      case ReadingSettings.keepLightAlways:
+        return '常亮';
+      case ReadingSettings.keepLightFollowSystem:
+      default:
+        return '默认';
+    }
   }
 
   String _titleModeLabel(int value) {

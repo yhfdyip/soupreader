@@ -207,10 +207,18 @@ void main() {
 
     expect(service.readingSettings.keepScreenOn, isTrue);
     expect(
+      service.readingSettings.keepLightSeconds,
+      ReadingSettings.keepLightAlways,
+    );
+    expect(
       service.readingSettings.chineseConverterType,
       ChineseConverterType.traditionalToSimplified,
     );
     expect(service.readingSettingsListenable.value.keepScreenOn, isTrue);
+    expect(
+      service.readingSettingsListenable.value.keepLightSeconds,
+      ReadingSettings.keepLightAlways,
+    );
     expect(
       service.readingSettingsListenable.value.chineseConverterType,
       ChineseConverterType.traditionalToSimplified,
@@ -220,6 +228,10 @@ void main() {
 
     await service.init();
     expect(service.readingSettings.keepScreenOn, isTrue);
+    expect(
+      service.readingSettings.keepLightSeconds,
+      ReadingSettings.keepLightAlways,
+    );
     expect(
       service.readingSettings.chineseConverterType,
       ChineseConverterType.traditionalToSimplified,
@@ -248,6 +260,10 @@ void main() {
 
     expect(service.readingSettings.fontSize, 31.0);
     expect(service.readingSettings.keepScreenOn, isTrue);
+    expect(
+      service.readingSettings.keepLightSeconds,
+      ReadingSettings.keepLightAlways,
+    );
     expect(service.readingSettings.pageTurnMode, PageTurnMode.scroll);
     expect(service.readingSettings.pageDirection, PageDirection.vertical);
     expect(service.readingSettings.showHeaderLine, isTrue);

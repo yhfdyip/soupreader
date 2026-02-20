@@ -21,6 +21,7 @@ class PagedReaderWidget extends StatefulWidget {
   final VoidCallback? onTap;
   final bool showStatusBar;
   final ReadingSettings settings;
+  final bool paddingDisplayCutouts;
   final String bookTitle;
   final Map<String, int> clickActions;
   final ValueChanged<int>? onAction;
@@ -43,6 +44,7 @@ class PagedReaderWidget extends StatefulWidget {
     this.onTap,
     this.showStatusBar = true,
     required this.settings,
+    this.paddingDisplayCutouts = false,
     required this.bookTitle,
     this.clickActions = const {},
     this.onAction,
@@ -299,8 +301,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   bool get _showHeader =>
       widget.settings.shouldShowHeader(showStatusBar: widget.showStatusBar);
-  bool get _showFooter =>
-      widget.settings.shouldShowFooter();
+  bool get _showFooter => widget.settings.shouldShowFooter();
   bool get _showAnyTipBar => _showHeader || _showFooter;
 
   Color get _tipTextColor {
@@ -340,16 +341,35 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!mounted || _isInteractionRunning) return false;
     final mediaQuery = MediaQuery.of(context);
     _applyStableSystemPadding(
-      padding: mediaQuery.padding,
+      padding: _resolveSystemPaddingForLayout(mediaQuery),
       orientation: mediaQuery.orientation,
     );
     _debugTrace('flush_pending_padding_refresh');
     return true;
   }
 
+  EdgeInsets _resolveSystemPaddingForLayout(MediaQueryData mediaQuery) {
+    final systemPadding = mediaQuery.padding;
+    final viewPadding = mediaQuery.viewPadding;
+    if (!widget.paddingDisplayCutouts) {
+      return EdgeInsets.only(
+        top: widget.showStatusBar ? systemPadding.top : 0.0,
+        bottom: widget.settings.hideNavigationBar ? 0.0 : systemPadding.bottom,
+      );
+    }
+    return EdgeInsets.only(
+      left: viewPadding.left,
+      top: widget.showStatusBar ? systemPadding.top : viewPadding.top,
+      right: viewPadding.right,
+      bottom: widget.settings.hideNavigationBar
+          ? viewPadding.bottom
+          : systemPadding.bottom,
+    );
+  }
+
   EdgeInsets _resolveStableSystemPadding() {
     final mediaQuery = MediaQuery.of(context);
-    final mediaPadding = mediaQuery.padding;
+    final mediaPadding = _resolveSystemPaddingForLayout(mediaQuery);
     final orientation = mediaQuery.orientation;
     final shouldRefresh = _stableSystemPadding == null ||
         _stablePaddingOrientation != orientation ||

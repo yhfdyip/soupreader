@@ -21,6 +21,7 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final VoidCallback onShowReadAloud;
   final VoidCallback onShowInterfaceSettings;
   final VoidCallback onShowBehaviorSettings;
+  final bool readBarStyleFollowPage;
 
   const ReaderBottomMenuNew({
     super.key,
@@ -38,6 +39,7 @@ class ReaderBottomMenuNew extends StatefulWidget {
     required this.onShowReadAloud,
     required this.onShowInterfaceSettings,
     required this.onShowBehaviorSettings,
+    this.readBarStyleFollowPage = false,
   });
 
   @override
@@ -63,9 +65,20 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   @override
   Widget build(BuildContext context) {
     final scheme = ShadTheme.of(context).colorScheme;
-    final panelBg = _isDarkMode
-        ? scheme.popover.withValues(alpha: 0.98)
-        : scheme.background.withValues(alpha: 0.97);
+    final followPage = widget.readBarStyleFollowPage;
+    final panelBg = followPage
+        ? widget.currentTheme.background.withValues(alpha: 0.96)
+        : (_isDarkMode
+            ? scheme.popover.withValues(alpha: 0.98)
+            : scheme.background.withValues(alpha: 0.97));
+    final panelForeground =
+        followPage ? widget.currentTheme.text : scheme.foreground;
+    final panelMutedForeground = followPage
+        ? widget.currentTheme.text.withValues(alpha: 0.62)
+        : scheme.mutedForeground;
+    final panelBorder = followPage
+        ? widget.currentTheme.text.withValues(alpha: 0.22)
+        : scheme.border.withValues(alpha: _isDarkMode ? 0.72 : 0.58);
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
 
@@ -78,7 +91,12 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               bottom: bottomPadding + _brightnessPanelBottomOffset,
               left: widget.settings.brightnessViewOnRight ? null : 16,
               right: widget.settings.brightnessViewOnRight ? 16 : null,
-              child: _buildBrightnessPanel(scheme, panelBg),
+              child: _buildBrightnessPanel(
+                panelBg,
+                foreground: panelForeground,
+                mutedForeground: panelMutedForeground,
+                borderColor: panelBorder,
+              ),
             ),
           Positioned(
             left: 0,
@@ -90,19 +108,18 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 decoration: BoxDecoration(
                   color: panelBg,
                   border: Border(
-                    top: BorderSide(
-                      color: scheme.border.withValues(
-                        alpha: _isDarkMode ? 0.72 : 0.58,
-                      ),
-                    ),
+                    top: BorderSide(color: panelBorder),
                   ),
                 ),
                 padding: EdgeInsets.only(bottom: bottomPadding > 0 ? 4 : 8),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildChapterSlider(scheme),
-                    _buildBottomTabs(scheme),
+                    _buildChapterSlider(
+                      foreground: panelForeground,
+                      mutedForeground: panelMutedForeground,
+                    ),
+                    _buildBottomTabs(foreground: panelForeground),
                   ],
                 ),
               ),
@@ -113,7 +130,10 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     );
   }
 
-  Widget _buildChapterSlider(ShadColorScheme scheme) {
+  Widget _buildChapterSlider({
+    required Color foreground,
+    required Color mutedForeground,
+  }) {
     final chapterMode =
         widget.settings.progressBarBehavior == ProgressBarBehavior.chapter;
     final maxChapter = (widget.totalChapters - 1).clamp(0, 9999);
@@ -142,7 +162,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           _buildChapterTextButton(
             label: '上一章',
             enabled: canPrev,
-            color: canPrev ? scheme.foreground : scheme.mutedForeground,
+            color: canPrev ? foreground : mutedForeground,
             onTap: canPrev
                 ? () => widget.onChapterChanged(widget.currentChapterIndex - 1)
                 : null,
@@ -184,7 +204,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           _buildChapterTextButton(
             label: '下一章',
             enabled: canNext,
-            color: canNext ? scheme.foreground : scheme.mutedForeground,
+            color: canNext ? foreground : mutedForeground,
             onTap: canNext
                 ? () => widget.onChapterChanged(widget.currentChapterIndex + 1)
                 : null,
@@ -218,14 +238,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   }
 
   Widget _buildBrightnessPanel(
-    ShadColorScheme scheme,
-    Color panelBg,
-  ) {
+    Color panelBg, {
+    required Color foreground,
+    required Color mutedForeground,
+    required Color borderColor,
+  }) {
     final accent = _isDarkMode
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
     final autoBrightness = widget.settings.useSystemBrightness;
-    final iconColor = autoBrightness ? accent : scheme.mutedForeground;
+    final iconColor = autoBrightness ? accent : mutedForeground;
     final panelColor = panelBg.withValues(alpha: _isDarkMode ? 0.48 : 0.66);
 
     return Align(
@@ -237,7 +259,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           color: panelColor,
           borderRadius: BorderRadius.circular(5),
           border: Border.all(
-            color: scheme.border.withValues(alpha: _isDarkMode ? 0.8 : 0.45),
+            color: borderColor,
           ),
         ),
         child: Column(
@@ -318,7 +340,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 child: Icon(
                   CupertinoIcons.arrow_left_right,
                   size: 20,
-                  color: scheme.foreground,
+                  color: foreground,
                 ),
               ),
             ),
@@ -328,35 +350,35 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     );
   }
 
-  Widget _buildBottomTabs(ShadColorScheme scheme) {
+  Widget _buildBottomTabs({required Color foreground}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: Row(
         children: [
           const Spacer(),
           _buildTabItem(
-            scheme: scheme,
+            foreground: foreground,
             icon: CupertinoIcons.list_bullet,
             label: '目录',
             onTap: widget.onShowChapterList,
           ),
           const Spacer(flex: 2),
           _buildTabItem(
-            scheme: scheme,
+            foreground: foreground,
             icon: CupertinoIcons.speaker_2_fill,
             label: '朗读',
             onTap: widget.onShowReadAloud,
           ),
           const Spacer(flex: 2),
           _buildTabItem(
-            scheme: scheme,
+            foreground: foreground,
             icon: CupertinoIcons.circle_grid_3x3,
             label: '界面',
             onTap: widget.onShowInterfaceSettings,
           ),
           const Spacer(flex: 2),
           _buildTabItem(
-            scheme: scheme,
+            foreground: foreground,
             icon: CupertinoIcons.gear,
             label: '设置',
             onTap: widget.onShowBehaviorSettings,
@@ -368,7 +390,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   }
 
   Widget _buildTabItem({
-    required ShadColorScheme scheme,
+    required Color foreground,
     required IconData icon,
     required String label,
     required VoidCallback onTap,
@@ -389,7 +411,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                   child: Icon(
                     icon,
                     size: 20,
-                    color: scheme.foreground,
+                    color: foreground,
                   ),
                 ),
               ),
@@ -400,7 +422,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
-                  color: scheme.foreground,
+                  color: foreground,
                   fontWeight: FontWeight.w500,
                 ),
               ),

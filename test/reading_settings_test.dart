@@ -70,6 +70,30 @@ void main() {
     expect(legacyDecoded.brightnessViewOnRight, isFalse);
   });
 
+  test('ReadingSettings migrates legacy keepScreenOn to keepLightSeconds', () {
+    final defaults = ReadingSettings.fromJson(<String, dynamic>{});
+    expect(defaults.keepLightSeconds, ReadingSettings.keepLightFollowSystem);
+    expect(defaults.keepScreenOn, isFalse);
+
+    final legacyAlways = ReadingSettings.fromJson(<String, dynamic>{
+      'keepScreenOn': true,
+    });
+    expect(legacyAlways.keepLightSeconds, ReadingSettings.keepLightAlways);
+    expect(legacyAlways.keepScreenOn, isTrue);
+
+    final timed = ReadingSettings.fromJson(<String, dynamic>{
+      'keepLightSeconds': ReadingSettings.keepLightFiveMinutes,
+    });
+    expect(timed.keepLightSeconds, ReadingSettings.keepLightFiveMinutes);
+    expect(timed.keepScreenOn, isFalse);
+
+    final copied = legacyAlways.copyWith(
+      keepLightSeconds: ReadingSettings.keepLightOneMinute,
+    );
+    expect(copied.keepLightSeconds, ReadingSettings.keepLightOneMinute);
+    expect(copied.keepScreenOn, isFalse);
+  });
+
   test('ReadingSettings keeps readStyleConfigs and clamps themeIndex', () {
     final decoded = ReadingSettings.fromJson(<String, dynamic>{
       'themeIndex': 9,
@@ -118,13 +142,34 @@ void main() {
   test('ReadingSettings keeps legado core switch defaults for O-04 step1', () {
     final defaults = ReadingSettings.fromJson(<String, dynamic>{});
     expect(defaults.hideNavigationBar, isFalse);
+    expect(defaults.paddingDisplayCutouts, isFalse);
     expect(defaults.mouseWheelPage, isTrue);
     expect(defaults.keyPageOnLongPress, isFalse);
+    expect(defaults.volumeKeyPageOnPlay, isTrue);
     expect(defaults.disableReturnKey, isFalse);
+    expect(defaults.showReadTitleAddition, isTrue);
+    expect(defaults.readBarStyleFollowPage, isFalse);
     expect(
       defaults.screenOrientation,
       ReadingSettings.screenOrientationUnspecified,
     );
+  });
+
+  test('ReadingSettings keeps legacy MoreConfig extra switches after roundtrip',
+      () {
+    final encoded = const ReadingSettings()
+        .copyWith(
+          paddingDisplayCutouts: true,
+          volumeKeyPageOnPlay: false,
+          showReadTitleAddition: false,
+          readBarStyleFollowPage: true,
+        )
+        .toJson();
+    final decoded = ReadingSettings.fromJson(encoded);
+    expect(decoded.paddingDisplayCutouts, isTrue);
+    expect(decoded.volumeKeyPageOnPlay, isFalse);
+    expect(decoded.showReadTitleAddition, isFalse);
+    expect(decoded.readBarStyleFollowPage, isTrue);
   });
 
   test('ReadingSettings sanitizes legacy screenOrientation range', () {

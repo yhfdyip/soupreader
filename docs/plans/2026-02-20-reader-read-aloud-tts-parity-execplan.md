@@ -1,9 +1,9 @@
 # 阅读器“朗读（TTS）”入口与点击动作对齐 legado ExecPlan
 
-- 状态：`active`
+- 状态：`blocked`
 - 日期：`2026-02-20`
 - 负责人：`codex`
-- 范围类型：`迁移级别（阅读器交互核心）`
+- 范围类型：`迁移级别（扩展功能，已冻结）`
 
 ## 背景与目标
 
@@ -78,7 +78,7 @@ legado 对照基准（已完整读取）：
 - 预期结果：
   - 具备 `start/pause/resume/stop/prevParagraph/nextParagraph` 语义；
   - 与当前章节内容、章节切换、页面销毁正确联动。
-- 状态：`in_progress`
+- 状态：`blocked`（等待需求方明确“开始做扩展功能”）
 
 ### Step 3（可并行，依赖 Step 2）
 
@@ -87,13 +87,13 @@ legado 对照基准（已完整读取）：
   - 涉及：
     - `lib/features/reader/widgets/reader_bottom_menu.dart`
     - `lib/features/reader/views/simple_reader_view.dart`
-  - 状态：`pending`
+  - 状态：`blocked`
 - 分支 3B（owner: B）
   - 目标：九宫格朗读动作接入真实控制。
   - 涉及：
     - `lib/features/reader/views/simple_reader_view.dart`
     - `lib/features/reader/models/reading_settings.dart`（仅在动作映射需要时调整）
-  - 状态：`pending`
+  - 状态：`blocked`
 
 ### Step 4（串行，依赖 Step 3）
 
@@ -102,7 +102,7 @@ legado 对照基准（已完整读取）：
   - `test/read_aloud_service_test.dart`（新增）
   - `test/simple_reader_view_compile_test.dart`（必要时补充）
   - 本 ExecPlan 文档回填
-- 状态：`pending`
+- 状态：`blocked`
 
 ## 风险与回滚
 
@@ -142,7 +142,10 @@ legado 对照基准（已完整读取）：
 
 - `2026-02-20`：
   - 已完成：Step 1（ExecPlan 建立 + 差异清单 + 检查清单）。
-  - 进行中：Step 2（朗读服务层与阅读页状态机接入）。
+  - 已阻塞：Step 2~Step 4（按需求方指令，停止 TTS 支线，回到“阅读器界面及设置”主线）。
+  - 说明：
+    - 当前仓库默认执行“核心优先、扩展冻结”，TTS 不在核心五段链路（search/explore/bookInfo/toc/content）内；
+    - 未收到需求方“开始做扩展功能”明确指令前，本计划保持 `blocked`，不再推进实现。
 
 ## Surprises & Discoveries
 
@@ -153,6 +156,7 @@ legado 对照基准（已完整读取）：
 
 1. 本轮先实现系统 TTS 的基础闭环，保持与 legado 核心交互同义。
 2. `ReadAloudDialog` 的高级设置（定时器/引擎管理）拆分为后续任务，避免本轮跨模块过度扩散。
+3. `2026-02-20` 按需求方最新指令暂停 TTS 支线，优先继续阅读器“界面/设置”迁移，TTS 计划状态调整为 `blocked`。
 
 ## Outcomes & Retrospective
 

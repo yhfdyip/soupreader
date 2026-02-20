@@ -8,6 +8,7 @@ class ReaderTopMenu extends StatelessWidget {
   final String chapterTitle;
   final String? chapterUrl;
   final String? sourceName;
+  final ReadingThemeColors currentTheme;
   final VoidCallback onOpenBookInfo;
   final VoidCallback onOpenChapterLink;
   final VoidCallback onToggleChapterLinkOpenMode;
@@ -20,6 +21,8 @@ class ReaderTopMenu extends StatelessWidget {
   final bool cleanChapterTitleEnabled;
   final bool showSourceAction;
   final bool showChapterLink;
+  final bool showTitleAddition;
+  final bool readBarStyleFollowPage;
 
   const ReaderTopMenu({
     super.key,
@@ -27,6 +30,7 @@ class ReaderTopMenu extends StatelessWidget {
     required this.chapterTitle,
     this.chapterUrl,
     this.sourceName,
+    required this.currentTheme,
     required this.onOpenBookInfo,
     required this.onOpenChapterLink,
     required this.onToggleChapterLinkOpenMode,
@@ -39,6 +43,8 @@ class ReaderTopMenu extends StatelessWidget {
     required this.cleanChapterTitleEnabled,
     this.showSourceAction = true,
     this.showChapterLink = true,
+    this.showTitleAddition = true,
+    this.readBarStyleFollowPage = false,
   });
 
   @override
@@ -51,8 +57,22 @@ class ReaderTopMenu extends StatelessWidget {
     final source = sourceName?.trim() ?? '';
     final chapterLabel = chapterTitle.trim().isEmpty ? '暂无章节' : chapterTitle;
     final chapterUrlLabel = chapterUrl?.trim() ?? '';
-    final hasChapterUrl = showChapterLink && chapterUrlLabel.isNotEmpty;
+    final hasChapterUrl =
+        showTitleAddition && showChapterLink && chapterUrlLabel.isNotEmpty;
     final sourceActionLabel = source.isEmpty ? '书源' : source;
+    final menuBgBase = readBarStyleFollowPage
+        ? currentTheme.background
+        : const Color(0xFF000000);
+    final menuPrimaryText =
+        readBarStyleFollowPage ? currentTheme.text : CupertinoColors.white;
+    final menuSecondaryText = menuPrimaryText.withValues(alpha: 0.78);
+    final menuTertiaryText = menuPrimaryText.withValues(alpha: 0.62);
+    final controlBg = menuBgBase.withValues(
+      alpha: readBarStyleFollowPage ? 0.40 : 0.28,
+    );
+    final controlBorder = menuPrimaryText.withValues(
+      alpha: readBarStyleFollowPage ? 0.24 : 0.30,
+    );
 
     return Positioned(
       top: 0,
@@ -70,9 +90,11 @@ class ReaderTopMenu extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(0xFF000000).withValues(alpha: 0.82),
-              const Color(0xFF000000).withValues(alpha: 0.58),
-              const Color(0x00000000),
+              menuBgBase.withValues(
+                  alpha: readBarStyleFollowPage ? 0.94 : 0.82),
+              menuBgBase.withValues(
+                  alpha: readBarStyleFollowPage ? 0.74 : 0.58),
+              menuBgBase.withValues(alpha: 0.0),
             ],
           ),
         ),
@@ -81,6 +103,9 @@ class ReaderTopMenu extends StatelessWidget {
             _buildRoundIcon(
               icon: CupertinoIcons.back,
               onTap: () => Navigator.pop(context),
+              iconColor: menuPrimaryText,
+              backgroundColor: controlBg,
+              borderColor: controlBorder,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -95,28 +120,30 @@ class ReaderTopMenu extends StatelessWidget {
                       bookTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: CupertinoColors.white,
+                      style: TextStyle(
+                        color: menuPrimaryText,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onOpenChapterLink,
-                    onLongPress: onToggleChapterLinkOpenMode,
-                    child: Text(
-                      chapterLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: CupertinoColors.white.withValues(alpha: 0.78),
-                        fontSize: 12,
+                  if (showTitleAddition) ...[
+                    const SizedBox(height: 2),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onOpenChapterLink,
+                      onLongPress: onToggleChapterLinkOpenMode,
+                      child: Text(
+                        chapterLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: menuSecondaryText,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                   if (hasChapterUrl)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
@@ -127,7 +154,7 @@ class ReaderTopMenu extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: CupertinoColors.white.withValues(alpha: 0.62),
+                          color: menuTertiaryText,
                           fontSize: 11,
                         ),
                       ),
@@ -136,12 +163,15 @@ class ReaderTopMenu extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            if (showSourceAction) ...[
+            if (showSourceAction && showTitleAddition) ...[
               _buildActionChip(
                 label: sourceActionLabel,
                 onTap: onShowSourceActions,
                 active: false,
                 accent: accent,
+                textColor: menuPrimaryText,
+                backgroundColor: controlBg,
+                borderColor: controlBorder,
               ),
               const SizedBox(width: 6),
             ],
@@ -150,26 +180,41 @@ class ReaderTopMenu extends StatelessWidget {
               onTap: onToggleCleanChapterTitle,
               active: cleanChapterTitleEnabled,
               accent: accent,
+              textColor: menuPrimaryText,
+              backgroundColor: controlBg,
+              borderColor: controlBorder,
             ),
             const SizedBox(width: 6),
             _buildRoundIcon(
               icon: CupertinoIcons.refresh,
               onTap: onRefreshChapter,
+              iconColor: menuPrimaryText,
+              backgroundColor: controlBg,
+              borderColor: controlBorder,
             ),
             const SizedBox(width: 6),
             _buildRoundIcon(
               icon: CupertinoIcons.search,
               onTap: onSearchContent,
+              iconColor: menuPrimaryText,
+              backgroundColor: controlBg,
+              borderColor: controlBorder,
             ),
             const SizedBox(width: 6),
             _buildRoundIcon(
               icon: CupertinoIcons.list_bullet,
               onTap: onShowChapterList,
+              iconColor: menuPrimaryText,
+              backgroundColor: controlBg,
+              borderColor: controlBorder,
             ),
             const SizedBox(width: 6),
             _buildRoundIcon(
               icon: CupertinoIcons.ellipsis,
               onTap: onShowMoreMenu,
+              iconColor: menuPrimaryText,
+              backgroundColor: controlBg,
+              borderColor: controlBorder,
             ),
           ],
         ),
@@ -180,6 +225,9 @@ class ReaderTopMenu extends StatelessWidget {
   Widget _buildRoundIcon({
     required IconData icon,
     required VoidCallback onTap,
+    required Color iconColor,
+    required Color backgroundColor,
+    required Color borderColor,
   }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -188,15 +236,15 @@ class ReaderTopMenu extends StatelessWidget {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: const Color(0xFF000000).withValues(alpha: 0.28),
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(17),
           border: Border.all(
-            color: CupertinoColors.white.withValues(alpha: 0.30),
+            color: borderColor,
           ),
         ),
         child: Icon(
           icon,
-          color: CupertinoColors.white,
+          color: iconColor,
           size: 18,
         ),
       ),
@@ -208,6 +256,9 @@ class ReaderTopMenu extends StatelessWidget {
     required VoidCallback onTap,
     required bool active,
     required Color accent,
+    required Color textColor,
+    required Color backgroundColor,
+    required Color borderColor,
   }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -215,19 +266,16 @@ class ReaderTopMenu extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-          color: active
-              ? accent.withValues(alpha: 0.2)
-              : const Color(0xFF000000).withValues(alpha: 0.28),
+          color: active ? accent.withValues(alpha: 0.2) : backgroundColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color:
-                active ? accent : CupertinoColors.white.withValues(alpha: 0.30),
+            color: active ? accent : borderColor,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: active ? accent : CupertinoColors.white,
+            color: active ? accent : textColor,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),

@@ -12,8 +12,10 @@ class ReadingSettings {
   final int fontFamilyIndex; // 字体选择索引
   final PageTurnMode pageTurnMode;
   final bool keepScreenOn;
+  final int keepLightSeconds; // legado keep_light：0/60/300/600/-1
   final bool showStatusBar; // 是否显示系统状态栏
   final bool hideNavigationBar; // 是否隐藏系统导航栏
+  final bool paddingDisplayCutouts; // 刘海屏留边（对标 legado paddingDisplayCutouts）
   final bool showBattery;
   final bool showTime;
   final bool showProgress;
@@ -22,6 +24,8 @@ class ReadingSettings {
   final bool useSystemBrightness;
   final bool showBrightnessView; // 是否显示阅读菜单亮度调节栏
   final bool brightnessViewOnRight; // 亮度侧边栏位置（true:右侧，false:左侧）
+  final bool showReadTitleAddition; // 显示阅读标题附加信息（对标 showReadTitleAddition）
+  final bool readBarStyleFollowPage; // 阅读菜单样式跟随页面（对标 readBarStyleFollowPage）
   final ProgressBarBehavior progressBarBehavior; // 进度条行为（页内/章节）
   final bool confirmSkipChapter; // 章节进度条跳转确认（对标 legado）
 
@@ -56,6 +60,7 @@ class ReadingSettings {
   final int pageTouchSlop; // 翻页触发阈值（0=系统默认，1-9999=自定义）
   final bool noAnimScrollPage; // 滚动翻页无动画（对标 legado）
   final bool volumeKeyPage; // 音量键翻页
+  final bool volumeKeyPageOnPlay; // 朗读时允许音量键翻页（对标 legado）
   final bool mouseWheelPage; // 鼠标滚轮翻页（对标 legado）
   final bool keyPageOnLongPress; // 按键长按翻页（对标 legado）
   final bool disableReturnKey; // 禁用返回键（对标 legado）
@@ -94,6 +99,11 @@ class ReadingSettings {
   static const int tipColorFollowContent = 0;
   static const int tipDividerColorDefault = -1;
   static const int tipDividerColorFollowContent = 0;
+  static const int keepLightFollowSystem = 0;
+  static const int keepLightOneMinute = 60;
+  static const int keepLightFiveMinutes = 300;
+  static const int keepLightTenMinutes = 600;
+  static const int keepLightAlways = -1;
   static const int screenOrientationUnspecified = 0;
   static const int screenOrientationPortrait = 1;
   static const int screenOrientationLandscape = 2;
@@ -120,8 +130,10 @@ class ReadingSettings {
     // Legado 默认翻页：覆盖
     this.pageTurnMode = PageTurnMode.cover,
     this.keepScreenOn = false,
+    this.keepLightSeconds = keepLightFollowSystem,
     this.showStatusBar = true,
     this.hideNavigationBar = false,
+    this.paddingDisplayCutouts = false,
     this.showBattery = true,
     this.showTime = true,
     this.showProgress = true,
@@ -130,6 +142,8 @@ class ReadingSettings {
     this.useSystemBrightness = true,
     this.showBrightnessView = true,
     this.brightnessViewOnRight = false,
+    this.showReadTitleAddition = true,
+    this.readBarStyleFollowPage = false,
     this.progressBarBehavior = ProgressBarBehavior.page,
     this.confirmSkipChapter = true,
     // 新增字段默认值
@@ -157,6 +171,7 @@ class ReadingSettings {
     // 对标 legado：滚动翻页默认保留动画
     this.noAnimScrollPage = false,
     this.volumeKeyPage = true,
+    this.volumeKeyPageOnPlay = true,
     this.mouseWheelPage = true,
     this.keyPageOnLongPress = false,
     this.disableReturnKey = false,
@@ -368,6 +383,24 @@ class ReadingSettings {
     return fallback;
   }
 
+  static bool _isValidKeepLightSeconds(int value) {
+    return value == keepLightFollowSystem ||
+        value == keepLightOneMinute ||
+        value == keepLightFiveMinutes ||
+        value == keepLightTenMinutes ||
+        value == keepLightAlways;
+  }
+
+  static int _normalizeKeepLightSeconds(int value, {required int fallback}) {
+    if (_isValidKeepLightSeconds(value)) {
+      return value;
+    }
+    if (_isValidKeepLightSeconds(fallback)) {
+      return fallback;
+    }
+    return keepLightFollowSystem;
+  }
+
   factory ReadingSettings.fromJson(Map<String, dynamic> json) {
     final rawPageTurnMode = json['pageTurnMode'];
     final pageTurnModeIndex = _toInt(rawPageTurnMode, PageTurnMode.cover.index);
@@ -382,6 +415,20 @@ class ReadingSettings {
         _toInt(rawPageDirection, defaultPageDirectionIndex);
     final safePageDirectionIndex =
         pageDirectionIndex.clamp(0, PageDirection.values.length - 1);
+    final legacyKeepScreenOn = _toBool(json['keepScreenOn'], false);
+    final keepLightFallback =
+        legacyKeepScreenOn ? keepLightAlways : keepLightFollowSystem;
+    final rawKeepLightSeconds = json.containsKey('keepLightSeconds')
+        ? _toInt(json['keepLightSeconds'], keepLightFallback)
+        : keepLightFallback;
+    final keepLightSeed =
+        legacyKeepScreenOn && rawKeepLightSeconds == keepLightFollowSystem
+            ? keepLightAlways
+            : rawKeepLightSeconds;
+    final parsedKeepLightSeconds = _normalizeKeepLightSeconds(
+      keepLightSeed,
+      fallback: keepLightFallback,
+    );
     final legacyChineseTraditional = _toBool(json['chineseTraditional'], false);
     final chineseConverterType = json.containsKey('chineseConverterType')
         ? _toInt(json['chineseConverterType'], chineseConverterOff)
@@ -421,9 +468,11 @@ class ReadingSettings {
       themeIndex: _toInt(json['themeIndex'], 9),
       fontFamilyIndex: _toInt(json['fontFamilyIndex'], 0),
       pageTurnMode: safePageTurnMode,
-      keepScreenOn: _toBool(json['keepScreenOn'], false),
+      keepScreenOn: parsedKeepLightSeconds == keepLightAlways,
+      keepLightSeconds: parsedKeepLightSeconds,
       showStatusBar: _toBool(json['showStatusBar'], true),
       hideNavigationBar: _toBool(json['hideNavigationBar'], false),
+      paddingDisplayCutouts: _toBool(json['paddingDisplayCutouts'], false),
       showBattery: _toBool(json['showBattery'], true),
       showTime: _toBool(json['showTime'], true),
       showProgress: _toBool(json['showProgress'], true),
@@ -432,6 +481,8 @@ class ReadingSettings {
       useSystemBrightness: _toBool(json['useSystemBrightness'], true),
       showBrightnessView: _toBool(json['showBrightnessView'], true),
       brightnessViewOnRight: _toBool(json['brightnessViewOnRight'], false),
+      showReadTitleAddition: _toBool(json['showReadTitleAddition'], true),
+      readBarStyleFollowPage: _toBool(json['readBarStyleFollowPage'], false),
       progressBarBehavior:
           _parseProgressBarBehavior(json['progressBarBehavior']),
       confirmSkipChapter: _toBool(json['confirmSkipChapter'], true),
@@ -458,6 +509,7 @@ class ReadingSettings {
       pageTouchSlop: _toInt(json['pageTouchSlop'], 0),
       noAnimScrollPage: _toBool(json['noAnimScrollPage'], false),
       volumeKeyPage: _toBool(json['volumeKeyPage'], true),
+      volumeKeyPageOnPlay: _toBool(json['volumeKeyPageOnPlay'], true),
       mouseWheelPage: _toBool(json['mouseWheelPage'], true),
       keyPageOnLongPress: _toBool(json['keyPageOnLongPress'], false),
       disableReturnKey: _toBool(json['disableReturnKey'], false),
@@ -501,8 +553,10 @@ class ReadingSettings {
       'fontFamilyIndex': fontFamilyIndex,
       'pageTurnMode': pageTurnMode.index,
       'keepScreenOn': keepScreenOn,
+      'keepLightSeconds': keepLightSeconds,
       'showStatusBar': showStatusBar,
       'hideNavigationBar': hideNavigationBar,
+      'paddingDisplayCutouts': paddingDisplayCutouts,
       'showBattery': showBattery,
       'showTime': showTime,
       'showProgress': showProgress,
@@ -511,6 +565,8 @@ class ReadingSettings {
       'useSystemBrightness': useSystemBrightness,
       'showBrightnessView': showBrightnessView,
       'brightnessViewOnRight': brightnessViewOnRight,
+      'showReadTitleAddition': showReadTitleAddition,
+      'readBarStyleFollowPage': readBarStyleFollowPage,
       'progressBarBehavior': progressBarBehavior.name,
       'confirmSkipChapter': confirmSkipChapter,
       // 新增字段
@@ -538,6 +594,7 @@ class ReadingSettings {
       'pageTouchSlop': pageTouchSlop,
       'noAnimScrollPage': noAnimScrollPage,
       'volumeKeyPage': volumeKeyPage,
+      'volumeKeyPageOnPlay': volumeKeyPageOnPlay,
       'mouseWheelPage': mouseWheelPage,
       'keyPageOnLongPress': keyPageOnLongPress,
       'disableReturnKey': disableReturnKey,
@@ -584,6 +641,14 @@ class ReadingSettings {
       max: footerModeHide,
       fallback: footerModeShow,
     );
+    final keepLightSeed =
+        keepScreenOn && keepLightSeconds == keepLightFollowSystem
+            ? keepLightAlways
+            : keepLightSeconds;
+    final safeKeepLightSeconds = _normalizeKeepLightSeconds(
+      keepLightSeed,
+      fallback: keepScreenOn ? keepLightAlways : keepLightFollowSystem,
+    );
     final safePageDirection = pageDirectionForMode(pageTurnMode);
     return ReadingSettings(
       fontSize: _safeDouble(
@@ -625,9 +690,11 @@ class ReadingSettings {
       themeIndex: safeThemeIndex,
       fontFamilyIndex: fontFamilyIndex < 0 ? 0 : fontFamilyIndex,
       pageTurnMode: pageTurnMode,
-      keepScreenOn: keepScreenOn,
+      keepScreenOn: safeKeepLightSeconds == keepLightAlways,
+      keepLightSeconds: safeKeepLightSeconds,
       showStatusBar: showStatusBar,
       hideNavigationBar: hideNavigationBar,
+      paddingDisplayCutouts: paddingDisplayCutouts,
       showBattery: showBattery,
       showTime: showTime,
       showProgress: showProgress,
@@ -641,6 +708,8 @@ class ReadingSettings {
       useSystemBrightness: useSystemBrightness,
       showBrightnessView: showBrightnessView,
       brightnessViewOnRight: brightnessViewOnRight,
+      showReadTitleAddition: showReadTitleAddition,
+      readBarStyleFollowPage: readBarStyleFollowPage,
       progressBarBehavior: progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter,
       textBold: _safeInt(textBold, min: 0, max: 2, fallback: 0),
@@ -696,6 +765,7 @@ class ReadingSettings {
       pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 9999, fallback: 0),
       noAnimScrollPage: noAnimScrollPage,
       volumeKeyPage: volumeKeyPage,
+      volumeKeyPageOnPlay: volumeKeyPageOnPlay,
       mouseWheelPage: mouseWheelPage,
       keyPageOnLongPress: keyPageOnLongPress,
       disableReturnKey: disableReturnKey,
@@ -757,8 +827,10 @@ class ReadingSettings {
     int? fontFamilyIndex,
     PageTurnMode? pageTurnMode,
     bool? keepScreenOn,
+    int? keepLightSeconds,
     bool? showStatusBar,
     bool? hideNavigationBar,
+    bool? paddingDisplayCutouts,
     bool? showBattery,
     bool? showTime,
     bool? showProgress,
@@ -767,6 +839,8 @@ class ReadingSettings {
     bool? useSystemBrightness,
     bool? showBrightnessView,
     bool? brightnessViewOnRight,
+    bool? showReadTitleAddition,
+    bool? readBarStyleFollowPage,
     ProgressBarBehavior? progressBarBehavior,
     bool? confirmSkipChapter,
     // 新增字段
@@ -792,6 +866,7 @@ class ReadingSettings {
     int? pageTouchSlop,
     bool? noAnimScrollPage,
     bool? volumeKeyPage,
+    bool? volumeKeyPageOnPlay,
     bool? mouseWheelPage,
     bool? keyPageOnLongPress,
     bool? disableReturnKey,
@@ -831,6 +906,14 @@ class ReadingSettings {
         (hideFooter == null
             ? this.footerMode
             : (hideFooter ? footerModeHide : footerModeShow));
+    final resolvedKeepLightSeconds = keepLightSeconds ??
+        (keepScreenOn == null
+            ? this.keepLightSeconds
+            : (keepScreenOn ? keepLightAlways : keepLightFollowSystem));
+    final resolvedKeepScreenOn = keepScreenOn ??
+        (keepLightSeconds == null
+            ? this.keepScreenOn
+            : keepLightSeconds == keepLightAlways);
 
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -842,9 +925,12 @@ class ReadingSettings {
       themeIndex: themeIndex ?? this.themeIndex,
       fontFamilyIndex: fontFamilyIndex ?? this.fontFamilyIndex,
       pageTurnMode: pageTurnMode ?? this.pageTurnMode,
-      keepScreenOn: keepScreenOn ?? this.keepScreenOn,
+      keepScreenOn: resolvedKeepScreenOn,
+      keepLightSeconds: resolvedKeepLightSeconds,
       showStatusBar: showStatusBar ?? this.showStatusBar,
       hideNavigationBar: hideNavigationBar ?? this.hideNavigationBar,
+      paddingDisplayCutouts:
+          paddingDisplayCutouts ?? this.paddingDisplayCutouts,
       showBattery: showBattery ?? this.showBattery,
       showTime: showTime ?? this.showTime,
       showProgress: showProgress ?? this.showProgress,
@@ -854,6 +940,10 @@ class ReadingSettings {
       showBrightnessView: showBrightnessView ?? this.showBrightnessView,
       brightnessViewOnRight:
           brightnessViewOnRight ?? this.brightnessViewOnRight,
+      showReadTitleAddition:
+          showReadTitleAddition ?? this.showReadTitleAddition,
+      readBarStyleFollowPage:
+          readBarStyleFollowPage ?? this.readBarStyleFollowPage,
       progressBarBehavior: progressBarBehavior ?? this.progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter ?? this.confirmSkipChapter,
       // 新增字段
@@ -879,6 +969,7 @@ class ReadingSettings {
       pageTouchSlop: pageTouchSlop ?? this.pageTouchSlop,
       noAnimScrollPage: noAnimScrollPage ?? this.noAnimScrollPage,
       volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
+      volumeKeyPageOnPlay: volumeKeyPageOnPlay ?? this.volumeKeyPageOnPlay,
       mouseWheelPage: mouseWheelPage ?? this.mouseWheelPage,
       keyPageOnLongPress: keyPageOnLongPress ?? this.keyPageOnLongPress,
       disableReturnKey: disableReturnKey ?? this.disableReturnKey,
@@ -985,7 +1076,8 @@ class ReadStyleConfig {
 
   ReadStyleConfig sanitize() {
     final safeName = name.trim();
-    final safeTextColor = _normalizeColor(textColor, fallback: legacyDefaultTextColor);
+    final safeTextColor =
+        _normalizeColor(textColor, fallback: legacyDefaultTextColor);
     final safeBgAlpha = _parseInt(bgAlpha, fallback: legacyDefaultBgAlpha)
         .clamp(0, 100)
         .toInt();
