@@ -34,19 +34,33 @@ class SettingsService {
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
 
+    var needsReadingSettingsRewrite = false;
     final jsonStr = _prefs.getString(_keyReadingSettings);
     if (jsonStr != null) {
       try {
-        _readingSettings = ReadingSettings.fromJson(json.decode(jsonStr));
-      } catch (e) {
+        final decoded = json.decode(jsonStr);
+        if (decoded is Map<String, dynamic>) {
+          _readingSettings = ReadingSettings.fromJson(decoded);
+        } else if (decoded is Map) {
+          _readingSettings = ReadingSettings.fromJson(
+            decoded.map((key, value) => MapEntry('$key', value)),
+          );
+        } else {
+          _readingSettings = const ReadingSettings();
+          needsReadingSettingsRewrite = true;
+        }
+      } catch (_) {
         _readingSettings = const ReadingSettings();
+        needsReadingSettingsRewrite = true;
       }
     } else {
       _readingSettings = const ReadingSettings();
+      needsReadingSettingsRewrite = true;
     }
 
-    await _migrateReadingSettingsSchema();
-    await _normalizePageDirectionByMode();
+    await _migrateReadingSettingsSchema(
+      forcePersist: needsReadingSettingsRewrite,
+    );
     _readingSettingsNotifier.value = _readingSettings;
 
     final appJson = _prefs.getString(_keyAppSettings);
@@ -62,32 +76,27 @@ class SettingsService {
     _appSettingsNotifier.value = _appSettings;
   }
 
-  Future<void> _migrateReadingSettingsSchema() async {
+  Future<void> _migrateReadingSettingsSchema({
+    required bool forcePersist,
+  }) async {
     final currentVersion = _prefs.getInt(_keyReadingSettingsSchemaVersion) ?? 0;
-    if (currentVersion >= _readingSettingsSchemaVersion) {
-      return;
-    }
-    // 对齐 legado：对现网用户做一次性全量阅读设置重置。
-    _readingSettings = const ReadingSettings();
-    await _prefs.setString(
-      _keyReadingSettings,
-      json.encode(_readingSettings.toJson()),
-    );
-    await _prefs.setInt(
-      _keyReadingSettingsSchemaVersion,
-      _readingSettingsSchemaVersion,
-    );
-  }
+    final normalized = _readingSettings.sanitize();
+    final normalizedJson = json.encode(normalized.toJson());
+    final storedJson = _prefs.getString(_keyReadingSettings);
+    final shouldPersist = forcePersist ||
+        currentVersion < _readingSettingsSchemaVersion ||
+        storedJson != normalizedJson;
 
-  Future<void> _normalizePageDirectionByMode() async {
-    final target = _readingSettings.pageTurnMode == PageTurnMode.scroll
-        ? PageDirection.vertical
-        : PageDirection.horizontal;
-    if (_readingSettings.pageDirection != target) {
-      _readingSettings = _readingSettings.copyWith(pageDirection: target);
-      await _prefs.setString(
-        _keyReadingSettings,
-        json.encode(_readingSettings.toJson()),
+    _readingSettings = normalized;
+
+    if (shouldPersist) {
+      await _prefs.setString(_keyReadingSettings, normalizedJson);
+    }
+
+    if (currentVersion != _readingSettingsSchemaVersion) {
+      await _prefs.setInt(
+        _keyReadingSettingsSchemaVersion,
+        _readingSettingsSchemaVersion,
       );
     }
   }
@@ -100,6 +109,13 @@ class SettingsService {
       _keyReadingSettings,
       json.encode(safeSettings.toJson()),
     );
+    final currentVersion = _prefs.getInt(_keyReadingSettingsSchemaVersion) ?? 0;
+    if (currentVersion != _readingSettingsSchemaVersion) {
+      await _prefs.setInt(
+        _keyReadingSettingsSchemaVersion,
+        _readingSettingsSchemaVersion,
+      );
+    }
   }
 
   Future<void> saveAppSettings(AppSettings settings) async {

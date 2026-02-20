@@ -170,9 +170,31 @@ void main() {
       ReadingSettings.headerModeHideWhenStatusBarShown,
     );
     expect(defaults.footerMode, ReadingSettings.footerModeShow);
+    expect(defaults.showHeaderLine, isFalse);
+    expect(defaults.showFooterLine, isTrue);
     expect(defaults.shouldShowHeader(showStatusBar: true), isFalse);
     expect(defaults.shouldShowHeader(showStatusBar: false), isTrue);
     expect(defaults.shouldShowFooter(), isTrue);
+  });
+
+  test('ReadingSettings normalizes pageDirection with pageTurnMode', () {
+    final scrollMode = ReadingSettings.fromJson(<String, dynamic>{
+      'pageTurnMode': PageTurnMode.scroll.index,
+      'pageDirection': PageDirection.horizontal.index,
+    });
+    expect(scrollMode.pageDirection, PageDirection.vertical);
+
+    final coverMode = ReadingSettings.fromJson(<String, dynamic>{
+      'pageTurnMode': PageTurnMode.cover.index,
+      'pageDirection': PageDirection.vertical.index,
+    });
+    expect(coverMode.pageDirection, PageDirection.horizontal);
+
+    final copied = scrollMode.copyWith(
+      pageTurnMode: PageTurnMode.cover,
+      pageDirection: PageDirection.vertical,
+    );
+    expect(copied.pageDirection, PageDirection.horizontal);
   });
 
   test('ReadingSettings migrates legacy hideHeader/hideFooter to mode fields',

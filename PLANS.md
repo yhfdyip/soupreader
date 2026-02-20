@@ -4,14 +4,16 @@
 
 ## 活跃计划
 
-1. `docs/plans/2026-02-19-reader-core-config-parity-execplan.md`
-   - 标题：Legado -> SoupReader 核心链路与阅读器配置迁移（排版/交互一致）
-   - 状态：`active`
-   - 口径：先完成核心链路与文本阅读配置迁移；排版一致性与交互一致性为阻塞验收门槛
+- 暂无
 
 ## 阻塞计划
 
-1. `docs/plans/2026-02-19-reader-extensions-blocked-execplan.md`
+1. `docs/plans/2026-02-19-reader-core-config-parity-execplan.md`
+   - 标题：Legado -> SoupReader 核心链路与阅读器配置迁移（按钮/排版/跳转层级/交互一致）
+   - 状态：`blocked`
+   - 阻塞点：`S3B-07-R1` 依赖扩展能力解锁；`flutter analyze` 仍有仓库级既有告警待后续清理
+
+2. `docs/plans/2026-02-19-reader-extensions-blocked-execplan.md`
    - 标题：Legado -> SoupReader 扩展阅读能力冻结（漫画/TTS/朗读引擎）
    - 状态：`blocked`
    - 口径：未收到“开始做扩展功能”指令前保持冻结，不得并行启动

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -159,5 +161,85 @@ void main() {
     );
 
     service.readingSettingsListenable.removeListener(listener);
+  });
+
+  test('SettingsService keeps reading settings during schema migration',
+      () async {
+    final legacyReadingSettings = const ReadingSettings(
+      fontSize: 31.0,
+      keepScreenOn: true,
+      pageTurnMode: PageTurnMode.scroll,
+      pageDirection: PageDirection.horizontal,
+      showHeaderLine: true,
+    ).toJson();
+
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'reading_settings': json.encode(legacyReadingSettings),
+      'reading_settings_schema_version': 0,
+    });
+
+    final service = SettingsService();
+    await service.init();
+
+    expect(service.readingSettings.fontSize, 31.0);
+    expect(service.readingSettings.keepScreenOn, isTrue);
+    expect(service.readingSettings.pageTurnMode, PageTurnMode.scroll);
+    expect(service.readingSettings.pageDirection, PageDirection.vertical);
+    expect(service.readingSettings.showHeaderLine, isTrue);
+
+    final prefs = await SharedPreferences.getInstance();
+    final repairedJson = prefs.getString('reading_settings');
+    expect(repairedJson, isNotNull);
+    final persisted = ReadingSettings.fromJson(
+      json.decode(repairedJson!) as Map<String, dynamic>,
+    );
+    expect(persisted.fontSize, 31.0);
+    expect(persisted.pageDirection, PageDirection.vertical);
+    expect(prefs.getInt('reading_settings_schema_version'), 2);
+  });
+
+  test('SettingsService repairs malformed reading settings json', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'reading_settings': '{"fontSize":',
+      'reading_settings_schema_version': 2,
+    });
+
+    final service = SettingsService();
+    await service.init();
+
+    expect(service.readingSettings.fontSize, const ReadingSettings().fontSize);
+    expect(
+      service.readingSettings.showHeaderLine,
+      const ReadingSettings().showHeaderLine,
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    final repairedJson = prefs.getString('reading_settings');
+    expect(repairedJson, isNotNull);
+    expect(() => json.decode(repairedJson!), returnsNormally);
+  });
+
+  test('SettingsService saveReadingSettings normalizes direction and schema',
+      () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final service = SettingsService();
+    await service.init();
+
+    await service.saveReadingSettings(
+      service.readingSettings.copyWith(
+        pageTurnMode: PageTurnMode.scroll,
+        pageDirection: PageDirection.horizontal,
+      ),
+    );
+
+    expect(service.readingSettings.pageTurnMode, PageTurnMode.scroll);
+    expect(service.readingSettings.pageDirection, PageDirection.vertical);
+
+    await service.init();
+    expect(service.readingSettings.pageTurnMode, PageTurnMode.scroll);
+    expect(service.readingSettings.pageDirection, PageDirection.vertical);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('reading_settings_schema_version'), 2);
   });
 }

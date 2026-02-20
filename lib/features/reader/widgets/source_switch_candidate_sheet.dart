@@ -120,7 +120,7 @@ class _SourceSwitchCandidateSheetState
                   ),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
-                    minSize: 32,
+                    minimumSize: const Size(32, 32),
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('取消'),
                   ),
@@ -165,7 +165,7 @@ class _SourceSwitchCandidateSheetState
                             horizontal: 16,
                             vertical: 10,
                           ),
-                          minSize: 0,
+                          minimumSize: Size.zero,
                           onPressed: () =>
                               Navigator.of(itemContext).pop(candidate),
                           child: Align(

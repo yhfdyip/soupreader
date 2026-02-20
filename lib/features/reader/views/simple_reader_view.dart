@@ -166,6 +166,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _TipOption(8, '页码/总页'),
     _TipOption(9, '时间+电量'),
   ];
+  static const List<_TipOption> _titleModeOptions = [
+    _TipOption(0, '居左'),
+    _TipOption(1, '居中'),
+    _TipOption(2, '隐藏'),
+  ];
   static const int _customColorPickerValue = -2;
   static const List<_TipOption> _headerModeOptions = [
     _TipOption(ReadingSettings.headerModeHideWhenStatusBarShown, '显示状态栏时隐藏'),
@@ -3697,6 +3702,63 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
           _buildSettingsCard(
+            title: '翻页模式',
+            child: Column(
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      PageTurnModeUi.values(current: _settings.pageTurnMode)
+                          .map((mode) {
+                    final isSelected = _settings.pageTurnMode == mode;
+                    final isHiddenMode = PageTurnModeUi.isHidden(mode);
+                    return Opacity(
+                      opacity: isHiddenMode ? 0.5 : 1,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        onPressed: isHiddenMode
+                            ? null
+                            : () {
+                                _updateSettingsFromSheet(
+                                  setPopupState,
+                                  _settings.copyWith(pageTurnMode: mode),
+                                );
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _uiAccent.withValues(alpha: 0.2)
+                                : _uiCardBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected ? _uiAccent : _uiBorder,
+                            ),
+                          ),
+                          child: Text(
+                            isHiddenMode ? '${mode.name}（隐藏）' : mode.name,
+                            style: TextStyle(
+                              color: isSelected ? _uiAccent : _uiTextNormal,
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
             title: '字体与装饰',
             child: Column(
               children: [
@@ -4094,6 +4156,71 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
           _buildSettingsCard(
+            title: '章节标题',
+            child: Column(
+              children: [
+                _buildOptionRow(
+                  '标题显示',
+                  _titleModeLabel(_settings.titleMode),
+                  () {
+                    _showTipOptionPicker(
+                      title: '章节标题位置',
+                      options: _titleModeOptions,
+                      currentValue: _settings.titleMode,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(titleMode: value),
+                        );
+                      },
+                    );
+                  },
+                ),
+                _buildSliderSetting(
+                  '字号偏移',
+                  _settings.titleSize.toDouble(),
+                  0,
+                  10,
+                  (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(titleSize: value.round()),
+                    );
+                  },
+                  displayFormat: (value) => value.toInt().toString(),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '上边距',
+                  _settings.titleTopSpacing,
+                  0,
+                  100,
+                  (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(titleTopSpacing: value),
+                    );
+                  },
+                  displayFormat: (value) => value.toInt().toString(),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '下边距',
+                  _settings.titleBottomSpacing,
+                  0,
+                  100,
+                  (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(titleBottomSpacing: value),
+                    );
+                  },
+                  displayFormat: (value) => value.toInt().toString(),
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
             title: '页眉页脚',
             child: Column(
               children: [
@@ -4324,63 +4451,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSettingsCard(
-            title: '翻页模式',
-            child: Column(
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      PageTurnModeUi.values(current: _settings.pageTurnMode)
-                          .map((mode) {
-                    final isSelected = _settings.pageTurnMode == mode;
-                    final isHiddenMode = PageTurnModeUi.isHidden(mode);
-                    return Opacity(
-                      opacity: isHiddenMode ? 0.5 : 1,
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        onPressed: isHiddenMode
-                            ? null
-                            : () {
-                                _updateSettingsFromSheet(
-                                  setPopupState,
-                                  _settings.copyWith(pageTurnMode: mode),
-                                );
-                              },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? _uiAccent.withValues(alpha: 0.2)
-                                : _uiCardBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected ? _uiAccent : _uiBorder,
-                            ),
-                          ),
-                          child: Text(
-                            isHiddenMode ? '${mode.name}（隐藏）' : mode.name,
-                            style: TextStyle(
-                              color: isSelected ? _uiAccent : _uiTextNormal,
-                              fontSize: 13,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          _buildSettingsCard(
             title: '翻页操作',
             child: Column(
               children: [
@@ -4558,49 +4628,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               ],
             ),
           ),
-          _buildSettingsCard(
-            title: '恢复默认',
-            child: SizedBox(
-              width: double.infinity,
-              child: CupertinoButton(
-                color: CupertinoColors.destructiveRed.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(10),
-                onPressed: () => _confirmResetReadingSettings(setPopupState),
-                child: const Text(
-                  '恢复为默认阅读配置',
-                  style: TextStyle(color: CupertinoColors.destructiveRed),
-                ),
-              ),
-            ),
-          ),
           const SizedBox(height: 12),
         ],
       ),
     );
-  }
-
-  Future<void> _confirmResetReadingSettings(StateSetter setPopupState) async {
-    final shouldReset = await showCupertinoDialog<bool>(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('恢复默认阅读配置'),
-            content: const Text('\n将恢复为 legado 风格默认值，当前修改会立即生效。'),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消'),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('恢复'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!shouldReset) return;
-    _updateSettingsFromSheet(setPopupState, const ReadingSettings());
   }
 
   void _updateSettingsFromSheet(
@@ -4744,6 +4775,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   String _touchSlopLabel(int value) {
     return value == 0 ? '系统默认' : value.toString();
+  }
+
+  String _titleModeLabel(int value) {
+    switch (value) {
+      case 1:
+        return '居中';
+      case 2:
+        return '隐藏';
+      case 0:
+      default:
+        return '居左';
+    }
   }
 
   String _headerModeLabel(int value) {

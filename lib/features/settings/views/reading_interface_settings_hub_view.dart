@@ -125,47 +125,49 @@ class _ReadingInterfaceSettingsHubViewState
     final scheme = theme.colorScheme;
     final infoText = info.trim();
 
-    return ShadButton.ghost(
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      mainAxisAlignment: MainAxisAlignment.start,
-      onPressed: onTap,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.p.copyWith(
-                    color: scheme.foreground,
-                  ),
-                ),
-                if (infoText.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+      child: CupertinoButton(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        alignment: Alignment.centerLeft,
+        onPressed: onTap,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    infoText,
-                    maxLines: 2,
+                    title,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.small.copyWith(
-                      color: scheme.mutedForeground,
+                    style: theme.textTheme.p.copyWith(
+                      color: scheme.foreground,
                     ),
                   ),
+                  if (infoText.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      infoText,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.small.copyWith(
+                        color: scheme.mutedForeground,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Icon(
-            LucideIcons.chevronRight,
-            size: 16,
-            color: scheme.mutedForeground,
-          ),
-        ],
+            const SizedBox(width: 8),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: scheme.mutedForeground,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,22 +1,24 @@
-# Legado -> SoupReader 核心链路与阅读器配置迁移（排版/交互一致）
+# Legado -> SoupReader 核心链路与阅读器配置迁移（按钮/排版/跳转层级/交互一致）
 
-- 状态：`active`
+- 状态：`blocked`
 - 负责人：`Core-Migration`（主）、`Reader-UI`（并行分支）、`Reader-Persistence`（并行分支）
-- 更新时间：`2026-02-19`
+- 更新时间：`2026-02-20`
 - 范围类型：迁移级别（非“最小收敛”）
 
 ## 背景与目标
 
 ### 背景
 - 当前仓库处于 Legado 向 Flutter 的迁移阶段。
-- 需求明确要求：阅读器功能配置在 **排版结构** 与 **交互语义** 上与 Legado 同义。
+- 需求明确要求：阅读器功能配置在 **按钮语义**、**排版结构**、**点击跳转层级** 与 **交互语义** 上与 Legado 同义（仅 UI 风格差异除外）。
 - 现状存在计划索引失真（`PLANS.md` 指向文件已删除），需先恢复可执行计划基线。
 
 ### 目标
 - 完成核心五段链路（`search` / `explore` / `bookInfo` / `toc` / `content`）的可调试可回归迁移方案。
 - 完成文本阅读器配置迁移方案，保证：
   - 功能配置项同义；
+  - 按钮集合、顺序、可见/可点击条件与点击反馈语义同义；
   - 排版结构与信息层级同义；
+  - 点击后跳转层级、返回路径与入口层级同义；
   - 交互触发、状态流转、反馈语义同义。
 - 在未收到“开始做扩展功能”指令前，扩展能力保持 `blocked`。
 
@@ -27,7 +29,7 @@
 
 ### 成功标准
 - 已输出并执行“差异点清单 + 逐项对照清单”。
-- 排版一致性与交互一致性检查全部回填，且无未处理阻塞项。
+- 按钮一致性、排版一致性、点击跳转层级一致性与交互一致性检查全部回填，且无未处理阻塞项。
 - 五段链路具备可复现回归路径和调试证据。
 - 计划文档动态章节持续更新，且状态流转清晰（`draft -> active -> blocked/done`）。
 
@@ -40,6 +42,7 @@
 | D-03 | 阅读配置入口结构 | `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt`、`TipConfigDialog.kt`、`MoreConfigDialog.kt`、`/home/server/legado/app/src/main/res/xml/pref_config_read.xml` | `lib/features/settings/views/reading_*.dart` + `lib/features/reader/views/simple_reader_view.dart` | 页面拆分策略不同 | 菜单层级、排序、触发语义偏差 |
 | D-04 | 排版一致性验收机制 | Legado 阅读配置页（分组、间距、控件顺序） | 仅有功能项迁移，缺少排版核验台账 | 验收维度不足 | 可能“功能可用但布局走样” |
 | D-05 | 交互一致性验收机制 | Legado 控件触发与反馈语义 | 缺少逐项交互闭环核验记录 | 验收维度不足 | 可能“入口一致但行为偏差” |
+| D-06 | 按钮与跳转层级验收机制 | Legado 按钮集合、触发条件与页面跳转层级 | 现有台账偏重配置项语义，按钮级与路由级核验粒度不足 | 验收口径未细化 | 可能“按钮存在但顺序/跳转层级偏移” |
 
 ## 逐项检查清单（实施前固定项）
 
@@ -47,7 +50,9 @@
 - 状态：默认值、切换值、重进恢复、重启恢复是否同义。
 - 异常：非法值、缺字段、反序列化失败、网络异常下表现是否同义。
 - 文案：标题、分组名、按钮文案、提示文案业务语义是否同义。
+- 按钮：按钮集合、排序、可见/可点击条件、点击反馈是否同义。
 - 排版：结构层级、间距节奏、控件排列、热区大小是否同义。
+- 点击跳转层级：点击后的目标页面层级、返回路径、二级/三级入口关系是否同义。
 - 交互触发：点击/滑杆/开关/弹窗确认取消行为是否同义。
 
 ## 实施步骤（含依赖/并行/验收）
@@ -57,7 +62,7 @@
 - 依赖：无
 - 并行性：串行（前置步骤）
 - 做什么：
-  - 固化差异点清单（本节 D-01 ~ D-05）。
+  - 固化差异点清单（本节 D-01 ~ D-06）。
   - 修复计划索引，建立可执行入口。
 - 预期结果：
   - 计划入口可用，执行不依赖聊天上下文。
@@ -172,7 +177,7 @@
 - 兼容影响：
   - 本步骤仅新增对照文档，不修改运行时代码，对现有书源兼容性无直接行为变更。
 
-### Step 3A：阅读器“界面（样式）”迁移（进行中，并行分支 A）
+### Step 3A：阅读器“界面（样式）”迁移（已完成，并行分支 A）
 - Owner：`Reader-UI-A`
 - 依赖：Step 2
 - 并行性：可与 Step 3B 并行（避免同文件冲突）
@@ -424,6 +429,62 @@
   - `flutter test test/reading_tip_settings_view_test.dart test/reading_behavior_settings_views_test.dart test/reading_settings_test.dart`
 - 兼容影响：
   - 仅调整 UI 入口层级与分组，不改动配置字段与持久化格式；旧配置可无损读取。
+
+#### Step 3A 子任务 S3A-05：阅读页内样式页签排版核验与入口收敛（已完成）
+
+##### legado 对照基准（已完整读取）
+
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/TipConfigDialog.kt`
+- `/home/server/legado/app/src/main/res/layout/dialog_read_book_style.xml`
+- `/home/server/legado/app/src/main/res/layout/dialog_tip_config.xml`
+- `/home/server/legado/app/src/main/java/io/legado/app/help/config/ReadBookConfig.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/help/config/ReadTipConfig.kt`
+
+##### 差异点清单（S3A-05）
+
+| ID | 差异 | legado 语义 | soupreader 变更前 | 影响 |
+| --- | --- | --- | --- | --- |
+| S3A-05-D1 | 阅读页“界面”入口缺少标题配置 | `TipConfigDialog` 提供 `titleMode/titleSize/titleTop/titleBottom` | `SimpleReaderView` 的 `allowedTabs[0,1]` 仅包含页眉页脚，不含标题四项 | 阅读中无法在“界面”入口完成标题排版调节 |
+| S3A-05-D2 | 翻页模式入口层级偏移 | `ReadStyleDialog` 内可直接切换翻页动画模式 | `SimpleReaderView` 将翻页模式放在“设置”页签（tab 2） | “界面/设置”语义分层与 legado 不同，入口预期漂移 |
+| S3A-05-D3 | 阅读页内样式分组顺序不完整 | 样式链路应覆盖“正文排版 -> 翻页模式 -> 标题/页眉页脚” | 样式页签缺少“章节标题”分组，且翻页模式不在样式入口 | 排版核验台账无法闭环，Step 3A 不能完结 |
+
+##### 实施前逐项检查清单（S3A-05）
+
+| 检查项 | 结果 |
+| --- | --- |
+| 入口（阅读页菜单 -> 界面） | 通过：`allowedTabs[0,1]` 仍为阅读内“界面”入口，不新增扩展路由 |
+| 状态（默认值/切换后值） | 通过：标题四项与翻页模式均复用 `ReadingSettings` 既有字段与 sanitize 边界 |
+| 异常（越界/隐藏模式） | 通过：标题滑杆边界对齐 `0..10/0..100`；`simulation2` 继续禁用并保留可观测显示 |
+| 文案（业务语义） | 通过：分组命名收敛为“翻页模式”“章节标题”“页眉页脚” |
+| 排版（分组顺序） | 通过：阅读页样式入口形成“排版 -> 翻页模式 -> 章节标题/页眉页脚”的同义层次 |
+| 交互触发（改动即生效） | 通过：ActionSheet/滑杆/模式切换即时写入并驱动阅读渲染链路 |
+
+##### 逐项对照清单（S3A-05）
+
+| 对照项 | legado 基准 | soupreader 当前 | 结论 |
+| --- | --- | --- | --- |
+| 标题位置入口 | `rg_title_mode` | 阅读页“界面”页签新增“标题显示”选择器 | 已同义 |
+| 标题字号/间距入口 | `dsb_title_size/top/bottom` | 阅读页“界面”页签新增“字号偏移/上边距/下边距”滑杆 | 已同义（实现层差异） |
+| 翻页模式入口归属 | `ReadStyleDialog.rgPageAnim` 位于“界面”入口 | 翻页模式卡片迁移到阅读页“排版”页签；“设置”页签移除该入口 | 已同义 |
+| 行为页签职责 | `MoreConfigDialog` 侧重触发阈值与按键行为 | 阅读页 tab 2 保留“进度条/章节跳转确认/音量键/滚动无动画/触发阈值” | 已同义 |
+| 样式核验闭环 | 阅读页内可完成样式主项调节 | `SimpleReaderView` 样式入口排版台账闭环 | 已同义 |
+
+##### 实施记录（做了什么 / 为什么 / 如何验证 / 兼容影响）
+
+- 做了什么：
+  - `SimpleReaderView` 在“排版”页签补齐“翻页模式”卡片，并从“翻页”页签移除重复入口。
+  - `SimpleReaderView` 在“界面”页签新增“章节标题”分组，补齐 `titleMode/titleSize/titleTopSpacing/titleBottomSpacing` 四项入口。
+  - 保持页眉页脚与颜色配置分组位置不变，确保与已完成的 `S3A-02` 语义连续。
+- 为什么：
+  - 收口 Step 3A 最后未闭环项，确保阅读页内“界面（样式）”入口与 legado `ReadStyleDialog/TipConfigDialog` 同义。
+- 如何验证：
+  - `flutter test test/reading_settings_test.dart test/reading_tip_settings_view_test.dart test/reading_behavior_settings_views_test.dart`
+  - `flutter test test/search_book_info_view_compile_test.dart`
+  - 手工路径：阅读页底部菜单 -> 界面（tabs 0/1）-> 调整翻页模式与章节标题四项 -> 退出菜单并翻页观察即时生效
+- 兼容影响：
+  - 仅调整阅读页内设置入口归属，不变更持久化字段；历史配置读写与五段链路不受影响。
 
 ### Step 3B：阅读器“设置（行为）”迁移（进行中，并行分支 B）
 - Owner：`Reader-UI-B`
@@ -832,9 +893,93 @@
   - 若历史配置导致无菜单区域，将自动恢复 `mc=菜单`；
   - 对旧书源解析链路无影响。
 
-### Step 4：配置持久化与迁移策略收敛（待执行）
-- Owner：`Reader-Persistence`
+### Step 3C：按钮与点击跳转层级同义核验（已完成）
+- Owner：`Core-Migration`（主）、`Reader-UI-A/B`（协作）
 - 依赖：Step 3A、Step 3B
+- 并行性：串行（Step 4 前置）
+- 做什么：
+  - 输出按钮对照清单（按钮名称、顺序、可见条件、可点击条件、点击反馈）。
+  - 输出点击跳转层级对照清单（一级/二级/三级入口、返回路径、回退语义）。
+  - 对不能等价复刻项按第 `1.1.2` 章标记 `blocked`，并记录替代方案与回补计划。
+- 涉及文件：
+  - `lib/features/settings/views/reading_*.dart`
+  - `lib/features/reader/views/simple_reader_view.dart`
+  - `docs/plans/2026-02-19-reader-core-config-parity-execplan.md`
+- 预期结果：
+  - 按钮与跳转层级核验台账闭环，且不再存在“同名入口但层级偏移”的未跟踪项。
+- 验证方式：
+  - Widget/手工双路径核验（不执行 `flutter analyze`）。
+  - 手工路径覆盖“设置页入口 -> 二级页 -> 三级弹层/子页 -> 返回”。
+
+#### Step 3C 子任务 S3C-01：按钮集合/排序/跳转层级核验与收敛（已完成）
+
+##### legado 对照基准（已完整读取）
+
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/TipConfigDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/MoreConfigDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ClickActionConfigDialog.kt`
+- `/home/server/legado/app/src/main/res/xml/pref_config_read.xml`
+- `/home/server/legado/app/src/main/res/layout/dialog_read_book_style.xml`
+- `/home/server/legado/app/src/main/res/layout/dialog_tip_config.xml`
+- `/home/server/legado/app/src/main/res/layout/dialog_click_action_config.xml`
+
+##### 差异点清单（S3C-01）
+
+| ID | 差异 | legado 语义 | soupreader 变更前 | 影响 |
+| --- | --- | --- | --- | --- |
+| S3C-01-D1 | 阅读页内设置多余扩展按钮 | `ReadStyleDialog/TipConfigDialog/MoreConfigDialog` 无“恢复默认阅读配置”入口 | `SimpleReaderView` 的“设置”页签包含“恢复默认”卡片与确认流程 | 按钮集合多出 legado 无对照扩展入口，层级语义漂移 |
+| S3C-01-D2 | 二级 Hub 按钮热区稳定性 | legado 按钮在固定容器内可稳定点击 | `ReadingInterfaceSettingsHubView/ReadingBehaviorSettingsHubView` 使用 `ShadButton + Expanded` 在无界宽度下出现布局断言 | 影响按钮可点击条件与测试可复现性 |
+| S3C-01-D3 | 阅读底部四按钮热区与高度 | legado 底栏按钮“目录/朗读/界面/设置”均可稳定触发 | `ReaderBottomMenuNew` 底部四按钮在 `ShadButton` 约束下出现高度溢出，存在点击命中不稳定 | 影响按钮触发反馈一致性验收 |
+
+##### 实施前逐项检查清单（S3C-01）
+
+| 检查项 | 结果 |
+| --- | --- |
+| 入口（全局设置页/阅读页菜单） | 通过：全局入口、阅读页底栏入口与 legado 对照路径一致 |
+| 状态（按钮可见/隐藏条件） | 通过：目录/朗读/界面/设置在阅读菜单显示时可见，局部按钮按章节边界禁用 |
+| 异常（不可点击时反馈） | 通过：章节边界按钮禁用，不触发回调；无菜单配置仍由 `ClickAction` 兜底 |
+| 文案（按钮命名） | 通过：一级入口文案收敛为 legado 同义语义 |
+| 排版（排序与热区） | 通过：底部四按钮顺序固定为“目录 -> 朗读 -> 界面 -> 设置”，并修复热区溢出问题 |
+| 交互触发（点击反馈） | 通过：按钮点击回调与目标入口一一对应，返回路径可回退到上一层 |
+| 点击跳转层级（一级/二级/三级） | 通过：一级入口 -> 二级设置页 -> 三级弹层/子页路径可复现 |
+
+##### 逐项对照清单（S3C-01）
+
+| 对照项 | legado 基准 | soupreader 当前 | 结论 |
+| --- | --- | --- | --- |
+| 阅读底栏四按钮集合与顺序 | `目录/朗读/界面/设置` | `ReaderBottomMenuNew` 顺序保持一致 | 已同义 |
+| 底栏按钮点击反馈 | 点击后分别进入目录/朗读/界面/更多设置链路 | 回调映射一一对应并补齐热区稳定性 | 已同义 |
+| 全局阅读设置一级入口 | 界面与行为入口分离 | `GlobalReadingSettingsView` 保持“界面（样式）/设置（行为）” | 已同义 |
+| 二级 Hub 入口层级 | 界面与行为页下钻到具体设置页 | `ReadingInterfaceSettingsHubView` 与 `ReadingBehaviorSettingsHubView` 下钻链路稳定 | 已同义 |
+| 阅读页内设置按钮集合 | 不包含“恢复默认阅读配置”入口 | 已移除 `SimpleReaderView` 中“恢复默认”卡片与确认流程 | 已同义 |
+| 返回路径 | 子页/弹层可回退到上一级入口 | 新增导航回归测试覆盖“进入 -> 返回”路径 | 已同义 |
+
+##### 实施记录（做了什么 / 为什么 / 如何验证 / 兼容影响）
+
+- 做了什么：
+  - `SimpleReaderView` 移除“恢复默认”卡片与对应确认弹层，收敛阅读页内设置按钮集合。
+  - `ReadingInterfaceSettingsHubView`、`ReadingBehaviorSettingsHubView` 将列表项按钮从 `ShadButton` 收敛为 `CupertinoButton` 容器，修复无界宽度下热区布局异常。
+  - `ReaderBottomMenuNew` 将底部四按钮触发组件从 `ShadButton` 收敛为 `CupertinoButton`，修复高度溢出与点击命中不稳定。
+  - 新增 `test/reading_settings_navigation_parity_test.dart` 与 `test/reader_bottom_menu_new_test.dart`，覆盖按钮顺序、回调映射、可点击边界与跳转返回路径。
+- 为什么：
+  - Step 3C 的阻塞门槛是“按钮集合/排序/触发反馈 + 点击跳转层级”同义；上述差异会直接导致验收不闭环。
+- 如何验证：
+  - `flutter test test/reading_settings_navigation_parity_test.dart test/reader_bottom_menu_new_test.dart`
+  - `flutter test test/global_reading_settings_view_test.dart test/reading_behavior_settings_views_test.dart test/reading_preferences_view_test.dart`
+  - 手工路径：
+    - 阅读页底栏：`目录 -> 朗读 -> 界面 -> 设置` 逐项点击；
+    - 设置页：`阅读设置（全局） -> 界面（样式）/设置（行为） -> 二级页 -> 返回`。
+- 兼容影响：
+  - 仅调整按钮容器与入口收敛，不改动书源链路与配置字段持久化格式；
+  - 历史阅读设置数据不受影响。
+
+### Step 4：配置持久化与迁移策略收敛（已完成）
+- Owner：`Reader-Persistence`
+- 依赖：Step 3C
 - 并行性：串行（收口步骤）
 - 做什么：
   - 统一 `ReadingSettings` 字段边界与 `SettingsService` 落盘/迁移策略。
@@ -847,7 +992,68 @@
 - 验证方式：
   - 定向单测与手工回归（不执行 `flutter analyze`）。
 
-### Step 5：迁移级验收与证据归档（待执行）
+#### Step 4 子任务 S4-01：持久化迁移策略与字段边界归一（已完成）
+
+##### legado 对照基准（已完整读取）
+
+- `/home/server/legado/app/src/main/java/io/legado/app/help/config/ReadBookConfig.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/help/config/ReadTipConfig.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/help/config/AppConfig.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/help/config/LocalConfig.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/TipConfigDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt`
+- `/home/server/legado/app/src/main/res/xml/pref_config_read.xml`
+- `/home/server/legado/app/src/main/res/values-zh/arrays.xml`
+
+##### 差异点清单（S4-01）
+
+| ID | 差异 | legado 语义 | soupreader 变更前 | 影响 |
+| --- | --- | --- | --- | --- |
+| S4-01-D1 | schema 迁移策略 | `LocalConfig.isLastVersion` 仅做版本位迁移，不重置阅读配置 | `SettingsService._migrateReadingSettingsSchema()` 在低版本时整包重置 `ReadingSettings` | 用户历史阅读配置可能被非预期清空 |
+| S4-01-D2 | 翻页方向归一化时机 | 翻页模式与运行时方向语义一致，不依赖重启修正 | `pageDirection` 仅在 `init` 阶段归一化，保存路径缺少同义归一 | 双入口保存后可能出现“模式已改但方向字段未同步” |
+| S4-01-D3 | 异常配置自愈 | 非法值读取后可回落默认并继续稳定持久化 | 解析异常时仅内存回落默认，不保证立即回写修复 | 异常 JSON 可能在后续冷启动重复触发解析失败 |
+| S4-01-D4 | 默认值同义性 | `ReadBookConfig.Config.showHeaderLine` 默认 `false` | `ReadingSettings.showHeaderLine` 默认 `true` | 新安装默认体验与 legado 页眉分割线语义偏差 |
+
+##### 实施前逐项检查清单（S4-01）
+
+| 检查项 | 结果 |
+| --- | --- |
+| 入口（全局设置页/阅读页内） | 通过：两入口写入最终统一走 `SettingsService.saveReadingSettings` + `ReadingSettings.sanitize` |
+| 状态（默认值/切换后/重启恢复） | 通过：schema 迁移保留历史值，且重启后保持一致 |
+| 异常（非法 JSON/越界字段） | 通过：解析失败时回落默认并立即回写自愈 |
+| 文案（业务语义） | 不涉及 UI 文案改动（N/A） |
+| 排版（结构/间距） | 不涉及 UI 布局改动（N/A） |
+| 交互触发（改动即生效） | 通过：双入口保存后同一字段即时生效，且持久化字段语义一致 |
+
+##### 逐项对照清单（S4-01）
+
+| 对照项 | legado 基准 | soupreader 当前 | 结论 |
+| --- | --- | --- | --- |
+| schema 迁移策略 | 版本位迁移不清空阅读配置 | schema 升级改为“保留原配置 + sanitize 归一 + 更新版本位” | 已同义 |
+| 翻页方向归一 | 翻页模式与方向语义一致，不依赖重启修正 | `ReadingSettings.sanitize()` 统一按 `pageTurnMode` 推导 `pageDirection`，覆盖初始化与保存路径 | 已同义 |
+| 异常配置自愈 | 非法配置回落后继续稳定可持久化 | 解析失败/结构异常时回落默认并回写可解析 JSON | 已同义 |
+| 默认值（页眉分割线） | `showHeaderLine=false` | `ReadingSettings` 默认值收敛为 `false` | 已同义 |
+| 双入口一致性 | 同一配置入口修改后行为一致 | 全局页与阅读页内入口最终都收敛到同一持久化链路 | 已同义 |
+
+##### 实施记录（做了什么 / 为什么 / 如何验证 / 兼容影响）
+
+- 做了什么：
+  - `SettingsService` 移除 schema 迁移阶段的整包重置，改为“读取 -> sanitize 归一 -> 必要时回写 -> 更新版本位”。
+  - `SettingsService` 在阅读设置 JSON 解析失败或结构异常时，自动回落默认并立即回写修复。
+  - `ReadingSettings.sanitize()` 新增 `pageTurnMode/pageDirection` 统一归一规则，消除仅初始化阶段归一导致的双入口漂移。
+  - `ReadingSettings` 将 `showHeaderLine` 默认值收敛为 legado 同义默认 `false`。
+  - 新增/更新定向测试，覆盖 schema 迁移保留、异常 JSON 自愈、保存路径归一与重启恢复。
+- 为什么：
+  - Step 4 的目标是把“字段边界 + 落盘迁移 + 异常回退 + 重启恢复”收敛成单一可信链路，避免用户配置在迁移时被清空或不同入口写入语义漂移。
+- 如何验证：
+  - `flutter test test/reading_settings_test.dart test/app_settings_test.dart`
+  - `flutter test test/reading_tip_settings_view_test.dart test/reading_preferences_view_test.dart test/reading_behavior_settings_views_test.dart test/reading_settings_navigation_parity_test.dart test/reader_bottom_menu_new_test.dart`
+- 兼容影响：
+  - 历史阅读配置不再因 schema 升级被整包重置；
+  - 旧字段/异常字段继续通过 `sanitize` 回落到安全值；
+  - 不影响书源解析链路与数据库结构。
+
+### Step 5：迁移级验收与证据归档（已完成，带阻塞结论）
 - Owner：`Core-Migration`
 - 依赖：Step 4
 - 并行性：串行（最终收口）
@@ -860,6 +1066,50 @@
 - 验证方式：
   - 验收报告与命令输出记录。
 
+#### Step 5 子任务 S5-01：验收证据归档与阻塞结论（已完成）
+
+##### 逐项对照清单（S5-01）
+
+| 类别 | 结论 |
+| --- | --- |
+| 排版一致性 | 已按 `Layout Parity Checklist` 全项 `done` 回填 |
+| 交互一致性 | 除 `S3B-07-R1` 外均已 `done`；9 宫格未迁移动作维持可观测提示兜底 |
+| 按钮与跳转层级一致性 | 已按 `Button & Navigation Parity Checklist` 全项 `done` 回填 |
+| 保留差异/阻塞 | `S3B-07-R1`（动作 `5/6/8/9/12/13` 依赖扩展能力解锁） |
+
+##### 命令验证结果（S5-01）
+
+- `flutter test test/reading_settings_test.dart test/app_settings_test.dart test/reading_tip_settings_view_test.dart test/reading_preferences_view_test.dart test/reading_behavior_settings_views_test.dart test/reading_settings_navigation_parity_test.dart test/reader_bottom_menu_new_test.dart`
+  - 结果：`All tests passed`。
+- `flutter analyze`（提交前阶段执行且仅执行一次）
+  - 结果：返回 `9 issues`（含 `reader_bottom_menu.dart` 的 `CupertinoButton.minSize` 废弃项与仓库既有告警）。
+- `flutter test test/reader_bottom_menu_new_test.dart`
+  - 结果：在将 `minSize` 替换为 `minimumSize: Size.zero` 后，定向用例 `All tests passed`。
+- `flutter test test/source_switch_candidate_sheet_test.dart test/reader_source_switch_helper_test.dart`
+  - 结果：在将 `source_switch_candidate_sheet.dart` 的 `CupertinoButton.minSize` 替换为 `minimumSize` 后，换源筛选相关用例 `All tests passed`。
+
+##### 手工回归记录（S5-01）
+
+- 核心链路 `search -> bookInfo -> toc -> content`、`explore -> bookInfo -> content`：
+  - 状态：`待设备回归`（本轮终端环境仅完成命令与测试证据归档）。
+- 配置链路“双入口修改互相回流 + 重启保持”：
+  - 状态：`待设备回归`（路径与预期已在本计划“验收与证据”章节固化）。
+
+##### 实施记录（做了什么 / 为什么 / 如何验证 / 兼容影响）
+
+- 做了什么：
+  - 回填迁移级逐项对照清单，确认排版、交互、按钮与跳转层级的验收结论。
+  - 在提交前阶段执行一次 `flutter analyze`，并记录告警清单与归因。
+  - 修复本轮相关文件 `reader_bottom_menu.dart` 的 `CupertinoButton.minSize` 废弃用法，改为 `minimumSize: Size.zero`。
+  - 修复 `source_switch_candidate_sheet.dart` 的 `CupertinoButton.minSize` 旧写法（`32/0`），统一改为 `minimumSize: const Size(32, 32) / Size.zero`。
+- 为什么：
+  - Step 5 目标是形成“可审计的验收证据 + 保留差异闭环”，避免仅凭口头结论宣称迁移一致。
+- 如何验证：
+  - 通过上述命令验证结果与三类 checklist 的状态回填。
+- 兼容影响：
+  - 不改变核心阅读链路语义；
+  - `reader_bottom_menu.dart` 与 `source_switch_candidate_sheet.dart` 仅修复 API 兼容写法，不改变按钮顺序、筛选语义与回调逻辑。
+
 ## Layout Parity Checklist（排版一致性）
 
 | 页面 | 状态 | 备注 |
@@ -870,7 +1120,7 @@
 | 翻页与按键（`ReadingPageSettingsView`） | done | 条目归位为“阈值/音量键/滚动无动画”，移除重复文本项 |
 | 状态栏与操作（`ReadingStatusActionSettingsView`） | done | 补齐“显示亮度条”，与阅读页内显示分组一致 |
 | 其他（`ReadingOtherSettingsView`） | done | 文本处理分组保留“简繁转换/净化章节标题”语义 |
-| 阅读页内设置面板（`SimpleReaderView`） | partial | 行为分组已与全局页对齐；样式页签排版仍待与 legado 逐项核验 |
+| 阅读页内设置面板（`SimpleReaderView`） | done | 已完成样式页签核验：补齐“章节标题”四项入口并将翻页模式收敛到界面入口 |
 
 ## Interaction Parity Checklist（交互一致性）
 
@@ -887,6 +1137,16 @@
 | 简繁转换 | done | 切换后正文与当前章节标题即时刷新，并保持持久化 |
 | 屏幕常亮 | done | 切换后即同步原生常亮能力，跨入口变更可回流阅读页 |
 | 换源候选筛选（书源名/最新章节） | done | 对齐 `changeSourceSearch` 语义，含空态与回传用例 |
+
+## Button & Navigation Parity Checklist（按钮与跳转层级一致性）
+
+| 核验项 | 状态 | 要点 |
+| --- | --- | --- |
+| 全局设置页按钮集合与顺序 | done | `GlobalReadingSettingsView` 保持“界面（样式） -> 设置（行为）”顺序，文案与显示条件同义 |
+| 二级设置页按钮集合与禁用条件 | done | 界面/行为 Hub 下钻按钮可点击条件稳定，阅读边界按钮禁用条件有测试覆盖 |
+| 阅读页内设置面板按钮与触发反馈 | done | 底栏四按钮顺序固定，点击回调一一对应；移除无 legado 对照的“恢复默认”入口 |
+| 点击后跳转层级与返回路径 | done | 新增导航回归测试覆盖“一级入口 -> 二级页 -> 返回”路径 |
+| 例外项记录闭环 | done | Step 3C 无新增例外；既有阻塞项仍沿用 `S3B-07-R1` 台账追踪 |
 
 ## 风险与回滚
 
@@ -930,13 +1190,14 @@
 
 - [x] Step 1：迁移基线固化（差异点清单 + 索引修复）
 - [x] Step 2：核心链路对照矩阵
-- [ ] Step 3A：界面（样式）迁移与排版核验（进行中：S3A-01/S3A-02/S3A-03/S3A-04 已完成，`SimpleReaderView` 样式页签排版仍待逐项核验）
+- [x] Step 3A：界面（样式）迁移与排版核验（S3A-01/S3A-02/S3A-03/S3A-04/S3A-05 已完成）
 - [ ] Step 3B：设置（行为）迁移与交互核验（进行中：S3B-01/S3B-02/S3B-03/S3B-04/S3B-05/S3B-06/S3B-07 已完成，保留差异 `S3B-07-R1`）
-- [ ] Step 4：配置持久化与迁移策略收敛
-- [ ] Step 5：迁移级验收与证据归档
+- [x] Step 3C：按钮与点击跳转层级同义核验（S3C-01 已完成）
+- [x] Step 4：配置持久化与迁移策略收敛（S4-01 已完成）
+- [x] Step 5：迁移级验收与证据归档（S5-01 已完成，含阻塞结论与命令证据）
 
-当前阻塞：`S3B-07-R1`（动作 `5/6/8/9/12/13` 依赖未解锁能力，暂以可观测提示兜底）。  
-下一步：继续核验 `SimpleReaderView` 样式页签排版与 legado 语义，完成 Step 3A 后进入 Step 4 持久化收口，并在扩展能力解锁后回补 `S3B-07-R1`。
+当前阻塞：`S3B-07-R1`（动作 `5/6/8/9/12/13` 依赖未解锁能力，暂以可观测提示兜底）；`flutter analyze` 仍有仓库级既有告警待后续清理（剩余数量待下次提交前 analyze 复核）。  
+下一步：等待“开始做扩展功能”解锁后回补 `S3B-07-R1`，并在后续任务中清理仓库级 analyze 历史告警后再推进计划 `done` 收口。
 
 ## Surprises & Discoveries
 
@@ -957,6 +1218,17 @@
 - 发现 legado 颜色配置以 `Int` 持久化，导入到 Dart 时可能出现有符号整型，需在 `ReadingSettings` 做 `ARGB` 归一化。
 - 发现 `ReadingBehaviorSettingsHubView` 在 widget test 环境会触发 `Row/Expanded` 的既有宽度约束断言；本轮回归改为锁定三个子页条目归属，不在本子任务扩散修复该历史问题。
 - 发现 `GlobalReadingSettingsView` 使用 `ShadButton + Expanded` 在 test 环境同样触发无界宽度断言，本轮改为 `CupertinoListSection` 收敛入口层级并规避约束问题。
+- 发现 `SimpleReaderView` 的“界面”入口（`allowedTabs[0,1]`）缺少标题四项且翻页模式误归属到“设置”页签，已在 `S3A-05` 回补并完成排版核验闭环。
+- `2026-02-19` 新增需求强调“按钮、排版、点击跳转层级”需与 legado 同义（仅 UI 风格可差异），计划已新增 Step 3C 做按钮级与路由级核验收口。
+- Step 3C 执行中确认 `SimpleReaderView` 仍保留“恢复默认阅读配置”扩展入口（legado 无对照），已在 `S3C-01` 移除。
+- Step 3C 执行中发现 `ReadingInterfaceSettingsHubView` 与 `ReadingBehaviorSettingsHubView` 的 `ShadButton + Expanded` 组合在无界宽度下会触发布局断言，已改为 `CupertinoButton` 容器收敛。
+- Step 3C 执行中发现 `ReaderBottomMenuNew` 底栏按钮在 `ShadButton` 约束下存在高度溢出与命中不稳定，已改为 `CupertinoButton` 并补充回归测试。
+- Step 4 执行中确认 `SettingsService` 的 schema 迁移曾采用整包重置策略，与 legado 的“版本位迁移不清配置”语义冲突，已改为非破坏迁移。
+- Step 4 执行中确认 `pageDirection` 仅在初始化阶段归一，保存路径存在漂移风险；已下沉到 `ReadingSettings.sanitize` 统一归一。
+- Step 4 执行中确认阅读设置 JSON 解析失败后缺少立即回写，已补齐异常自愈落盘。
+- Step 5 执行中确认 `flutter analyze`（唯一一次）报告 9 条问题，其中 `reader_bottom_menu.dart` 为本轮相关告警，其余 8 条为仓库既有告警。
+- Step 5 执行中确认将 `CupertinoButton.minSize` 替换为 `minimumSize: Size.zero` 后，底栏定向测试保持通过。
+- Step 5 收口补充中发现换源候选面板仍残留 `CupertinoButton.minSize` 旧写法，已统一替换为 `minimumSize` 并通过筛选面板定向测试验证。
 
 ## Decision Log
 
@@ -1000,6 +1272,28 @@
   - 原因：入口层级需与 legado 主语义同义，避免在全局入口暴露无对照扩展流程。
 - 决策 20：`ReadingPreferencesView` 收敛为“样式/排版/高级”三组，并补齐“字体/字重/字距”入口，同时移除“亮度/恢复默认”扩展项。
   - 原因：对齐 `ReadStyleDialog` 的核心分组与控件顺序，防止页面语义被扩展入口稀释。
+- 决策 21：阅读页内“翻页模式”入口收敛到“界面（样式）”侧，并在同一入口补齐“章节标题”四项配置。
+  - 原因：对齐 legado `ReadStyleDialog + TipConfigDialog` 入口语义，关闭 Step 3A 样式页签排版遗留项。
+- 决策 22：将“按钮集合/顺序/点击条件 + 点击跳转层级”提升为独立阻塞验收项（Step 3C），UI 风格差异不纳入功能差异。
+  - 原因：需求方最新明确要求除 UI 风格外保持与 legado 一致，需避免“入口同名但跳转层级偏移”。
+- 决策 23：移除阅读页内“恢复默认阅读配置”入口，不以确认弹层保留扩展流程。
+  - 原因：legado 无对应按钮语义，保留会导致按钮集合与入口层级偏差。
+- 决策 24：界面/行为 Hub 的入口按钮统一改用 `CupertinoButton` 容器实现，不继续使用 `ShadButton + Expanded` 组合。
+  - 原因：该组合在无界宽度下存在布局断言，影响按钮可点击条件与测试可复现性。
+- 决策 25：阅读底栏四按钮触发容器改用 `CupertinoButton`，并通过定向测试锁定“顺序 + 回调映射 + 边界可点击性”。
+  - 原因：`ShadButton` 约束导致高度溢出与命中不稳定，不满足 Step 3C 验收口径。
+- 决策 26：Step 4 将 schema 迁移策略调整为“非破坏迁移”，禁止低版本升级时整包重置阅读配置。
+  - 原因：legado 基线是版本位迁移与兼容读取，不应在迁移阶段丢失用户阅读配置。
+- 决策 27：将 `pageTurnMode/pageDirection` 归一逻辑下沉到 `ReadingSettings.sanitize`，由模型层统一兜底。
+  - 原因：初始化归一不足以覆盖双入口保存路径，模型层收口可避免同字段跨入口漂移。
+- 决策 28：阅读设置解析失败时立即回写默认可解析 JSON，不保留“坏数据原样留存”。
+  - 原因：保证冷启动可重复稳定，避免同一异常在后续每次启动重复触发。
+- 决策 29：Step 5 的 `flutter analyze` 严格按规范执行一次，不因修复局部告警追加二次全量 analyze。
+  - 原因：遵循 AGENTS“提交前仅执行一次 `flutter analyze`”的约束。
+- 决策 30：仅修复本轮相关文件的 analyze 告警，其余仓库级既有告警在后续独立任务中处理。
+  - 原因：避免在迁移收口阶段扩散到非本任务模块，降低回归面。
+- 决策 31：在不追加 `flutter analyze` 的前提下，优先清理已定位的 `CupertinoButton.minSize` 旧 API 并以定向测试闭环验证。
+  - 原因：遵守“提交前仅一次 analyze”约束，同时推进既有兼容告警的可执行收口项。
 
 ## Outcomes & Retrospective
 
@@ -1020,7 +1314,22 @@
   - 已完成 S3A-02（`headerMode/footerMode/tipColor` 语义回补）：模式联动、颜色配置与双入口交互已对齐，`S3A-01-R1/R2` 已关闭。
   - 已完成 S3A-03（行为设置页排版归类）：修复“净化章节标题”重复归属、补齐“显示亮度条”全局入口，并完成三子页定向回归测试。
   - 已完成 S3A-04（全局入口与样式页排版收敛）：全局入口收敛为“界面/行为”双入口，样式页补齐字体/字重/字距并移除无 legado 对照扩展项。
-- 后续回填项（Step 3A/3B/4/5 完成后补充）：
-  - 差异回补完成度；
-  - 排版/交互核验通过率；
-  - 兼容性回归结果与残留风险。
+  - 已完成 S3A-05（阅读页内样式页签核验）：界面入口补齐标题四项，并将翻页模式入口收敛到样式页签，Step 3A 正式收口。
+- Step 3C 阶段进展：
+  - 已完成 S3C-01（按钮与跳转层级核验）：移除阅读页内“恢复默认”扩展入口，完成底栏四按钮顺序/反馈核验，并收敛二级 Hub 按钮热区实现。
+  - 已新增 `reading_settings_navigation_parity_test.dart` 与 `reader_bottom_menu_new_test.dart`，覆盖“按钮排序 + 回调映射 + 层级跳转与返回路径”。
+- Step 4 阶段进展：
+  - 已完成 S4-01（持久化迁移策略与字段边界归一）：schema 迁移改为非破坏策略，异常 JSON 自愈回写，`pageTurnMode/pageDirection` 归一下沉到模型层。
+  - 已新增/更新定向测试，覆盖“迁移保留历史值 + 异常回退 + 保存即归一 + 重启恢复”四类场景。
+- Step 5 阶段进展：
+  - 已完成 S5-01（验收证据归档与阻塞结论）：三类 checklist 全量回填，命令验证结果落盘。
+  - 已在提交前阶段执行一次 `flutter analyze` 并记录 9 条问题；其中本轮相关告警已修复并通过底栏定向测试验证。
+  - 已补充修复换源候选面板中的 `CupertinoButton.minSize` 旧写法，并通过换源筛选定向测试验证不回归。
+  - 计划维持 `blocked`，待扩展能力解锁后回补 `S3B-07-R1`，并在后续任务中清理仓库级 analyze 既有告警。
+- 计划收口更新（`2026-02-19`）：
+  - 根据最新需求新增 Step 3C，要求对“按钮集合/排序/可点击条件/点击反馈”和“点击跳转层级/返回路径”做逐项核验。
+  - Step 4 依赖更新为 Step 3C，确保先完成按钮与跳转层级一致性后再做持久化收口。
+- 后续回填项（阻塞解除后补充）：
+  - `S3B-07-R1` 解锁后的回补实现与验收结果；
+  - 仓库级 analyze 既有告警清理结果；
+  - 手工设备回归记录与截图证据。

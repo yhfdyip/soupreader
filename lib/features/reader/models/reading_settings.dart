@@ -86,6 +86,12 @@ class ReadingSettings {
   static const int tipDividerColorDefault = -1;
   static const int tipDividerColorFollowContent = 0;
 
+  static PageDirection pageDirectionForMode(PageTurnMode mode) {
+    return mode == PageTurnMode.scroll
+        ? PageDirection.vertical
+        : PageDirection.horizontal;
+  }
+
   const ReadingSettings({
     // 安装后默认值：尽量对齐 Legado 的阅读默认体验
     this.fontSize = 24.0,
@@ -136,7 +142,7 @@ class ReadingSettings {
     // 页眉/页脚配置默认值
     this.hideHeader = false,
     this.hideFooter = false,
-    this.showHeaderLine = true,
+    this.showHeaderLine = false,
     this.showFooterLine = true,
     this.headerMode = headerModeHideWhenStatusBarShown,
     this.footerMode = footerModeShow,
@@ -326,9 +332,8 @@ class ReadingSettings {
         pageTurnModeIndex.clamp(0, PageTurnMode.values.length - 1);
     final safePageTurnMode = PageTurnMode.values[safePageTurnModeIndex];
 
-    final defaultPageDirectionIndex = safePageTurnMode == PageTurnMode.scroll
-        ? PageDirection.vertical.index
-        : PageDirection.horizontal.index;
+    final defaultPageDirectionIndex =
+        pageDirectionForMode(safePageTurnMode).index;
     final rawPageDirection = json['pageDirection'];
     final pageDirectionIndex =
         _toInt(rawPageDirection, defaultPageDirectionIndex);
@@ -509,6 +514,7 @@ class ReadingSettings {
       max: footerModeHide,
       fallback: footerModeShow,
     );
+    final safePageDirection = pageDirectionForMode(pageTurnMode);
     return ReadingSettings(
       fontSize: _safeDouble(
         fontSize,
@@ -612,7 +618,7 @@ class ReadingSettings {
       ),
       autoReadSpeed: _safeInt(autoReadSpeed, min: 1, max: 100, fallback: 10),
       pageAnimDuration: legacyPageAnimDuration,
-      pageDirection: pageDirection,
+      pageDirection: safePageDirection,
       pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 9999, fallback: 0),
       noAnimScrollPage: noAnimScrollPage,
       volumeKeyPage: volumeKeyPage,

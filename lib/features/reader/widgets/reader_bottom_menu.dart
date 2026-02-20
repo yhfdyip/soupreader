@@ -380,9 +380,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 : scheme.border.withValues(alpha: 0.7),
           ),
         ),
-        child: ShadButton.ghost(
-          width: double.infinity,
+        child: CupertinoButton(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          minimumSize: Size.zero,
           onPressed: () {
             setState(() => _selectedTab = tab);
             onTap();
