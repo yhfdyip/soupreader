@@ -1,6 +1,6 @@
 # 阅读器界面与设置继续对齐 legado（ReadStyle/MoreConfig）ExecPlan
 
-- 状态：`active`
+- 状态：`done`
 - 日期：`2026-02-20`
 - 负责人：`codex`
 - 范围类型：`迁移级别（UI/设置语义同义）`
@@ -113,7 +113,7 @@
 - 目标：完成本任务逐项检查清单、证据回填、兼容影响记录。
 - 预期结果：形成可复现的验收结果，不使用“基本一致”笼统表述。
 - 验证方式：手工路径 + 定向测试记录（提交前不提前跑 `flutter analyze`）。
-- 状态：`pending`
+- 状态：`completed`
 
 ## 风险与回滚
 
@@ -159,6 +159,17 @@
 - 开发过程：执行与改动相关的定向测试/手工回归，不执行 `flutter analyze`。
 - 提交推送前：执行且仅执行一次 `flutter analyze`。
 
+### Step 5 逐项检查清单回填（`2026-02-20`）
+
+| 检查项 | 核验方式 | 结果 | 备注 |
+|---|---|---|---|
+| 入口 | 自动化：`test/reader_bottom_menu_new_test.dart`（验证 `目录/朗读/界面/设置` 顺序与回调）；代码复核：`lib/features/reader/views/simple_reader_view.dart:2965`（设置入口）与 `lib/features/reader/views/simple_reader_view.dart:4640`（信息入口） | 通过 | `界面` 与 `设置` 入口职责分离保持同义 |
+| 状态 | 自动化：`test/reading_settings_test.dart`（`keep_light`/新增字段 roundtrip 与 sanitize）；`test/app_settings_test.dart`（`SettingsService` 持久化与迁移） | 通过 | 重进后字段可恢复，旧配置兼容迁移 |
+| 异常 | 自动化：`test/paged_reader_widget_non_simulation_test.dart`（滚动/覆盖翻页拖拽取消边界）；代码复核：`lib/features/reader/views/simple_reader_view.dart:1468`（无书源回退缓存内容）、`lib/features/reader/views/simple_reader_view.dart:3043`（空章节保护） | 通过 | 覆盖“无书源/空章节/滚动模式切换”防崩溃路径 |
+| 文案 | 代码复核：`lib/features/reader/views/simple_reader_view.dart:6252`、`lib/features/reader/views/simple_reader_view.dart:6336`、`lib/features/reader/views/simple_reader_view.dart:6346`；`lib/features/reader/views/simple_reader_view.dart:3722`（设置编码不可用原因） | 通过 | 文案维持 legado 业务语义，阻塞项提示可观测 |
+| 排版 | 代码复核：`lib/features/reader/views/simple_reader_view.dart:5810`（`360 + bottomInset`）；自动化：`test/reader_bottom_menu_new_test.dart`（四入口热区 `60dp`） | 通过 | 弹层高度与高频热区语义对齐 legacy |
+| 交互触发 | 自动化：`test/reader_tip_selection_helper_test.dart`（Tip 互斥与清理逻辑）；`test/reader_system_ui_helper_test.dart`（方向/系统栏状态矩阵）；代码复核：`lib/features/reader/views/simple_reader_view.dart:6362`（点击区域配置） | 通过 | `信息/点击区域/方向` 等触发链路可达且状态联动正确 |
+
 ## Progress
 
 - `2026-02-20`：
@@ -175,8 +186,7 @@
     - 完成 Step 3B：`界面 -> 信息` 入口改为独立弹层链路 `_showLegacyTipConfigDialog`，不再复用通用“阅读设置页签弹层”；
     - `信息` 弹层按 `TipConfigDialog` 语义拆分为四组：`正文标题`、`页眉`、`页脚`、`页眉页脚`，覆盖标题模式/字号与上下间距、页眉页脚显示模式、左右中槽位配置、文字与分割线颜色；
     - `信息` 入口触发行为对齐 legado：在 `ReadStyleDialog` 内可直接打开信息配置弹层，不再切走到“设置”入口链路。
-  - 进行中：
-    - Step 5：逐项检查清单与最终验收证据回填。
+    - 完成 Step 5：逐项检查清单回填、证据闭环与兼容影响复核，任务状态由 `active` 置为 `done`。
   - 本轮新增（Step 4）：
     - 补齐 `pref_config_read.xml` 未覆盖主线 key 的可达实现：
       - `paddingDisplayCutouts`：新增设置字段并接入翻页/滚动模式的安全区留边逻辑；
@@ -211,6 +221,7 @@
     - `dart format lib/features/reader/widgets/reader_bottom_menu.dart`
     - `dart format lib/features/reader/widgets/paged_reader_widget.dart`
     - `flutter test test/reading_settings_test.dart test/reader_bottom_menu_new_test.dart test/paged_reader_widget_non_simulation_test.dart test/simple_reader_view_compile_test.dart`
+    - `flutter test test/reading_settings_test.dart test/app_settings_test.dart test/reader_bottom_menu_new_test.dart test/paged_reader_widget_non_simulation_test.dart test/reader_legacy_menu_helper_test.dart test/reader_tip_selection_helper_test.dart test/reader_system_ui_helper_test.dart test/simple_reader_view_compile_test.dart`
     - 未执行 `flutter analyze`（符合仓库规则：仅提交前执行一次）。
   - 兼容影响：
     - `设置` 入口交互路径发生变化（由“四页签弹层”改为“独立 MoreConfig 弹层”）；
@@ -253,6 +264,7 @@
 5. Step 3A 采用“时长枚举主字段 + 布尔兼容迁移”策略，优先保证 legado 语义同义，同时避免破坏既有持久化数据。
 6. Step 3B 采用“先恢复独立入口链路，再按 TipConfig 分组落位”的策略；`tip` 编码层差异保留到 Step 4 统一分类并决定回补方案。
 7. Step 4 对 `UI-S4/UI-S5` 采用“主线先同义、例外先落盘”策略：可直接同义的 key 本轮补齐，无法等价项按 `blocked` 记录原因/影响/替代/回补计划。
+8. Step 5 采用“自动化回归 + 关键分支代码复核”闭环方式，逐项回填入口/状态/异常/文案/排版/交互触发，避免仅凭主观结论宣称完成。
 
 ## Outcomes & Retrospective
 
@@ -262,4 +274,7 @@
 - 当前里程碑（Step 4）已完成：
   - `paddingDisplayCutouts` / `showReadTitleAddition` / `readBarStyleFollowPage` 已落地并可持久化；
   - `customPageKey` / `volumeKeyPageOnPlay`（运行态联动）/ `设置编码` 已按规则记录为 `blocked` 例外项；
-  - 仍待完成 Step 5 的最终逐项验收与证据收尾后再进入任务完成态。
+- 当前里程碑（Step 5）已完成：
+  - 逐项检查清单六项全部完成回填并给出证据；
+  - 任务主线实现与文档收尾完成，ExecPlan 状态切换为 `done`；
+  - 保留差异仍仅限已登记的 `blocked` 项，未新增未记录偏差。

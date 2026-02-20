@@ -50,7 +50,7 @@ class ReaderTopMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final horizontalPadding =
-        MediaQuery.of(context).size.width < 390 ? 8.0 : 10.0;
+        MediaQuery.of(context).size.width < 390 ? 8.0 : 12.0;
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final accent =
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
@@ -68,10 +68,10 @@ class ReaderTopMenu extends StatelessWidget {
     final menuSecondaryText = menuPrimaryText.withValues(alpha: 0.78);
     final menuTertiaryText = menuPrimaryText.withValues(alpha: 0.62);
     final controlBg = menuBgBase.withValues(
-      alpha: readBarStyleFollowPage ? 0.40 : 0.28,
+      alpha: readBarStyleFollowPage ? 0.36 : 0.24,
     );
     final controlBorder = menuPrimaryText.withValues(
-      alpha: readBarStyleFollowPage ? 0.24 : 0.30,
+      alpha: readBarStyleFollowPage ? 0.2 : 0.24,
     );
 
     return Positioned(
@@ -80,10 +80,10 @@ class ReaderTopMenu extends StatelessWidget {
       right: 0,
       child: Container(
         padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 6,
+          top: MediaQuery.of(context).padding.top + 7,
           left: horizontalPadding,
           right: horizontalPadding,
-          bottom: 10,
+          bottom: 8,
         ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -91,11 +91,17 @@ class ReaderTopMenu extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [
               menuBgBase.withValues(
-                  alpha: readBarStyleFollowPage ? 0.94 : 0.82),
+                  alpha: readBarStyleFollowPage ? 0.94 : 0.86),
               menuBgBase.withValues(
-                  alpha: readBarStyleFollowPage ? 0.74 : 0.58),
+                  alpha: readBarStyleFollowPage ? 0.76 : 0.62),
               menuBgBase.withValues(alpha: 0.0),
             ],
+          ),
+          border: Border(
+            bottom: BorderSide(
+              color: menuPrimaryText.withValues(alpha: 0.06),
+              width: 0.8,
+            ),
           ),
         ),
         child: Row(
@@ -107,7 +113,7 @@ class ReaderTopMenu extends StatelessWidget {
               backgroundColor: controlBg,
               borderColor: controlBorder,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 7),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,13 +128,13 @@ class ReaderTopMenu extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: menuPrimaryText,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   if (showTitleAddition) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: onOpenChapterLink,
@@ -139,7 +145,7 @@ class ReaderTopMenu extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: menuSecondaryText,
-                          fontSize: 12,
+                          fontSize: 11.5,
                         ),
                       ),
                     ),
@@ -155,14 +161,14 @@ class ReaderTopMenu extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: menuTertiaryText,
-                          fontSize: 11,
+                          fontSize: 10.5,
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             if (showSourceAction && showTitleAddition) ...[
               _buildActionChip(
                 label: sourceActionLabel,
@@ -172,8 +178,9 @@ class ReaderTopMenu extends StatelessWidget {
                 textColor: menuPrimaryText,
                 backgroundColor: controlBg,
                 borderColor: controlBorder,
+                maxWidth: MediaQuery.of(context).size.width < 390 ? 56 : 74,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
             ],
             _buildActionChip(
               label: cleanChapterTitleEnabled ? '净化中' : '净化',
@@ -184,7 +191,7 @@ class ReaderTopMenu extends StatelessWidget {
               backgroundColor: controlBg,
               borderColor: controlBorder,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             _buildRoundIcon(
               icon: CupertinoIcons.refresh,
               onTap: onRefreshChapter,
@@ -192,7 +199,7 @@ class ReaderTopMenu extends StatelessWidget {
               backgroundColor: controlBg,
               borderColor: controlBorder,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             _buildRoundIcon(
               icon: CupertinoIcons.search,
               onTap: onSearchContent,
@@ -200,7 +207,7 @@ class ReaderTopMenu extends StatelessWidget {
               backgroundColor: controlBg,
               borderColor: controlBorder,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             _buildRoundIcon(
               icon: CupertinoIcons.list_bullet,
               onTap: onShowChapterList,
@@ -208,7 +215,7 @@ class ReaderTopMenu extends StatelessWidget {
               backgroundColor: controlBg,
               borderColor: controlBorder,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             _buildRoundIcon(
               icon: CupertinoIcons.ellipsis,
               onTap: onShowMoreMenu,
@@ -233,11 +240,11 @@ class ReaderTopMenu extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        width: 34,
-        height: 34,
+        width: 32,
+        height: 32,
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(17),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: borderColor,
           ),
@@ -245,7 +252,7 @@ class ReaderTopMenu extends StatelessWidget {
         child: Icon(
           icon,
           color: iconColor,
-          size: 18,
+          size: 17,
         ),
       ),
     );
@@ -259,24 +266,29 @@ class ReaderTopMenu extends StatelessWidget {
     required Color textColor,
     required Color backgroundColor,
     required Color borderColor,
+    double? maxWidth,
   }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        constraints:
+            maxWidth == null ? null : BoxConstraints(maxWidth: maxWidth),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: active ? accent.withValues(alpha: 0.2) : backgroundColor,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(13),
           border: Border.all(
             color: active ? accent : borderColor,
           ),
         ),
         child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: active ? accent : textColor,
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: FontWeight.w600,
           ),
         ),

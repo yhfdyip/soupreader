@@ -3284,24 +3284,36 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final accent = _isUiDark
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
+    final navBtnBg = _uiPanelBg.withValues(alpha: _isUiDark ? 0.88 : 0.94);
+    final navBtnShadow = CupertinoColors.black.withValues(
+      alpha: _isUiDark ? 0.32 : 0.12,
+    );
+    final sideButtonTop = MediaQuery.of(context).size.height * 0.44;
 
     return Stack(
       children: [
         Positioned(
           left: 16,
-          top: MediaQuery.of(context).size.height * 0.45,
+          top: sideButtonTop,
           child: CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _contentSearchHits.isEmpty
                 ? null
                 : () => _navigateSearchHit(-1),
             child: Container(
-              width: 40,
-              height: 40,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: _uiCardBg,
-                borderRadius: BorderRadius.circular(20),
+                color: navBtnBg,
+                borderRadius: BorderRadius.circular(19),
                 border: Border.all(color: _uiBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: navBtnShadow,
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Icon(CupertinoIcons.chevron_left, color: _uiTextStrong),
             ),
@@ -3309,18 +3321,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         ),
         Positioned(
           right: 16,
-          top: MediaQuery.of(context).size.height * 0.45,
+          top: sideButtonTop,
           child: CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed:
                 _contentSearchHits.isEmpty ? null : () => _navigateSearchHit(1),
             child: Container(
-              width: 40,
-              height: 40,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: _uiCardBg,
-                borderRadius: BorderRadius.circular(20),
+                color: navBtnBg,
+                borderRadius: BorderRadius.circular(19),
                 border: Border.all(color: _uiBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: navBtnShadow,
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Icon(CupertinoIcons.chevron_right, color: _uiTextStrong),
             ),
@@ -3333,11 +3352,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           child: SafeArea(
             top: false,
             child: Container(
+              margin: const EdgeInsets.fromLTRB(8, 0, 8, 0),
               decoration: BoxDecoration(
-                color: _uiPanelBg.withValues(alpha: 0.98),
-                border: Border(top: BorderSide(color: _uiBorder)),
+                color: _uiPanelBg.withValues(alpha: 0.97),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(14),
+                ),
+                border: Border.all(color: _uiBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: navBtnShadow,
+                    blurRadius: 14,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 9),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -3449,10 +3479,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       padding: EdgeInsets.zero,
       onPressed: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 7),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: _uiCardBg,
-          borderRadius: BorderRadius.circular(10),
+          color: _uiCardBg.withValues(alpha: _isUiDark ? 0.82 : 0.96),
+          borderRadius: BorderRadius.circular(11),
           border: Border.all(color: _uiBorder),
         ),
         child: Column(
@@ -3460,7 +3490,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           children: [
             Icon(
               icon,
-              size: 17,
+              size: 16,
               color: enabled ? color : _uiTextSubtle,
             ),
             const SizedBox(height: 4),
@@ -3468,7 +3498,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               label,
               style: TextStyle(
                 color: enabled ? color : _uiTextSubtle,
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -3479,30 +3509,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Widget _buildFloatingActionRail() {
-    final topOffset = MediaQuery.of(context).padding.top + 86;
+    final topOffset = MediaQuery.of(context).padding.top + 92;
     final actionOrder = ReaderLegacyQuickActionHelper.legacyOrder;
     return Positioned(
-      right: 10,
+      right: 8,
       top: topOffset,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF000000).withValues(alpha: 0.42),
-          borderRadius: BorderRadius.circular(24),
-          border:
-              Border.all(color: CupertinoColors.white.withValues(alpha: 0.24)),
+          color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.64 : 0.84),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: _uiBorder),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF000000).withValues(alpha: 0.22),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: CupertinoColors.black
+                  .withValues(alpha: _isUiDark ? 0.24 : 0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
         child: Column(
           children: List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
             if (index.isOdd) {
-              return const SizedBox(height: 8);
+              return const SizedBox(height: 6);
             }
             final action = actionOrder[index ~/ 2];
             return _buildLegacyQuickActionButton(action);
@@ -3556,13 +3586,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
-        width: 40,
-        height: 40,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
           color: active
               ? _uiAccent.withValues(alpha: 0.22)
-              : const Color(0xFF000000).withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(20),
+              : _uiPanelBg.withValues(alpha: _isUiDark ? 0.62 : 0.8),
+          borderRadius: BorderRadius.circular(19),
           border: Border.all(
             color: active ? _uiAccent : _uiBorder,
           ),
@@ -3572,7 +3602,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           label: semanticLabel,
           child: Icon(
             icon,
-            size: 20,
+            size: 19,
             color: active ? _uiAccent : _uiTextStrong,
           ),
         ),

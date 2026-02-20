@@ -79,6 +79,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final panelBorder = followPage
         ? widget.currentTheme.text.withValues(alpha: 0.22)
         : scheme.border.withValues(alpha: _isDarkMode ? 0.72 : 0.58);
+    final panelShadow = followPage
+        ? widget.currentTheme.text.withValues(alpha: 0.08)
+        : CupertinoColors.black.withValues(alpha: _isDarkMode ? 0.26 : 0.12);
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
 
@@ -110,6 +113,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                   border: Border(
                     top: BorderSide(color: panelBorder),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: panelShadow,
+                      blurRadius: 14,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
                 ),
                 padding: EdgeInsets.only(bottom: bottomPadding > 0 ? 4 : 8),
                 child: Column(
@@ -156,7 +166,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 5, 20, 5),
+      padding: const EdgeInsets.fromLTRB(18, 4, 18, 6),
       child: Row(
         children: [
           _buildChapterTextButton(
@@ -224,13 +234,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 13.5,
             color: color,
-            fontWeight: enabled ? FontWeight.w500 : FontWeight.w400,
+            fontWeight: enabled ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
       ),
@@ -254,10 +264,10 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       alignment: Alignment.topCenter,
       child: Container(
         key: _brightnessPanelKey,
-        width: 40,
+        width: 42,
         decoration: BoxDecoration(
           color: panelColor,
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: borderColor,
           ),
@@ -275,7 +285,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 );
               },
               child: SizedBox(
-                width: 40,
+                width: 42,
                 height: 40,
                 child: Icon(
                   CupertinoIcons.brightness,
@@ -335,7 +345,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 );
               },
               child: SizedBox(
-                width: 40,
+                width: 42,
                 height: 40,
                 child: Icon(
                   CupertinoIcons.arrow_left_right,
@@ -352,7 +362,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
 
   Widget _buildBottomTabs({required Color foreground}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.only(bottom: 6, top: 1),
       child: Row(
         children: [
           const Spacer(),
@@ -410,7 +420,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 child: Center(
                   child: Icon(
                     icon,
-                    size: 20,
+                    size: 19,
                     color: foreground,
                   ),
                 ),
@@ -421,9 +431,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   color: foreground,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
