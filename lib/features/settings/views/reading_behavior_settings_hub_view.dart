@@ -34,7 +34,7 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
                 _buildItem(
                   context,
                   title: '翻页与按键',
-                  info: '阈值 / 音量键 / 滚动无动画',
+                  info: '阈值 / 音量键 / 鼠标滚轮 / 长按按键',
                   onTap: () => Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) => const ReadingPageSettingsView(),
@@ -47,7 +47,7 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
                 _buildItem(
                   context,
                   title: '状态栏与操作',
-                  info: '状态栏显示 / 亮度条 / 点击动作',
+                  info: '状态栏/导航栏 / 亮度条 / 点击动作',
                   onTap: () => Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) =>
@@ -61,7 +61,7 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
                 _buildItem(
                   context,
                   title: '其他阅读行为',
-                  info: '自动阅读 / 常亮 / 繁简 / 净化标题',
+                  info: '方向 / 返回键 / 常亮 / 繁简 / 净化标题',
                   onTap: () => Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) => const ReadingOtherSettingsView(),

@@ -58,6 +58,36 @@ void main() {
     expect(invalid.pageTouchSlop, 0);
   });
 
+  test('ReadingSettings keeps legado core switch defaults for O-04 step1', () {
+    final defaults = ReadingSettings.fromJson(<String, dynamic>{});
+    expect(defaults.hideNavigationBar, isFalse);
+    expect(defaults.mouseWheelPage, isTrue);
+    expect(defaults.keyPageOnLongPress, isFalse);
+    expect(defaults.disableReturnKey, isFalse);
+    expect(
+      defaults.screenOrientation,
+      ReadingSettings.screenOrientationUnspecified,
+    );
+  });
+
+  test('ReadingSettings sanitizes legacy screenOrientation range', () {
+    final valid = ReadingSettings.fromJson(<String, dynamic>{
+      'screenOrientation': 4,
+    });
+    expect(
+      valid.screenOrientation,
+      ReadingSettings.screenOrientationReversePortrait,
+    );
+
+    final invalid = ReadingSettings.fromJson(<String, dynamic>{
+      'screenOrientation': 99,
+    });
+    expect(
+      invalid.screenOrientation,
+      ReadingSettings.screenOrientationUnspecified,
+    );
+  });
+
   test('ReadingSettings keeps legacy fixed pageAnimDuration', () {
     final defaults = ReadingSettings.fromJson(<String, dynamic>{});
     expect(

@@ -13,6 +13,7 @@ class ReadingSettings {
   final PageTurnMode pageTurnMode;
   final bool keepScreenOn;
   final bool showStatusBar; // 是否显示系统状态栏
+  final bool hideNavigationBar; // 是否隐藏系统导航栏
   final bool showBattery;
   final bool showTime;
   final bool showProgress;
@@ -51,6 +52,10 @@ class ReadingSettings {
   final int pageTouchSlop; // 翻页触发阈值（0=系统默认，1-9999=自定义）
   final bool noAnimScrollPage; // 滚动翻页无动画（对标 legado）
   final bool volumeKeyPage; // 音量键翻页
+  final bool mouseWheelPage; // 鼠标滚轮翻页（对标 legado）
+  final bool keyPageOnLongPress; // 按键长按翻页（对标 legado）
+  final bool disableReturnKey; // 禁用返回键（对标 legado）
+  final int screenOrientation; // 屏幕方向（0~4，对标 legado）
 
   // === 页眉/页脚配置 ===
   final bool hideHeader; // 隐藏页眉
@@ -85,6 +90,11 @@ class ReadingSettings {
   static const int tipColorFollowContent = 0;
   static const int tipDividerColorDefault = -1;
   static const int tipDividerColorFollowContent = 0;
+  static const int screenOrientationUnspecified = 0;
+  static const int screenOrientationPortrait = 1;
+  static const int screenOrientationLandscape = 2;
+  static const int screenOrientationSensor = 3;
+  static const int screenOrientationReversePortrait = 4;
 
   static PageDirection pageDirectionForMode(PageTurnMode mode) {
     return mode == PageTurnMode.scroll
@@ -107,6 +117,7 @@ class ReadingSettings {
     this.pageTurnMode = PageTurnMode.cover,
     this.keepScreenOn = false,
     this.showStatusBar = true,
+    this.hideNavigationBar = false,
     this.showBattery = true,
     this.showTime = true,
     this.showProgress = true,
@@ -139,6 +150,10 @@ class ReadingSettings {
     // 对标 legado：滚动翻页默认保留动画
     this.noAnimScrollPage = false,
     this.volumeKeyPage = true,
+    this.mouseWheelPage = true,
+    this.keyPageOnLongPress = false,
+    this.disableReturnKey = false,
+    this.screenOrientation = screenOrientationUnspecified,
     // 页眉/页脚配置默认值
     this.hideHeader = false,
     this.hideFooter = false,
@@ -380,6 +395,7 @@ class ReadingSettings {
       pageTurnMode: safePageTurnMode,
       keepScreenOn: _toBool(json['keepScreenOn'], false),
       showStatusBar: _toBool(json['showStatusBar'], true),
+      hideNavigationBar: _toBool(json['hideNavigationBar'], false),
       showBattery: _toBool(json['showBattery'], true),
       showTime: _toBool(json['showTime'], true),
       showProgress: _toBool(json['showProgress'], true),
@@ -411,6 +427,13 @@ class ReadingSettings {
       pageTouchSlop: _toInt(json['pageTouchSlop'], 0),
       noAnimScrollPage: _toBool(json['noAnimScrollPage'], false),
       volumeKeyPage: _toBool(json['volumeKeyPage'], true),
+      mouseWheelPage: _toBool(json['mouseWheelPage'], true),
+      keyPageOnLongPress: _toBool(json['keyPageOnLongPress'], false),
+      disableReturnKey: _toBool(json['disableReturnKey'], false),
+      screenOrientation: _toInt(
+        json['screenOrientation'],
+        screenOrientationUnspecified,
+      ),
       // 页眉/页脚配置
       hideHeader:
           _toBool(json['hideHeader'], parsedHeaderMode == headerModeHide),
@@ -448,6 +471,7 @@ class ReadingSettings {
       'pageTurnMode': pageTurnMode.index,
       'keepScreenOn': keepScreenOn,
       'showStatusBar': showStatusBar,
+      'hideNavigationBar': hideNavigationBar,
       'showBattery': showBattery,
       'showTime': showTime,
       'showProgress': showProgress,
@@ -478,6 +502,10 @@ class ReadingSettings {
       'pageTouchSlop': pageTouchSlop,
       'noAnimScrollPage': noAnimScrollPage,
       'volumeKeyPage': volumeKeyPage,
+      'mouseWheelPage': mouseWheelPage,
+      'keyPageOnLongPress': keyPageOnLongPress,
+      'disableReturnKey': disableReturnKey,
+      'screenOrientation': screenOrientation,
       // 页眉/页脚配置
       'hideHeader': hideHeader,
       'hideFooter': hideFooter,
@@ -557,6 +585,7 @@ class ReadingSettings {
       pageTurnMode: pageTurnMode,
       keepScreenOn: keepScreenOn,
       showStatusBar: showStatusBar,
+      hideNavigationBar: hideNavigationBar,
       showBattery: showBattery,
       showTime: showTime,
       showProgress: showProgress,
@@ -622,6 +651,15 @@ class ReadingSettings {
       pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 9999, fallback: 0),
       noAnimScrollPage: noAnimScrollPage,
       volumeKeyPage: volumeKeyPage,
+      mouseWheelPage: mouseWheelPage,
+      keyPageOnLongPress: keyPageOnLongPress,
+      disableReturnKey: disableReturnKey,
+      screenOrientation: _safeInt(
+        screenOrientation,
+        min: screenOrientationUnspecified,
+        max: screenOrientationReversePortrait,
+        fallback: screenOrientationUnspecified,
+      ),
       hideHeader: safeHeaderMode == headerModeHide,
       hideFooter: safeFooterMode == footerModeHide,
       showHeaderLine: showHeaderLine,
@@ -675,6 +713,7 @@ class ReadingSettings {
     PageTurnMode? pageTurnMode,
     bool? keepScreenOn,
     bool? showStatusBar,
+    bool? hideNavigationBar,
     bool? showBattery,
     bool? showTime,
     bool? showProgress,
@@ -705,6 +744,10 @@ class ReadingSettings {
     int? pageTouchSlop,
     bool? noAnimScrollPage,
     bool? volumeKeyPage,
+    bool? mouseWheelPage,
+    bool? keyPageOnLongPress,
+    bool? disableReturnKey,
+    int? screenOrientation,
     // 页眉/页脚配置
     int? headerMode,
     int? footerMode,
@@ -753,6 +796,7 @@ class ReadingSettings {
       pageTurnMode: pageTurnMode ?? this.pageTurnMode,
       keepScreenOn: keepScreenOn ?? this.keepScreenOn,
       showStatusBar: showStatusBar ?? this.showStatusBar,
+      hideNavigationBar: hideNavigationBar ?? this.hideNavigationBar,
       showBattery: showBattery ?? this.showBattery,
       showTime: showTime ?? this.showTime,
       showProgress: showProgress ?? this.showProgress,
@@ -783,6 +827,10 @@ class ReadingSettings {
       pageTouchSlop: pageTouchSlop ?? this.pageTouchSlop,
       noAnimScrollPage: noAnimScrollPage ?? this.noAnimScrollPage,
       volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
+      mouseWheelPage: mouseWheelPage ?? this.mouseWheelPage,
+      keyPageOnLongPress: keyPageOnLongPress ?? this.keyPageOnLongPress,
+      disableReturnKey: disableReturnKey ?? this.disableReturnKey,
+      screenOrientation: screenOrientation ?? this.screenOrientation,
       // 页眉/页脚配置
       hideHeader: resolvedHeaderMode == headerModeHide,
       hideFooter: resolvedFooterMode == footerModeHide,
@@ -844,6 +892,39 @@ class ChineseConverterType {
       case off:
       default:
         return '关闭';
+    }
+  }
+}
+
+class ReaderScreenOrientation {
+  static const int unspecified = ReadingSettings.screenOrientationUnspecified;
+  static const int portrait = ReadingSettings.screenOrientationPortrait;
+  static const int landscape = ReadingSettings.screenOrientationLandscape;
+  static const int sensor = ReadingSettings.screenOrientationSensor;
+  static const int reversePortrait =
+      ReadingSettings.screenOrientationReversePortrait;
+
+  static const List<int> values = <int>[
+    unspecified,
+    portrait,
+    landscape,
+    sensor,
+    reversePortrait,
+  ];
+
+  static String label(int value) {
+    switch (value) {
+      case portrait:
+        return '竖屏';
+      case landscape:
+        return '横屏';
+      case sensor:
+        return '自动旋转';
+      case reversePortrait:
+        return '反向竖屏';
+      case unspecified:
+      default:
+        return '跟随系统';
     }
   }
 }

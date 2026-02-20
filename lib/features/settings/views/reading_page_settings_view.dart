@@ -66,6 +66,22 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                       _update(_settings.copyWith(volumeKeyPage: v)),
                 ),
               ),
+              CupertinoListTile.notched(
+                title: const Text('鼠标滚轮翻页'),
+                trailing: CupertinoSwitch(
+                  value: _settings.mouseWheelPage,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(mouseWheelPage: v)),
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('长按按键翻页'),
+                trailing: CupertinoSwitch(
+                  value: _settings.keyPageOnLongPress,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(keyPageOnLongPress: v)),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),

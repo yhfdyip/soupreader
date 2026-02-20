@@ -38,19 +38,24 @@ void main() {
     expect(find.text('翻页触发阈值'), findsOneWidget);
     expect(find.text('滚动翻页无动画'), findsOneWidget);
     expect(find.text('音量键翻页'), findsOneWidget);
+    expect(find.text('鼠标滚轮翻页'), findsOneWidget);
+    expect(find.text('长按按键翻页'), findsOneWidget);
     expect(find.text('净化章节标题'), findsNothing);
   });
 
-  testWidgets('ReadingStatusActionSettingsView 补齐亮度条入口', (tester) async {
+  testWidgets('ReadingStatusActionSettingsView 补齐导航栏与亮度条入口', (tester) async {
     await pumpSettingsPage(tester, const ReadingStatusActionSettingsView());
 
+    expect(find.text('隐藏导航栏'), findsOneWidget);
     expect(find.text('显示亮度条'), findsOneWidget);
     expect(find.text('点击区域（9 宫格）'), findsOneWidget);
   });
 
-  testWidgets('ReadingOtherSettingsView 保留文本处理分组', (tester) async {
+  testWidgets('ReadingOtherSettingsView 保留方向与文本处理分组', (tester) async {
     await pumpSettingsPage(tester, const ReadingOtherSettingsView());
 
+    expect(find.text('屏幕方向'), findsOneWidget);
+    expect(find.text('禁用返回键'), findsOneWidget);
     expect(find.text('简繁转换'), findsOneWidget);
     expect(find.text('净化章节标题'), findsOneWidget);
     expect(find.text('屏幕常亮'), findsOneWidget);

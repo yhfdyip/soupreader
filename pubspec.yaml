@@ -97,6 +97,7 @@ flutter:
 
   assets:
     - assets/source/18PlusList.txt
+    - assets/rss/rssSources.json
 
   # To add assets to your application, add an assets section, like this:
   # assets:

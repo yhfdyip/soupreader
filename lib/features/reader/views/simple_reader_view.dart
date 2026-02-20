@@ -1,12 +1,15 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show mapEquals;
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show listEquals, mapEquals;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/js_runtime.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
@@ -16,12 +19,24 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
+import '../../replace/views/replace_rule_list_view.dart';
 import '../../replace/services/replace_rule_service.dart';
+import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/source_login_ui_helper.dart';
+import '../../source/services/source_login_url_resolver.dart';
+import '../../source/views/source_edit_legacy_view.dart';
+import '../../source/views/source_login_form_view.dart';
+import '../../source/views/source_web_verify_view.dart';
+import '../../search/views/search_book_info_view.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
 import '../services/reader_key_paging_helper.dart';
+import '../services/reader_legacy_quick_action_helper.dart';
+import '../services/reader_source_action_helper.dart';
 import '../services/reader_source_switch_helper.dart';
+import '../services/reader_system_ui_helper.dart';
+import '../services/reader_top_bar_action_helper.dart';
 import '../services/reader_tip_selection_helper.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
@@ -116,7 +131,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   // UI 状态
   bool _showMenu = false;
   bool _showSearchMenu = false;
-  SystemUiMode? _appliedSystemUiMode;
+  ReaderSystemUiConfig? _appliedSystemUiConfig;
+  List<DeviceOrientation>? _appliedPreferredOrientations;
   final ScrollController _scrollController = ScrollController();
   bool _isInitialized = false;
   final FocusNode _keyboardFocusNode = FocusNode();
@@ -134,6 +150,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   String? _bookCoverUrl;
   String? _currentSourceUrl;
   String? _currentSourceName;
+  final Map<String, bool> _chapterVipByUrl = <String, bool>{};
+  final Map<String, bool> _chapterPayByUrl = <String, bool>{};
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
@@ -180,6 +198,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   static const List<_TipOption> _footerModeOptions = [
     _TipOption(ReadingSettings.footerModeShow, '显示'),
     _TipOption(ReadingSettings.footerModeHide, '隐藏'),
+  ];
+  static const List<_TipOption> _screenOrientationOptions = [
+    _TipOption(ReadingSettings.screenOrientationUnspecified, '跟随系统'),
+    _TipOption(ReadingSettings.screenOrientationPortrait, '竖屏'),
+    _TipOption(ReadingSettings.screenOrientationLandscape, '横屏'),
+    _TipOption(ReadingSettings.screenOrientationSensor, '自动旋转'),
+    _TipOption(ReadingSettings.screenOrientationReversePortrait, '反向竖屏'),
   ];
   static const List<_TipOption> _tipColorOptions = [
     _TipOption(ReadingSettings.tipColorFollowContent, '同正文颜色'),
@@ -274,6 +299,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         force: true,
       );
       unawaited(_syncNativeKeepScreenOn(_settings));
+      unawaited(_applyPreferredOrientations(_settings, force: true));
+      _syncSystemUiForOverlay(force: true);
     });
 
     // 初始化自动翻页器
@@ -289,8 +316,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
     });
 
-    // 全屏沉浸
-    _applySystemUiMode(SystemUiMode.immersiveSticky, force: true);
+    _syncSystemUiForOverlay(force: true);
   }
 
   Future<void> _initReader() async {
@@ -356,21 +382,49 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 离开阅读器时恢复系统亮度（iOS 还原原始亮度；Android 还原窗口亮度为跟随系统）
     unawaited(_brightnessService.resetToSystem());
     unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
-    _applySystemUiMode(SystemUiMode.edgeToEdge, force: true);
+    unawaited(_restoreSystemUiAndOrientation());
     super.dispose();
   }
 
-  void _applySystemUiMode(SystemUiMode mode, {bool force = false}) {
-    if (!force && _appliedSystemUiMode == mode) return;
-    _appliedSystemUiMode = mode;
-    SystemChrome.setEnabledSystemUIMode(mode);
+  Future<void> _applyPreferredOrientations(
+    ReadingSettings settings, {
+    bool force = false,
+  }) async {
+    final next = ReaderSystemUiHelper.resolvePreferredOrientations(
+      settings.screenOrientation,
+    );
+    if (!force && listEquals(_appliedPreferredOrientations, next)) {
+      return;
+    }
+    _appliedPreferredOrientations = List<DeviceOrientation>.from(next);
+    await SystemChrome.setPreferredOrientations(next);
   }
 
-  void _syncSystemUiForOverlay() {
-    final hasOverlay = _showMenu || _showSearchMenu;
-    _applySystemUiMode(
-      hasOverlay ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
+  Future<void> _restoreSystemUiAndOrientation() async {
+    _appliedSystemUiConfig = ReaderSystemUiHelper.appDefault;
+    _appliedPreferredOrientations = const <DeviceOrientation>[];
+    await SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]);
+    await SystemChrome.setEnabledSystemUIMode(
+      ReaderSystemUiHelper.appDefault.mode,
+      overlays: ReaderSystemUiHelper.appDefault.overlays,
     );
+  }
+
+  void _syncSystemUiForOverlay({bool force = false}) {
+    final next = ReaderSystemUiHelper.resolveReaderUiConfig(
+      settings: _settings,
+      showOverlay: _showMenu || _showSearchMenu,
+    );
+    final sameMode = _appliedSystemUiConfig?.mode == next.mode;
+    final sameOverlays = listEquals(
+      _appliedSystemUiConfig?.overlays,
+      next.overlays,
+    );
+    if (!force && sameMode && sameOverlays) {
+      return;
+    }
+    _appliedSystemUiConfig = next;
+    SystemChrome.setEnabledSystemUIMode(next.mode, overlays: next.overlays);
   }
 
   void _setReaderMenuVisible(bool visible) {
@@ -1555,6 +1609,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (oldSettings.keepScreenOn != newSettings.keepScreenOn) {
       unawaited(_syncNativeKeepScreenOn(newSettings));
     }
+    if (oldSettings.screenOrientation != newSettings.screenOrientation) {
+      unawaited(_applyPreferredOrientations(newSettings));
+    }
+    if (oldSettings.showStatusBar != newSettings.showStatusBar ||
+        oldSettings.hideNavigationBar != newSettings.hideNavigationBar) {
+      _syncSystemUiForOverlay(force: true);
+    }
     if (persist) {
       unawaited(_settingsService.saveReadingSettings(newSettings));
     }
@@ -1679,7 +1740,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _handleKeyEvent(KeyEvent event) {
     if (_showMenu || _showSearchMenu || _showAutoReadPanel) return;
-    if (event is! KeyDownEvent) return;
+    final isRepeat = event is KeyRepeatEvent;
+    final isKeyDown = event is KeyDownEvent || isRepeat;
+    if (!isKeyDown) return;
+    if (isRepeat && !_settings.keyPageOnLongPress) return;
 
     final action = ReaderKeyPagingHelper.resolveKeyDownAction(
       key: event.logicalKey,
@@ -1699,6 +1763,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (_showMenu || _showSearchMenu || _showAutoReadPanel) return;
+    if (!_settings.mouseWheelPage) return;
     if (event is! PointerScrollEvent) return;
     GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
       final scrollEvent = resolved as PointerScrollEvent;
@@ -2188,6 +2253,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           return;
         }
         if (!_showMenu) {
+          if (_settings.disableReturnKey) {
+            return;
+          }
           // 如果阻止了 pop 且菜单未显示，则显示菜单
           _setReaderMenuVisible(true);
         }
@@ -2271,18 +2339,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       ReaderTopMenu(
                         bookTitle: widget.bookTitle,
                         chapterTitle: _currentTitle,
+                        chapterUrl: _resolvedCurrentChapterUrlForTopMenu(),
                         sourceName: _currentSourceName,
+                        onOpenBookInfo: () =>
+                            unawaited(_openBookInfoFromTopMenu()),
+                        onOpenChapterLink: () =>
+                            unawaited(_openChapterLinkFromTopMenu()),
+                        onToggleChapterLinkOpenMode: () =>
+                            unawaited(_toggleChapterLinkOpenModeFromTopMenu()),
                         onShowChapterList: _showChapterList,
                         onSearchContent: _showContentSearchDialog,
-                        onSwitchSource: _showSwitchSourceMenu,
+                        onShowSourceActions: _showSourceActionsMenu,
                         onToggleCleanChapterTitle:
                             _toggleCleanChapterTitleFromTopMenu,
                         onRefreshChapter: _refreshChapter,
                         onShowMoreMenu: _showReaderActionsMenu,
                         cleanChapterTitleEnabled: _settings.cleanChapterTitle,
+                        showSourceAction: !_isCurrentBookLocal(),
+                        showChapterLink: !_isCurrentBookLocal(),
                       ),
 
-                    // 右侧悬浮快捷栏（对标同类阅读器）
+                    // 右侧悬浮快捷栏（对标 legado 快捷动作区）
                     if (_showMenu) _buildFloatingActionRail(),
 
                     // 底部菜单（章节进度 + 高频设置 + 导航）
@@ -2595,6 +2672,37 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _openReadAloudFromMenu() {
     _closeReaderMenuOverlay();
     _openReadAloudAction();
+  }
+
+  void _toggleAutoPageFromQuickAction() {
+    _closeReaderMenuOverlay();
+    _autoPager.toggle();
+  }
+
+  Future<void> _openReplaceRuleFromMenu() async {
+    _closeReaderMenuOverlay();
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => const ReplaceRuleListView(),
+      ),
+    );
+    if (!mounted) return;
+    _replaceStageCache.clear();
+    await _loadChapter(
+      _currentChapterIndex,
+      restoreOffset: _settings.pageTurnMode == PageTurnMode.scroll,
+    );
+  }
+
+  void _toggleDayNightThemeFromQuickAction() {
+    final targetIndex = ReaderLegacyQuickActionHelper.resolveToggleThemeIndex(
+      currentIndex: _settings.themeIndex,
+      themes: AppColors.readingThemes,
+    );
+    if (targetIndex == _settings.themeIndex) {
+      return;
+    }
+    _updateSettings(_settings.copyWith(themeIndex: targetIndex));
   }
 
   void _openReadAloudAction() {
@@ -3076,6 +3184,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Widget _buildFloatingActionRail() {
     final topOffset = MediaQuery.of(context).padding.top + 86;
+    final actionOrder = ReaderLegacyQuickActionHelper.legacyOrder;
     return Positioned(
       right: 10,
       top: topOffset,
@@ -3095,47 +3204,53 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ],
         ),
         child: Column(
-          children: [
-            _buildFloatingActionButton(
-              icon: CupertinoIcons.search,
-              onTap: _showContentSearchDialog,
-            ),
-            const SizedBox(height: 8),
-            _buildFloatingActionButton(
-              icon: _hasBookmarkAtCurrent
-                  ? CupertinoIcons.bookmark_solid
-                  : CupertinoIcons.bookmark,
-              active: _hasBookmarkAtCurrent,
-              onTap: () => unawaited(_toggleBookmark()),
-            ),
-            const SizedBox(height: 8),
-            _buildFloatingActionButton(
-              icon: CupertinoIcons.list_bullet,
-              onTap: _openChapterListFromMenu,
-            ),
-            const SizedBox(height: 8),
-            _buildFloatingActionButton(
-              icon: CupertinoIcons.speaker_2_fill,
-              onTap: _openReadAloudFromMenu,
-            ),
-            const SizedBox(height: 8),
-            _buildFloatingActionButton(
-              icon: CupertinoIcons.circle_grid_3x3,
-              onTap: _openInterfaceSettingsFromMenu,
-            ),
-            const SizedBox(height: 8),
-            _buildFloatingActionButton(
-              icon: CupertinoIcons.gear,
-              onTap: _openBehaviorSettingsFromMenu,
-            ),
-          ],
+          children: List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
+            if (index.isOdd) {
+              return const SizedBox(height: 8);
+            }
+            final action = actionOrder[index ~/ 2];
+            return _buildLegacyQuickActionButton(action);
+          }),
         ),
       ),
     );
   }
 
+  Widget _buildLegacyQuickActionButton(ReaderLegacyQuickAction action) {
+    switch (action) {
+      case ReaderLegacyQuickAction.searchContent:
+        return _buildFloatingActionButton(
+          icon: CupertinoIcons.search,
+          semanticLabel: '搜索正文',
+          onTap: _showContentSearchDialog,
+        );
+      case ReaderLegacyQuickAction.autoPage:
+        final running = _autoPager.isRunning;
+        return _buildFloatingActionButton(
+          icon: running ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
+          semanticLabel: running ? '停止自动翻页' : '自动翻页',
+          active: running,
+          onTap: _toggleAutoPageFromQuickAction,
+        );
+      case ReaderLegacyQuickAction.replaceRule:
+        return _buildFloatingActionButton(
+          icon: CupertinoIcons.refresh,
+          semanticLabel: '替换规则',
+          onTap: () => unawaited(_openReplaceRuleFromMenu()),
+        );
+      case ReaderLegacyQuickAction.toggleDayNightTheme:
+        final isDark = _currentTheme.isDark;
+        return _buildFloatingActionButton(
+          icon: isDark ? CupertinoIcons.sun_max : CupertinoIcons.moon_fill,
+          semanticLabel: isDark ? '切换日间模式' : '切换夜间模式',
+          onTap: _toggleDayNightThemeFromQuickAction,
+        );
+    }
+  }
+
   Widget _buildFloatingActionButton({
     required IconData icon,
+    required String semanticLabel,
     required VoidCallback onTap,
     bool active = false,
   }) {
@@ -3156,10 +3271,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             color: active ? _uiAccent : _uiBorder,
           ),
         ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: active ? _uiAccent : _uiTextStrong,
+        child: Semantics(
+          button: true,
+          label: semanticLabel,
+          child: Icon(
+            icon,
+            size: 20,
+            color: active ? _uiAccent : _uiTextStrong,
+          ),
         ),
       ),
     );
@@ -3207,12 +3326,470 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _currentSourceName;
   }
 
+  String _normalizeChapterUrl(String? url) {
+    return ReaderTopBarActionHelper.normalizeChapterUrl(url);
+  }
+
+  bool _isCurrentBookLocal() {
+    if (widget.isEphemeral) return false;
+    return _bookRepo.getBookById(widget.bookId)?.isLocal ?? false;
+  }
+
+  BookSource? _resolveCurrentSource() {
+    final sourceUrl = (_currentSourceUrl ?? '').trim();
+    if (sourceUrl.isEmpty) return null;
+    return _sourceRepo.getSourceByUrl(sourceUrl);
+  }
+
+  String _resolvedCurrentChapterUrlForTopMenu() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return '';
+    }
+    final chapter = _chapters[_currentChapterIndex];
+    final source = _resolveCurrentSource();
+    final bookUrl = _bookRepo.getBookById(widget.bookId)?.bookUrl;
+    return ReaderTopBarActionHelper.resolveChapterUrl(
+      chapterUrl: chapter.url,
+      bookUrl: bookUrl,
+      sourceUrl: source?.bookSourceUrl ?? _currentSourceUrl,
+    );
+  }
+
+  Future<void> _openBookInfoFromTopMenu() async {
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null) {
+      _showToast('当前会话未关联书架书籍，无法打开书籍详情');
+      return;
+    }
+
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SearchBookInfoView.fromBookshelf(book: book),
+      ),
+    );
+    if (!mounted) return;
+    _refreshCurrentSourceName();
+    setState(() {});
+  }
+
+  Future<void> _openChapterLinkFromTopMenu() async {
+    if (_isCurrentBookLocal()) {
+      _showToast('本地书籍不支持打开章节链接');
+      return;
+    }
+
+    final chapterUrl = _resolvedCurrentChapterUrlForTopMenu();
+    if (chapterUrl.isEmpty) {
+      _showToast('当前章节链接为空');
+      return;
+    }
+    if (!ReaderTopBarActionHelper.isHttpUrl(chapterUrl)) {
+      _showToast('当前章节链接不是有效网页地址');
+      return;
+    }
+    final uri = Uri.tryParse(chapterUrl);
+    if (uri == null) {
+      _showToast('当前章节链接不是有效网页地址');
+      return;
+    }
+
+    if (_settingsService.readerChapterUrlOpenInBrowser) {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        _showToast('打开浏览器失败');
+      }
+      return;
+    }
+
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceWebVerifyView(initialUrl: chapterUrl),
+      ),
+    );
+  }
+
+  Future<void> _toggleChapterLinkOpenModeFromTopMenu() async {
+    if (_isCurrentBookLocal()) {
+      _showToast('本地书籍不支持章节链接打开');
+      return;
+    }
+
+    final currentOpenInBrowser = _settingsService.readerChapterUrlOpenInBrowser;
+    final nextOpenInBrowser = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('章节链接打开方式'),
+        content: Text(
+          '\n当前：${currentOpenInBrowser ? '浏览器打开' : '应用内网页打开'}',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('应用内网页打开'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('浏览器打开'),
+          ),
+        ],
+      ),
+    );
+    if (nextOpenInBrowser == null ||
+        nextOpenInBrowser == currentOpenInBrowser) {
+      return;
+    }
+
+    await _settingsService.saveReaderChapterUrlOpenInBrowser(
+      nextOpenInBrowser,
+    );
+    if (!mounted) return;
+    _showToast(
+      nextOpenInBrowser ? '已切换为浏览器打开章节链接' : '已切换为应用内网页打开章节链接',
+    );
+  }
+
+  bool? _resolveCurrentChapterIsVip() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return null;
+    }
+    final chapterUrl =
+        _normalizeChapterUrl(_chapters[_currentChapterIndex].url);
+    if (chapterUrl.isEmpty) return null;
+    return _chapterVipByUrl[chapterUrl];
+  }
+
+  bool? _resolveCurrentChapterIsPay() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return null;
+    }
+    final chapterUrl =
+        _normalizeChapterUrl(_chapters[_currentChapterIndex].url);
+    if (chapterUrl.isEmpty) return null;
+    return _chapterPayByUrl[chapterUrl];
+  }
+
+  void _cacheChapterPayFlags(List<TocItem> toc) {
+    _chapterVipByUrl.clear();
+    _chapterPayByUrl.clear();
+    for (final item in toc) {
+      final url = _normalizeChapterUrl(item.url);
+      if (url.isEmpty) continue;
+      _chapterVipByUrl[url] = item.isVip;
+      _chapterPayByUrl[url] = item.isPay;
+    }
+  }
+
   Future<void> _toggleCleanChapterTitleFromTopMenu() async {
     _updateSettings(
       _settings.copyWith(cleanChapterTitle: !_settings.cleanChapterTitle),
     );
     if (!mounted) return;
     _showToast(_settings.cleanChapterTitle ? '已开启净化章节标题' : '已关闭净化章节标题');
+  }
+
+  Future<void> _showSourceActionsMenu() async {
+    _closeReaderMenuOverlay();
+    if (_isCurrentBookLocal()) {
+      _showToast('本地书籍不支持书源操作');
+      return;
+    }
+
+    final source = _resolveCurrentSource();
+    if (source == null) {
+      _showToast('未找到当前书源');
+      return;
+    }
+
+    final hasLogin = ReaderSourceActionHelper.hasLoginUrl(source.loginUrl);
+    final hasPayAction =
+        ReaderSourceActionHelper.hasPayAction(source.ruleContent?.payAction);
+    final showChapterPay = ReaderSourceActionHelper.shouldShowChapterPay(
+      hasLoginUrl: hasLogin,
+      hasPayAction: hasPayAction,
+      currentChapterIsVip: _resolveCurrentChapterIsVip(),
+      currentChapterIsPay: _resolveCurrentChapterIsPay(),
+    );
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: Text(source.bookSourceName),
+        message: Text(source.bookSourceUrl),
+        actions: [
+          if (hasLogin)
+            CupertinoActionSheetAction(
+              onPressed: () async {
+                Navigator.pop(sheetContext);
+                await _openSourceLoginFromReader(source);
+              },
+              child: const Text('登录'),
+            ),
+          if (showChapterPay)
+            CupertinoActionSheetAction(
+              onPressed: () async {
+                Navigator.pop(sheetContext);
+                await _triggerChapterPayAction(source);
+              },
+              child: const Text('章节购买'),
+            ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _openSourceEditorFromReader(source);
+            },
+            child: const Text('编辑书源'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _disableSourceFromReader(source);
+            },
+            child: const Text('禁用书源'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSourceLoginFromReader(BookSource source) async {
+    if (SourceLoginUiHelper.hasLoginUi(source.loginUi)) {
+      await Navigator.of(context).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => SourceLoginFormView(source: source),
+        ),
+      );
+      return;
+    }
+
+    final resolvedUrl = SourceLoginUrlResolver.resolve(
+      baseUrl: source.bookSourceUrl,
+      loginUrl: source.loginUrl ?? '',
+    );
+    if (resolvedUrl.isEmpty) {
+      _showToast('当前书源未配置登录地址');
+      return;
+    }
+    final uri = Uri.tryParse(resolvedUrl);
+    final scheme = uri?.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      _showToast('登录地址不是有效网页地址');
+      return;
+    }
+
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
+      ),
+    );
+  }
+
+  Future<void> _triggerChapterPayAction(BookSource source) async {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      _showToast('当前章节不存在');
+      return;
+    }
+    final chapter = _chapters[_currentChapterIndex];
+    final payAction = (source.ruleContent?.payAction ?? '').trim();
+    if (payAction.isEmpty) {
+      _showToast('当前书源未配置购买动作');
+      return;
+    }
+
+    final confirmed = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: const Text('章节购买'),
+            content: Text('\n${chapter.title}'),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('购买'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    final output = _evaluateChapterPayAction(
+      source: source,
+      chapter: chapter,
+      payAction: payAction,
+    );
+    if (output.startsWith('__SR_CHAPTER_PAY_ERR__')) {
+      final reason = output.replaceFirst('__SR_CHAPTER_PAY_ERR__', '').trim();
+      _showToast(reason.isEmpty ? '章节购买执行失败' : '章节购买执行失败：$reason');
+      return;
+    }
+
+    final result = ReaderSourceActionHelper.resolvePayActionOutput(output);
+    switch (result.type) {
+      case ReaderSourcePayActionResultType.url:
+        final payUrl = result.url;
+        if (payUrl == null || payUrl.isEmpty) {
+          _showToast('章节购买地址为空');
+          return;
+        }
+        await Navigator.of(context).push(
+          CupertinoPageRoute<void>(
+            builder: (_) => SourceWebVerifyView(initialUrl: payUrl),
+          ),
+        );
+        return;
+      case ReaderSourcePayActionResultType.success:
+        await _reloadCurrentChapterAfterPurchase();
+        if (!mounted) return;
+        _showToast('章节购买完成，已刷新当前章节');
+        return;
+      case ReaderSourcePayActionResultType.noop:
+        _showToast('章节购买未返回可执行结果');
+        return;
+      case ReaderSourcePayActionResultType.unsupported:
+        _showToast('章节购买动作返回暂不支持的结果');
+        return;
+    }
+  }
+
+  String _evaluateChapterPayAction({
+    required BookSource source,
+    required Chapter chapter,
+    required String payAction,
+  }) {
+    final runtime = createJsRuntime();
+    final chapterUrl = (chapter.url ?? '').trim();
+    final book = _bookRepo.getBookById(widget.bookId);
+    final script = '''
+      (function() {
+        try {
+          var source = {
+            bookSourceUrl: ${jsonEncode(source.bookSourceUrl)},
+            bookSourceName: ${jsonEncode(source.bookSourceName)},
+            loginUrl: ${jsonEncode(source.loginUrl ?? '')}
+          };
+          var book = {
+            id: ${jsonEncode(widget.bookId)},
+            name: ${jsonEncode(widget.bookTitle)},
+            author: ${jsonEncode(_bookAuthor)},
+            bookUrl: ${jsonEncode((book?.bookUrl ?? '').trim())}
+          };
+          var chapter = {
+            title: ${jsonEncode(chapter.title)},
+            url: ${jsonEncode(chapterUrl)},
+            index: $_currentChapterIndex,
+            isVip: ${jsonEncode(_resolveCurrentChapterIsVip())},
+            isPay: ${jsonEncode(_resolveCurrentChapterIsPay())}
+          };
+          var baseUrl = chapter.url || book.bookUrl || source.bookSourceUrl || '';
+          var url = baseUrl;
+          var result = eval(${jsonEncode(payAction)});
+          if (result === undefined || result === null) return '';
+          if (typeof result === 'boolean') return result ? 'true' : 'false';
+          if (typeof result === 'string') return result;
+          try {
+            return JSON.stringify(result);
+          } catch (e) {
+            return String(result);
+          }
+        } catch (e) {
+          return '__SR_CHAPTER_PAY_ERR__' + String(e);
+        }
+      })()
+    ''';
+    return runtime.evaluate(script).trim();
+  }
+
+  Future<void> _reloadCurrentChapterAfterPurchase() async {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return;
+    }
+    final chapterIndex = _currentChapterIndex;
+    final previousChapter = _chapters[chapterIndex];
+    final nextChapters = List<Chapter>.from(_chapters, growable: false);
+    nextChapters[chapterIndex] = previousChapter.copyWith(
+      content: null,
+      isDownloaded: false,
+    );
+    if (mounted) {
+      setState(() {
+        _chapters = nextChapters;
+      });
+    } else {
+      _chapters = nextChapters;
+    }
+    _replaceStageCache.remove(previousChapter.id);
+    await _loadChapter(
+      chapterIndex,
+      restoreOffset: _settings.pageTurnMode == PageTurnMode.scroll,
+    );
+  }
+
+  Future<void> _openSourceEditorFromReader(BookSource source) async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceEditLegacyView.fromSource(
+          source,
+          rawJson: _sourceRepo.getRawJsonByUrl(source.bookSourceUrl),
+        ),
+      ),
+    );
+    _refreshCurrentSourceName();
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  Future<void> _disableSourceFromReader(BookSource source) async {
+    final confirmed = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: const Text('禁用书源'),
+            content: Text('\n确定禁用 ${source.bookSourceName}？'),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('禁用'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    await _sourceRepo.updateSource(
+      source.copyWith(enabled: false),
+    );
+    if (!mounted) return;
+    _showToast('已禁用书源：${source.bookSourceName}');
   }
 
   Future<void> _showSwitchSourceMenu() async {
@@ -3308,6 +3885,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final previousChapterIndex = _currentChapterIndex;
     final previousTitle = _currentTitle;
     final previousChapters = List<Chapter>.from(_chapters);
+    final previousChapterVipByUrl = Map<String, bool>.from(_chapterVipByUrl);
+    final previousChapterPayByUrl = Map<String, bool>.from(_chapterPayByUrl);
 
     try {
       final detail = await _ruleEngine.getBookInfo(
@@ -3382,6 +3961,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       );
 
       if (!mounted) return;
+      _cacheChapterPayFlags(toc);
       setState(() {
         _catalogDisplayTitleCacheByChapterId.clear();
         _chapters = newChapters;
@@ -3425,6 +4005,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           _chapters = previousChapters;
           _currentSourceUrl = previousSourceUrl;
           _currentSourceName = previousSourceName;
+          _chapterVipByUrl
+            ..clear()
+            ..addAll(previousChapterVipByUrl);
+          _chapterPayByUrl
+            ..clear()
+            ..addAll(previousChapterPayByUrl);
         });
       }
       if (!mounted) return;
@@ -4484,6 +5070,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(volumeKeyPage: value),
                   );
                 }),
+                _buildSwitchRow('鼠标滚轮翻页', _settings.mouseWheelPage, (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(mouseWheelPage: value),
+                  );
+                }),
+                _buildSwitchRow('长按按键翻页', _settings.keyPageOnLongPress,
+                    (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(keyPageOnLongPress: value),
+                  );
+                }),
                 if (_settings.pageTurnMode == PageTurnMode.scroll)
                   _buildSwitchRow(
                     '滚动翻页无动画',
@@ -4531,6 +5130,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   _updateSettingsFromSheet(
                     setPopupState,
                     _settings.copyWith(showStatusBar: value),
+                  );
+                }),
+                _buildSwitchRow('隐藏导航栏', _settings.hideNavigationBar, (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(hideNavigationBar: value),
                   );
                 }),
                 _buildSwitchRow('显示章节进度', _settings.showChapterProgress,
@@ -4607,6 +5212,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   _updateSettingsFromSheet(
                     setPopupState,
                     _settings.copyWith(keepScreenOn: value),
+                  );
+                }),
+                _buildOptionRow(
+                  '屏幕方向',
+                  ReaderScreenOrientation.label(_settings.screenOrientation),
+                  () => _showTipOptionPicker(
+                    title: '屏幕方向',
+                    options: _screenOrientationOptions,
+                    currentValue: _settings.screenOrientation,
+                    onSelected: (value) {
+                      _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(screenOrientation: value),
+                      );
+                    },
+                  ),
+                ),
+                _buildSwitchRow('禁用返回键', _settings.disableReturnKey, (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(disableReturnKey: value),
                   );
                 }),
                 _buildSwitchRow('净化章节标题', _settings.cleanChapterTitle, (value) {
@@ -5221,6 +5847,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _chapters = updated;
       _currentChapterIndex = _currentChapterIndex.clamp(0, maxChapter).toInt();
       _currentTitle = _postProcessTitle(updated[_currentChapterIndex].title);
+      _chapterVipByUrl.clear();
+      _chapterPayByUrl.clear();
     });
     _syncPageFactoryChapters(
       keepPosition: _settings.pageTurnMode != PageTurnMode.scroll,

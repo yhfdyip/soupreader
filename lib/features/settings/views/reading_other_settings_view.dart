@@ -48,6 +48,21 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
                 ),
               ),
               CupertinoListTile.notched(
+                title: const Text('屏幕方向'),
+                additionalInfo: Text(
+                    ReaderScreenOrientation.label(_settings.screenOrientation)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickScreenOrientation,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('禁用返回键'),
+                trailing: CupertinoSwitch(
+                  value: _settings.disableReturnKey,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(disableReturnKey: v)),
+                ),
+              ),
+              CupertinoListTile.notched(
                 title: const Text('自动阅读速度'),
                 additionalInfo: Text(_settings.autoReadSpeed.toString()),
                 trailing: const CupertinoListTileChevron(),
@@ -136,5 +151,27 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
     );
     if (selected == null) return;
     _update(_settings.copyWith(chineseConverterType: selected));
+  }
+
+  Future<void> _pickScreenOrientation() async {
+    final selected = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('屏幕方向'),
+        actions: [
+          for (final mode in ReaderScreenOrientation.values)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(context, mode),
+              child: Text(ReaderScreenOrientation.label(mode)),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    _update(_settings.copyWith(screenOrientation: selected));
   }
 }

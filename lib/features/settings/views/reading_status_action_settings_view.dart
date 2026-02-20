@@ -50,6 +50,14 @@ class _ReadingStatusActionSettingsViewState
                 ),
               ),
               CupertinoListTile.notched(
+                title: const Text('隐藏导航栏'),
+                trailing: CupertinoSwitch(
+                  value: _settings.hideNavigationBar,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(hideNavigationBar: v)),
+                ),
+              ),
+              CupertinoListTile.notched(
                 title: const Text('显示章节进度'),
                 trailing: CupertinoSwitch(
                   value: _settings.showChapterProgress,

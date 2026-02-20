@@ -14,7 +14,9 @@ class SettingsService {
   static const String _keyReadingSettingsSchemaVersion =
       'reading_settings_schema_version';
   static const String _keyAppSettings = 'app_settings';
-  static const int _readingSettingsSchemaVersion = 2;
+  static const String _keyReaderChapterUrlOpenInBrowser =
+      'reader_chapter_url_open_in_browser';
+  static const int _readingSettingsSchemaVersion = 3;
 
   late SharedPreferences _prefs;
   late ReadingSettings _readingSettings;
@@ -30,6 +32,8 @@ class SettingsService {
       _readingSettingsNotifier;
   ValueListenable<AppSettings> get appSettingsListenable =>
       _appSettingsNotifier;
+  bool get readerChapterUrlOpenInBrowser =>
+      _prefs.getBool(_keyReaderChapterUrlOpenInBrowser) ?? false;
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -122,6 +126,10 @@ class SettingsService {
     _appSettings = settings;
     _appSettingsNotifier.value = settings;
     await _prefs.setString(_keyAppSettings, json.encode(settings.toJson()));
+  }
+
+  Future<void> saveReaderChapterUrlOpenInBrowser(bool value) async {
+    await _prefs.setBool(_keyReaderChapterUrlOpenInBrowser, value);
   }
 
   String _scrollOffsetKey(String bookId, {int? chapterIndex}) {

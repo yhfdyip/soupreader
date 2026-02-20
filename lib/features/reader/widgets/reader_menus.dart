@@ -6,40 +6,53 @@ import '../models/reading_settings.dart';
 class ReaderTopMenu extends StatelessWidget {
   final String bookTitle;
   final String chapterTitle;
+  final String? chapterUrl;
   final String? sourceName;
+  final VoidCallback onOpenBookInfo;
+  final VoidCallback onOpenChapterLink;
+  final VoidCallback onToggleChapterLinkOpenMode;
   final VoidCallback onShowChapterList;
   final VoidCallback onSearchContent;
-  final VoidCallback onSwitchSource;
+  final VoidCallback onShowSourceActions;
   final VoidCallback onToggleCleanChapterTitle;
   final VoidCallback onRefreshChapter;
   final VoidCallback onShowMoreMenu;
   final bool cleanChapterTitleEnabled;
+  final bool showSourceAction;
+  final bool showChapterLink;
 
   const ReaderTopMenu({
     super.key,
     required this.bookTitle,
     required this.chapterTitle,
+    this.chapterUrl,
     this.sourceName,
+    required this.onOpenBookInfo,
+    required this.onOpenChapterLink,
+    required this.onToggleChapterLinkOpenMode,
     required this.onShowChapterList,
     required this.onSearchContent,
-    required this.onSwitchSource,
+    required this.onShowSourceActions,
     required this.onToggleCleanChapterTitle,
     required this.onRefreshChapter,
     required this.onShowMoreMenu,
     required this.cleanChapterTitleEnabled,
+    this.showSourceAction = true,
+    this.showChapterLink = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final horizontalPadding =
         MediaQuery.of(context).size.width < 390 ? 8.0 : 10.0;
-    final compactMode = MediaQuery.of(context).size.width < 375;
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final accent =
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     final source = sourceName?.trim() ?? '';
-    final chapterLine =
-        source.isNotEmpty ? '$source · $chapterTitle' : chapterTitle;
+    final chapterLabel = chapterTitle.trim().isEmpty ? '暂无章节' : chapterTitle;
+    final chapterUrlLabel = chapterUrl?.trim() ?? '';
+    final hasChapterUrl = showChapterLink && chapterUrlLabel.isNotEmpty;
+    final sourceActionLabel = source.isEmpty ? '书源' : source;
 
     return Positioned(
       top: 0,
@@ -75,34 +88,58 @@ class ReaderTopMenu extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    bookTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: CupertinoColors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onOpenBookInfo,
+                    child: Text(
+                      bookTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: CupertinoColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    chapterLine,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: CupertinoColors.white.withValues(alpha: 0.72),
-                      fontSize: 12,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onOpenChapterLink,
+                    onLongPress: onToggleChapterLinkOpenMode,
+                    child: Text(
+                      chapterLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: CupertinoColors.white.withValues(alpha: 0.78),
+                        fontSize: 12,
+                      ),
                     ),
                   ),
+                  if (hasChapterUrl)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onOpenChapterLink,
+                      onLongPress: onToggleChapterLinkOpenMode,
+                      child: Text(
+                        chapterUrlLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: CupertinoColors.white.withValues(alpha: 0.62),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
             const SizedBox(width: 6),
-            if (!compactMode) ...[
+            if (showSourceAction) ...[
               _buildActionChip(
-                label: '换源',
-                onTap: onSwitchSource,
+                label: sourceActionLabel,
+                onTap: onShowSourceActions,
                 active: false,
                 accent: accent,
               ),
