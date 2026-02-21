@@ -132,6 +132,8 @@ class Book {
   bool get isReading => currentChapter > 0 || readProgress > 0;
 }
 
+const _unsetChapterContent = Object();
+
 /// 章节模型
 class Chapter {
   final String id;
@@ -183,7 +185,7 @@ class Chapter {
     String? url,
     int? index,
     bool? isDownloaded,
-    String? content,
+    Object? content = _unsetChapterContent,
   }) {
     return Chapter(
       id: id ?? this.id,
@@ -192,7 +194,9 @@ class Chapter {
       url: url ?? this.url,
       index: index ?? this.index,
       isDownloaded: isDownloaded ?? this.isDownloaded,
-      content: content ?? this.content,
+      content: identical(content, _unsetChapterContent)
+          ? this.content
+          : content as String?,
     );
   }
 }

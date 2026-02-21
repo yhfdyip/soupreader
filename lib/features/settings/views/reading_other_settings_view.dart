@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 
@@ -132,44 +133,34 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
   }
 
   Future<void> _pickChineseConverterType() async {
-    final selected = await showCupertinoModalPopup<int>(
+    final selected = await showOptionPickerSheet<int>(
       context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: const Text('简繁转换'),
-        actions: [
-          for (final mode in ChineseConverterType.values)
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.pop(context, mode),
-              child: Text(ChineseConverterType.label(mode)),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '简繁转换',
+      currentValue: _settings.chineseConverterType,
+      items: [
+        for (final mode in ChineseConverterType.values)
+          OptionPickerItem<int>(
+            value: mode,
+            label: ChineseConverterType.label(mode),
+          ),
+      ],
     );
     if (selected == null) return;
     _update(_settings.copyWith(chineseConverterType: selected));
   }
 
   Future<void> _pickScreenOrientation() async {
-    final selected = await showCupertinoModalPopup<int>(
+    final selected = await showOptionPickerSheet<int>(
       context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: const Text('屏幕方向'),
-        actions: [
-          for (final mode in ReaderScreenOrientation.values)
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.pop(context, mode),
-              child: Text(ReaderScreenOrientation.label(mode)),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '屏幕方向',
+      currentValue: _settings.screenOrientation,
+      items: [
+        for (final mode in ReaderScreenOrientation.values)
+          OptionPickerItem<int>(
+            value: mode,
+            label: ReaderScreenOrientation.label(mode),
+          ),
+      ],
     );
     if (selected == null) return;
     _update(_settings.copyWith(screenOrientation: selected));

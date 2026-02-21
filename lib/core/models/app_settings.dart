@@ -20,6 +20,46 @@ enum BookshelfSortMode {
   author,
 }
 
+int bookshelfLayoutIndexFromViewMode(BookshelfViewMode mode) {
+  return mode == BookshelfViewMode.list ? 0 : 1;
+}
+
+BookshelfViewMode bookshelfViewModeFromLayoutIndex(int index) {
+  final normalized = index.clamp(0, 4).toInt();
+  return normalized == 0 ? BookshelfViewMode.list : BookshelfViewMode.grid;
+}
+
+int bookshelfLegacySortIndexFromMode(BookshelfSortMode mode) {
+  switch (mode) {
+    case BookshelfSortMode.recentRead:
+      return 0;
+    case BookshelfSortMode.recentAdded:
+      return 1;
+    case BookshelfSortMode.title:
+      return 2;
+    case BookshelfSortMode.author:
+      return 5;
+  }
+}
+
+BookshelfSortMode bookshelfSortModeFromLegacyIndex(int index) {
+  final normalized = index.clamp(0, 5).toInt();
+  switch (normalized) {
+    case 1:
+      return BookshelfSortMode.recentAdded;
+    case 2:
+      return BookshelfSortMode.title;
+    case 5:
+      return BookshelfSortMode.author;
+    case 0:
+    case 3:
+    case 4:
+      return BookshelfSortMode.recentRead;
+    default:
+      return BookshelfSortMode.recentRead;
+  }
+}
+
 enum MainDefaultHomePage {
   bookshelf,
   explore,
@@ -53,6 +93,13 @@ class AppSettings {
 
   final BookshelfViewMode bookshelfViewMode;
   final BookshelfSortMode bookshelfSortMode;
+  final int bookshelfGroupStyle;
+  final int bookshelfLayoutIndex;
+  final int bookshelfSortIndex;
+  final bool bookshelfShowUnread;
+  final bool bookshelfShowLastUpdateTime;
+  final bool bookshelfShowWaitUpCount;
+  final bool bookshelfShowFastScroller;
   final SearchFilterMode searchFilterMode;
   final int searchConcurrency;
   final int searchCacheRetentionDays;
@@ -75,6 +122,13 @@ class AppSettings {
     this.defaultHomePage = MainDefaultHomePage.bookshelf,
     this.bookshelfViewMode = BookshelfViewMode.grid,
     this.bookshelfSortMode = BookshelfSortMode.recentRead,
+    this.bookshelfGroupStyle = 0,
+    this.bookshelfLayoutIndex = 1,
+    this.bookshelfSortIndex = 0,
+    this.bookshelfShowUnread = true,
+    this.bookshelfShowLastUpdateTime = false,
+    this.bookshelfShowWaitUpCount = false,
+    this.bookshelfShowFastScroller = false,
     this.searchFilterMode = SearchFilterMode.normal,
     this.searchConcurrency = 8,
     this.searchCacheRetentionDays = 5,
@@ -211,6 +265,20 @@ class AppSettings {
     if (parsedSearchScope.isEmpty && legacyScopeSourceUrls.length == 1) {
       parsedSearchScope = '::${legacyScopeSourceUrls.first}';
     }
+    final hasLegacyLayoutIndex = json.containsKey('bookshelfLayoutIndex') ||
+        json.containsKey('bookshelfLayout');
+    final parsedLayoutIndex = parseIntWithDefault(
+      json['bookshelfLayoutIndex'] ?? json['bookshelfLayout'],
+      bookshelfLayoutIndexFromViewMode(
+          parseViewMode(json['bookshelfViewMode'])),
+    ).clamp(0, 4);
+    final hasLegacySortIndex = json.containsKey('bookshelfSortIndex') ||
+        json.containsKey('bookshelfSort');
+    final parsedSortIndex = parseIntWithDefault(
+      json['bookshelfSortIndex'] ?? json['bookshelfSort'],
+      bookshelfLegacySortIndexFromMode(
+          parseSortMode(json['bookshelfSortMode'])),
+    ).clamp(0, 5);
 
     return AppSettings(
       appearanceMode: parseAppearanceMode(json['appearanceMode']),
@@ -222,8 +290,33 @@ class AppSettings {
         true,
       ),
       defaultHomePage: parseDefaultHomePage(json['defaultHomePage']),
-      bookshelfViewMode: parseViewMode(json['bookshelfViewMode']),
-      bookshelfSortMode: parseSortMode(json['bookshelfSortMode']),
+      bookshelfViewMode: hasLegacyLayoutIndex
+          ? bookshelfViewModeFromLayoutIndex(parsedLayoutIndex)
+          : parseViewMode(json['bookshelfViewMode']),
+      bookshelfSortMode: hasLegacySortIndex
+          ? bookshelfSortModeFromLegacyIndex(parsedSortIndex)
+          : parseSortMode(json['bookshelfSortMode']),
+      bookshelfGroupStyle: parseIntWithDefault(
+              json['bookshelfGroupStyle'] ?? json['bookGroupStyle'], 0)
+          .clamp(0, 1),
+      bookshelfLayoutIndex: parsedLayoutIndex,
+      bookshelfSortIndex: parsedSortIndex,
+      bookshelfShowUnread: parseBoolWithDefault(
+        json['bookshelfShowUnread'] ?? json['showUnread'],
+        true,
+      ),
+      bookshelfShowLastUpdateTime: parseBoolWithDefault(
+        json['bookshelfShowLastUpdateTime'] ?? json['showLastUpdateTime'],
+        false,
+      ),
+      bookshelfShowWaitUpCount: parseBoolWithDefault(
+        json['bookshelfShowWaitUpCount'] ?? json['showWaitUpCount'],
+        false,
+      ),
+      bookshelfShowFastScroller: parseBoolWithDefault(
+        json['bookshelfShowFastScroller'] ?? json['showBookshelfFastScroller'],
+        false,
+      ),
       searchFilterMode: normalizeSearchFilterMode(
           parseSearchFilterMode(json['searchFilterMode'])),
       searchConcurrency:
@@ -264,6 +357,20 @@ class AppSettings {
       'defaultHomePage': defaultHomePage.name,
       'bookshelfViewMode': bookshelfViewMode.index,
       'bookshelfSortMode': bookshelfSortMode.index,
+      'bookshelfGroupStyle': bookshelfGroupStyle,
+      'bookGroupStyle': bookshelfGroupStyle,
+      'bookshelfLayoutIndex': bookshelfLayoutIndex,
+      'bookshelfLayout': bookshelfLayoutIndex,
+      'bookshelfSortIndex': bookshelfSortIndex,
+      'bookshelfSort': bookshelfSortIndex,
+      'bookshelfShowUnread': bookshelfShowUnread,
+      'showUnread': bookshelfShowUnread,
+      'bookshelfShowLastUpdateTime': bookshelfShowLastUpdateTime,
+      'showLastUpdateTime': bookshelfShowLastUpdateTime,
+      'bookshelfShowWaitUpCount': bookshelfShowWaitUpCount,
+      'showWaitUpCount': bookshelfShowWaitUpCount,
+      'bookshelfShowFastScroller': bookshelfShowFastScroller,
+      'showBookshelfFastScroller': bookshelfShowFastScroller,
       'searchFilterMode': normalizeSearchFilterMode(searchFilterMode).index,
       'searchConcurrency': searchConcurrency,
       'searchCacheRetentionDays': searchCacheRetentionDays,
@@ -288,6 +395,13 @@ class AppSettings {
     MainDefaultHomePage? defaultHomePage,
     BookshelfViewMode? bookshelfViewMode,
     BookshelfSortMode? bookshelfSortMode,
+    int? bookshelfGroupStyle,
+    int? bookshelfLayoutIndex,
+    int? bookshelfSortIndex,
+    bool? bookshelfShowUnread,
+    bool? bookshelfShowLastUpdateTime,
+    bool? bookshelfShowWaitUpCount,
+    bool? bookshelfShowFastScroller,
     SearchFilterMode? searchFilterMode,
     int? searchConcurrency,
     int? searchCacheRetentionDays,
@@ -310,6 +424,16 @@ class AppSettings {
       defaultHomePage: defaultHomePage ?? this.defaultHomePage,
       bookshelfViewMode: bookshelfViewMode ?? this.bookshelfViewMode,
       bookshelfSortMode: bookshelfSortMode ?? this.bookshelfSortMode,
+      bookshelfGroupStyle: bookshelfGroupStyle ?? this.bookshelfGroupStyle,
+      bookshelfLayoutIndex: bookshelfLayoutIndex ?? this.bookshelfLayoutIndex,
+      bookshelfSortIndex: bookshelfSortIndex ?? this.bookshelfSortIndex,
+      bookshelfShowUnread: bookshelfShowUnread ?? this.bookshelfShowUnread,
+      bookshelfShowLastUpdateTime:
+          bookshelfShowLastUpdateTime ?? this.bookshelfShowLastUpdateTime,
+      bookshelfShowWaitUpCount:
+          bookshelfShowWaitUpCount ?? this.bookshelfShowWaitUpCount,
+      bookshelfShowFastScroller:
+          bookshelfShowFastScroller ?? this.bookshelfShowFastScroller,
       searchFilterMode: searchFilterMode ?? this.searchFilterMode,
       searchConcurrency: searchConcurrency ?? this.searchConcurrency,
       searchCacheRetentionDays:

@@ -19,10 +19,7 @@ class SourceVariableStore {
     if (key.isEmpty) return null;
 
     final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString(_variableKey(key));
-    if (value == null) return null;
-    if (value.trim().isEmpty) return null;
-    return value;
+    return prefs.getString(_variableKey(key));
   }
 
   static Future<void> putVariable(String sourceKey, String? variable) async {
@@ -30,13 +27,12 @@ class SourceVariableStore {
     if (key.isEmpty) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final text = variable ?? '';
-    if (text.trim().isEmpty) {
+    if (variable == null) {
       await prefs.remove(_variableKey(key));
       return;
     }
 
-    await prefs.setString(_variableKey(key), text);
+    await prefs.setString(_variableKey(key), variable);
   }
 
   static Future<void> removeVariable(String sourceKey) async {

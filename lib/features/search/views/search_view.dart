@@ -20,7 +20,7 @@ import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_cover_loader.dart';
 import '../../source/views/source_list_view.dart';
-import '../../settings/views/exception_logs_view.dart';
+import '../../settings/views/app_log_dialog.dart';
 import '../models/search_scope.dart';
 import '../models/search_scope_group_helper.dart';
 import '../services/search_cache_service.dart';
@@ -729,17 +729,12 @@ class _SearchViewState extends State<SearchView> {
     setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
   }
 
-  String _precisionSearchValueLabel() {
-    return _isPrecisionSearchEnabled ? '开启' : '关闭';
-  }
-
   String _precisionSearchSummaryLabel() {
     return _isPrecisionSearchEnabled ? '精准搜索开' : '精准搜索关';
   }
 
   String _scopeLabel({
     required SearchScopeResolveResult scope,
-    required int allEnabledCount,
   }) {
     if (scope.isAll) {
       return '全部书源';
@@ -748,16 +743,6 @@ class _SearchViewState extends State<SearchView> {
       return scope.display(allLabel: '全部书源');
     }
     return scope.display(allLabel: '全部书源');
-  }
-
-  Future<void> _updateScopeAndMaybeSearch(String nextScope) async {
-    final normalized = SearchScope.normalizeScopeText(nextScope);
-    if (normalized == _settings.searchScope) return;
-    await _saveSettings(_settings.copyWith(searchScope: normalized));
-    if (!mounted) return;
-    if (_shouldAutoSearchOnScopeChanged()) {
-      await _search();
-    }
   }
 
   bool _shouldAutoSearchOnScopeChanged() {
@@ -769,137 +754,7 @@ class _SearchViewState extends State<SearchView> {
     );
   }
 
-  Future<void> _showScopeQuickSheet() async {
-    var scopeState = _resolveSearchScope();
-    if (scopeState.resolvedScope.normalizedScope != _settings.searchScope) {
-      await _saveSettings(
-        _settings.copyWith(
-          searchScope: scopeState.resolvedScope.normalizedScope,
-        ),
-      );
-      if (!mounted) return;
-      scopeState = _resolveSearchScope();
-    }
-    final scope = scopeState.resolvedScope;
-    final selectedNames = scope.displayNames;
-    final enabledGroups = _enabledGroupsReady
-        ? _enabledGroups
-        : SearchScopeGroupHelper.enabledGroupsFromSources(
-            scopeState.allEnabledSources,
-          );
-    final allEnabledCount = scopeState.allEnabledSources.length;
-
-    final action = await showCupertinoModalPopup<_ScopeQuickAction>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('搜索范围'),
-        message: Text(
-          _scopeLabel(
-            scope: scope,
-            allEnabledCount: allEnabledCount,
-          ),
-        ),
-        actions: [
-          for (final selectedName in selectedNames)
-            _buildScopeQuickAction(
-              ctx,
-              title: selectedName,
-              selected: true,
-              action: _ScopeQuickAction.remove(selectedName),
-            ),
-          _buildScopeQuickAction(
-            ctx,
-            title: '全部书源',
-            selected: scope.isAll,
-            action: const _ScopeQuickAction(
-              type: _ScopeQuickActionType.all,
-              value: '',
-            ),
-          ),
-          for (final group in enabledGroups)
-            if (!selectedNames.contains(group))
-              _buildScopeQuickAction(
-                ctx,
-                title: group,
-                selected: false,
-                action: _ScopeQuickAction(
-                  type: _ScopeQuickActionType.group,
-                  value: group,
-                ),
-              ),
-          _buildScopeQuickAction(
-            ctx,
-            title: '多分组/单源模式…',
-            selected: false,
-            action: const _ScopeQuickAction(
-              type: _ScopeQuickActionType.dialog,
-              value: '',
-            ),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
-    );
-    if (action == null) return;
-
-    switch (action.type) {
-      case _ScopeQuickActionType.dialog:
-        await _openScopePicker();
-        return;
-      case _ScopeQuickActionType.all:
-        await _updateScopeAndMaybeSearch('');
-        return;
-      case _ScopeQuickActionType.group:
-        await _updateScopeAndMaybeSearch(action.value);
-        return;
-      case _ScopeQuickActionType.remove:
-        if (scope.isSource) {
-          await _updateScopeAndMaybeSearch('');
-          return;
-        }
-        final remaining = scope.selectedGroups
-            .where((item) => item != action.value)
-            .toList(growable: false);
-        await _updateScopeAndMaybeSearch(SearchScope.fromGroups(remaining));
-        return;
-    }
-  }
-
-  CupertinoActionSheetAction _buildScopeQuickAction(
-    BuildContext ctx, {
-    required String title,
-    required bool selected,
-    required _ScopeQuickAction action,
-  }) {
-    return CupertinoActionSheetAction(
-      onPressed: () => Navigator.pop(ctx, action),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (selected)
-            Icon(
-              CupertinoIcons.check_mark_circled_solid,
-              size: 18,
-              color: CupertinoColors.activeGreen.resolveFrom(context),
-            ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _showSearchSettingsSheet() async {
-    final scopeState = _resolveSearchScope();
-    final allEnabledCount = scopeState.allEnabledSources.length;
     final action = await showCupertinoModalPopup<_SearchSettingAction>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
@@ -910,7 +765,7 @@ class _SearchViewState extends State<SearchView> {
             ctx,
             action: _SearchSettingAction.precisionSearch,
             label: '精准搜索',
-            value: _precisionSearchValueLabel(),
+            checked: _isPrecisionSearchEnabled,
           ),
           _buildSettingsAction(
             ctx,
@@ -921,11 +776,7 @@ class _SearchViewState extends State<SearchView> {
           _buildSettingsAction(
             ctx,
             action: _SearchSettingAction.scope,
-            label: '搜索范围',
-            value: _scopeLabel(
-              scope: scopeState.resolvedScope,
-              allEnabledCount: allEnabledCount,
-            ),
+            label: '多分组/书源',
           ),
           _buildSettingsAction(
             ctx,
@@ -948,13 +799,13 @@ class _SearchViewState extends State<SearchView> {
         await _togglePrecisionSearchLikeLegado();
         break;
       case _SearchSettingAction.scope:
-        await _showScopeQuickSheet();
+        await _openScopePickerLikeLegado();
         break;
       case _SearchSettingAction.sourceManage:
         await _openSourceManage();
         break;
       case _SearchSettingAction.logs:
-        await _openExceptionLogs();
+        await _openAppLogDialog();
         break;
     }
   }
@@ -963,7 +814,8 @@ class _SearchViewState extends State<SearchView> {
     BuildContext ctx, {
     required _SearchSettingAction action,
     required String label,
-    required String value,
+    String value = '',
+    bool checked = false,
     bool isDestructive = false,
   }) {
     return CupertinoActionSheetAction(
@@ -972,13 +824,20 @@ class _SearchViewState extends State<SearchView> {
       child: Row(
         children: [
           Expanded(child: Text(label)),
-          if (value.isNotEmpty)
+          if (value.isNotEmpty) ...[
             Text(
               value,
               style: TextStyle(
                 color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 fontSize: 14,
               ),
+            ),
+            if (checked) const SizedBox(width: 8),
+          ],
+          if (checked)
+            const Icon(
+              CupertinoIcons.check_mark,
+              size: 18,
             ),
         ],
       ),
@@ -991,20 +850,11 @@ class _SearchViewState extends State<SearchView> {
         : SearchFilterMode.precise;
     await _saveSettings(_settings.copyWith(searchFilterMode: nextMode));
     if (!mounted) return;
-    if (_searchController.text.trim().isNotEmpty) {
-      await _search();
-      return;
-    }
-    setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
+    await _search();
   }
 
-  Future<void> _openScopePicker() async {
+  Future<void> _openScopePickerLikeLegado() async {
     final scopeState = _resolveSearchScope();
-    if (scopeState.allSources.isEmpty) {
-      _showMessage('没有可用书源。');
-      return;
-    }
-
     final result =
         await Navigator.of(context, rootNavigator: true).push<String>(
       CupertinoPageRoute(
@@ -1034,12 +884,8 @@ class _SearchViewState extends State<SearchView> {
     );
   }
 
-  Future<void> _openExceptionLogs() async {
-    await Navigator.of(context, rootNavigator: true).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => const ExceptionLogsView(),
-      ),
-    );
+  Future<void> _openAppLogDialog() async {
+    await showAppLogDialog(context);
   }
 
   Future<bool> _confirm({
@@ -1111,10 +957,8 @@ class _SearchViewState extends State<SearchView> {
     final scopeState = _resolveSearchScope();
     final enabledSources = scopeState.sources;
     final totalSources = enabledSources.length;
-    final allEnabledCount = scopeState.allEnabledSources.length;
     final scopeLabel = _scopeLabel(
       scope: scopeState.resolvedScope,
-      allEnabledCount: allEnabledCount,
     );
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
@@ -2046,30 +1890,6 @@ class _SourceRunIssue {
     required this.sourceName,
     required this.reason,
   });
-}
-
-enum _ScopeQuickActionType {
-  remove,
-  group,
-  all,
-  dialog,
-}
-
-class _ScopeQuickAction {
-  final _ScopeQuickActionType type;
-  final String value;
-
-  const _ScopeQuickAction({
-    required this.type,
-    required this.value,
-  });
-
-  factory _ScopeQuickAction.remove(String name) {
-    return _ScopeQuickAction(
-      type: _ScopeQuickActionType.remove,
-      value: name,
-    );
-  }
 }
 
 enum _SearchSettingAction {

@@ -1,0 +1,918 @@
+# 2026-02-21 legado 全功能逐项迁移 ExecPlan（One-by-One）
+
+状态：`active`
+
+## 背景与目标
+
+### 背景
+- 历史计划与进度记录已清空，需建立一份可持续执行的新主计划。
+- 当前仓库已有 legado 菜单入口基线：`90` 个菜单文件、`410` 个功能入口（来源：`docs/migration/button-audit/legacy-button-ledger.md`）。
+- 需求目标是“挨个处理所有功能”，因此执行粒度必须细化到单个功能入口。
+
+### 目标
+- 建立并使用统一的 410 项逐项跟踪台账，确保每个功能项都有状态与验证证据。
+- 以 legado 为第一标准完成迁移级别收敛：交互路径、状态流转、边界处理、错误可观测、文案语义与菜单触发逻辑同义。
+- 在单项推进过程中持续回填计划文档，避免无记录偏航。
+
+### 范围
+- 覆盖 legado `res/menu` 全量入口（410 项）及其对应业务链路。
+- 覆盖 SoupReader 对应模块：主入口、搜索、发现、详情、目录、正文、书源、RSS、规则、设置及工具类入口。
+- 覆盖验证证据：定向测试与手工回归路径。
+
+### 非目标
+- 不做与 legado 无关的新特性扩展。
+- 不追求平台组件像素级一致（允许 Shadcn/Cupertino 与 Flutter 平台差异）。
+- 非提交推送阶段不执行 `flutter analyze`。
+
+### 成功标准
+- `docs/plans/2026-02-21-legado-feature-item-tracker.csv` 中 410 项全部进入 `done`，且每项 `verify` 字段有可复现证据。
+- 每个阶段（P1~P10）完成后都有阶段回归结论。
+- 无未记录的偏差项；无法等价复现项必须记录为 `blocked` 并给出替代与回补计划。
+
+## 差异点清单（执行前）
+
+| ID | 文件位置 | 差异描述 | 原因 | 影响 |
+|---|---|---|---|---|
+| D-001 | `PLANS.md`（旧） | 旧计划包含多轮历史增量，缺少统一“单项执行主线” | 历史任务并行叠加 | 全量收敛路径不够直观 |
+| D-002 | `docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`（旧） | 聚焦阅读器 C5，无法覆盖全功能域 | 任务范围局部化 | 无法作为“所有功能逐项”总计划 |
+| D-003 | 缺失文件（执行前） | 无统一 410 项逐项状态台账 | 历史上以模块清单为主 | 难以做到“挨个处理不漏项” |
+
+## 逐项检查清单（每项必填）
+
+1. 入口：所在页面/菜单/弹层入口是否与 legado 同义。  
+2. 状态：默认/选中/禁用/加载/空态/错误是否同义。  
+3. 异常：失败分支是否可观测（提示、日志、状态回退）。  
+4. 文案：用户可见语义是否与 legado 同义。  
+5. 排版：信息层级、间距节奏、热区触发是否同义。  
+6. 交互触发：点击后路径、结果、取消/清理行为是否同义。  
+7. 验证：至少一条定向验证（测试命令或手工路径）。
+
+## 实施步骤（顺序执行）
+
+### Step 0：重建执行基线（已完成）
+- 动作：清理旧计划文件，重建主计划与逐项跟踪台账。  
+- 输出：
+  - `PLANS.md`
+  - `docs/plans/2026-02-21-legado-feature-item-tracker.csv`
+  - 本文档
+- 验证：台账行数为 `411`（含表头；功能项 410）。
+
+### Step 1：按 Phase 串行逐项推进（进行中）
+- 执行顺序固定：`P1 -> P2 -> P3 -> P4 -> P5 -> P6 -> P7 -> P8 -> P9 -> P10`。
+- 每个 Phase 内按 `seq` 升序逐项推进（不可跳项，不可并项）。
+- 每完成一项，立即更新 tracker 行状态与验证证据。
+
+### Step 2：阶段收口
+- 每个 Phase 完成时输出：
+  - 已完成项数 / 阻塞项数 / 待处理项数
+  - 阶段回归路径与结果
+  - 差异项（若有）与回补计划
+
+### Step 3：全量收口
+- 条件：410 项全部 `done` 或已有明确 `blocked` 处置单。
+- 输出：最终对照清单与风险结论。
+- 提交前检查：仅执行一次 `flutter analyze`（仅在提交推送阶段）。
+
+## Phase 拆分（全量 410 项）
+
+| Phase | 领域 | 项数 | 状态 | 依赖 |
+|---|---|---:|---|---|
+| P1 | 主入口与导航 | 21 | `done` | Step 0 |
+| P2 | 搜索/详情/目录 | 38 | `active` | P1 |
+| P3 | 阅读与朗读 | 89 | `pending` | P2 |
+| P4 | 书源管理与换源 | 85 | `pending` | P3 |
+| P5 | 规则与净化 | 46 | `pending` | P4 |
+| P6 | 书架/缓存/分组 | 31 | `pending` | P5 |
+| P7 | RSS | 47 | `pending` | P6 |
+| P8 | 导入导出与备份 | 27 | `pending` | P7 |
+| P9 | 主题与外观 | 2 | `pending` | P8 |
+| P10 | 系统与工具 | 24 | `pending` | P9 |
+
+## 风险与回滚
+
+- 风险 R1：单项数量大导致执行周期长。  
+  - 缓解：Phase 串行 + 单项回填，确保中断可恢复。  
+  - 回滚：按 tracker 回退到最近 `done` 项继续。
+
+- 风险 R2：部分 legacy 行为无法在 Flutter 端完全等价。  
+  - 缓解：标记 `blocked`，记录影响范围与替代方案。  
+  - 回滚：不合并偏差实现，先完成确认流程。
+
+- 风险 R3：多人并行导致同文件覆盖。  
+  - 缓解：当前策略为单线串行，不启用并行分支。
+
+- 风险 R4：验证不足导致“看似完成”。  
+  - 缓解：每项必须填写 `verify`，每阶段必须有回归证据。
+
+## 验收与证据
+
+### 命令验证
+- 逐项阶段：仅运行相关定向测试。
+- 最终提交前：`flutter analyze` 执行且仅执行一次。
+
+### 手工回归主路径
+- 主入口（P1）：底栏四 Tab、重选行为、各页菜单入口。
+- 核心五段链路（P2+P3）：`search -> explore -> bookInfo -> toc -> content`。
+- 书源链路（P4）：源列表/编辑/登录/调试/换源。
+- 规则链路（P5）：替换/字典/TXT 目录规则的入口与生效。
+- 其余链路（P6~P10）：按 tracker 行逐项回归。
+
+## Progress（动态）
+
+- `2026-02-21`
+  - 已完成 Step 0：重建计划体系与 410 项跟踪台账。
+  - 当前推进：P1（主入口与导航）逐项处理中。
+  - 已完成 `P1-seq257`：`main_bnv.xml / @+id/menu_bookshelf / 书架`。
+  - `P1-seq257` 差异点清单（实施前）：
+    - `legado MainActivity.onNavigationItemReselected` 对书架采用 `300ms` 双击窗口触发 `gotoTop`；当前 Flutter 实现为重选即触发回顶，触发阈值不一致。
+  - `P1-seq257` 逐项对照清单（实施后）：
+    - 入口：已同义（主底栏首项为“书架”）。
+    - 状态：已同义（选中态与页面切换保持一致）。
+    - 异常：已同义（无新增失败分支；不改变异常可观测路径）。
+    - 文案：已同义（“书架”语义一致）。
+    - 排版：已同义（Cupertino 底栏形态差异属于平台允许差异）。
+    - 交互触发：已同义（改为 `300ms` 双击书架触发回顶）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 底栏书架标签 -> 连续两次点击书架`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq258`：`main_bnv.xml / @+id/menu_discovery / 发现`。
+  - `P1-seq258` 差异点清单（实施前）：
+    - `legado MainActivity.onNavigationItemReselected` 对发现采用 `300ms` 双击窗口触发 `compressExplore`；当前 Flutter 实现为重选即触发压缩，触发阈值不一致。
+  - `P1-seq258` 逐项对照清单（实施后）：
+    - 入口：已同义（主底栏“发现”入口与 legado 同层级）。
+    - 状态：已同义（选中态切换与可见性策略一致）。
+    - 异常：已同义（无新增失败分支；发现页错误提示链路不变）。
+    - 文案：已同义（“发现”语义一致）。
+    - 排版：已同义（Cupertino 底栏形态差异属于平台允许差异）。
+    - 交互触发：已同义（改为 `300ms` 双击发现触发压缩/回顶）。
+    - 验证：`flutter test test/discovery_view_compile_test.dart test/widget_test.dart` 通过；手工路径 `启动应用 -> 切换到发现 -> 连续两次点击发现标签`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq259`：`main_bnv.xml / @+id/menu_rss / 订阅`。
+  - `P1-seq259` 差异点清单（实施前）：
+    - Flutter 底栏文案为 `RSS`，legado 菜单文案语义为“订阅”；存在用户可见语义偏差。
+  - `P1-seq259` 逐项对照清单（实施后）：
+    - 入口：已同义（底栏订阅入口可见性受 `showRss` 控制，与 legado `showRSS` 同义）。
+    - 状态：已同义（选中态与切换路径一致）。
+    - 异常：已同义（无新增失败分支）。
+    - 文案：已同义（改为“订阅”）。
+    - 排版：已同义（Cupertino 底栏形态差异属于平台允许差异）。
+    - 交互触发：已同义（点击切换到订阅页；重选无额外动作）。
+    - 验证：`flutter test test/widget_test.dart test/discovery_view_compile_test.dart test/rss_subscription_view_compile_test.dart` 通过；手工路径 `启动应用 -> 点击底栏订阅标签`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq260`：`main_bnv.xml / @+id/menu_my_config / 我的`。
+  - `P1-seq260` 差异点清单（实施前）：
+    - 未发现语义差异；需完成逐项核验并留存证据。
+  - `P1-seq260` 逐项对照清单（实施后）：
+    - 入口：已同义（底栏“我的”入口与 legado 同层级）。
+    - 状态：已同义（选中态与切换路径一致）。
+    - 异常：已同义（无新增失败分支）。
+    - 文案：已同义（“我的”语义一致）。
+    - 排版：已同义（Cupertino 底栏形态差异属于平台允许差异）。
+    - 交互触发：已同义（点击切换到“我的”页；重选无额外动作）。
+    - 验证：`flutter test test/widget_test.dart test/discovery_view_compile_test.dart test/rss_subscription_view_compile_test.dart` 通过；手工路径 `启动应用 -> 点击底栏我的标签`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq261`：`main_bookshelf.xml / @+id/menu_search / 搜索`。
+  - `P1-seq261` 差异点清单（实施前）：
+    - 未发现语义差异；需确认入口层级与触发路径是否保持 legado `menu_search -> SearchActivity` 同义。
+  - `P1-seq261` 逐项对照清单（实施后）：
+    - 入口：已同义（书架顶栏常驻搜索入口，非“更多菜单”二级入口）。
+    - 状态：已同义（入口常驻可用，不受书架空态/列表态影响）。
+    - 异常：已同义（无新增失败分支；导航失败仍由 Flutter 路由异常链路可观测）。
+    - 文案：已同义（入口语义为“搜索”）。
+    - 排版：已同义（平台图标样式差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击搜索图标打开 `SearchView`，等价 legado 启动 `SearchActivity`）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架顶栏搜索按钮 -> 进入搜索页`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq262`：`main_bookshelf.xml / @+id/menu_update_toc / 更新目录`。
+  - `P1-seq262` 差异点清单（实施前）：
+    - 未发现入口层级差异；需确认“更多菜单 -> 更新目录”触发与空数据反馈是否保持 legado 同义。
+  - `P1-seq262` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（非进行中显示“更新目录”，进行中显示“更新目录（进行中）”用于可观测状态提示）。
+    - 异常：已同义（无可更新网络书籍时提示“当前书架没有可更新的网络书籍”）。
+    - 文案：已同义（动作语义保持“更新目录”）。
+    - 排版：已同义（平台 ActionSheet 差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后进入目录更新链路，空书架场景走同义失败提示）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 更新目录`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq263`：`main_bookshelf.xml / @+id/menu_add_local / 添加本地`。
+  - `P1-seq263` 差异点清单（实施前）：
+    - Flutter 书架更多菜单文案为“本机导入”，与 legado `book_local=添加本地` 用户可见语义不一致。
+  - `P1-seq263` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（入口常驻可点击，不依赖书架内容状态）。
+    - 异常：已同义（沿用既有本地导入异常提示链路，无新增静默失败分支）。
+    - 文案：已同义（由“本机导入”收敛为“添加本地”）。
+    - 排版：已同义（平台 ActionSheet 差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后触发本地导入流程，等价 legado `menu_add_local -> ImportBookActivity` 入口语义）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 添加本地`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq264`：`main_bookshelf.xml / @+id/menu_remote / 远程书籍`。
+  - `P1-seq264` 差异点清单（实施前）：
+    - Flutter 书架更多菜单文案为“远程导入”，与 legado `add_remote_book=远程书籍` 用户可见语义不一致。
+    - 当前点击仅走“暂未实现”提示，未形成与 legado `menu_remote -> RemoteBookActivity` 同义的页面导航路径。
+  - `P1-seq264` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（入口常驻可点击，不依赖书架内容状态）。
+    - 异常：已同义（移除静默占位提示，进入远程书籍承载页后可见当前迁移状态说明）。
+    - 文案：已同义（由“远程导入”收敛为“远程书籍”）。
+    - 排版：已同义（平台页面容器差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后进入远程书籍页，等价 legado 进入 `RemoteBookActivity` 的入口语义）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 远程书籍`。
+  - 兼容影响：无旧书源兼容性影响；远程书籍页内菜单能力按后续 `seq101~107` 继续收敛。
+  - 已完成 `P1-seq265`：`main_bookshelf.xml / @+id/menu_add_url / 添加网址`。
+  - `P1-seq265` 差异点清单（实施前）：
+    - Flutter 书架更多菜单文案为“URL 导入”，与 legado `add_url=添加网址` 用户可见语义不一致。
+    - 当前点击仅走占位提示，缺少 legado `添加书籍网址` 输入弹窗与网址加书触发链路。
+  - `P1-seq265` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（入口常驻可点击；加书过程中展示“添加中...（计数）”，并支持取消中断与清理）。
+    - 异常：已同义（未成功匹配/导入时统一反馈“添加网址失败”，与 legado 失败语义一致）。
+    - 文案：已同义（由“URL 导入”收敛为“添加网址”；弹窗标题为“添加书籍网址”）。
+    - 排版：已同义（Cupertino 对话框与平台输入控件差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后弹出 URL 输入框，确认后按 `baseUrl -> bookUrlPattern` 规则匹配书源并执行加书链路；过程支持取消）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 添加网址 -> 输入 URL -> 确定`。
+  - 兼容影响：无旧书源兼容性影响。
+  - 已完成 `P1-seq266`：`main_bookshelf.xml / @+id/menu_bookshelf_manage / 书架管理`。
+  - `P1-seq266` 差异点清单（实施前）：
+    - Flutter 书架更多菜单“书架管理”仅弹占位提示，缺少 legado `menu_bookshelf_manage -> BookshelfManageActivity` 页面导航路径。
+  - `P1-seq266` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（入口常驻可点击，不依赖书架内容状态）。
+    - 异常：已同义（从占位提示改为页面承载，当前迁移状态可见且不静默失败）。
+    - 文案：已同义（“书架管理”语义保持一致）。
+    - 排版：已同义（平台页面容器差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后进入书架管理页，等价 legado 进入 `BookshelfManageActivity` 的入口语义）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 书架管理`。
+  - 兼容影响：无旧书源兼容性影响；页内批量管理动作按后续对应序号逐项迁移。
+  - 已完成 `P1-seq267`：`main_bookshelf.xml / @+id/menu_download / 缓存/导出`。
+  - `P1-seq267` 差异点清单（实施前）：
+    - Flutter 书架更多菜单文案为“缓存导出”，与 legado `cache_export=缓存/导出` 用户可见语义不一致。
+    - 当前点击仅走占位提示，缺少 legado `menu_download -> CacheActivity` 页面导航路径。
+  - `P1-seq267` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（入口常驻可点击，不依赖书架内容状态）。
+    - 异常：已同义（从占位提示改为页面承载，当前迁移状态可见且不静默失败）。
+    - 文案：已同义（由“缓存导出”收敛为“缓存/导出”）。
+    - 排版：已同义（平台页面容器差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后进入缓存/导出页，等价 legado 进入 `CacheActivity` 的入口语义）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 缓存/导出`。
+  - 兼容影响：无旧书源兼容性影响；缓存下载与导出页内菜单动作按后续对应序号逐项迁移。
+  - 已完成 `P1-seq268`：`main_bookshelf.xml / @+id/menu_group_manage / 分组管理`。
+  - `P1-seq268` 差异点清单（实施前）：
+    - Flutter 书架更多菜单“分组管理”点击后仅弹占位提示，缺少 legado `menu_group_manage -> GroupManageDialog` 的对话框层级触发语义。
+  - `P1-seq268` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（入口常驻可点击，不依赖书架内容状态）。
+    - 异常：已同义（移除占位提示；改为弹窗承载并明确当前迁移状态，避免静默失败）。
+    - 文案：已同义（保留“分组管理”语义，与 legado 一致）。
+    - 排版：已同义（改为对话框层级承载；Cupertino 对话框视觉差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后弹出分组管理弹窗，等价 legado `showDialogFragment<GroupManageDialog>()` 的入口语义）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 分组管理 -> 弹出分组管理对话框`。
+  - 兼容影响：无旧书源兼容性影响；分组新增/编辑/排序等页内动作按后续对应序号逐项迁移。
+  - 已完成 `P1-seq269`：`main_bookshelf.xml / @+id/menu_bookshelf_layout / 书架布局`。
+  - `P1-seq269` 差异点清单（实施前）：
+    - Flutter 书架布局入口为 `ActionSheet` 即时选择，缺少 legado `configBookshelf` 的“确认式弹窗 + 统一提交”交互语义。
+    - Flutter 仅支持“图墙/列表 + 4 种排序”，缺少 legado 入口内“分组样式、未读数量、最新更新时间、待更新计数、快速滚动条、5 档布局、6 档排序”配置项。
+    - AppSettings 缺少 legado 对应配置字段（`bookGroupStyle/bookshelfLayout/bookshelfSort/showUnread/showLastUpdateTime/showWaitUpCount/showBookshelfFastScroller`）的持久化映射。
+  - `P1-seq269` 逐项对照清单（实施后）：
+    - 入口：已同义（书架“更多”菜单点击“书架布局”后进入配置弹窗）。
+    - 状态：已同义（改为“取消不生效、确定统一提交”的确认式状态流转，匹配 legado `okButton/cancelButton` 语义）。
+    - 异常：已同义（配置数据统一落盘；非法索引在解析时归一到合法区间，避免异常值导致 UI 崩溃）。
+    - 文案：已同义（配置项采用 legado 语义：分组样式、显示未读数量、显示最新更新时间、显示待更新计数、显示快速滚动条、视图、排序）。
+    - 排版：已同义（采用 `CupertinoAlertDialog` + 分区选项承载；视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（确定后应用布局索引/排序索引并刷新书架；未读/更新时间/快速滚动条/待更新计数开关即时反映在书架页表现层）。
+    - 验证：`flutter test test/widget_test.dart test/app_settings_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 书架布局 -> 修改选项 -> 确定`。
+  - 兼容影响：无旧书源兼容性影响；新增配置字段已兼容 legacy key 读写（`bookshelfLayout/bookshelfSort/showUnread/...`），对旧配置文件回放无破坏性。
+  - 已完成 `P1-seq270`：`main_bookshelf.xml / @+id/menu_export_bookshelf / 导出书单`。
+  - `P1-seq270` 差异点清单（实施前）：
+    - Flutter 书架更多菜单文案为“导出书架”，与 legado `export_bookshelf=导出书单` 用户可见语义不一致。
+    - Flutter 成功路径仅弹出“导出成功：路径”文案，缺少 legado `export_success` 成功弹窗中的路径可复制交互语义。
+  - `P1-seq270` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（用户取消文件保存时不提示成功；保存成功后弹出导出成功确认弹窗）。
+    - 异常：已同义（导出异常统一反馈“导出书籍出错\n错误摘要”，保持可观测失败分支）。
+    - 文案：已同义（由“导出书架”收敛为“导出书单”）。
+    - 排版：已同义（采用 `CupertinoAlertDialog` 承载成功提示与复制动作；视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（点击后进入保存路径选择；成功后展示路径并支持“复制”，等价 legado 导出成功弹窗可复制 URI 的语义）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 导出书单 -> 选择保存路径 -> 导出成功弹窗 -> 点击复制`。
+  - 兼容影响：无旧书源兼容性影响；导出 JSON 仍保持 legado 同义字段 `name/author/intro`。
+  - 已完成 `P1-seq271`：`main_bookshelf.xml / @+id/menu_import_bookshelf / 导入书单`。
+  - `P1-seq271` 差异点清单（实施前）：
+    - Flutter 书架更多菜单文案为“导入书架”，与 legado `import_bookshelf=导入书单` 用户可见语义不一致。
+    - Flutter 入口点击后直接选择文件，缺少 legado `importBookshelfAlert` 的 `url/json` 输入弹窗与“选择文件”并存入口。
+    - Flutter 解析口径支持“文件 JSON/对象容错”，但缺少 legado 同义的 `http/https 链接 -> 拉取文本 -> 按 url/json 递归解析` 路径与“非 JSON 数组即格式不对”语义。
+  - `P1-seq271` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（点击后弹出“导入书单”对话框，支持输入框与文件选择双入口；导入过程中展示进度弹窗）。
+    - 异常：已同义（空输入或非数组 JSON 统一反馈“格式不对”；URL 请求失败可见 `HTTP/网络请求失败` 错误摘要）。
+    - 文案：已同义（由“导入书架”收敛为“导入书单”；输入框提示为 `url/json`）。
+    - 排版：已同义（采用 `CupertinoAlertDialog` 承载输入与三按钮动作；视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（“确定”按 `url/json` 语义导入；“选择文件”仅允许 `txt/json` 并复用同一解析链路，等价 legado `okButton + neutralButton(select_file)`）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 导入书单 -> 输入 url/json 或点击选择文件 -> 确定进入导入流程`。
+  - 兼容影响：无旧书源兼容性影响；仅调整书架入口与导入解析口径，不改变既有书源数据结构。
+  - 已完成 `P1-seq272`：`main_bookshelf.xml / @+id/menu_log / 日志`。
+  - `P1-seq272` 差异点清单（实施前）：
+    - Flutter 书架“日志”入口跳转的是 `ExceptionLogsView` 页面，触发层级与 legado `showDialogFragment<AppLogDialog>()` 的弹层语义不一致。
+    - Flutter 日志页标题为“异常日志”，与 legado 菜单动作文案“日志”存在用户可见语义偏差。
+  - `P1-seq272` 逐项对照清单（实施后）：
+    - 入口：已同义（位于书架“更多”菜单，层级与 legado `main_bookshelf` 菜单一致）。
+    - 状态：已同义（点击后弹出“日志”对话框；日志为空时展示“暂无日志”）。
+    - 异常：已同义（无新增静默失败分支；日志为空与清空后状态均可见）。
+    - 文案：已同义（入口与弹层标题统一为“日志”，并提供“清空”动作）。
+    - 排版：已同义（改为对话框层级承载；Cupertino 弹层视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（点击菜单弹出日志弹层；点击“清空”立即清空列表；点击含堆栈条目可打开详情弹窗）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 书架更多菜单 -> 日志 -> 弹出日志对话框 -> 清空`。
+  - 兼容影响：无旧书源兼容性影响；仅调整日志入口承载形态与文案语义，不变更书源链路。
+  - 已完成 `P1-seq273`：`main_explore.xml / @+id/menu_group / 分组`。
+  - `P1-seq273` 差异点清单（实施前）：
+    - Flutter 发现页分组入口为 `OptionPickerSheet`，与 legado `main_explore/menu_group` 的工具栏动态子菜单触发形态不一致。
+    - Flutter 分组排序使用默认 `sort()`，与 legado `BookSourceDao.dealGroups -> cnCompare` 的中文排序语义不一致。
+    - Flutter `group:` 查询分支采用“拆分后 contains”匹配，未对齐 legado `flowGroupExplore` 的逗号边界匹配语义。
+  - `P1-seq273` 逐项对照清单（实施后）：
+    - 入口：已同义（发现页右上角“分组”动作保留为一级入口，点击后展示动态分组动作列表）。
+    - 状态：已同义（分组为空时入口不额外弹错误提示；分组存在时可直接选择并应用筛选）。
+    - 异常：已同义（无新增静默失败分支；分组筛选为空结果时保持发现页原有空列表表现）。
+    - 文案：已同义（入口与动作文案均为“分组/分组名”，保持 legado 业务语义）。
+    - 排版：已同义（采用 `CupertinoActionSheet` 承载动态分组动作；平台视觉差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击分组后写入 `group:<分组>` 并即时筛选，等价 legado `setQuery(\"group:...\", true)` 触发路径；筛选匹配规则收敛为 legado `flowGroupExplore` 逗号边界语义）。
+    - 验证：`flutter test test/discovery_view_compile_test.dart test/widget_test.dart` 通过；手工路径 `启动应用 -> 发现页 -> 右上角分组 -> 选择分组 -> 查询框显示 group:分组 且列表即时筛选`。
+  - 兼容影响：无旧书源兼容性影响；仅收敛发现页分组入口与筛选语义。
+  - 已完成 `P1-seq274`：`main_my.xml / @+id/menu_help / 帮助`。
+  - `P1-seq274` 差异点清单（实施前）：
+    - Flutter “我的”页未提供 `main_my/menu_help` 对应的顶栏帮助入口，触发层级与 legado `MyFragment` 右上角帮助按钮不一致。
+    - Flutter 无 `appHelp` 资产与加载链路，缺失 legado `showHelp("appHelp") -> assets/web/help/md/appHelp.md` 帮助文档展示语义。
+    - 现有页面未提供帮助弹层承载，无法等价 legado `TextDialog(Mode.MD)` 的“同页弹层查看帮助”交互路径。
+  - `P1-seq274` 逐项对照清单（实施后）：
+    - 入口：已同义（“我的”页顶栏新增右上角“帮助”动作，层级与 legado `main_my/menu_help` 一致）。
+    - 状态：已同义（帮助按钮常驻可点击；加载中显示活动指示器，避免重复触发）。
+    - 异常：已同义（资源加载失败时弹窗提示“帮助文档加载失败”，保持失败分支可观测）。
+    - 文案：已同义（入口语义为“帮助”；弹层标题为“帮助”，文档内容来自 legado 同源 `appHelp.md`）。
+    - 排版：已同义（采用 `CupertinoPopupSurface` + 可滚动正文承载长文档；平台视觉差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后读取 `assets/web/help/md/appHelp.md` 并弹层展示，等价 legado `showHelp("appHelp")` 触发路径）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 底栏我的 -> 右上角帮助 -> 弹出帮助文档弹层`。
+  - 兼容影响：无旧书源兼容性影响；仅补齐“我的”页帮助入口与本地帮助文档资产。
+  - 已完成 `P1-seq275`：`main_rss.xml / @+id/menu_rss_star / 收藏`。
+  - `P1-seq275` 差异点清单（实施前）：
+    - tracker 中 `seq275` 仍为 `pending`，缺少可复现验证证据，无法闭环该项迁移记录。
+    - 需确认 Flutter 订阅页顶栏星标入口保持 legado `menu_rss_star -> RssFavoritesActivity` 的一级触发语义。
+  - `P1-seq275` 逐项对照清单（实施后）：
+    - 入口：已同义（订阅页顶栏星标“收藏”入口保持一级动作层级）。
+    - 状态：已同义（入口常驻可点击，不依赖订阅源列表与筛选状态）。
+    - 异常：已同义（无新增静默失败分支；导航异常仍由现有路由错误链路可观测）。
+    - 文案：已同义（目标承载页标题为“收藏”，与 legado 业务语义一致）。
+    - 排版：已同义（顶栏动作与页面容器视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（点击星标进入收藏承载页，等价 legado 打开 `RssFavoritesActivity` 的入口语义）。
+    - 验证：`flutter test test/widget_test.dart` 通过；手工路径 `启动应用 -> 底栏订阅 -> 顶栏星标收藏 -> 进入收藏页`。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 RSS 顶栏收藏入口，收藏页内分组/删除等动作按 `P7-seq307~309` 继续迁移。
+  - 已完成 `P1-seq276`：`main_rss.xml / @+id/menu_group / 分组`。
+  - `P1-seq276` 差异点清单（实施前）：
+    - Flutter 订阅页“分组”入口使用通用 `OptionPickerSheet`，并额外提供 legado 无对应能力的“全部”扩展项，菜单结构与触发语义不一致。
+    - 缺少 `main_rss/menu_group` 的独立可复现验证证据，tracker 仍为 `pending`。
+  - `P1-seq276` 逐项对照清单（实施后）：
+    - 入口：已同义（订阅页顶栏保留一级“分组”入口，层级与 legado `main_rss/menu_group` 一致）。
+    - 状态：已同义（仅在存在启用分组时弹出动态分组菜单；分组为空时不引入额外提示分支）。
+    - 异常：已同义（无新增静默失败分支；筛选结果为空时保持订阅页原有空态语义）。
+    - 文案：已同义（移除“全部”扩展项，仅展示分组名称列表并保持 `group:<分组>` 业务语义）。
+    - 排版：已同义（改为 `CupertinoActionSheet` 承载动态分组菜单；视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（点击分组后查询写入 `group:<分组>` 并即时筛选，等价 legado `searchView.setQuery(\"group:...\", true)`）。
+    - 验证：`flutter test test/rss_subscription_view_group_menu_test.dart test/widget_test.dart` 通过；手工路径 `启动应用 -> 底栏订阅 -> 顶栏分组 -> 选择分组 -> 查询文案显示 group:分组 且列表按启用分组筛选`。
+  - 兼容影响：无旧书源兼容性影响；仅收敛订阅页分组入口形态与筛选触发语义。
+  - 已完成 `P1-seq277`：`main_rss.xml / @+id/menu_rss_config / 设置`。
+  - `P1-seq277` 差异点清单（实施前）：
+    - tracker 中 `seq277` 仍为 `pending`，缺少可复现验证证据，无法闭环该项迁移记录。
+    - 需确认 Flutter 订阅页顶栏设置入口保持 legado `menu_rss_config -> RssSourceActivity` 的一级触发语义。
+  - `P1-seq277` 逐项对照清单（实施后）：
+    - 入口：已同义（订阅页顶栏“设置”入口保持一级动作层级）。
+    - 状态：已同义（入口常驻可点击，不依赖订阅源列表与筛选状态）。
+    - 异常：已同义（无新增静默失败分支；导航异常仍由现有路由错误链路可观测）。
+    - 文案：已同义（入口语义为“设置”，与 legado 菜单动作一致）。
+    - 排版：已同义（顶栏动作视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（点击设置后进入 `RssSourceManageView`，等价 legado 打开 `RssSourceActivity` 的入口语义）。
+    - 验证：`flutter test test/widget_test.dart --plain-name "RSS settings action opens source manage page"`、`flutter test test/rss_subscription_view_group_menu_test.dart` 通过；手工路径 `启动应用 -> 底栏订阅 -> 顶栏设置 -> 进入订阅源管理页`。
+  - 兼容影响：无旧书源兼容性影响；仅补齐 `main_rss/menu_rss_config` 的独立验证证据，不改变书源数据结构与同步链路。
+  - 阶段收口：`P1` 共 `21/21` 项完成，`blocked=0`。
+  - 当前推进：P2（搜索/详情/目录）逐项处理中。
+  - 已完成 `P2-seq30`：`book_info.xml / @+id/menu_edit / 编辑`。
+  - `P2-seq30` 差异点清单（实施前）：
+    - tracker 中 `seq30` 仍为 `pending`，缺少可复现验证证据，无法闭环该项迁移记录。
+    - 需确认 Flutter 详情页编辑入口可见性是否对齐 legado `BookInfoActivity.upTvBookshelf -> editMenuItem.isVisible = inBookshelf` 语义。
+    - 需补充“点击编辑后进入编辑页”的页面级回归用例，避免仅凭代码阅读宣称同义。
+  - `P2-seq30` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页顶栏保留一级编辑动作入口）。
+    - 状态：已同义（仅当书籍在书架中时显示编辑入口；不在书架时隐藏，与 legado 同义）。
+    - 异常：已同义（非书架书籍不会暴露编辑入口，避免误触发；既有失败提示链路保持可观测）。
+    - 文案：已同义（编辑页标题与字段语义保持“编辑书籍信息/书名/作者”）。
+    - 排版：已同义（顶栏图标与编辑页表单采用 `Shadcn + Cupertino` 承载，平台视觉差异属于允许范围）。
+    - 交互触发：已同义（点击编辑进入 `SearchBookInfoEditView`，等价 legado `menu_edit -> BookInfoEditActivity` 触发语义，保存回写链路保持不变）。
+    - 验证：`flutter test test/search_book_info_edit_helper_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_view_edit_action_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 顶栏编辑 -> 进入编辑书籍信息页`。
+  - 兼容影响：无旧书源兼容性影响；仅补齐 `menu_edit` 的迁移证据与页面级回归用例，不改变书源/目录数据结构。
+  - 已完成 `P2-seq31`：`book_info.xml / @+id/menu_share_it / 分享`。
+  - `P2-seq31` 差异点清单（实施前）：
+    - Flutter 详情页分享入口点击后进入 `SourceQrShareView` 中间页，触发路径与 legado `menu_share_it -> shareWithQr` 的“直接系统分享”语义不一致。
+    - Flutter 分享载荷为定制字段集合（`name/author/sourceName/...`），未对齐 legado `bookUrl#bookJson` 拼接规则。
+    - Flutter 二维码生成失败时回退为文本分享，未对齐 legado `text_too_long_qr_error` 的失败提示语义。
+  - `P2-seq31` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页顶栏保留一级分享动作入口）。
+    - 状态：已同义（点击后直接进入系统分享流程，不再经过二维码预览中间页）。
+    - 异常：已同义（二维码生成失败时提示“文字太多，生成二维码失败”，与 legado `text_too_long_qr_error` 语义一致）。
+    - 文案：已同义（分享主题优先使用书名；失败文案收敛为 legado 同义中文语义）。
+    - 排版：已同义（分享仍由系统面板承载；平台分享面板视觉差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击分享后生成二维码图片并调用系统分享，载荷收敛为 `bookUrl#bookJson`，等价 legado `shareWithQr("$bookUrl#$bookJson", name)`）。
+    - 验证：`flutter test test/search_book_info_edit_helper_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_share_helper_test.dart test/search_book_info_view_compile_test.dart test/search_book_info_view_edit_action_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 顶栏分享 -> 系统分享面板`。
+  - 兼容影响：无旧书源兼容性影响；仅收敛详情页分享入口语义与载荷格式，不变更书源解析链路。
+  - 已完成 `P2-seq32`：`book_info.xml / @+id/menu_upload / 上传 WebDav`。
+  - `P2-seq32` 差异点清单（实施前）：
+    - Flutter 详情页更多菜单文案为“上传到远程”，与 legado `upload_to_remote=上传 WebDav` 用户可见语义不一致。
+    - Flutter 确认弹窗标题/文案为“提示 + 远程 WebDav 链接已存在，是否继续上传？”，并附带远程 URL，偏离 legado `draw/sure_upload` 的固定提醒语义。
+    - Flutter 上传等待态仅展示无文案的活动指示器，缺少 legado `WaitDialog("上传中.....")` 的可见状态文案。
+  - `P2-seq32` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“上传 WebDav”动作入口）。
+    - 状态：已同义（仅本地书籍显示上传入口；已有远程链接时先确认，取消则不进入上传流程）。
+    - 异常：已同义（上传失败沿用错误摘要提示；取消确认不产生副作用）。
+    - 文案：已同义（入口文案收敛为“上传 WebDav”；确认弹窗收敛为“提醒 / 远程webDav链接已存在，是否继续”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet + CupertinoAlertDialog + CupertinoPopupSurface`；视觉差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（存在远程链接时先弹确认，确认后进入上传并显示“上传中.....”等待态，等价 legado `menu_upload -> sure_upload -> upLoadBook` 状态流转）。
+    - 验证：`flutter test test/search_book_info_view_upload_action_test.dart test/search_book_info_view_edit_action_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_share_helper_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径 `书架 -> 本地书籍详情 -> 右上角更多 -> 上传 WebDav -> 已有远程链接时弹确认 -> 取消`。
+  - 兼容影响：无旧书源兼容性影响；仅收敛详情页上传入口文案与交互语义，不变更书源解析或目录链路。
+  - 已完成 `P2-seq33`：`book_info.xml / @+id/menu_refresh / 刷新`。
+  - `P2-seq33` 差异点清单（实施前）：
+    - Flutter 详情页 `menu_refresh` 在书架内默认走“刷新目录”链路，本地书籍会被“缺少详情链接，无法刷新目录”直接拦截，与 legado `menu_refresh -> refreshBook()` 的统一刷新语义不一致。
+    - Flutter 刷新链路缺少本地 TXT/EPUB 重解析与章节回写能力，无法对齐 legado 本地书籍刷新后“详情/目录同步更新”的状态流转。
+    - 当前测试基线缺少本地刷新链路的定向验证，tracker 无法闭环该项迁移证据。
+  - `P2-seq33` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单仍保留一级“刷新”动作）。
+    - 状态：已同义（书架内本地书籍走本地重解析链路；书架内网络书籍维持详情+目录刷新链路；非书架场景维持详情重载）。
+    - 异常：已同义（本地路径缺失/文件不存在/不支持格式时给出可观测错误提示；网络刷新失败沿用现有可观测提示）。
+    - 文案：已同义（入口文案保持“刷新”，未新增扩展入口与扩展文案）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 与既有提示弹层承载，平台视觉差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击刷新后收敛为 legado `refreshBook` 语义：刷新详情/目录并回写书架缓存）。
+    - 验证：`flutter test test/search_book_info_refresh_helper_test.dart test/search_book_info_view_upload_action_test.dart test/search_book_info_view_edit_action_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_share_helper_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径 `书架 -> 本地书籍详情 -> 右上角更多 -> 刷新`。
+  - 兼容影响：无旧书源兼容性影响；新增本地刷新 helper 仅作用于详情页刷新链路，不改变既有书源规则解析接口。
+  - 已完成 `P2-seq34`：`book_info.xml / @+id/menu_login / 登录`。
+  - `P2-seq34` 差异点清单（实施前）：
+    - tracker 中 `seq34` 仍为 `pending`，缺少可复现验证证据，无法闭环该项迁移记录。
+    - 需确认 Flutter 详情页“登录”入口可见性是否严格对齐 legado `BookInfoActivity.onMenuOpened -> !bookSource.loginUrl.isNullOrBlank()` 语义。
+    - 需确认点击“登录”后的分支优先级保持 legado 同义：有 `loginUi` 走表单登录，无 `loginUi` 走网页登录。
+  - `P2-seq34` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“登录”动作入口）。
+    - 状态：已同义（仅当 `bookSource.loginUrl` 非空时展示登录入口；`loginUrl` 为空即隐藏，即使 `loginUi` 非空也不展示）。
+    - 异常：已同义（无书源或登录入口不可见时不会触发登录流程；保留现有可观测提示链路）。
+    - 文案：已同义（入口文案为“登录”，与 legado `@string/login` 语义一致）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 菜单承载；视觉差异属于 `Shadcn + Cupertino` 平台允许差异）。
+    - 交互触发：已同义（点击登录时优先进入 `loginUi` 表单登录页，否则进入网页登录流程；触发语义对齐 legado `menu_login -> SourceLoginActivity(type=bookSource, key=bookSourceUrl)`）。
+    - 验证：`flutter test test/search_book_info_menu_helper_test.dart test/search_book_info_view_login_action_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 登录`（校验 `loginUrl` 为空隐藏入口、`loginUrl` 非空且 `loginUi` 存在时进入表单登录页）。
+  - 兼容影响：无旧书源兼容性影响；本次仅补齐 `menu_login` 的页面级回归与台账证据，不改变书源解析与 Cookie 存储链路。
+  - 已完成 `P2-seq35`：`book_info.xml / @+id/menu_top / 置顶`。
+  - `P2-seq35` 差异点清单（实施前）：
+    - Flutter 详情页 `menu_top` 在执行前新增了“当前书籍不在书架，无法置顶/书架记录不存在，无法置顶”的前置拦截提示，触发语义偏离 legado `menu_top -> topBook()` 的“点击即写库”路径。
+    - 缺少 `menu_top` 的独立可复现验证证据，tracker 仍为 `pending`，无法闭环该项迁移记录。
+  - `P2-seq35` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“置顶”动作入口）。
+    - 状态：已同义（入口常驻可点击，不新增前置拦截弹窗分支）。
+    - 异常：已同义（当书架记录缺失时静默返回，不引入扩展失败文案；保持 legado 同义无阻断语义）。
+    - 文案：已同义（保留“置顶”业务语义，不新增扩展入口文案）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 菜单承载；视觉差异属于 `Shadcn + Cupertino` 允许差异）。
+    - 交互触发：已同义（点击后直接执行置顶写库，更新书架时间戳用于排序可见性；触发语义对齐 legado `menu_top -> topBook`）。
+    - 验证：`flutter test test/search_book_info_top_helper_test.dart test/search_book_info_view_top_action_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_view_login_action_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 置顶`（确认点击后无前置拦截，书籍置顶可见）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_top` 触发语义与置顶写库测试证据，不改变书源解析与目录链路。
+  - 已完成 `P2-seq36`：`book_info.xml / @+id/menu_set_source_variable / 设置源变量`。
+  - `P2-seq36` 差异点清单（实施前）：
+    - Flutter `SourceVariableStore.putVariable` 将空字符串视为删除，而 legado `BaseSource.setVariable(variable)` 仅在 `variable == null` 时删除，空字符串应被保留。
+    - Flutter 详情页保存源变量后会额外提示“源变量已保存”，legado `BookInfoActivity.setVariable` 仅回写变量不追加成功提示，存在扩展文案偏差。
+    - Flutter 源变量兜底错误文案为“书源不存在，无法设置源变量”，legado 原始文案为“书源不存在”，存在可见语义偏差。
+  - `P2-seq36` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“设置源变量”动作入口）。
+    - 状态：已同义（仅在 `bookSource` 存在时展示入口，与 legado `onMenuOpened -> menu_set_source_variable.isVisible = bookSource != null` 同义）。
+    - 异常：已同义（书源缺失时提示收敛为“书源不存在”，保留可观测失败分支）。
+    - 文案：已同义（入口文案“设置源变量”与注释默认文案 `源变量可在js中通过source.getVariable()获取` 保持 legado 语义）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + CupertinoAlertDialog` 承载输入弹窗，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后读取 `sourceVariable_<bookSourceUrl>` 当前值；保存时调用 `setVariable` 同义逻辑，空字符串写入不删除，且不追加扩展成功提示）。
+    - 验证：`flutter test test/source_variable_store_test.dart test/search_book_info_view_source_variable_action_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 设置源变量 -> 清空后保存并再次打开弹窗`（确认空串可回读且无额外“已保存”提示）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_set_source_variable` 的存储边界与提示文案语义，不改变书源解析/目录链路。
+  - 已完成 `P2-seq37`：`book_info.xml / @+id/menu_set_book_variable / 设置书籍变量`。
+  - `P2-seq37` 差异点清单（实施前）：
+    - Flutter `BookVariableStore.putVariable` 将空字符串/空白字符串视为删除，而 legado `Book.putCustomVariable -> RuleDataInterface.putVariable` 仅在 `value == null` 时删除，空字符串应被保留。
+    - Flutter 详情页保存书籍变量后会额外提示“书籍变量已保存”，legado `BookInfoActivity.setVariable` 仅回写变量不追加成功提示，存在扩展文案偏差。
+    - Flutter 书籍变量兜底错误文案为“书源不存在，无法设置书籍变量”，legado 原始文案为“书源不存在”，存在可见语义偏差。
+  - `P2-seq37` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“设置书籍变量”动作入口）。
+    - 状态：已同义（仅在 `bookSource` 存在时展示入口，与 legado `onMenuOpened -> menu_set_book_variable.isVisible = bookSource != null` 同义）。
+    - 异常：已同义（书源缺失时提示收敛为“书源不存在”；书籍链接缺失时静默返回，不引入扩展失败文案）。
+    - 文案：已同义（入口文案“设置书籍变量”与注释默认文案 `书籍变量可在js中通过book.getVariable("custom")获取` 保持 legado 语义）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + CupertinoAlertDialog` 承载输入弹窗，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后读取 `bookVariable_<bookUrl>` 当前值；保存时调用 `setVariable` 同义逻辑，空字符串写入不删除，且不追加扩展成功提示）。
+    - 验证：`flutter test test/book_variable_store_test.dart test/search_book_info_view_book_variable_action_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 设置书籍变量 -> 清空后保存并再次打开弹窗`（确认空串可回读且无额外“已保存”提示）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_set_book_variable` 的存储边界与提示文案语义，不改变书源解析/目录链路。
+  - 已完成 `P2-seq38`：`book_info.xml / @+id/menu_copy_book_url / 拷贝书籍 URL`。
+  - `P2-seq38` 差异点清单（实施前）：
+    - Flutter 详情页菜单文案为“复制书籍链接”，与 legado `copy_book_url=拷贝书籍 URL` 存在用户可见语义偏差。
+    - Flutter 成功提示为“已复制书籍链接”且 `bookUrl` 为空时提示“当前书籍链接为空”，而 legado `menu_copy_book_url -> sendToClip(bookUrl)` 统一反馈“复制完成”，空字符串也按复制链路执行。
+  - `P2-seq38` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“拷贝书籍 URL”动作入口）。
+    - 状态：已同义（入口常驻可点击，不依赖书架/非书架状态切换）。
+    - 异常：已同义（复制流程不新增扩展失败文案；空字符串场景按 legado 语义走复制完成链路）。
+    - 文案：已同义（菜单文案收敛为“拷贝书籍 URL”，复制反馈收敛为“复制完成”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 菜单承载与现有提示弹窗，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后将 `_resolveBookUrl()` 结果写入剪贴板，包含空字符串场景，不再拦截为“链接为空”）。
+    - 验证：`flutter test test/search_book_info_view_copy_book_url_action_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 拷贝书籍 URL`（确认剪贴板已更新且反馈“复制完成”）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_copy_book_url` 的菜单文案与复制反馈语义，不影响书源解析与目录链路。
+  - 已完成 `P2-seq39`：`book_info.xml / @+id/menu_copy_toc_url / 拷贝目录 URL`。
+  - `P2-seq39` 差异点清单（实施前）：
+    - Flutter 详情页菜单文案为“复制目录链接”，与 legado `copy_toc_url=拷贝目录 URL` 存在用户可见语义偏差。
+    - Flutter `tocUrl` 为空时会提示“当前目录链接为空”并中断复制，成功提示为“已复制目录链接”；而 legado `menu_copy_toc_url -> sendToClip(tocUrl)` 不做空值拦截，统一反馈“复制完成”。
+  - `P2-seq39` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“拷贝目录 URL”动作入口）。
+    - 状态：已同义（入口常驻可点击，不依赖书架/非书架状态切换）。
+    - 异常：已同义（复制流程不再追加“目录链接为空”扩展提示；空字符串场景按 legado 语义走复制完成链路）。
+    - 文案：已同义（菜单文案收敛为“拷贝目录 URL”，复制反馈收敛为“复制完成”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 菜单承载与现有提示弹窗，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后将 `_resolveTocUrl()` 结果写入剪贴板，包含空字符串场景，不再拦截）。
+    - 验证：`flutter test test/search_book_info_view_copy_toc_url_action_test.dart test/search_book_info_view_copy_book_url_action_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 拷贝目录 URL`（确认剪贴板已更新且反馈“复制完成”）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_copy_toc_url` 的菜单文案与复制反馈语义，不影响书源解析与目录链路。
+  - 已完成 `P2-seq40`：`book_info.xml / @+id/menu_can_update / 允许更新`。
+  - `P2-seq40` 差异点清单（实施前）：
+    - Flutter 详情页将该菜单实现为“允许更新：开/关”文案，并在切换后弹出“已开启/已关闭允许更新”提示；legado 为 `checkable` 菜单项，标题固定“允许更新”，点击只切换状态不追加成功提示。
+    - Flutter 菜单缺少勾选标记语义，无法对齐 legado `onMenuOpened -> menu_can_update.isChecked = book.canUpdate` 的可视状态反馈。
+  - `P2-seq40` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“允许更新”动作入口，仅在存在书源时可见）。
+    - 状态：已同义（标题固定“允许更新”，开启时展示勾选标记，关闭时移除勾选标记；对齐 legado checkable 菜单语义）。
+    - 异常：已同义（不新增扩展失败分支；切换后不弹“已开启/已关闭”提示，保持 legado 同义静默切换）。
+    - 文案：已同义（移除“允许更新：开/关”扩展文案，收敛为固定“允许更新”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet`，以勾选图标表达 checkable 状态；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击切换 `_allowUpdate`，并保持 legado 边界：仅在书架内书籍且 `bookId` 有效时持久化写入）。
+    - 验证：`flutter test test/search_book_info_view_allow_update_action_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 允许更新 -> 重新打开更多菜单`（确认勾选态随开关变化且无扩展提示）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_can_update` 的展示与提示语义，不改变目录更新筛选逻辑。
+  - 已完成 `P2-seq41`：`book_info.xml / @+id/menu_split_long_chapter / 拆分超长章节`。
+  - `P2-seq41` 差异点清单（实施前）：
+    - Flutter 详情页切换“分割长章节”仅保存设置并重载上下文，未确保本地 TXT 章节缓存即时重解析；与 legado `menu_split_long_chapter -> loadBookInfo` 的“切换即生效”语义不一致。
+    - `TxtParser.reparseFromFile` 之前未接收 `splitLongChapter` 参数，解析层无法感知开关状态，导致“开/关”无法驱动长正文拆分策略。
+    - Reader 与详情页虽共享同一设置项，但重解析调用未显式传递开关，存在“状态已改、解析未跟随”的语义漂移风险。
+  - `P2-seq41` 逐项对照清单（实施后）：
+    - 入口：已同义（仅本地 TXT 书籍在详情页“更多”菜单显示“分割长章节”）。
+    - 状态：已同义（切换后立即刷新本地章节缓存；成功后展示“已开启/已关闭”提示，关闭分支保留“重新加载可能更慢”文案）。
+    - 异常：已同义（重解析失败时保留可观测错误提示，并避免误报成功提示）。
+    - 文案：已同义（菜单标题与提示语义保持 legado `split_long_chapter` 业务语义）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 与勾选图标表达开关状态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（保存设置后详情页强制触发本地重解析并回写 `ChapterRepository/BookRepository`；Reader 侧重解析同样传入开关，确保同一 `bookId` 行为一致）。
+    - 验证：`flutter test test/txt_parser_charset_override_test.dart test/search_book_info_refresh_helper_test.dart test/search_book_info_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径 `书架 -> 打开本地 TXT 详情 -> 更多 -> 分割长章节 -> 切换后进入目录确认章节即时变化`。
+  - 兼容影响：无旧书源兼容性影响；仅收敛本地 TXT 的 `menu_split_long_chapter` 开关传递与即时重解析路径，不改变网络书籍目录链路。
+  - 已完成 `P2-seq42`：`book_info.xml / @+id/menu_delete_alert / 删除提醒`。
+  - `P2-seq42` 差异点清单（实施前）：
+    - Flutter 详情页将该菜单实现为“删除提醒：开/关”文案，legado 为 `checkable` 菜单项，标题固定“删除提醒”并通过勾选态表达状态，存在状态表达偏差。
+    - Flutter 切换“删除提醒”后会弹“已开启/已关闭删除提醒”扩展提示；legado 仅切换持久化状态，不追加成功提示。
+  - `P2-seq42` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“删除提醒”动作入口）。
+    - 状态：已同义（标题固定“删除提醒”，开启时展示勾选标记，关闭时移除勾选标记；默认值与持久化均对齐 `bookInfoDeleteAlert`）。
+    - 异常：已同义（`SettingsService` 不可用时仅回退会话内状态，不新增崩溃与静默失败分支）。
+    - 文案：已同义（移除“删除提醒：开/关”与“已开启/已关闭删除提醒”扩展文案，收敛为 legado checkable 语义）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 并以勾选图标表达 checkable 状态；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后仅切换删除提醒状态并持久化；移出书架确认流程继续读取该开关，保持 legado 同义控制边界）。
+    - 验证：`flutter test test/search_book_info_view_delete_alert_action_test.dart test/search_book_info_view_allow_update_action_test.dart` 通过；手工路径（待回归）`书架 -> 书籍详情 -> 右上角更多 -> 删除提醒 -> 重新打开更多菜单确认勾选态变化 -> 点击移出书架确认开关生效`。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_delete_alert` 的 checkable 状态表达与提示文案语义，不改变书架删除数据链路。
+  - 已完成 `P2-seq43`：`book_info.xml / @+id/menu_clear_cache / 清理缓存`。
+  - `P2-seq43` 差异点清单（实施前）：
+    - Flutter 详情页 `menu_clear_cache` 仅允许书架内 `bookId` 非空场景触发，非书架场景会提示“当前书籍不在书架，无法清理缓存”；legado `BookInfoActivity.menu_clear_cache -> viewModel.clearCache` 不依赖 `inBookshelf`，点击即执行清理。
+    - Flutter 清理后按章节数分支提示“暂无可清理的章节缓存 / 已清理缓存：x 章”，与 legado `clear_cache_success=成功清理缓存` 的统一成功反馈语义不一致。
+    - Flutter `Chapter.copyWith` 采用 `content ?? this.content`，导致清理缓存时无法显式将 `content` 置空，出现“已清理但内存正文仍残留”的语义偏差风险。
+  - `P2-seq43` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“清理缓存”动作入口）。
+    - 状态：已同义（不再依赖书架状态拦截；书架与非书架详情均可触发清理）。
+    - 异常：已同义（清理异常统一提示“清理缓存出错\n<摘要>”，保持可观测失败分支）。
+    - 文案：已同义（清理成功统一提示“成功清理缓存”，移除“无法清理/暂无缓存/已清理 x 章”等扩展文案）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + ShadDialog` 承载动作与反馈，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后按当前书籍 `bookId` 清理；当 `bookId` 缺失时使用 `ephemeral` 会话 ID 回退执行清理，保持 legado “点击即清理”语义）。
+    - 验证：`flutter test test/search_book_info_view_clear_cache_action_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 清理缓存`（确认反馈“成功清理缓存”且不再出现“无法清理缓存/暂无可清理/已清理 x 章”扩展提示），以及 `非书架详情 -> 更多 -> 清理缓存`（确认无书架拦截）。
+  - 兼容影响：无旧书源解析兼容性影响；仅收敛 `menu_clear_cache` 触发与反馈语义，并修复章节缓存模型 `content` 可显式置空能力，避免清理后内存残留。
+  - 已完成 `P2-seq44`：`book_info.xml / @+id/menu_log / 日志`。
+  - `P2-seq44` 差异点清单（实施前）：
+    - Flutter 详情页 `menu_log` 触发 `_openExceptionLogs` 页面跳转到 `ExceptionLogsView`，而 legado `BookInfoActivity` 为 `menu_log -> showDialogFragment<AppLogDialog>()`，触发层级存在偏差。
+    - Flutter 日志页标题/空态文案为“异常日志 / 暂无异常日志”，与 legado `@string/log` 菜单语义及 `AppLogDialog` 的“日志 / 暂无日志”可见文案不一致。
+    - tracker `seq44` 仍为 `pending`，缺少页面级回归证据与手工路径记录，无法闭环本序号迁移。
+  - `P2-seq44` 逐项对照清单（实施后）：
+    - 入口：已同义（详情页“更多”菜单保留一级“日志”动作入口）。
+    - 状态：已同义（点击后弹出日志对话框，保留“清空”动作与空态可见反馈）。
+    - 异常：已同义（无日志时展示“暂无日志”；不新增静默失败分支）。
+    - 文案：已同义（收敛为“日志 / 暂无日志”，移除“异常日志”页面级文案偏差）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + CupertinoDialog` 承载菜单与日志弹层；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（动作路径收敛为 `menu_log -> showAppLogDialog` 弹层语义，对齐 legado `menu_log -> AppLogDialog`）。
+    - 验证：`flutter test test/search_book_info_view_log_action_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 右上角更多 -> 日志`（确认弹出日志对话框，显示“清空/暂无日志”且不出现“异常日志”）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_log` 入口触发层级与可见文案语义，不变更搜索/详情/目录请求链路。
+  - 已完成 `P2-seq45`：`book_info_edit.xml / @+id/menu_save / 保存`。
+  - `P2-seq45` 差异点清单（实施前）：
+    - Flutter 编辑页保存后会额外提示“书籍信息已保存”，而 legado `BookInfoEditActivity.menu_save -> saveData` 仅写库并返回上一页，不追加成功提示。
+    - Flutter `SearchBookInfoEditHelper.applyDraft` 在作者输入为空白时回退旧值，偏离 legado `saveData` 直接按输入写入（可保存空字符串）的语义。
+    - Flutter 编辑保存链路缺少写库失败可观测分支；若落库异常，当前路径会静默失败，不符合迁移期“异常可观测”要求。
+  - `P2-seq45` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页右上角保留一级“保存”动作，文案为“保存”）。
+    - 状态：已同义（点击保存后直接返回详情页并回写书籍信息，不追加扩展成功提示）。
+    - 异常：已同义（落库失败时输出“保存失败\n<摘要>”提示，失败分支可观测）。
+    - 文案：已同义（保存按钮文案固定“保存”，移除“书籍信息已保存”扩展提示）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 顶栏保存按钮承载；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（保存时字段按输入值落库，作者空白输入不回退旧值；对齐 legado `menu_save -> saveData -> finish` 的提交语义）。
+    - 验证：`flutter test test/search_book_info_edit_helper_test.dart test/search_book_info_view_edit_action_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径 `书架 -> 书籍详情 -> 点击编辑 -> 编辑页右上角保存`（确认保存后返回详情页且无“书籍信息已保存”扩展提示）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_save` 的保存反馈与字段覆盖语义，不改书源请求与阅读链路。
+  - 已完成 `P2-seq101`：`book_remote.xml / @+id/menu_refresh / 刷新`。
+  - `P2-seq101` 差异点清单（实施前）：
+    - Flutter 远程书籍页仍为静态占位文案，缺少 legado `menu_refresh -> upPath()` 的“重载当前目录”行为。
+    - 当前远程页无目录路径状态，无法对齐 legado 刷新时的“路径栏 + 返回上级 + 当前目录数据重拉”联动语义。
+    - 缺少 WebDav 目录拉取链路与失败可观测输出，无法满足 legado `loadRemoteBookList` 的错误可见边界。
+  - `P2-seq101` 逐项对照清单（实施后）：
+    - 入口：已同义（书架更多菜单进入“远程书籍”后，顶栏提供独立“刷新”动作）。
+    - 状态：已同义（刷新时清空当前目录列表并显示加载态，完成后更新“最近刷新时间”）。
+    - 异常：已同义（WebDav 配置缺失或请求失败时，统一可观测输出“获取webDav书籍出错\n<原因>”）。
+    - 文案：已同义（刷新动作标题语义保持“刷新”，错误口径与 legado `获取webDav书籍出错` 语义一致）。
+    - 排版：已同义（采用 `AppCupertinoPageScaffold` 顶栏刷新按钮 + 路径栏 + 列表区结构，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击刷新会重载当前目录；进入子目录/返回上级后再次刷新仍以“当前目录”为目标重拉数据）。
+    - 验证：`flutter test test/remote_books_service_test.dart test/remote_books_placeholder_view_test.dart test/widget_test.dart` 通过；手工路径 `书架 -> 更多 -> 远程书籍 -> 点击右上角刷新`（确认列表重载、路径状态保持、失败分支可见）。
+  - 兼容影响：无旧书源兼容性影响；新增能力仅作用于 WebDav 远程目录列表读取与刷新，不影响五段链路与本地书架数据结构。
+  - 已完成 `P2-seq102`：`book_remote.xml / @+id/menu_sort / 排序`。
+  - `P2-seq102` 差异点清单（实施前）：
+    - Flutter 远程书籍页仅有刷新按钮，缺少 legado `menu_sort` 的独立排序入口，入口层级与交互热区不一致。
+    - Flutter 远程书籍页缺少 `menu_sort` 对应的排序子菜单承载，无法进入 legado 同义的“排序菜单”路径。
+    - 现有页面级回归仅覆盖 `menu_refresh`，缺少 `menu_sort` 可复现证据，tracker 无法闭环该序号。
+  - `P2-seq102` 逐项对照清单（实施后）：
+    - 入口：已同义（远程书籍页顶栏补齐一级“排序”入口，与 legado `menu_sort` 同层级）。
+    - 状态：已同义（非加载态可点击排序入口；加载态禁用，避免与刷新并发触发）。
+    - 异常：已同义（仅补齐入口承载，不新增静默失败分支与扩展错误文案）。
+    - 文案：已同义（排序弹层标题“排序”，菜单项文案“名称排序/更新时间排序”对齐 legado 字符串语义）。
+    - 排版：已同义（采用 `CupertinoActionSheet` 承载排序子菜单，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击顶栏排序可弹出子菜单；具体排序行为按 `seq103/seq104` 逐项收敛，未跨序号并项实现）。
+    - 验证：`flutter test test/remote_books_placeholder_view_test.dart test/remote_books_service_test.dart test/widget_test.dart` 通过；手工路径 `书架 -> 更多 -> 远程书籍 -> 点击右上角排序`（确认弹出“排序/名称排序/更新时间排序”菜单）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅补齐 `menu_sort` 入口层级与菜单承载，不改动 WebDav 拉取与书架数据结构。
+  - 已完成 `P2-seq103`：`book_remote.xml / @+id/menu_sort_name / 名称排序`。
+  - `P2-seq103` 差异点清单（实施前）：
+    - Flutter 排序弹层中“名称排序”仅关闭弹层，不触发排序状态变更，与 legado `menu_sort_name -> sortCheck(RemoteBookSort.Name) -> upPath()` 不同义。
+    - Flutter 远程书籍页缺少 `sortKey/sortAscending` 状态流，无法复刻 legado 的“首次点击名称升序、再次点击同项切换升降序”语义。
+    - Flutter 远程书籍页缺少 legado `AlphanumComparator` 等价比较，文件名会退化为普通字符串序或时间序，出现 `b10`/`b2` 顺序偏差风险。
+  - `P2-seq103` 逐项对照清单（实施后）：
+    - 入口：已同义（远程书籍页“排序”子菜单保留一级“名称排序”入口）。
+    - 状态：已同义（首次点击“名称排序”切换为名称升序；再次点击同项在升/降序间切换，保持 legado `sortCheck` 语义）。
+    - 异常：已同义（排序切换沿用既有刷新链路；WebDav 异常仍统一可观测输出“获取webDav书籍出错\n<原因>”）。
+    - 文案：已同义（动作文案保持“名称排序”，不新增扩展文案）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载排序子菜单；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“名称排序”后按 legado 同义链路重载当前目录；目录始终优先，文件名比较按 `AlphanumComparator` 等价规则执行）。
+    - 验证：`flutter test test/remote_books_placeholder_view_test.dart test/remote_books_service_test.dart test/widget_test.dart` 通过；手工路径 `书架 -> 更多 -> 远程书籍 -> 右上角排序 -> 名称排序（再点击一次名称排序）`（确认首次名称升序、再次切换降序且均触发目录重载）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛远程书籍页 `menu_sort_name` 排序状态流与文件名比较语义，不改动 WebDav 认证与导入链路。
+  - 已完成 `P2-seq104`：`book_remote.xml / @+id/menu_sort_time / 更新时间排序`。
+  - `P2-seq104` 差异点清单（实施前）：
+    - Flutter 排序弹层中“更新时间排序”仅关闭弹层，不触发排序状态变更，与 legado `menu_sort_time -> sortCheck(RemoteBookSort.Default) -> upPath()` 不同义。
+    - Flutter 缺少更新时间排序的状态切换逻辑，无法复刻 legado “若已是时间排序则重复点击切换升降序；若从其它排序切回则先设为升序”的 `sortCheck` 语义。
+    - 远程书籍页当前仅覆盖名称排序回归，缺少“更新时间排序切换 + 目录重载次数”可复现证据，tracker 无法闭环 `seq104`。
+  - `P2-seq104` 逐项对照清单（实施后）：
+    - 入口：已同义（远程书籍页“排序”子菜单保留一级“更新时间排序”入口）。
+    - 状态：已同义（从名称排序切换到更新时间排序时先进入时间升序；再次点击“更新时间排序”在升/降序间切换，对齐 legado `sortCheck(RemoteBookSort.Default)`）。
+    - 异常：已同义（排序切换沿用刷新链路；WebDav 异常仍统一可观测输出“获取webDav书籍出错\n<原因>”）。
+    - 文案：已同义（动作文案保持“更新时间排序”，不新增扩展文案）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载排序子菜单；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“更新时间排序”后按 legado 同义链路重载当前目录；目录始终优先，文件按更新时间升/降序切换）。
+    - 验证：`flutter test test/remote_books_placeholder_view_test.dart test/remote_books_service_test.dart test/widget_test.dart` 通过；手工路径 `书架 -> 更多 -> 远程书籍 -> 右上角排序 -> 更新时间排序（再点击一次更新时间排序）`（确认首次时间升序、再次切换降序且均触发目录重载）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛远程书籍页 `menu_sort_time` 排序状态流，不改动 WebDav 认证与导入链路。
+  - 已完成 `P2-seq105`：`book_remote.xml / @+id/menu_server_config / 服务器配置`。
+  - `P2-seq105` 差异点清单（实施前）：
+    - Flutter 远程书籍页仅提供“刷新/排序”操作，缺少 legado `menu_server_config` 的一级入口，入口层级与热区不一致。
+    - Flutter 远程书籍页无独立服务器配置承载路径；WebDav 字段仅散落在“备份与恢复”页面，无法满足 legado “从远程书籍页直接进入服务器配置”的语义。
+    - Flutter 在配置返回后不会自动重载远程目录，缺少 legado `onDialogDismiss -> initData -> upPath` 的回调刷新语义。
+  - `P2-seq105` 逐项对照清单（实施后）：
+    - 入口：已同义（远程书籍页顶栏补齐“更多”入口，弹层内提供一级“服务器配置”动作）。
+    - 状态：已同义（配置页展示并可编辑 WebDav 地址/账号/密码/同步目录，保存后即时持久化）。
+    - 异常：已同义（测试连接失败时保留可观测错误摘要；不新增静默失败分支）。
+    - 文案：已同义（入口文案固定“服务器配置”，配置页标题与字段语义对齐 legado `server_config`）。
+    - 排版：已同义（采用 `CupertinoActionSheet + AppCupertinoPageScaffold` 承载菜单与配置页；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（`服务器配置` 返回后强制重载当前目录，收敛为 legado `onDialogDismiss -> upPath` 语义）。
+    - 验证：`flutter test test/remote_books_placeholder_view_test.dart`、`flutter test test/widget_test.dart --plain-name "Bookshelf remote action opens remote books page"` 通过；手工路径 `书架 -> 更多 -> 远程书籍 -> 右上角更多 -> 服务器配置 -> 返回远程书籍页`（确认返回后自动重载目录）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛远程书籍页 `menu_server_config` 入口与回调刷新语义，不改动 WebDav 拉取与导入链路。
+  - 已完成 `P2-seq106`：`book_remote.xml / @+id/menu_help / 帮助`。
+  - `P2-seq106` 差异点清单（实施前）：
+    - Flutter 远程书籍页“更多”菜单仅有“服务器配置”，缺少 legado `menu_help` 一级入口，入口层级不一致。
+    - Flutter 项目仅接入 `appHelp.md`，缺少 legado 同源 `webDavBookHelp.md` 资产，无法还原 `showHelp("webDavBookHelp")` 文档语义。
+    - 远程书籍页缺少 `menu_help` 定向回归，tracker 无法提供该序号可复现证据。
+  - `P2-seq106` 逐项对照清单（实施后）：
+    - 入口：已同义（远程书籍页“更多”菜单补齐一级“帮助”动作，层级与 legado `menu_help` 一致）。
+    - 状态：已同义（非加载态可点击“帮助”；加载态禁用更多菜单，避免与刷新并发触发）。
+    - 异常：已同义（帮助文档加载失败时弹出“帮助文档加载失败：<原因>”可观测提示，不新增静默失败分支）。
+    - 文案：已同义（动作文案固定“帮助”，弹层标题“帮助”与 legado 语义一致）。
+    - 排版：已同义（菜单使用 `CupertinoActionSheet`，帮助内容复用现有帮助弹层承载；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“帮助”后读取 `assets/web/help/md/webDavBookHelp.md` 并弹层展示，对齐 legado `showHelp("webDavBookHelp")` 触发链路）。
+    - 验证：`flutter test test/remote_books_placeholder_view_test.dart` 通过；手工路径 `书架 -> 更多 -> 远程书籍 -> 右上角更多 -> 帮助`（确认弹层展示 “WebDav 书籍简明使用教程”）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛远程书籍页 `menu_help` 入口与帮助文档展示链路，不改动 WebDav 拉取、排序与导入逻辑。
+  - 已完成 `P2-seq107`：`book_remote.xml / @+id/menu_log / 日志`。
+  - `P2-seq107` 差异点清单（实施前）：
+    - Flutter 远程书籍页“更多”菜单仅提供“服务器配置/帮助”，缺少 legado `menu_log` 一级入口，入口层级不一致。
+    - Flutter 远程书籍页缺少 `menu_log -> AppLogDialog` 触发链路，无法在当前页面就地查看/清空日志。
+    - `test/remote_books_placeholder_view_test.dart` 缺少 `menu_log` 定向回归，tracker 无法提供本序号可复现证据。
+  - `P2-seq107` 逐项对照清单（实施后）：
+    - 入口：已同义（远程书籍页“更多”菜单补齐一级“日志”动作，层级与 legado `menu_log` 一致）。
+    - 状态：已同义（非加载态可点击“日志”；进入日志弹层后保留“清空”动作与空态展示）。
+    - 异常：已同义（沿用现有日志服务，不新增静默失败分支；无日志时可观测提示“暂无日志”）。
+    - 文案：已同义（动作文案固定“日志”，移除“异常日志”扩展文案口径）。
+    - 排版：已同义（菜单使用 `CupertinoActionSheet`，日志内容使用现有 `showAppLogDialog` 弹层承载；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“日志”后直接弹出 `AppLogDialog`，对齐 legado `menu_log -> showDialogFragment<AppLogDialog>()` 链路）。
+    - 验证：`flutter test test/remote_books_placeholder_view_test.dart` 通过；手工路径 `书架 -> 更多 -> 远程书籍 -> 右上角更多 -> 日志`（确认可见“清空/暂无日志”，且不出现“异常日志”文案）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛远程书籍页 `menu_log` 入口与弹层触发语义，不改动 WebDav 拉取、排序与导入逻辑。
+  - 已完成 `P2-seq108`：`book_search.xml / @+id/menu_precision_search / 精准搜索`。
+  - `P2-seq108` 差异点清单（实施前）：
+    - Flutter 搜索设置中“精准搜索”以“开启/关闭”值文本展示，未对齐 legado `menu_precision_search` 的 `checkable` 勾选态语义。
+    - Flutter 切换精准搜索时仅在输入框非空才触发 `_search()`，空输入时会走本地重排分支，与 legado `setQuery(..., true)` 的统一重提交流程不一致。
+    - tracker `seq108` 仍为 `pending`，缺少“勾选态切换 + 持久化”定向回归证据，无法闭环本序号。
+  - `P2-seq108` 逐项对照清单（实施后）：
+    - 入口：已同义（搜索页设置弹层保留一级“精准搜索”入口，层级与 legado `book_search.xml` 一致）。
+    - 状态：已同义（“精准搜索”改为勾选态显示，开启时展示 `check_mark`，关闭时无勾选）。
+    - 异常：已同义（切换后复用既有搜索链路的错误可观测输出，不新增静默失败分支）。
+    - 文案：已同义（菜单标题固定“精准搜索”，移除“开启/关闭”扩展值文本）。
+    - 排版：已同义（仍使用 `CupertinoActionSheet` 承载，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（切换后统一触发 `_search()`，收敛为 legado `menu_precision_search -> setQuery(..., true)` 的同义重提交流程）。
+    - 验证：`flutter test test/search_view_precision_search_action_test.dart test/search_view_compile_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 精准搜索 -> 再次打开设置`（确认勾选态随开关变化且配置持久化）。
+  - 兼容影响：无旧书源兼容性影响；仅收敛 `menu_precision_search` 的展示与触发语义，不改动搜索源解析链路与缓存结构。
+  - 已完成 `P2-seq109`：`book_search.xml / @+id/menu_source_manage / 书源管理`。
+  - `P2-seq109` 差异点清单（实施前）：
+    - 需确认当前搜索页“设置 -> 书源管理”入口是否与 legado `menu_source_manage -> startActivity<BookSourceActivity>()` 的一级跳转语义同义，并补齐迁移证据。
+    - 定向回归时发现进入 `SourceListView` 会在 Linux/测试环境触发 QuickJS 动态库缺失（`libquickjs_c_bridge_plugin.so`）异常，导致入口崩溃并无法闭环该序号验证。
+    - `tracker seq109` 仍为 `pending`，缺少页面级回归证据与兼容记录。
+  - `P2-seq109` 逐项对照清单（实施后）：
+    - 入口：已同义（搜索页设置弹层保留一级“书源管理”入口，层级与 legado `book_search.xml` 一致）。
+    - 状态：已同义（入口常驻可点击，不依赖搜索关键字与结果状态）。
+    - 异常：已同义（`js_runtime_native` 改为惰性初始化并在 QuickJS 动态库缺失时降级为空运行时，避免进入书源管理页即崩溃）。
+    - 文案：已同义（入口文案固定“书源管理”，与 legado `@string/book_source_manage` 一致）。
+    - 排版：已同义（设置弹层与页面跳转承载保持 `Shadcn + Cupertino`，视觉差异属于平台允许范围）。
+    - 交互触发：已同义（点击“书源管理”后直接进入 `SourceListView`，对齐 legado `menu_source_manage -> BookSourceActivity` 的页面跳转语义）。
+    - 验证：`flutter test test/search_view_source_manage_action_test.dart test/search_view_compile_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理`（确认可进入书源管理页且无崩溃）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_source_manage` 入口与运行时兼容边界，不改动书源数据结构与五段链路。
+  - 已完成 `P2-seq110`：`book_search.xml / @+id/menu_search_scope / 多分组/书源`。
+  - `P2-seq110` 差异点清单（实施前）：
+    - Flutter 搜索设置中该入口文案为“搜索范围”，与 legado `@string/groups_or_source=多分组/书源` 不一致。
+    - 点击入口后先进入自定义 quick sheet，再二次点击“多分组/单源模式…”才进入范围选择页；与 legado `menu_search_scope -> showDialogFragment<SearchScopeDialog>()` 的直达触发链路不一致。
+    - 当书源列表为空时，Flutter 会提前提示“没有可用书源。”并阻断进入范围页；legado 在空数据场景仍允许进入 `SearchScopeDialog` 并通过空列表态交互。
+  - `P2-seq110` 逐项对照清单（实施后）：
+    - 入口：已同义（搜索页设置弹层保留一级“多分组/书源”入口，层级与 legado `book_search.xml` 一致）。
+    - 状态：已同义（点击入口后直接进入 `SearchScopePickerView`，不再经过扩展 quick sheet；范围保存后仍按现有同义规则自动重搜）。
+    - 异常：已同义（移除“无书源即阻断”扩展分支；空书源场景可进入范围页并保持可取消返回）。
+    - 文案：已同义（入口文案由“搜索范围”收敛为“多分组/书源”，移除“多分组/单源模式…”扩展文案入口）。
+    - 排版：已同义（继续使用 `Shadcn + Cupertino` 页面承载范围选择，平台视觉差异属于允许范围）。
+    - 交互触发：已同义（点击“多分组/书源”后直接打开范围页，对齐 legado `menu_search_scope` 的一级触发语义）。
+    - 验证：`flutter test test/search_view_precision_search_action_test.dart test/search_view_source_manage_action_test.dart test/search_view_search_scope_action_test.dart test/search_scope_picker_view_compile_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 多分组/书源`（确认直接进入范围页）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_search_scope` 入口文案与触发链路，不改动搜索数据结构与缓存键规则。
+  - 已完成 `P2-seq111`：`book_search.xml / @+id/menu_log / 日志`。
+  - `P2-seq111` 差异点清单（实施前）：
+    - Flutter 搜索设置“日志”动作触发的是页面跳转 `ExceptionLogsView`，与 legado `menu_log -> showDialogFragment(AppLogDialog())` 的弹层语义不一致。
+    - Flutter 日志页面标题语义为“异常日志”，与 legado 菜单文案“日志”存在用户可见语义偏差。
+    - tracker `seq111` 仍为 `pending`，缺少“搜索设置日志入口 -> 日志弹层”定向回归证据。
+  - `P2-seq111` 逐项对照清单（实施后）：
+    - 入口：已同义（搜索页设置弹层保留一级“日志”入口，层级与 legado `book_search.xml` 一致）。
+    - 状态：已同义（点击后直接弹出日志对话框；日志为空时展示“暂无日志”，并提供“清空”动作）。
+    - 异常：已同义（沿用现有日志存储与弹层承载，不新增静默失败分支；清空后状态即时可见）。
+    - 文案：已同义（入口与弹层标题均为“日志”，移除“异常日志”页面级文案偏差）。
+    - 排版：已同义（`CupertinoActionSheet` 入口 + `showAppLogDialog` 弹层承载，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“日志”后直接触发 `AppLogDialog`，对齐 legado `menu_log` 弹层触发链路）。
+    - 验证：`flutter test test/search_view_log_action_test.dart test/search_view_precision_search_action_test.dart test/search_view_source_manage_action_test.dart test/search_view_search_scope_action_test.dart test/search_view_compile_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 日志`（确认弹出日志弹层且可见“清空/暂无日志”）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_log` 触发承载与文案语义，不改动搜索链路与书源数据结构。
+  - 已完成 `P2-seq112`：`book_search_scope.xml / @+id/menu_screen / 筛选`。
+  - `P2-seq112` 差异点清单（实施前）：
+    - Flutter 搜索范围页将筛选输入放在内容区，未对齐 legado `menu_screen` 作为工具栏 actionView 的入口层级语义。
+    - Flutter 虽然仅在“书源”模式显示筛选框，但缺少“顶栏菜单位显隐”这一 legacy 触发形态，`menu_screen` 对照证据不足。
+    - tracker `seq112` 仍为 `pending`，缺少“分组模式隐藏 / 书源模式显示 / 输入后筛选生效”的页面级定向回归。
+  - `P2-seq112` 逐项对照清单（实施后）：
+    - 入口：已同义（筛选入口迁移到导航栏 `trailing`，对应 legacy `menu_screen` 顶栏动作位）。
+    - 状态：已同义（分组模式隐藏筛选入口；切换到书源模式后显示筛选输入）。
+    - 异常：已同义（筛选仅作用于本地列表过滤，不新增静默失败分支；无匹配时保持现有空态提示）。
+    - 文案：已同义（入口文案统一“筛选”，不追加扩展标题）。
+    - 排版：已同义（采用 `CupertinoNavigationBar` trailing 搜索框承载；平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（输入后即时按书源名/分组/URL/备注过滤，且模式切换后保留筛选词以对齐 legacy `screenText` 持续语义）。
+    - 验证：`flutter test test/search_scope_picker_view_menu_screen_test.dart test/search_scope_picker_helper_test.dart test/search_scope_picker_view_compile_test.dart test/search_view_search_scope_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 多分组/书源 -> 切换书源 -> 顶栏输入筛选词`。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_screen` 入口承载与筛选触发形态，不改动搜索范围保存格式。
+  - 已完成 `P2-seq113`：`book_source.xml / @+id/action_sort / 排序`。
+  - `P2-seq113` 差异点清单（实施前）：
+    - Flutter 书源管理页排序弹层标题为“排序选项”，与 legado `action_sort` 的父级标题语义“排序”不一致。
+    - `tracker seq113` 仍为 `pending`，缺少“顶栏排序入口 -> 打开排序菜单”的定向回归证据。
+  - `P2-seq113` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理页顶栏保留一级排序入口 `CupertinoIcons.arrow_up_arrow_down`，层级与 legado `action_sort` 一致）。
+    - 状态：已同义（点击排序入口后可打开排序菜单，后续子项动作保持待 `seq114~121` 逐项收敛）。
+    - 异常：已同义（仅收敛父级标题与回归证据，不新增静默失败分支）。
+    - 文案：已同义（排序弹层父级标题由“排序选项”收敛为 legado 同义“排序”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载父级排序菜单；视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击顶栏排序入口即可弹出排序菜单，对齐 legado `action_sort` 一级触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序`（确认弹出标题“排序”的排序菜单）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `action_sort` 父级入口文案与触发证据，不改动排序子项比较逻辑与书源数据结构。
+  - 已完成 `P2-seq114`：`book_source.xml / @+id/menu_sort_desc / 反序`。
+  - `P2-seq114` 差异点清单（实施前）：
+    - Flutter 排序菜单子项使用动态文案“切换为降序/升序”，与 legado `menu_sort_desc` 的固定“反序” checkable 语义不一致。
+    - `tracker seq114` 仍为 `pending`，缺少“反序勾选态切换”定向回归证据。
+  - `P2-seq114` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_desc` 一致）。
+    - 状态：已同义（默认未勾选；点击后切换为勾选态并同步反转排序方向）。
+    - 异常：已同义（仅切换本地排序状态，不新增静默失败分支）。
+    - 文案：已同义（由“切换为降序/升序”收敛为固定“反序”）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现 checkable 勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“反序”后仅执行 `sortAscending` 翻转并关闭菜单，对齐 legado `menu_sort_desc` 触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 反序`（再次打开排序菜单确认“反序”勾选态切换）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_sort_desc` 展示与状态语义，不改动排序算法与书源数据结构。
+  - 已完成 `P2-seq115`：`book_source.xml / @+id/menu_sort_manual / 手动排序`。
+  - `P2-seq115` 差异点清单（实施前）：
+    - legado `menu_sort_manual` 属于 `menu_group_sort` 单选组中的 checkable 子项；语义要求为“切回手动排序后该子项独占勾选态，并恢复默认排序模式”。
+    - Flutter 端虽已有“手动排序”菜单项与 `sortMode=manual` 切换能力，但缺少“先切到其它排序再切回手动”的独立可复现回归证据。
+    - tracker `seq115` 仍为 `pending`，缺少页面级定向验证记录，无法闭环迁移证据。
+  - `P2-seq115` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_manual` 一致）。
+    - 状态：已同义（从其它排序切回后“手动排序”独占勾选态；再次打开菜单可见勾选结果）。
+    - 异常：已同义（仅切换本地排序模式，不新增静默失败分支）。
+    - 文案：已同义（菜单项文案保持“手动排序”，与 legado `@string/sort_manual` 一致）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“手动排序”后仅切换 `_sortMode=manual` 并关闭菜单，对齐 legado `menu_sort_manual -> sort=Default -> upBookSource(...)` 触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 权重 -> 再次顶栏排序 -> 手动排序`（确认切回后仅“手动排序”带勾选）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅补齐 `menu_sort_manual` 的单选勾选态回归证据，不改动书源排序算法与持久化结构。
+  - 下一项：`seq116`（`book_source.xml / @+id/menu_sort_auto / 智能排序`）。
+
+## Surprises & Discoveries
+
+- `2026-02-21`：历史计划文档体量较大且聚焦阅读器，不适合作为“全量逐项迁移”主执行文档，已改为统一 tracker 驱动。
+- `2026-02-21`：在 `widget test` 场景下直接调用 `RssSourceRepository.addSource/addSources` 进行写库会出现阻塞；`P1-seq276` 改为内存 `FakeRssSourceRepository` 提供可控分组数据，保证分组菜单回归用例稳定可复现。
+- `2026-02-21`：`P2-seq30` 页面级测试中，`testWidgets` 直接执行 Drift 写库会阻塞；改为 `tester.runAsync` 包裹 `BookRepository.addBook` 后恢复稳定，可复用到后续涉及 DB 预置数据的详情页测试。
+- `2026-02-21`：`P2-seq31` 对照 legado 时发现当前分享入口存在“二维码预览中间页 + 文本回退分享”扩展语义，需在当前序号内收敛为直接系统分享二维码并对齐失败提示。
+- `2026-02-21`：`P2-seq32` 对照 legado 字符串时发现当前详情页上传入口仍保留“上传到远程”扩展文案，且确认弹窗附加远程 URL；需在当前序号内收敛为固定提醒文案与确认路径。
+- `2026-02-21`：`P2-seq33` 新增本地刷新测试时，详情页 widget 用例在 `pumpAndSettle` 下会被页面持续动画阻塞；改为 service 层定向单测可稳定复现本地刷新行为并避免假阻塞。
+- `2026-02-21`：`P2-seq34` 页面级回归确认了 legado 的边界语义：即使书源配置了 `loginUi`，只要 `loginUrl` 为空，“登录”入口仍应隐藏；该规则已在 Flutter 端固化为可复现测试。
+- `2026-02-21`：`P2-seq35` 页面级回归中发现 `BookRepository` 缓存快照存在时序抖动；置顶验证改为直接校验 Drift `book_records` 行字段，确保“写库结果”可稳定复现。
+- `2026-02-21`：对照 legado `BaseSource.setVariable/getVariable` 时确认源变量边界语义是“仅 `null` 删除，空字符串保留并可回读”；Flutter 端原先将空串视为删除，已在 `P2-seq36` 收敛。
+- `2026-02-21`：对照 legado `Book.putCustomVariable -> RuleDataInterface.putVariable` 时确认书籍变量边界语义与源变量一致：仅 `null` 删除，空字符串保留并可回读；Flutter 端原先将空白字符串视为删除，已在 `P2-seq37` 收敛。
+- `2026-02-21`：`P2-seq38` 页面级回归中，若直接用 `MethodChannel('flutter/platform')` 伪造剪贴板会触发 `Message corrupted`；改为 `SystemChannels.platform` 同编解码通道后，剪贴板写入断言恢复稳定。
+- `2026-02-21`：`P2-seq39` 对照 legado 时发现目录链接复制仍保留“空值拦截 + 已复制目录链接”扩展语义；已收敛为与 `sendToClip` 同义的“始终复制并统一提示复制完成”。
+- `2026-02-21`：`P2-seq40` 对照 legado 时确认“允许更新”必须以 checkable 状态表达，不应把开关状态写进标题文本；Flutter 端已改为固定标题 + 勾选图标，并移除切换成功提示。
+- `2026-02-21`：`P2-seq41` 对照 legado 时发现本地 TXT 重解析链路未读取 `splitLongChapter` 设置，导致开关只改 UI 不改解析策略；已在 `TxtParser.reparseFromFile` 与详情/阅读两侧调用链补齐参数透传，并将详情页切换动作改为“保存设置后立即重解析”。
+- `2026-02-21`：`P2-seq42` 对照 legado 时确认“删除提醒”属于 checkable 静默开关语义：状态应由勾选态表达，切换不追加成功提示；Flutter 端已收敛为固定标题 + 勾选图标并移除开关提示文案。
+- `2026-02-21`：`P2-seq43` 在 widget 场景中触发 `CupertinoActionSheetAction` 的异步清理链路时，需要通过 `tester.runAsync` 驱动数据库异步任务，否则会出现“动作已触发但清理结果未落盘”的假阴性；已固化到定向回归用例。
+- `2026-02-21`：`P2-seq44` 对照 legado 时发现详情页“日志”虽已存在入口，但仍沿用“异常日志”页面跳转语义；需收敛为 `menu_log -> AppLogDialog` 弹层，并将空态文案统一到“暂无日志”。
+- `2026-02-21`：`P2-seq45` 对照 legado 时发现编辑保存链路存在两处语义漂移：作者空白输入被回退为旧值，以及保存后追加“书籍信息已保存”扩展提示；已在本序号内收敛。
+- `2026-02-21`：`P2-seq101` 的页面级测试发现 `RemoteBooksPlaceholderView` 依赖 `ShadTheme` 上下文；定向测试需以 `ShadApp.custom + ShadAppBuilder` 包裹后方可稳定复现刷新行为。
+- `2026-02-21`：`P2-seq102` 对照 tracker 后确认 `menu_sort_name/menu_sort_time` 在台账中是独立序号（`seq103/104`）；当前序号仅收敛父级 `menu_sort` 入口与子菜单承载，避免跨序号并项实现。
+- `2026-02-21`：`P2-seq103` 对照 legado `AlphanumComparator` 时发现普通字符串排序会把 `b10` 排在 `b2` 前；已按 chunk 比较规则实现 Dart 等价比较，确保名称排序语义一致。
+- `2026-02-21`：`P2-seq104` 对照 legado `sortCheck(RemoteBookSort.Default)` 时确认“更新时间排序”并非固定单向排序，而是可重复点击切换升/降序；Flutter 端已补齐该状态机并追加页面级回归用例。
+- `2026-02-21`：`P2-seq105` 页面级回归中，配置页返回后需显式触发目录重载才能对齐 legado `onDialogDismiss -> upPath`；已在远程页收敛为“配置页关闭即刷新当前目录”并通过测试固化。
+- `2026-02-21`：`P2-seq106` 对照 legado `showHelp("webDavBookHelp")` 时发现 Flutter 资产仅包含 `appHelp.md`；需补齐同源 `webDavBookHelp.md` 后才能完成远程页帮助入口同义迁移。
+- `2026-02-21`：`P2-seq107` 的页面级回归需要先清空 `ExceptionLogService` 才能稳定断言“暂无日志”空态；已在远程页定向测试中固化该前置动作。
+- `2026-02-21`：`P2-seq108` 对照 legado 时确认“精准搜索”属于 `checkable` 菜单语义，不应以“开启/关闭”值文本承载；Flutter 端已改为勾选态并补齐定向回归。
+- `2026-02-21`：`P2-seq109` 定向回归暴露 `SourceListView` 在 Linux/测试环境对 QuickJS 动态库的强依赖；已将 `js_runtime_native` 收敛为惰性初始化并在缺库时降级为空运行时，恢复书源管理入口可测可用。
+- `2026-02-21`：`P2-seq110` 对照 legado 时确认当前“搜索范围 quick sheet”属于扩展流程，且将 `menu_search_scope` 变成二级入口；已移除该扩展并恢复“多分组/书源”一级直达语义。
+- `2026-02-21`：`P2-seq111` 对照 legado 时确认搜索页“日志”必须是 `AppLogDialog` 弹层语义；Flutter 原实现仍跳转 `ExceptionLogsView` 页面，已收敛为弹层并补齐定向回归。
+- `2026-02-21`：`P2-seq112` 对照 legado 时确认 `menu_screen` 的关键不只是“有筛选框”，还包括“入口位于工具栏 action 位且仅书源模式可见”；Flutter 端已将筛选输入迁移到导航栏 trailing 并补齐显隐回归。
+- `2026-02-21`：`P2-seq113` 对照 legado 时确认当前排序入口的唯一偏差在父级标题文案（“排序选项” vs “排序”）；本序号仅收敛父级语义与回归证据，排序子项行为继续按 `seq114~121` 串行推进。
+- `2026-02-21`：`P2-seq114` 对照 legado 时确认 `menu_sort_desc` 是固定“反序”checkable 项，不是“切换为降序/升序”的动态文案；Flutter 端已收敛为固定文案 + 勾选态并补齐定向回归。
+- `2026-02-21`：`P2-seq115` 对照 legado 时确认当前偏差属于“迁移证据缺口”而非实现缺口；已新增“先切换到其它排序再切回手动排序”的定向回归，用例固化 `menu_sort_manual` 单选勾选态语义。
+
+## Decision Log
+
+- `2026-02-21` 决策 1：执行粒度下沉到单项（seq），避免模块级“完成但漏项”。
+- `2026-02-21` 决策 2：执行方式固定串行（不并行），优先稳定推进与可追溯。
+- `2026-02-21` 决策 3：基于需求“挨个处理所有功能”，全功能域纳入计划，不再仅限核心链路。
+- `2026-02-21` 决策 4：主入口底栏项按 `seq` 串行收敛，`P1-seq257/258` 分别对齐 legado 的 `300ms` 双击触发阈值语义，不跨越到未到序号的业务菜单实现。
+- `2026-02-21` 决策 5：主入口底栏文案以 legado 中文业务语义为准，`P1-seq259` 将 `RSS` 明确收敛为“订阅”。
+- `2026-02-21` 决策 6：`P1-seq261` 保持书架搜索入口为顶栏一级动作（非折叠菜单项），并以“点击即进搜索页”作为与 legado 的同义标准。
+- `2026-02-21` 决策 7：`P1-seq262` 保持“更新目录”在书架更多菜单层级，空数据场景优先提供可观测提示而非静默返回。
+- `2026-02-21` 决策 8：`P1-seq263` 菜单文案以 legado 字符串语义为准，将“本机导入”统一为“添加本地”，并保持本地导入触发链路不变。
+- `2026-02-21` 决策 9：`P1-seq264` 先收敛入口语义（文案 + 页面导航），远程书籍页内菜单与数据行为保留到后续对应序号逐项迁移，避免跨序号并项。
+- `2026-02-21` 决策 10：`P1-seq265` 网址加书链路按 legado 口径优先复刻“`baseUrl` 精确匹配 + `bookUrlPattern` 回退匹配”，并复用现有 `BookAddService` 完成详情与目录入库，避免重复实现数据写入逻辑。
+- `2026-02-21` 决策 11：`P1-seq266` 先收敛“入口可达”语义，书架管理页内批量操作（删除/允许更新/批量换源等）保持后续序号分步迁移，不与当前序号并项实现。
+- `2026-02-21` 决策 12：`P1-seq267` 按同一策略先收敛“缓存/导出”入口语义（文案 + 页面导航），`CacheActivity` 页内下载/导出/分组/日志菜单保留到 P6 对应序号迁移，避免跨序号并项实现。
+- `2026-02-21` 决策 13：`P1-seq268` 对齐 legado 的弹窗层级语义，先将“分组管理”从提示文案收敛为对话框承载入口；分组新增/编辑/排序等复杂行为保留到后续对应序号逐项迁移，避免跨序号并项实现。
+- `2026-02-21` 决策 14：`P1-seq269` 采用“入口先完整收敛 + 配置字段同步落盘”的策略：以 `bookshelfLayoutIndex/bookshelfSortIndex` 作为 legado 索引语义主字段，同时回写 `bookshelfViewMode/bookshelfSortMode` 兼容现有页面，避免一次性改动冲击已迁移链路。
+- `2026-02-21` 决策 15：`P1-seq270` 维持现有文件保存实现（`FilePicker.saveFile`）不引入中间临时文件，但补齐 legado 同义的成功弹窗路径复制语义与错误文案口径，避免跨序号扩展导出基础设施。
+- `2026-02-21` 决策 16：`P1-seq271` 复用现有书单导入执行器（按书名/作者搜索入库）但将入口交互与输入解析严格收敛到 legado 语义（`url/json` 输入 + 选择文件 + `http/https 或 JSON 数组`），避免在同一序号跨入后续批量导入策略重构。
+- `2026-02-21` 决策 17：`P1-seq272` 采用“日志入口弹层先收敛”的实现策略，复用既有日志数据服务但将入口触发层级与文案统一到 legado `AppLogDialog` 语义，避免在当前序号引入额外日志管线重构。
+- `2026-02-21` 决策 18：`P1-seq273` 将发现页分组入口从通用选单收敛为“动态分组动作列表直达筛选”的 legado 同义语义，并同步收敛分组排序（`cnCompare`）与 `group:` 逗号边界匹配规则，避免出现“入口同义但筛选语义偏差”。
+- `2026-02-21` 决策 19：`P1-seq274` 采用“同源资产直读 + 弹层承载”策略，直接引入 legado `appHelp.md` 到 Flutter 资产并由“我的”页顶栏触发，优先保证帮助文档内容与入口语义同义，不在当前序号扩展 Markdown 渲染器替换链路。
+- `2026-02-21` 决策 20：`P1-seq275` 先收敛 RSS 顶栏“收藏”入口触发与页面标题语义，并将收藏页内部菜单（分组/删除）保留到 `P7-seq307~309`，避免跨序号并项实现。
+- `2026-02-21` 决策 21：`P1-seq276` 将订阅页“分组”入口从通用选项面板收敛为 legado 同义“动态分组菜单”，并移除“全部”扩展项；为保证回归稳定性，新增基于内存仓库的页面级测试用例，不在该序号引入数据库写入链路重构。
+- `2026-02-21` 决策 22：`P1-seq277` 不新增业务实现，仅通过补充“设置入口直达订阅源管理页”的定向回归用例闭环证据，以保持 `menu_rss_config -> RssSourceActivity` 入口语义与现有 Flutter 路由实现同义。
+- `2026-02-21` 决策 23：`P2-seq30` 在保持现有实现不变的前提下，以“页面级测试 + 手工路径”补齐迁移证据，优先闭环 `menu_edit` 同义性验证，不在该序号提前并入 `menu_share_it/menu_refresh` 等后续动作。
+- `2026-02-21` 决策 24：`P2-seq31` 采用“直接系统分享 + 载荷纯对齐”策略：移除详情页分享中间预览页，分享文本固定为 `bookUrl#bookJson` 并仅输出二维码图片；二维码生成失败统一提示“文字太多，生成二维码失败”。
+- `2026-02-21` 决策 25：`P2-seq32` 采用“菜单语义先收敛 + 远程标记延续既有映射”的策略：入口文案与 `sure_upload` 弹窗文案严格对齐 legado，同时保留现有 `book_remote_upload_url_map` 作为“已存在远程链接”判定来源，避免在该序号提前重构本地书籍数据模型。
+- `2026-02-21` 决策 26：`P2-seq33` 采用“刷新分流同义化”策略：`_triggerRefresh` 在书架内按本地/网络类型分流；本地链路新增 `SearchBookInfoRefreshHelper` 复用 TXT/EPUB 解析能力并回写章节与书籍元数据，网络链路保留既有目录刷新逻辑，避免跨序号改动登录/置顶等后续菜单动作。
+- `2026-02-21` 决策 27：`P2-seq34` 采用“实现不扩展、证据先闭环”策略：保持现有登录入口实现不引入额外扩展逻辑，仅补齐 `menu_login` 的可见性与触发分支页面级回归用例，并回填 tracker/计划文档。
+- `2026-02-21` 决策 28：`P2-seq35` 采用“触发语义先收敛”策略：移除详情页置顶的前置拦截提示，收敛为 legado 同义“点击即写库”，并新增 helper + 页面级回归用例闭环置顶证据。
+- `2026-02-21` 决策 29：`P2-seq36` 采用“边界语义优先收敛”策略：源变量存储对齐 legado `setVariable/getVariable`（空串保留、仅 `null` 删除），并移除保存后的扩展成功提示，确保 `menu_set_source_variable` 仅保留 legado 定义的状态流转与文案语义。
+- `2026-02-21` 决策 30：`P2-seq37` 延续变量边界收敛策略：书籍变量存储对齐 legado `putCustomVariable`（空串保留、仅 `null` 删除），并将错误提示与保存后反馈收敛为 legado 同义最小文案，不新增扩展提示链路。
+- `2026-02-21` 决策 31：`P2-seq38` 采用“入口语义 + 边界触发同义化”策略：菜单文案收敛为“拷贝书籍 URL”，复制反馈统一为“复制完成”，并按 legado 保留空字符串也执行复制；`menu_copy_toc_url` 保持待下一序号（`P2-seq39`）处理，避免跨序号并项。
+- `2026-02-21` 决策 32：`P2-seq39` 采用与 `menu_copy_book_url` 对称的复制策略：菜单文案收敛为“拷贝目录 URL”，复制动作统一走“写入剪贴板 + 复制完成提示”，并移除空值拦截以对齐 legado `sendToClip` 语义。
+- `2026-02-21` 决策 33：`P2-seq40` 采用“标题语义固定 + 勾选态表达状态”策略：将 `menu_can_update` 文案收敛为固定“允许更新”，以勾选图标表达开关状态并移除切换成功提示，同时保留“仅书架内持久化”的 legado 边界行为。
+- `2026-02-21` 决策 34：`P2-seq41` 采用“解析层参数化 + 详情页即时重解析”策略：为 `TxtParser.reparseFromFile` 增加 `splitLongChapter` 参数并贯穿到 `SearchBookInfoRefreshHelper` 与 `SimpleReaderView`，详情页切换开关后强制触发本地刷新（禁用刷新成功 toast）再统一输出开关提示，确保与 legado “切换即生效”语义同义。
+- `2026-02-21` 决策 35：`P2-seq42` 采用与 legado 一致的 checkable 菜单语义：删除提醒标题固定为“删除提醒”并通过勾选态表达状态，切换后不追加“已开启/已关闭”扩展提示；保留现有删除提醒持久化键以避免跨序号改动设置结构。
+- `2026-02-21` 决策 36：`P2-seq43` 采用“触发语义统一 + 缓存实体补丁”策略：`menu_clear_cache` 移除书架态前置拦截并统一成功提示为“成功清理缓存”；同时修复 `Chapter.copyWith` 的 `content` 显式置空能力，保证清理缓存后内存态与持久化态同义。
+- `2026-02-21` 决策 37：`P2-seq44` 采用“入口不变、触发层级收敛”策略：保留详情页“日志”菜单位置与排序，仅将动作从页面跳转改为 `showAppLogDialog` 弹层，并将日志空态文案统一为“暂无日志”，对齐 legado `menu_log -> AppLogDialog` 语义。
+- `2026-02-21` 决策 38：`P2-seq45` 采用“保存语义去扩展”策略：保留编辑页保存入口层级，仅收敛字段提交与反馈口径（作者空白按输入落库、移除成功提示、失败可观测），不在本序号提前扩展 `BookType`/封面文件迁移等非 `menu_save` 核心逻辑。
+- `2026-02-21` 决策 39：`P2-seq101` 采用“最小必要链路”策略：先实现 `menu_refresh` 所需的目录重载能力（路径栈、PROPFIND 拉取、失败可观测），排序/服务器配置/帮助/日志菜单严格留待后续 `seq102~107`，避免跨序号并项。
+- `2026-02-21` 决策 40：`P2-seq102` 采用“入口先同义、行为后续拆分”策略：本序号仅补齐顶栏排序入口与 `名称排序/更新时间排序` 子菜单承载，具体排序执行逻辑严格留待 `seq103/104` 逐项实现。
+- `2026-02-21` 决策 41：`P2-seq103` 采用“名称排序单序号收敛”策略：仅实现 `menu_sort_name` 的状态切换与目录重载，并在 Flutter 端补齐 legado `AlphanumComparator` 等价比较；`menu_sort_time` 保留到 `seq104`，不跨序号并项。
+- `2026-02-21` 决策 42：`P2-seq104` 采用“时间排序独立收敛”策略：在不改动 `seq103` 名称排序链路的前提下，仅补齐 `menu_sort_time` 的 `sortCheck(Default)` 状态切换与重载触发，并新增页面级回归验证“首次切换升序 + 再次点击降序”。
+- `2026-02-21` 决策 43：`P2-seq105` 采用“入口同层级 + 配置关闭即刷新”策略：在远程书籍页补齐 `menu_server_config` 更多菜单入口，配置承载页复用现有 WebDav 设置字段（地址/账号/密码/目录），并在返回远程页时强制触发目录重载，对齐 legado `onDialogDismiss -> initData -> upPath` 语义。
+- `2026-02-21` 决策 44：`P2-seq106` 采用“同源资产直读 + 入口单项收敛”策略：在不提前实现 `menu_log` 的前提下，仅补齐“帮助”动作并直接加载 legado `webDavBookHelp.md` 文档，同时保留加载失败可观测提示，确保序号边界与迁移语义同时满足。
+- `2026-02-21` 决策 45：`P2-seq107` 采用“复用通用日志弹层”策略：在远程书籍页仅补齐 `menu_log` 入口并复用现有 `showAppLogDialog`，确保与 legado `AppLogDialog` 触发语义同义，同时避免跨序号改动日志存储管线。
+- `2026-02-21` 决策 46：`P2-seq108` 采用“展示层 checkable 收敛 + 触发链统一重提交流程”策略：将“精准搜索”改为勾选态表达，并在切换后统一调用 `_search()` 对齐 legado `setQuery(..., true)` 语义，避免空输入分支与非空分支行为漂移。
+- `2026-02-21` 决策 47：`P2-seq109` 采用“入口语义保持 + 运行时惰性降级”策略：`menu_source_manage` 继续直接跳转书源管理页，不引入额外确认流程；针对 Linux/测试环境 QuickJS 缺库场景，将 `createJsRuntime()` 收敛为首次 evaluate 时初始化，失败则降级为空运行时以保证入口稳定可用。
+- `2026-02-21` 决策 48：`P2-seq110` 采用“去扩展流程、直达 legacy 入口”策略：搜索设置中的该项固定为“多分组/书源”，点击后直接进入范围选择页；移除 quick sheet 二级跳转与“无书源阻断”扩展分支，保持范围变更后自动重搜边界不变。
+- `2026-02-21` 决策 49：`P2-seq111` 采用“统一日志入口承载”策略：搜索设置“日志”动作与书架/详情/远程页保持同一 `showAppLogDialog` 弹层链路，不再跳转 `ExceptionLogsView`，以确保 `menu_log` 在各入口层级语义一致并避免扩展文案偏差。
+- `2026-02-21` 决策 50：`P2-seq112` 采用“菜单位同义优先”策略：保留现有筛选算法不变，仅收敛筛选入口承载到导航栏 trailing 并维持“分组隐藏/书源显示”的状态机，以最小改动达成 `menu_screen` 交互层级同义。
+- `2026-02-21` 决策 51：`P2-seq113` 采用“父级入口单项收敛”策略：仅修正 `action_sort` 父级标题文案并补齐入口触发回归，不提前并入 `menu_sort_desc/menu_sort_manual/...` 子项行为改动，确保严格按 tracker 序号串行推进。
+- `2026-02-21` 决策 52：`P2-seq114` 采用“反序子项单项收敛”策略：仅将排序菜单动态切换文案收敛为固定“反序”checkable 语义并补齐勾选态回归，不提前并入 `menu_sort_manual/menu_sort_auto/...` 排序模式改造，确保严格按 tracker 序号串行推进。
+- `2026-02-21` 决策 53：`P2-seq115` 采用“证据闭环优先”策略：保持现有 `menu_sort_manual` 业务实现不扩展，仅新增定向回归固化“从其它排序切回手动排序后手动项独占勾选”的 legado 语义，确保序号边界清晰且可复现。
+
+## Outcomes & Retrospective
+
+- `2026-02-21`：完成 P1（主入口与导航）`21/21` 项逐项迁移与验收，全部为 `done`，无 `blocked` 项；阶段内所有入口均补齐了可复现验证证据。

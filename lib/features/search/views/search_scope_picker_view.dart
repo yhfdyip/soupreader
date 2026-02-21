@@ -22,6 +22,8 @@ class SearchScopePickerView extends StatefulWidget {
 }
 
 class _SearchScopePickerViewState extends State<SearchScopePickerView> {
+  static const Key _menuScreenFieldKey = Key('search_scope_menu_screen_field');
+
   final TextEditingController _queryController = TextEditingController();
   late _SearchScopeMode _mode;
   late final List<BookSource> _sources;
@@ -93,6 +95,17 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
 
     return AppCupertinoPageScaffold(
       title: '搜索范围',
+      trailing: _mode == _SearchScopeMode.source
+          ? SizedBox(
+              width: 168,
+              child: CupertinoSearchTextField(
+                key: _menuScreenFieldKey,
+                controller: _queryController,
+                placeholder: '筛选',
+                onChanged: (_) => setState(() {}),
+              ),
+            )
+          : null,
       child: Column(
         children: [
           Padding(
@@ -115,19 +128,6 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
               },
             ),
           ),
-          if (_mode == _SearchScopeMode.source)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: ShadInput(
-                controller: _queryController,
-                placeholder: const Text('筛选书源'),
-                leading: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(LucideIcons.search, size: 16),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
           Expanded(
             child: _mode == _SearchScopeMode.group
                 ? _buildGroupList(theme, scheme)

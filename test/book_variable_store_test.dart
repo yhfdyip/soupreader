@@ -15,14 +15,23 @@ void main() {
     );
   });
 
-  test('BookVariableStore 写入空白时删除变量', () async {
+  test('BookVariableStore 写入空白字符串时保留变量', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{
       'bookVariable_book://2': 'legacy',
     });
 
     expect(await BookVariableStore.getVariable('book://2'), 'legacy');
     await BookVariableStore.putVariable('book://2', '   ');
-    expect(await BookVariableStore.getVariable('book://2'), isNull);
+    expect(await BookVariableStore.getVariable('book://2'), '   ');
+  });
+
+  test('BookVariableStore 仅在写入 null 时删除变量', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'bookVariable_book://4': 'legacy',
+    });
+
+    await BookVariableStore.putVariable('book://4', null);
+    expect(await BookVariableStore.getVariable('book://4'), isNull);
   });
 
   test('BookVariableStore 可显式移除变量', () async {

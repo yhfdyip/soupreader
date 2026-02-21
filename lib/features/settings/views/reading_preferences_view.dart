@@ -6,6 +6,7 @@ import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/typography_settings_dialog.dart';
@@ -20,13 +21,6 @@ class ReadingPreferencesView extends StatefulWidget {
 class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
-
-  Color _accent(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    return isDark
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
-  }
 
   @override
   void initState() {
@@ -65,134 +59,63 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   }
 
   Future<void> _pickTheme() async {
-    await showCupertinoModalPopup<void>(
+    final selected = await showOptionPickerSheet<int>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('选择阅读主题'),
-        actions: AppColors.readingThemes.asMap().entries.map((entry) {
-          final index = entry.key;
-          final theme = entry.value;
-          final isSelected = index == _settings.themeIndex;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              _update(_settings.copyWith(themeIndex: index));
-              Navigator.pop(ctx);
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  theme.name,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-                if (isSelected) ...[
-                  const SizedBox(width: 8),
-                  Icon(CupertinoIcons.checkmark,
-                      size: 18, color: _accent(context)),
-                ],
-              ],
-            ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择阅读主题',
+      currentValue: _settings.themeIndex,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: AppColors.readingThemes.asMap().entries.map((entry) {
+        final index = entry.key;
+        final theme = entry.value;
+        return OptionPickerItem<int>(
+          value: index,
+          label: theme.name,
+        );
+      }).toList(growable: false),
     );
+    if (selected == null) return;
+    _update(_settings.copyWith(themeIndex: selected));
   }
 
   Future<void> _pickPageTurnMode() async {
-    await showCupertinoModalPopup<void>(
+    final selected = await showOptionPickerSheet<PageTurnMode>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('选择翻页模式'),
-        actions:
-            PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
-          final isSelected = mode == _settings.pageTurnMode;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              if (PageTurnModeUi.isHidden(mode)) {
-                _showMessage('仿真2模式已隐藏');
-                return;
-              }
-              _update(_settings.copyWith(pageTurnMode: mode));
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  PageTurnModeUi.isHidden(mode)
-                      ? '${mode.name}（隐藏）'
-                      : mode.name,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: PageTurnModeUi.isHidden(mode)
-                        ? CupertinoColors.inactiveGray
-                        : null,
-                  ),
-                ),
-                if (isSelected) ...[
-                  const SizedBox(width: 8),
-                  Icon(CupertinoIcons.checkmark,
-                      size: 18, color: _accent(context)),
-                ],
-              ],
-            ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择翻页模式',
+      currentValue: _settings.pageTurnMode,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
+        return OptionPickerItem<PageTurnMode>(
+          value: mode,
+          label: PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name,
+          subtitle: PageTurnModeUi.isHidden(mode) ? '当前版本隐藏' : null,
+        );
+      }).toList(growable: false),
     );
+    if (selected == null) return;
+    if (PageTurnModeUi.isHidden(selected)) {
+      _showMessage('仿真2模式已隐藏');
+      return;
+    }
+    _update(_settings.copyWith(pageTurnMode: selected));
   }
 
   Future<void> _pickFontFamily() async {
-    await showCupertinoModalPopup<void>(
+    final selected = await showOptionPickerSheet<int>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('选择字体'),
-        actions: ReadingFontFamily.presets.asMap().entries.map((entry) {
-          final index = entry.key;
-          final preset = entry.value;
-          final isSelected = _settings.fontFamilyIndex == index;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              _update(_settings.copyWith(fontFamilyIndex: index));
-              Navigator.pop(ctx);
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  preset.name,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-                if (isSelected) ...[
-                  const SizedBox(width: 8),
-                  Icon(CupertinoIcons.checkmark,
-                      size: 18, color: _accent(context)),
-                ],
-              ],
-            ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择字体',
+      currentValue: _settings.fontFamilyIndex,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: ReadingFontFamily.presets.asMap().entries.map((entry) {
+        final index = entry.key;
+        final preset = entry.value;
+        return OptionPickerItem<int>(
+          value: index,
+          label: preset.name,
+        );
+      }).toList(growable: false),
     );
+    if (selected == null) return;
+    _update(_settings.copyWith(fontFamilyIndex: selected));
   }
 
   Future<void> _pickFontWeight() async {
@@ -202,42 +125,22 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       (2, '细体'),
     ];
 
-    await showCupertinoModalPopup<void>(
+    final selected = await showOptionPickerSheet<int>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('选择字重'),
-        actions: options.map((option) {
-          final isSelected = _settings.textBold == option.$1;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              _update(_settings.copyWith(textBold: option.$1));
-              Navigator.pop(ctx);
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  option.$2,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-                if (isSelected) ...[
-                  const SizedBox(width: 8),
-                  Icon(CupertinoIcons.checkmark,
-                      size: 18, color: _accent(context)),
-                ],
-              ],
+      title: '选择字重',
+      currentValue: _settings.textBold,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: options
+          .map(
+            (option) => OptionPickerItem<int>(
+              value: option.$1,
+              label: option.$2,
             ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
+          )
+          .toList(growable: false),
     );
+    if (selected == null) return;
+    _update(_settings.copyWith(textBold: selected));
   }
 
   void _openAdvancedTypography() {

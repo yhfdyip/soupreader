@@ -41,8 +41,8 @@ void main() {
     );
 
     expect(updated.title, '新书名');
-    // 作者空白时回退为旧值
-    expect(updated.author, '旧作者');
+    // 对齐 legado：作者输入为空白时保存为空字符串，不回退旧值。
+    expect(updated.author, '');
     // 封面空白时清空（对齐编辑页“删除覆盖值”语义）
     expect(updated.coverUrl, isNull);
     expect(updated.intro, '新简介');

@@ -72,5 +72,35 @@ void main() {
         } catch (_) {}
       }
     });
+
+    test('reparseFromFile 按 splitLongChapter 控制长正文拆分', () async {
+      final dir = await Directory.systemTemp.createTemp('txt_reparse_split_');
+      final file = File('${dir.path}${Platform.pathSeparator}split.txt');
+      final longContent = List<String>.filled(6200, '甲').join();
+      await file.writeAsString(longContent, flush: true);
+
+      try {
+        final disabled = await TxtParser.reparseFromFile(
+          filePath: file.path,
+          bookId: 'book-split-off',
+          bookName: '关闭拆分',
+          splitLongChapter: false,
+        );
+        final enabled = await TxtParser.reparseFromFile(
+          filePath: file.path,
+          bookId: 'book-split-on',
+          bookName: '开启拆分',
+          splitLongChapter: true,
+        );
+
+        expect(disabled.chapters.length, 1);
+        expect(disabled.chapters.first.title, '正文');
+        expect(enabled.chapters.length, greaterThan(1));
+      } finally {
+        try {
+          await dir.delete(recursive: true);
+        } catch (_) {}
+      }
+    });
   });
 }

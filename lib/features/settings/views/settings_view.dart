@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme/colors.dart';
@@ -18,6 +19,7 @@ import 'appearance_settings_view.dart';
 import 'backup_settings_view.dart';
 import 'developer_tools_view.dart';
 import 'other_settings_view.dart';
+import 'app_help_dialog.dart';
 import 'reading_behavior_settings_hub_view.dart';
 import 'reading_interface_settings_hub_view.dart';
 import 'reading_theme_settings_view.dart';
@@ -36,6 +38,7 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _readingSettings;
+  bool _loadingMyHelp = false;
 
   String _version = '—';
   int? _sourceCount;
@@ -132,10 +135,58 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  Future<void> _openMyHelp() async {
+    if (_loadingMyHelp) return;
+    setState(() => _loadingMyHelp = true);
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/appHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(
+        context,
+        markdownText: markdownText,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('帮助'),
+          content: Text('帮助文档加载失败：$error'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _loadingMyHelp = false);
+    }
+  }
+
+  Widget _buildHelpAction() {
+    if (_loadingMyHelp) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8),
+        child: CupertinoActivityIndicator(radius: 9),
+      );
+    }
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minSize: 30,
+      onPressed: _openMyHelp,
+      child: const Icon(CupertinoIcons.question_circle, size: 22),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '设置',
+      trailing: _buildHelpAction(),
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [

@@ -24,6 +24,7 @@ import '../../../core/utils/chinese_script_converter.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
 import '../../import/txt_parser.dart';
@@ -5112,43 +5113,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<void> _openPageAnimConfigFromAutoReadPanel() async {
     _screenOffTimerStart(force: true);
-    final selectedMode = await showCupertinoModalPopup<PageTurnMode>(
+    final pageModes = PageTurnModeUi.values(current: _settings.pageTurnMode);
+    final selectedMode = await showOptionPickerSheet<PageTurnMode>(
       context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('翻页动画'),
-        actions: PageTurnModeUi.values(current: _settings.pageTurnMode)
-            .map(
-              (mode) => CupertinoActionSheetAction(
-                onPressed: () {
-                  if (PageTurnModeUi.isHidden(mode)) {
-                    Navigator.pop(sheetContext);
-                    _showToast('仿真2模式已隐藏');
-                    return;
-                  }
-                  Navigator.pop(sheetContext, mode);
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      PageTurnModeUi.isHidden(mode)
-                          ? '${mode.name}（隐藏）'
-                          : mode.name,
-                    ),
-                    if (_settings.pageTurnMode == mode)
-                      Icon(CupertinoIcons.check_mark, color: _uiAccent),
-                  ],
-                ),
-              ),
-            )
-            .toList(growable: false),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '翻页动画',
+      currentValue: _settings.pageTurnMode,
+      accentColor: _uiAccent,
+      items: pageModes
+          .map(
+            (mode) => OptionPickerItem<PageTurnMode>(
+              value: mode,
+              label: mode.name,
+              subtitle: PageTurnModeUi.isHidden(mode) ? '当前版本隐藏' : null,
+            ),
+          )
+          .toList(growable: false),
     );
     if (!mounted || selectedMode == null) return;
+    if (PageTurnModeUi.isHidden(selectedMode)) {
+      _showToast('仿真2模式已隐藏');
+      _screenOffTimerStart(force: true);
+      return;
+    }
     if (selectedMode != _settings.pageTurnMode) {
       _updateSettings(_settings.copyWith(pageTurnMode: selectedMode));
     }
@@ -6602,30 +6588,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Future<void> _openImageStyleFromMenu() async {
-    final selected = await showCupertinoModalPopup<String>(
+    final selected = await showOptionPickerSheet<String>(
       context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('图片样式'),
-        actions: _legacyImageStyles
-            .map(
-              (style) => CupertinoActionSheetAction(
-                onPressed: () => Navigator.pop(sheetContext, style),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(style),
-                    if (style == _imageStyle)
-                      Icon(CupertinoIcons.check_mark, color: _uiAccent),
-                  ],
-                ),
-              ),
-            )
-            .toList(growable: false),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '图片样式',
+      currentValue: _imageStyle,
+      accentColor: _uiAccent,
+      items: _legacyImageStyles
+          .map(
+            (style) => OptionPickerItem<String>(
+              value: style,
+              label: style,
+            ),
+          )
+          .toList(growable: false),
     );
     if (selected == null) return;
     await _applyImageStyleFromMenu(selected);
@@ -6675,30 +6650,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final normalizedCurrent =
         ReaderCharsetService.normalizeCharset(currentCharset) ??
             ReaderCharsetService.defaultCharset;
-    return showCupertinoModalPopup<String>(
+    return showOptionPickerSheet<String>(
       context: context,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('设置编码'),
-        actions: _legacyCharsetOptions
-            .map(
-              (charset) => CupertinoActionSheetAction(
-                onPressed: () => Navigator.pop(popupContext, charset),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(charset),
-                    if (charset == normalizedCurrent)
-                      Icon(CupertinoIcons.check_mark, color: _uiAccent),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '设置编码',
+      currentValue: normalizedCurrent,
+      accentColor: _uiAccent,
+      items: _legacyCharsetOptions
+          .map(
+            (charset) => OptionPickerItem<String>(
+              value: charset,
+              label: charset,
+            ),
+          )
+          .toList(growable: false),
     );
   }
 
@@ -6718,9 +6682,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (!mounted) return;
     setState(() => _isLoadingChapter = true);
     try {
+      final splitLongChapter =
+          _settingsService.getBookSplitLongChapter(widget.bookId);
       await _reparseLocalTxtBookWithCharset(
         book: book,
         charset: normalized,
+        splitLongChapter: splitLongChapter,
       );
       if (!mounted) return;
       _showToast('编码已切换：$normalized');
@@ -6737,6 +6704,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Future<void> _reparseLocalTxtBookWithCharset({
     required Book book,
     required String charset,
+    required bool splitLongChapter,
   }) async {
     final localPath = (book.localPath ?? book.bookUrl ?? '').trim();
     if (localPath.isEmpty) {
@@ -6752,6 +6720,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       bookId: widget.bookId,
       bookName: book.title,
       forcedCharset: charset,
+      splitLongChapter: splitLongChapter,
     );
     final newChapters = parsed.chapters;
     if (newChapters.isEmpty) {
@@ -8873,22 +8842,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (defaultStyles.isEmpty) {
       return Future<int?>.value(null);
     }
-    return showCupertinoModalPopup<int>(
+    return showOptionPickerSheet<int>(
       context: context,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('选择预设布局'),
-        actions: List<Widget>.generate(defaultStyles.length, (index) {
-          final name = _readStyleDisplayName(defaultStyles[index]);
-          return CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(popupContext, index),
-            child: Text(name),
-          );
-        }),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择预设布局',
+      currentValue: null,
+      accentColor: _uiAccent,
+      items:
+          List<OptionPickerItem<int>>.generate(defaultStyles.length, (index) {
+        final name = _readStyleDisplayName(defaultStyles[index]);
+        return OptionPickerItem<int>(
+          value: index,
+          label: name,
+        );
+      }),
     );
   }
 
@@ -8922,32 +8888,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Future<ReadStyleConfig?> _showReadStyleBackgroundSourceDialog({
     required ReadStyleConfig style,
   }) async {
-    final selectedAction = await showCupertinoModalPopup<_ReadStyleBgAction>(
+    final selectedAction = await showOptionPickerSheet<_ReadStyleBgAction>(
       context: context,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('背景图片'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(popupContext, _ReadStyleBgAction.asset),
-            child: const Text('选择内置背景'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(popupContext, _ReadStyleBgAction.file),
-            child: const Text('选择本地图片'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(popupContext, _ReadStyleBgAction.clear),
-            child: const Text('使用纯色背景'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
+      title: '背景图片',
+      currentValue: null,
+      accentColor: _uiAccent,
+      items: const [
+        OptionPickerItem<_ReadStyleBgAction>(
+          value: _ReadStyleBgAction.asset,
+          label: '选择内置背景',
         ),
-      ),
+        OptionPickerItem<_ReadStyleBgAction>(
+          value: _ReadStyleBgAction.file,
+          label: '选择本地图片',
+        ),
+        OptionPickerItem<_ReadStyleBgAction>(
+          value: _ReadStyleBgAction.clear,
+          label: '使用纯色背景',
+        ),
+      ],
     );
 
     switch (selectedAction) {
@@ -8988,23 +8947,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (!mounted) {
       return null;
     }
-    return showCupertinoModalPopup<String>(
+    return showOptionPickerSheet<String>(
       context: context,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('选择内置背景'),
-        actions: List<Widget>.generate(assetNames.length, (index) {
-          final name = assetNames[index];
-          final displayName = _readStyleBackgroundDisplayName(name);
-          return CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(popupContext, name),
-            child: Text(displayName.isEmpty ? name : displayName),
-          );
-        }),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择内置背景',
+      currentValue: null,
+      accentColor: _uiAccent,
+      items:
+          List<OptionPickerItem<String>>.generate(assetNames.length, (index) {
+        final name = assetNames[index];
+        final displayName = _readStyleBackgroundDisplayName(name);
+        return OptionPickerItem<String>(
+          value: name,
+          label: displayName.isEmpty ? name : displayName,
+        );
+      }),
     );
   }
 
@@ -11227,33 +11183,24 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required int currentValue,
     required ValueChanged<int> onSelected,
   }) {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: Text(title),
-        actions: options
+    unawaited(
+      showOptionPickerSheet<int>(
+        context: context,
+        title: title,
+        currentValue: currentValue,
+        accentColor: _uiAccent,
+        items: options
             .map(
-              (option) => CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.pop(context);
-                  onSelected(option.value);
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(option.label),
-                    if (option.value == currentValue)
-                      Icon(CupertinoIcons.check_mark, color: _uiAccent),
-                  ],
-                ),
+              (option) => OptionPickerItem<int>(
+                value: option.value,
+                label: option.label,
               ),
             )
-            .toList(),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-      ),
+            .toList(growable: false),
+      ).then((selected) {
+        if (selected == null) return;
+        onSelected(selected);
+      }),
     );
   }
 
@@ -11785,6 +11732,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       await _reparseLocalTxtBookWithCharset(
         book: book,
         charset: charset,
+        splitLongChapter: enabled,
       );
     } finally {
       if (mounted) {

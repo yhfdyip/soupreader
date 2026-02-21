@@ -8,6 +8,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../search/models/search_scope_group_helper.dart';
 import '../../search/views/search_view.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/source_explore_kinds_service.dart';
@@ -131,7 +132,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       groups
           .addAll(DiscoveryFilterHelper.extractGroups(source.bookSourceGroup));
     }
-    final sorted = groups.toList()..sort();
+    final sorted = groups.toList(growable: false)
+      ..sort(SearchScopeGroupHelper.cnCompareLikeLegado);
     return sorted;
   }
 
@@ -144,28 +146,24 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   Future<void> _showGroupFilterMenu() async {
     final groups = _buildGroups(_eligibleSources(_allSources));
-    if (groups.isEmpty) {
-      _showMessage('当前没有可用分组');
-      return;
-    }
-
-    showCupertinoModalPopup<void>(
+    if (groups.isEmpty) return;
+    await showCupertinoModalPopup<void>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
-        title: const Text('按分组筛选'),
+        title: const Text('分组'),
         actions: [
           for (final group in groups)
             CupertinoActionSheetAction(
-              child: Text(group),
               onPressed: () {
                 Navigator.pop(ctx);
                 _setQuery('group:$group');
               },
+              child: Text(group),
             ),
         ],
         cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
           onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
         ),
       ),
     );

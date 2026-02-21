@@ -1,9 +1,14 @@
-import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:uuid/uuid.dart';
 
@@ -19,21 +24,24 @@ import '../../../core/services/webdav_service.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../reader/models/reading_settings.dart';
+import '../../reader/services/reader_charset_service.dart';
 import '../../reader/services/chapter_title_display_helper.dart';
 import '../../reader/services/reader_source_switch_helper.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../../reader/widgets/source_switch_candidate_sheet.dart';
 import '../../replace/services/replace_rule_service.dart';
-import '../../settings/views/exception_logs_view.dart';
+import '../../settings/views/app_log_dialog.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_login_form_view.dart';
-import '../../source/views/source_qr_share_view.dart';
 import '../../source/views/source_web_verify_view.dart';
 import '../services/search_book_info_edit_helper.dart';
 import '../services/search_book_info_menu_helper.dart';
+import '../services/search_book_info_refresh_helper.dart';
+import '../services/search_book_info_share_helper.dart';
+import '../services/search_book_info_top_helper.dart';
 import '../services/search_book_toc_filter_helper.dart';
 import 'search_book_info_edit_view.dart';
 
@@ -92,6 +100,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   late final BookAddService _addService;
   late final SettingsService _settingsService;
   late final WebDavService _webDavService;
+  late final ReaderCharsetService _readerCharsetService;
   late final ChapterTitleDisplayHelper _chapterTitleDisplayHelper;
 
   late SearchResult _activeResult;
@@ -130,6 +139,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _addService = BookAddService(database: db, engine: _engine);
     _settingsService = SettingsService();
     _webDavService = WebDavService();
+    _readerCharsetService = ReaderCharsetService();
     _deleteAlertEnabled = _resolveBookInfoDeleteAlertSetting();
     _chapterTitleDisplayHelper = ChapterTitleDisplayHelper(
       replaceRuleService: ReplaceRuleService(db),
@@ -589,48 +599,147 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     );
   }
 
-  String _buildSharePayload() {
-    final bookUrl = _resolveBookUrl();
-    final payload = <String, dynamic>{
-      'name': _displayName,
-      'author': _displayAuthor,
-      'bookUrl': bookUrl,
-      'sourceUrl': _activeResult.sourceUrl.trim(),
-      'sourceName': _displaySourceName,
-      'coverUrl': _displayCoverUrl,
-      'intro': _displayIntro,
-      'lastChapter': _pickFirstNonEmpty(<String>[
-            _detail?.lastChapter ?? '',
-            _activeResult.lastChapter,
-          ]) ??
-          '',
-      'tocUrl': _resolveTocUrl(),
-    };
-    return '$bookUrl#${jsonEncode(payload)}';
+  Book _buildShareBookSnapshot() {
+    final stored = _resolveStoredBook();
+    final resolvedName = _pickFirstNonEmpty(<String>[
+          _detail?.name ?? '',
+          _activeResult.name,
+          stored?.title ?? '',
+        ]) ??
+        '';
+    final resolvedAuthor = _pickFirstNonEmpty(<String>[
+          _detail?.author ?? '',
+          _activeResult.author,
+          stored?.author ?? '',
+        ]) ??
+        '';
+    final resolvedCoverUrl = _pickFirstNonEmpty(<String>[
+          _detail?.coverUrl ?? '',
+          _activeResult.coverUrl,
+          stored?.coverUrl ?? '',
+        ]) ??
+        '';
+    final resolvedIntro = _pickFirstNonEmpty(<String>[
+          _detail?.intro ?? '',
+          _activeResult.intro,
+          stored?.intro ?? '',
+        ]) ??
+        '';
+    final resolvedSourceUrl = _pickFirstNonEmpty(<String>[
+          _source?.bookSourceUrl ?? '',
+          _activeResult.sourceUrl,
+          stored?.sourceUrl ?? '',
+          stored?.sourceId ?? '',
+        ]) ??
+        '';
+    final resolvedBookUrl = _resolveBookUrl();
+    final resolvedLastChapter = _pickFirstNonEmpty(<String>[
+          _detail?.lastChapter ?? '',
+          _activeResult.lastChapter,
+          stored?.latestChapter ?? '',
+        ]) ??
+        '';
+    final resolvedTotalChapters =
+        _toc.isEmpty ? stored?.totalChapters ?? 0 : _toc.length;
+    if (stored != null) {
+      return stored.copyWith(
+        title: resolvedName,
+        author: resolvedAuthor,
+        coverUrl: resolvedCoverUrl,
+        intro: resolvedIntro,
+        sourceId: resolvedSourceUrl,
+        sourceUrl: resolvedSourceUrl,
+        bookUrl: resolvedBookUrl,
+        latestChapter: resolvedLastChapter,
+        totalChapters: resolvedTotalChapters,
+      );
+    }
+    return Book(
+      id: (_bookId?.trim().isNotEmpty ?? false)
+          ? _bookId!.trim()
+          : _buildEphemeralSessionId(),
+      title: resolvedName,
+      author: resolvedAuthor,
+      coverUrl: resolvedCoverUrl.isEmpty ? null : resolvedCoverUrl,
+      intro: resolvedIntro.isEmpty ? null : resolvedIntro,
+      sourceId: resolvedSourceUrl.isEmpty ? null : resolvedSourceUrl,
+      sourceUrl: resolvedSourceUrl.isEmpty ? null : resolvedSourceUrl,
+      bookUrl: resolvedBookUrl.isEmpty ? null : resolvedBookUrl,
+      latestChapter: resolvedLastChapter.isEmpty ? null : resolvedLastChapter,
+      totalChapters: resolvedTotalChapters,
+    );
+  }
+
+  Future<File?> _buildShareQrPngFile(String payload) async {
+    if (kIsWeb) return null;
+    try {
+      final painter = QrPainter(
+        data: payload,
+        version: QrVersions.auto,
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: CupertinoColors.black,
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: CupertinoColors.black,
+        ),
+      );
+      final imageData = await painter.toImageData(
+        1024,
+        format: ui.ImageByteFormat.png,
+      );
+      final bytes = imageData?.buffer.asUint8List();
+      if (bytes == null || bytes.isEmpty) {
+        return null;
+      }
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        p.join(
+          dir.path,
+          'book_info_share_${DateTime.now().millisecondsSinceEpoch}.png',
+        ),
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      return file;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _copyText(String text, String successMessage) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    _showMessage(successMessage);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showMessage(successMessage);
+    });
   }
 
   Future<void> _shareBook() async {
-    final bookUrl = _resolveBookUrl();
-    if (bookUrl.isEmpty) {
-      _showMessage('当前书籍缺少可分享的链接');
+    final snapshot = _buildShareBookSnapshot();
+    final payload = SearchBookInfoShareHelper.buildPayload(snapshot);
+    final subject =
+        snapshot.title.trim().isEmpty ? '分享' : snapshot.title.trim();
+    final qrFile = await _buildShareQrPngFile(payload);
+    if (qrFile == null) {
+      _showMessage('文字太多，生成二维码失败');
       return;
     }
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => SourceQrShareView(
-          text: _buildSharePayload(),
-          subject: _displayName.trim().isEmpty ? '书籍二维码' : _displayName.trim(),
-          hintText: '使用其他设备扫码分享书籍',
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[
+            XFile(qrFile.path, mimeType: 'image/png'),
+          ],
+          subject: subject,
+          text: subject,
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('分享失败：${_compactReason(e.toString())}');
+    }
   }
 
   Future<void> _openBookEdit() async {
@@ -658,14 +767,19 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       original: stored,
       draft: edited,
     );
-    await _bookRepo.updateBook(updated);
+    try {
+      await _bookRepo.updateBook(updated);
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('保存失败\n${_compactReason(e.toString())}');
+      return;
+    }
     if (!mounted) return;
 
     setState(() {
       _syncDisplayFromStoredBook(updated);
       _introExpanded = false;
     });
-    _showMessage('书籍信息已保存');
   }
 
   Future<void> _openSourceLogin() async {
@@ -708,40 +822,30 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   Future<void> _pinBookToTop() async {
     final id = _bookId?.trim() ?? '';
-    if (!_inBookshelf || id.isEmpty) {
-      _showMessage('当前书籍不在书架，无法置顶');
-      return;
-    }
+    if (id.isEmpty) return;
 
-    final stored = _bookRepo.getBookById(id);
-    if (stored == null) {
-      _showMessage('书架记录不存在，无法置顶');
-      return;
-    }
+    final stored = _bookRepo.getBookById(id) ??
+        ((_isBookshelfEntry && widget.bookshelfBook?.id == id)
+            ? widget.bookshelfBook
+            : null);
+    if (stored == null) return;
 
-    final now = DateTime.now();
-    await _bookRepo.updateBook(
-      stored.copyWith(
-        addedTime: now,
-        lastReadTime: now,
-      ),
+    final pinned = SearchBookInfoTopHelper.buildPinnedBook(
+      book: stored,
+      now: DateTime.now(),
     );
+    await _bookRepo.updateBook(pinned);
     if (!mounted) return;
     setState(() {});
-    _showMessage('已置顶（按“最近添加/最近阅读”排序可见）');
   }
 
   Future<void> _setSourceVariable() async {
     final source = _source;
     if (source == null) {
-      _showMessage('书源不存在，无法设置源变量');
+      _showMessage('书源不存在');
       return;
     }
-    final sourceKey = source.bookSourceUrl.trim();
-    if (sourceKey.isEmpty) {
-      _showMessage('书源地址为空，无法设置源变量');
-      return;
-    }
+    final sourceKey = source.bookSourceUrl;
 
     final note = _displaySourceVariableComment(source);
     final current = await SourceVariableStore.getVariable(sourceKey) ?? '';
@@ -789,19 +893,16 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (result == null) return;
 
     await SourceVariableStore.putVariable(sourceKey, result);
-    if (!mounted) return;
-    _showMessage('源变量已保存');
   }
 
   Future<void> _setBookVariable() async {
     final source = _source;
     if (source == null) {
-      _showMessage('书源不存在，无法设置书籍变量');
+      _showMessage('书源不存在');
       return;
     }
     final bookKey = _resolveBookUrl();
     if (bookKey.isEmpty) {
-      _showMessage('书籍链接为空，无法设置书籍变量');
       return;
     }
 
@@ -851,8 +952,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (result == null) return;
 
     await BookVariableStore.putVariable(bookKey, result);
-    if (!mounted) return;
-    _showMessage('书籍变量已保存');
   }
 
   Future<void> _uploadToRemote() async {
@@ -868,23 +967,22 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
     final settings = _settingsService.appSettings;
     final bookId = book.id.trim();
-    final remoteHint =
+    final existingRemoteUrl =
         bookId.isEmpty ? null : _settingsService.getBookRemoteUploadUrl(bookId);
-    if (remoteHint != null) {
+    if (existingRemoteUrl != null) {
       final confirmed = await showCupertinoDialog<bool>(
             context: context,
             builder: (dialogContext) => CupertinoAlertDialog(
-              title: const Text('提示'),
-              content: Text('\n远程 WebDav 链接已存在，是否继续上传？\n$remoteHint'),
+              title: const Text('提醒'),
+              content: const Text('远程webDav链接已存在，是否继续'),
               actions: [
                 CupertinoDialogAction(
                   onPressed: () => Navigator.pop(dialogContext, false),
                   child: const Text('取消'),
                 ),
                 CupertinoDialogAction(
-                  isDestructiveAction: true,
                   onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('继续'),
+                  child: const Text('确定'),
                 ),
               ],
             ),
@@ -893,13 +991,35 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       if (!confirmed) return;
     }
 
-    unawaited(
-      showCupertinoDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CupertinoActivityIndicator()),
-      ),
-    );
+    OverlayEntry? loadingOverlay;
+    final overlayState = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlayState != null) {
+      loadingOverlay = OverlayEntry(
+        builder: (overlayContext) => ColoredBox(
+          color: const Color(0x33000000),
+          child: Center(
+            child: CupertinoPopupSurface(
+              isSurfacePainted: true,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CupertinoActivityIndicator(),
+                    SizedBox(width: 12),
+                    Text('上传中.....'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      overlayState.insert(loadingOverlay);
+    }
 
     String feedback = '上传成功';
     try {
@@ -914,9 +1034,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     } catch (error) {
       feedback = _compactReason(error.toString(), maxLength: 180);
     } finally {
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      loadingOverlay?.remove();
     }
 
     if (!mounted) return;
@@ -925,20 +1043,12 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   Future<void> _copyBookUrl() async {
     final bookUrl = _resolveBookUrl();
-    if (bookUrl.isEmpty) {
-      _showMessage('当前书籍链接为空');
-      return;
-    }
-    await _copyText(bookUrl, '已复制书籍链接');
+    await _copyText(bookUrl, '复制完成');
   }
 
   Future<void> _copyTocUrl() async {
     final tocUrl = _resolveTocUrl();
-    if (tocUrl.isEmpty) {
-      _showMessage('当前目录链接为空');
-      return;
-    }
-    await _copyText(tocUrl, '已复制目录链接');
+    await _copyText(tocUrl, '复制完成');
   }
 
   Future<void> _toggleAllowUpdate() async {
@@ -948,23 +1058,49 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (_inBookshelf && id.isNotEmpty) {
       await _settingsService.saveBookCanUpdate(id, next);
     }
-    _showMessage(next ? '已开启“允许更新”' : '已关闭“允许更新”');
+  }
+
+  Widget _buildCheckableActionLabel({
+    required String title,
+    required bool checked,
+  }) {
+    if (!checked) {
+      return Text(title);
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(CupertinoIcons.check_mark, size: 18),
+        const SizedBox(width: 6),
+        Text(title),
+      ],
+    );
   }
 
   Future<void> _toggleSplitLongChapter() async {
     final next = !_splitLongChapter;
     if (!mounted) return;
-    setState(() {
-      _splitLongChapter = next;
-      _loading = true;
-      _loadingToc = true;
-    });
+    setState(() => _splitLongChapter = next);
     final id = _bookId?.trim() ?? '';
     if (_inBookshelf && id.isNotEmpty) {
       await _settingsService.saveBookSplitLongChapter(id, next);
     }
-    await _loadContext(silent: true);
-    if (!mounted) return;
+    var refreshSuccess = true;
+    if (_inBookshelf && id.isNotEmpty && _isLocalTxtBook()) {
+      refreshSuccess = await _refreshLocalBookshelfBook(
+        force: true,
+        splitLongChapter: next,
+        showSuccessToast: false,
+      );
+    } else {
+      if (!mounted) return;
+      setState(() {
+        _loading = true;
+        _loadingToc = true;
+      });
+      await _loadContext(silent: true);
+    }
+    if (!mounted || !refreshSuccess) return;
     if (!next) {
       _showMessage('已关闭“分割长章节”，重新加载正文可能需要更长时间');
       return;
@@ -985,38 +1121,107 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     } catch (_) {
       // SettingsService 未初始化时仅保持本页会话内状态。
     }
-    _showMessage(_deleteAlertEnabled ? '已开启删除提醒' : '已关闭删除提醒');
   }
 
   Future<void> _clearBookCache() async {
-    final id = _bookId?.trim() ?? '';
-    if (id.isEmpty) {
-      _showMessage('当前书籍不在书架，无法清理缓存');
-      return;
+    final id = (_bookId?.trim().isNotEmpty ?? false)
+        ? _bookId!.trim()
+        : _buildEphemeralSessionId();
+    try {
+      await _chapterRepo.clearDownloadedCacheForBook(id);
+      if (!mounted) return;
+      _showMessage('成功清理缓存');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('清理缓存出错\n${_compactReason(e.toString())}');
     }
-    final result = await _chapterRepo.clearDownloadedCacheForBook(id);
-    if (!mounted) return;
-    if (result.chapters <= 0) {
-      _showMessage('暂无可清理的章节缓存');
-      return;
-    }
-    _showMessage('已清理缓存：${result.chapters} 章');
   }
 
-  Future<void> _openExceptionLogs() async {
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => const ExceptionLogsView(),
-      ),
-    );
+  Future<void> _openAppLogDialog() async {
+    await showAppLogDialog(context);
   }
 
   Future<void> _triggerRefresh() async {
     if (_inBookshelf) {
+      if (_isLocalBook()) {
+        await _refreshLocalBookshelfBook();
+        return;
+      }
       await _refreshBookshelfToc();
       return;
     }
     await _loadContext();
+  }
+
+  Future<bool> _refreshLocalBookshelfBook({
+    bool force = false,
+    bool? splitLongChapter,
+    bool showSuccessToast = true,
+  }) async {
+    if (_loadingToc && !force) return false;
+    final id = _bookId?.trim() ?? '';
+    if (!_inBookshelf || id.isEmpty) {
+      await _loadContext();
+      return true;
+    }
+
+    final storedBook = _bookRepo.getBookById(id);
+    if (storedBook == null || !storedBook.isLocal) {
+      await _refreshBookshelfToc();
+      return true;
+    }
+
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _loadingToc = true;
+        _error = null;
+        _tocError = null;
+      });
+    }
+
+    String? refreshError;
+    try {
+      final preferredTxtCharset =
+          await _readerCharsetService.getBookCharset(id);
+      final refreshResult = await SearchBookInfoRefreshHelper.refreshLocalBook(
+        book: storedBook,
+        preferredTxtCharset: preferredTxtCharset,
+        splitLongChapter:
+            splitLongChapter ?? _settingsService.getBookSplitLongChapter(id),
+      );
+      await _chapterRepo.clearChaptersForBook(id);
+      await _chapterRepo.addChapters(refreshResult.chapters);
+      await _bookRepo.updateBook(refreshResult.book);
+      final charset = (refreshResult.charset ?? '').trim();
+      if (charset.isNotEmpty) {
+        await _readerCharsetService.setBookCharset(id, charset);
+      }
+    } catch (error) {
+      refreshError = _compactReason(error.toString(), maxLength: 180);
+    }
+
+    final latestBook = _bookRepo.getBookById(id) ?? storedBook;
+    final localToc = _loadStoredToc(id);
+    if (!mounted) return refreshError == null;
+
+    setState(() {
+      _syncDisplayFromStoredBook(latestBook);
+      _source = null;
+      _toc = localToc;
+      _loading = false;
+      _loadingToc = false;
+      _error = null;
+      _tocError =
+          localToc.isEmpty ? (refreshError ?? '目录为空（书架缓存中无章节，请先刷新目录）') : null;
+    });
+
+    if (localToc.isNotEmpty && refreshError == null && showSuccessToast) {
+      _showMessage('目录已刷新（共 ${localToc.length} 章）');
+    } else if (refreshError != null) {
+      _showMessage(refreshError);
+    }
+    return refreshError == null;
   }
 
   Future<bool> _confirmRemoveFromShelf() async {
@@ -1373,7 +1578,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                 Navigator.pop(sheetContext);
                 await _uploadToRemote();
               },
-              child: const Text('上传到远程'),
+              child: const Text('上传 WebDav'),
             ),
           CupertinoActionSheetAction(
             onPressed: () async {
@@ -1418,14 +1623,14 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
               Navigator.pop(sheetContext);
               await _copyBookUrl();
             },
-            child: const Text('复制书籍链接'),
+            child: const Text('拷贝书籍 URL'),
           ),
           CupertinoActionSheetAction(
             onPressed: () async {
               Navigator.pop(sheetContext);
               await _copyTocUrl();
             },
-            child: const Text('复制目录链接'),
+            child: const Text('拷贝目录 URL'),
           ),
           if (showAllowUpdate)
             CupertinoActionSheetAction(
@@ -1433,7 +1638,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                 Navigator.pop(sheetContext);
                 await _toggleAllowUpdate();
               },
-              child: Text(_allowUpdate ? '允许更新：开' : '允许更新：关'),
+              child: _buildCheckableActionLabel(
+                title: '允许更新',
+                checked: _allowUpdate,
+              ),
             ),
           if (showSplitLongChapter)
             CupertinoActionSheetAction(
@@ -1448,7 +1656,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
               Navigator.pop(sheetContext);
               await _toggleDeleteAlertEnabled();
             },
-            child: Text(_deleteAlertEnabled ? '删除提醒：开' : '删除提醒：关'),
+            child: _buildCheckableActionLabel(
+              title: '删除提醒',
+              checked: _deleteAlertEnabled,
+            ),
           ),
           if (canClearCache)
             CupertinoActionSheetAction(
@@ -1461,7 +1672,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           CupertinoActionSheetAction(
             onPressed: () async {
               Navigator.pop(sheetContext);
-              await _openExceptionLogs();
+              await _openAppLogDialog();
             },
             child: const Text('日志'),
           ),

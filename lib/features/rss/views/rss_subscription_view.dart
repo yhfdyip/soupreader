@@ -59,7 +59,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             minimumSize: const Size(28, 28),
-            onPressed: _openGroupFilterSheet,
+            onPressed: _openGroupMenu,
             child: const Icon(CupertinoIcons.folder),
           ),
           CupertinoButton(
@@ -230,23 +230,20 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     setState(() {});
   }
 
-  Future<void> _openGroupFilterSheet() async {
+  Future<void> _openGroupMenu() async {
     final groups = RssSubscriptionHelper.enabledGroups(_repo.getAllSources());
-    if (!mounted) return;
+    if (!mounted || groups.isEmpty) return;
+    final query = _query;
+    final currentGroup = query.startsWith(RssSubscriptionHelper.groupPrefix)
+        ? query.substring(RssSubscriptionHelper.groupPrefix.length).trim()
+        : '';
     await showCupertinoModalPopup<void>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
-        title: const Text('分组筛选'),
         actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _setQuery('');
-            },
-            child: const Text('全部'),
-          ),
           for (final group in groups)
             CupertinoActionSheetAction(
+              isDefaultAction: currentGroup == group,
               onPressed: () {
                 Navigator.of(ctx).pop();
                 _setQuery(RssSubscriptionHelper.buildGroupQuery(group));
@@ -364,7 +361,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
             CupertinoActionSheetAction(
               onPressed: () {
                 Navigator.of(ctx).pop();
-                _openGroupFilterSheet();
+                _openGroupMenu();
               },
               child: Text('分组筛选 (${groups.length})'),
             ),

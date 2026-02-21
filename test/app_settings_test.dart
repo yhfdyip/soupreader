@@ -18,6 +18,13 @@ void main() {
       defaultHomePage: MainDefaultHomePage.rss,
       bookshelfViewMode: BookshelfViewMode.list,
       bookshelfSortMode: BookshelfSortMode.title,
+      bookshelfGroupStyle: 1,
+      bookshelfLayoutIndex: 4,
+      bookshelfSortIndex: 5,
+      bookshelfShowUnread: false,
+      bookshelfShowLastUpdateTime: true,
+      bookshelfShowWaitUpCount: true,
+      bookshelfShowFastScroller: true,
       searchScope: '玄幻,男频',
       bookInfoDeleteAlert: false,
       syncBookProgress: false,
@@ -34,8 +41,15 @@ void main() {
     expect(decoded.showDiscovery, false);
     expect(decoded.showRss, true);
     expect(decoded.defaultHomePage, MainDefaultHomePage.rss);
-    expect(decoded.bookshelfViewMode, BookshelfViewMode.list);
-    expect(decoded.bookshelfSortMode, BookshelfSortMode.title);
+    expect(decoded.bookshelfViewMode, BookshelfViewMode.grid);
+    expect(decoded.bookshelfSortMode, BookshelfSortMode.author);
+    expect(decoded.bookshelfGroupStyle, 1);
+    expect(decoded.bookshelfLayoutIndex, 4);
+    expect(decoded.bookshelfSortIndex, 5);
+    expect(decoded.bookshelfShowUnread, false);
+    expect(decoded.bookshelfShowLastUpdateTime, true);
+    expect(decoded.bookshelfShowWaitUpCount, true);
+    expect(decoded.bookshelfShowFastScroller, true);
     expect(decoded.searchScope, '玄幻,男频');
     expect(decoded.bookInfoDeleteAlert, false);
     expect(decoded.syncBookProgress, false);
@@ -78,6 +92,28 @@ void main() {
       'searchScopeSourceUrls': ['https://example.com/source'],
     });
     expect(decoded.searchScope, '::https://example.com/source');
+  });
+
+  test('AppSettings migrates legacy bookshelf layout keys', () {
+    final decoded = AppSettings.fromJson({
+      'bookGroupStyle': 1,
+      'bookshelfLayout': 3,
+      'bookshelfSort': 4,
+      'showUnread': 0,
+      'showLastUpdateTime': 1,
+      'showWaitUpCount': true,
+      'showBookshelfFastScroller': 1,
+    });
+
+    expect(decoded.bookshelfGroupStyle, 1);
+    expect(decoded.bookshelfLayoutIndex, 3);
+    expect(decoded.bookshelfViewMode, BookshelfViewMode.grid);
+    expect(decoded.bookshelfSortIndex, 4);
+    expect(decoded.bookshelfSortMode, BookshelfSortMode.recentRead);
+    expect(decoded.bookshelfShowUnread, false);
+    expect(decoded.bookshelfShowLastUpdateTime, true);
+    expect(decoded.bookshelfShowWaitUpCount, true);
+    expect(decoded.bookshelfShowFastScroller, true);
   });
 
   test('AppSettings migrates legacy search filter mode to precision toggle',

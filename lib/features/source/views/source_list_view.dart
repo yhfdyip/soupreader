@@ -1128,7 +1128,7 @@ class _SourceListViewState extends State<SourceListView> {
     showCupertinoModalPopup<void>(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('排序选项'),
+        title: const Text('排序'),
         actions: [
           CupertinoActionSheetAction(
             child:
@@ -1136,7 +1136,8 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () => pickSort(_SourceSortMode.manual),
           ),
           CupertinoActionSheetAction(
-            child: Text('${_sortMode == _SourceSortMode.weight ? '✓ ' : ''}权重'),
+            child:
+                Text('${_sortMode == _SourceSortMode.weight ? '✓ ' : ''}智能排序'),
             onPressed: () => pickSort(_SourceSortMode.weight),
           ),
           CupertinoActionSheetAction(
@@ -1163,7 +1164,7 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () => pickSort(_SourceSortMode.enabled),
           ),
           CupertinoActionSheetAction(
-            child: Text(_sortAscending ? '切换为降序' : '切换为升序'),
+            child: Text('${!_sortAscending ? '✓ ' : ''}反序'),
             onPressed: () {
               setState(() => _sortAscending = !_sortAscending);
               Navigator.pop(context);

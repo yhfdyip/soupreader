@@ -341,9 +341,12 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  static const Duration _legacyReselectWindow = Duration(milliseconds: 300);
   late final CupertinoTabController _tabController;
   final ValueNotifier<int> _bookshelfReselectSignal = ValueNotifier<int>(0);
   final ValueNotifier<int> _discoveryCompressSignal = ValueNotifier<int>(0);
+  int _bookshelfReselectedAt = 0;
+  int _discoveryReselectedAt = 0;
   late List<_MainTabSpec> _tabs;
 
   @override
@@ -390,10 +393,22 @@ class _MainScreenState extends State<MainScreen> {
     if (index != _tabController.index) return;
     switch (tab.id) {
       case _MainTabId.bookshelf:
-        _bookshelfReselectSignal.value++;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _bookshelfReselectedAt >
+            _legacyReselectWindow.inMilliseconds) {
+          _bookshelfReselectedAt = now;
+        } else {
+          _bookshelfReselectSignal.value++;
+        }
         return;
       case _MainTabId.discovery:
-        _discoveryCompressSignal.value++;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _discoveryReselectedAt >
+            _legacyReselectWindow.inMilliseconds) {
+          _discoveryReselectedAt = now;
+        } else {
+          _discoveryCompressSignal.value++;
+        }
         return;
       case _MainTabId.rss:
       case _MainTabId.my:
@@ -426,7 +441,7 @@ class _MainScreenState extends State<MainScreen> {
           item: BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.dot_radiowaves_left_right),
             activeIcon: Icon(CupertinoIcons.dot_radiowaves_right),
-            label: 'RSS',
+            label: '订阅',
           ),
         ),
       const _MainTabSpec(

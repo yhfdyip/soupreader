@@ -1,0 +1,411 @@
+seq,menu_file,item_id,title_ref,title_zh,domain,phase,status,owner,verify,notes
+1,about.xml,@+id/menu_share_it,@string/share,分享,系统与工具,P10,pending,-,-,-
+2,about.xml,@+id/menu_scoring,@string/scoring,评分,系统与工具,P10,pending,-,-,-
+3,app_log.xml,@+id/menu_clear,@string/clear,清除,系统与工具,P10,pending,-,-,-
+4,app_update.xml,@+id/menu_download,@string/action_download,下载,系统与工具,P10,pending,-,-,-
+5,audio_play.xml,@+id/menu_change_source,@string/change_origin,换源,阅读与朗读,P3,pending,-,-,-
+6,audio_play.xml,@+id/menu_login,@string/login,登录,阅读与朗读,P3,pending,-,-,-
+7,audio_play.xml,@+id/menu_copy_audio_url,@string/copy_play_url,拷贝播放 URL,阅读与朗读,P3,pending,-,-,-
+8,audio_play.xml,@+id/menu_edit_source,@string/edit_book_source,编辑书源,阅读与朗读,P3,pending,-,-,-
+9,audio_play.xml,@+id/menu_wake_lock,@string/audio_play_wake_lock,音频服务唤醒锁,阅读与朗读,P3,pending,-,-,-
+10,audio_play.xml,@+id/menu_log,@string/log,日志,阅读与朗读,P3,pending,-,-,-
+11,backup_restore.xml,@+id/menu_help,@string/help,帮助,导入导出与备份,P8,pending,-,-,-
+12,backup_restore.xml,@+id/menu_log,@string/log,日志,导入导出与备份,P8,pending,-,-,-
+13,book_cache.xml,@+id/menu_download,@string/action_download,下载,书架/缓存/分组,P6,pending,-,-,-
+14,book_cache.xml,@+id/menu_book_group,@string/group,分组,书架/缓存/分组,P6,pending,-,-,-
+15,book_cache.xml,@+id/menu_export_all,@string/export_all,导出所有,书架/缓存/分组,P6,pending,-,-,-
+16,book_cache.xml,@+id/menu_enable_replace,@string/replace_purify,替换净化,书架/缓存/分组,P6,pending,-,-,-
+17,book_cache.xml,@+id/menu_enable_custom_export,@string/custom_export_section,自定义Epub导出章节,书架/缓存/分组,P6,pending,-,-,-
+18,book_cache.xml,@+id/menu_export_web_dav,@string/export_to_web_dav,导出到 WebDav,书架/缓存/分组,P6,pending,-,-,-
+19,book_cache.xml,@+id/menu_export_no_chapter_name,@string/export_no_chapter_name,TXT 不导出章节名,书架/缓存/分组,P6,pending,-,-,-
+20,book_cache.xml,@+id/menu_export_pics_file,@string/export_pics_file,TXT 导出图片,书架/缓存/分组,P6,pending,-,-,-
+21,book_cache.xml,@+id/menu_parallel_export,@string/parallel_export_book,多线程导出,书架/缓存/分组,P6,pending,-,-,-
+22,book_cache.xml,@+id/menu_export_folder,@string/export_folder,导出文件夹,书架/缓存/分组,P6,pending,-,-,-
+23,book_cache.xml,@+id/menu_export_file_name,@string/export_file_name,导出文件名,书架/缓存/分组,P6,pending,-,-,-
+24,book_cache.xml,@+id/menu_export_type,@string/export_type,导出格式,书架/缓存/分组,P6,pending,-,-,-
+25,book_cache.xml,@+id/menu_export_charset,@string/export_charset,导出编码,书架/缓存/分组,P6,pending,-,-,-
+26,book_cache.xml,@+id/menu_log,@string/log,日志,书架/缓存/分组,P6,pending,-,-,-
+27,book_cache_download.xml,@+id/menu_download_after,@string/menu_download_after,下载之后章节,书架/缓存/分组,P6,pending,-,-,-
+28,book_cache_download.xml,@+id/menu_download_all,@string/menu_download_all,下载全部章节,书架/缓存/分组,P6,pending,-,-,-
+29,book_group_manage.xml,@+id/menu_add,@string/add_group,添加分组,书架/缓存/分组,P6,pending,-,-,-
+30,book_info.xml,@+id/menu_edit,@string/edit,编辑,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_edit_helper_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_view_edit_action_test.dart 通过; 手工路径: 书架点开书籍详情->顶栏编辑->进入编辑书籍信息页,确认仅书架内书籍显示编辑入口并保持 legado menu_edit->BookInfoEditActivity 同义触发语义
+31,book_info.xml,@+id/menu_share_it,@string/share,分享,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_edit_helper_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_share_helper_test.dart test/search_book_info_view_compile_test.dart test/search_book_info_view_edit_action_test.dart 通过; 手工路径: 书架打开书籍详情->顶栏分享->直接弹系统分享并携带二维码图片,确认载荷对齐 legado bookUrl#bookJson 且二维码过长时报错文案同义,将详情页分享从二维码预览中间页收敛为 legado menu_share_it 直达系统分享语义并补齐 bookUrl#bookJson 载荷与二维码失败提示
+32,book_info.xml,@+id/menu_upload,@string/upload_to_remote,上传 WebDav,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_upload_action_test.dart test/search_book_info_view_edit_action_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_share_helper_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开本地书籍详情->右上角更多->上传 WebDav->已有远程链接时弹出确认并可取消,将 menu_upload 文案收敛为“上传 WebDav”并对齐 legado sure_upload 提醒弹窗与“上传中.....”等待态语义
+33,book_info.xml,@+id/menu_refresh,@string/refresh,刷新,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_refresh_helper_test.dart test/search_book_info_view_upload_action_test.dart test/search_book_info_view_edit_action_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_share_helper_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开本地书籍详情->右上角更多->刷新,将 menu_refresh 刷新逻辑收敛为 legado refreshBook 同义链路：书架内本地书籍触发本地 TXT/EPUB 重解析并回写章节和元数据；书架内网络书籍继续刷新详情和目录；非书架场景维持详情重载
+34,book_info.xml,@+id/menu_login,@string/login,登录,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_menu_helper_test.dart test/search_book_info_view_login_action_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->登录 确认 loginUrl 为空时不显示登录且 loginUrl 非空且存在 loginUi 时进入表单登录页,确认详情页 menu_login 仅在 bookSource.loginUrl 非空显示并按 loginUi/loginUrl 分支打开登录页 保持 legado menu_login->SourceLoginActivity(type=bookSource key=bookSourceUrl) 触发语义同义
+35,book_info.xml,@+id/menu_top,@string/to_top,置顶,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_top_helper_test.dart test/search_book_info_view_top_action_test.dart test/search_book_info_menu_helper_test.dart test/search_book_info_view_login_action_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->置顶,确认点击后无前置拦截并写入最近阅读/添加时间以在书架排序中生效,对齐 legado menu_top->topBook 触发语义,将详情页 menu_top 收敛为 legado 同义“点击即置顶写库”语义并补齐置顶写库回归用例
+36,book_info.xml,@+id/menu_set_source_variable,@string/set_source_variable,设置源变量,搜索/详情/目录,P2,done,codex,flutter test test/source_variable_store_test.dart test/search_book_info_view_source_variable_action_test.dart 通过；手工路径: 书架打开书籍详情->右上角更多->设置源变量->输入或清空变量后保存，确认入口可见性 注释文案与保存语义对齐 legado menu_set_source_variable 并且保存后不追加扩展成功提示,将 menu_set_source_variable 收敛为 legado 同义语义：source.getVariable 读取原值 setVariable 空串可写入且不视为删除 失败分支仅保留“书源不存在”提示
+37,book_info.xml,@+id/menu_set_book_variable,@string/set_book_variable,设置书籍变量,搜索/详情/目录,P2,done,codex,flutter test test/book_variable_store_test.dart test/search_book_info_view_book_variable_action_test.dart 通过；手工路径: 书架打开书籍详情->右上角更多->设置书籍变量->清空后保存并再次打开弹窗，确认注释文案与保存语义对齐 legado menu_set_book_variable 且不追加扩展成功提示，将 menu_set_book_variable 收敛为 legado 同义语义：book.getVariable('custom') 注释保留，setVariable 仅在 null 时删除且空串可写入，失败分支仅保留“书源不存在”提示
+38,book_info.xml,@+id/menu_copy_book_url,@string/copy_book_url,拷贝书籍 URL,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_copy_book_url_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->拷贝书籍 URL,将详情页 menu_copy_book_url 文案收敛为“拷贝书籍 URL”并对齐 legado sendToClip 语义：点击后写入剪贴板且反馈“复制完成” 空字符串也按同义链路复制
+39,book_info.xml,@+id/menu_copy_toc_url,@string/copy_toc_url,拷贝目录 URL,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_copy_toc_url_action_test.dart test/search_book_info_view_copy_book_url_action_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->拷贝目录 URL,将详情页 menu_copy_toc_url 文案收敛为“拷贝目录 URL”并对齐 legado sendToClip 语义：点击后写入剪贴板且反馈“复制完成” 空字符串也按同义链路复制
+40,book_info.xml,@+id/menu_can_update,@string/allow_update,允许更新,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_allow_update_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->允许更新->再次打开更多菜单确认勾选状态变化,将详情页 menu_can_update 收敛为 legado checkable 语义: 标题固定“允许更新” 仅以勾选态表达开关 点击切换时不弹“已开启/已关闭”扩展提示 且仅书架内写入持久化设置
+41,book_info.xml,@+id/menu_split_long_chapter,@string/split_long_chapter,拆分超长章节,搜索/详情/目录,P2,done,codex,flutter test test/txt_parser_charset_override_test.dart test/search_book_info_refresh_helper_test.dart test/search_book_info_view_compile_test.dart test/simple_reader_view_compile_test.dart 通过; 手工路径: 书架打开本地TXT书籍详情->右上角更多->分割长章节开关切换->再次进入目录确认章节即时重算,将 menu_split_long_chapter 收敛为 legado 同义语义: 开关状态持久化后立即触发本地TXT重解析并回写章节缓存; TxtParser 新增 splitLongChapter 参数以控制长正文按长度拆分开关并在详情页/阅读页共用同一设置
+42,book_info.xml,@+id/menu_delete_alert,@string/delete_alert,删除提醒,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_delete_alert_action_test.dart test/search_book_info_view_allow_update_action_test.dart 通过; 手工路径(待回归): 书架打开书籍详情->右上角更多->删除提醒->再次打开更多菜单确认勾选状态变化->点击移出书架确认弹窗按开关生效,将详情页 menu_delete_alert 收敛为 legado checkable 语义: 标题固定“删除提醒” 仅以勾选态表达开关 点击切换不弹“已开启/已关闭删除提醒”扩展提示 并保持全局持久化设置
+43,book_info.xml,@+id/menu_clear_cache,@string/clear_cache,清理缓存,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_clear_cache_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->清理缓存->确认弹窗提示“成功清理缓存”并校验不再出现“当前书籍不在书架，无法清理缓存/暂无可清理的章节缓存/已清理缓存：x章”扩展提示；非书架详情同样执行清理并验证无“无法清理缓存”拦截提示,将 menu_clear_cache 收敛为 legado 同义语义：不依赖书架状态 点击即执行清理并统一提示“成功清理缓存”；补齐非书架场景的 ephemeral 书籍清理回归，并修复 Chapter.copyWith 无法显式置空 content 导致清理后内存缓存残留的问题
+44,book_info.xml,@+id/menu_log,@string/log,日志,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_log_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->日志->弹出日志对话框并可清空,将详情页 menu_log 从“异常日志”页面跳转收敛为 legado menu_log->AppLogDialog 同义弹层语义（标题“日志” 空态“暂无日志”）
+45,book_info_edit.xml,@+id/menu_save,@string/action_save,保存,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_edit_helper_test.dart test/search_book_info_view_edit_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->点击编辑->编辑页右上角保存并返回详情页,将 menu_save 保存语义收敛为 legado 同义: 保存按钮文案固定“保存” 保存后直接返回详情页且不追加“书籍信息已保存”扩展提示 字段按输入值落库（作者空白不回退旧值）并补齐保存失败可观测提示
+46,book_manga.xml,@+id/menu_change_source,@string/change_origin,换源,阅读与朗读,P3,pending,-,-,-
+47,book_manga.xml,@+id/menu_refresh,@string/refresh,刷新,阅读与朗读,P3,pending,-,-,-
+48,book_manga.xml,@+id/menu_catalog,@string/chapter_list,目录,阅读与朗读,P3,pending,-,-,-
+49,book_manga.xml,@+id/menu_pre_manga_number,@string/pre_download,预下载,阅读与朗读,P3,pending,-,-,-
+50,book_manga.xml,@+id/menu_disable_manga_scale,@string/disable_manga_scale,禁用漫画缩放,阅读与朗读,P3,pending,-,-,-
+51,book_manga.xml,@+id/menu_disable_click_scroll,@string/disable_manga_click_scroll,禁用点击翻页,阅读与朗读,P3,pending,-,-,-
+52,book_manga.xml,@+id/menu_enable_auto_page,@string/enable_auto_page_scroll,开启自动翻页,阅读与朗读,P3,pending,-,-,-
+53,book_manga.xml,@+id/menu_enable_auto_scroll,@string/enable_auto_scroll,开启滚动,阅读与朗读,P3,pending,-,-,-
+54,book_manga.xml,@+id/menu_manga_auto_page_speed,@string/manga_auto_page_speed,翻页速度 %s,阅读与朗读,P3,pending,-,-,-
+55,book_manga.xml,@+id/menu_enable_horizontal_scroll,@string/enable_manga_horizontal_scroll,水平滚动,阅读与朗读,P3,pending,-,-,-
+56,book_manga.xml,@+id/menu_disable_horizontal_page_snap,@string/disable_horizontal_page_snap,禁用水平翻页效果,阅读与朗读,P3,pending,-,-,-
+57,book_manga.xml,@+id/menu_disable_manga_page_anim,@string/disable_manga_page_anim,禁用翻页动画,阅读与朗读,P3,pending,-,-,-
+58,book_manga.xml,@+id/menu_manga_footer_config,@string/manga_footer_config,页脚配置,阅读与朗读,P3,pending,-,-,-
+59,book_manga.xml,@+id/menu_manga_color_filter,@string/manga_color_filter,滤镜,阅读与朗读,P3,pending,-,-,-
+60,book_manga.xml,@+id/menu_hide_manga_title,@string/hide_manga_title,隐藏漫画列表标题,阅读与朗读,P3,pending,-,-,-
+61,book_manga.xml,@+id/menu_epaper_manga,@string/manga_epaper,墨水屏,阅读与朗读,P3,pending,-,-,-
+62,book_manga.xml,@+id/menu_epaper_manga_setting,@string/manga_epaper_stting,墨水屏设置,阅读与朗读,P3,pending,-,-,-
+63,book_manga.xml,@+id/menu_gray_manga,@string/enable_manga_gray,开启图片灰色,阅读与朗读,P3,pending,-,-,-
+64,book_read.xml,@+id/menu_change_source,@string/change_origin,换源,阅读与朗读,P3,pending,-,-,-
+65,book_read.xml,@+id/menu_refresh,@string/refresh,刷新,阅读与朗读,P3,pending,-,-,-
+66,book_read.xml,@+id/menu_download,@string/offline_cache,离线缓存,阅读与朗读,P3,pending,-,-,-
+67,book_read.xml,@+id/menu_toc_regex,@string/txt_toc_rule,TXT 目录规则,阅读与朗读,P3,pending,-,-,-
+68,book_read.xml,@+id/menu_set_charset,@string/set_charset,设置编码,阅读与朗读,P3,pending,-,-,-
+69,book_read.xml,@+id/menu_add_bookmark,@string/bookmark_add,添加书签,阅读与朗读,P3,pending,-,-,-
+70,book_read.xml,@+id/menu_edit_content,@string/edit_content,编辑内容,阅读与朗读,P3,pending,-,-,-
+71,book_read.xml,@+id/menu_page_anim,@string/book_page_anim,翻页动画（本书）,阅读与朗读,P3,pending,-,-,-
+72,book_read.xml,@+id/menu_get_progress,@string/get_book_progress,拉取云端进度,阅读与朗读,P3,pending,-,-,-
+73,book_read.xml,@+id/menu_cover_progress,@string/cover_book_progress,覆盖云端进度,阅读与朗读,P3,pending,-,-,-
+74,book_read.xml,@+id/menu_reverse_content,@string/reverse_content,反转内容,阅读与朗读,P3,pending,-,-,-
+75,book_read.xml,@+id/menu_simulated_reading,@string/simulated_reading,模拟追读,阅读与朗读,P3,pending,-,-,-
+76,book_read.xml,@+id/menu_enable_replace,@string/replace_rule_title,替换净化,阅读与朗读,P3,pending,-,-,-
+77,book_read.xml,@+id/menu_same_title_removed,@string/same_title_removed,移除重复标题,阅读与朗读,P3,pending,-,-,-
+78,book_read.xml,@+id/menu_re_segment,@string/re_segment,重新分段,阅读与朗读,P3,pending,-,-,-
+79,book_read.xml,@+id/menu_enable_review,@string/review,段评,阅读与朗读,P3,pending,-,-,-
+80,book_read.xml,@+id/menu_del_ruby_tag,@string/del_ruby_tag,删除ruby标签,阅读与朗读,P3,pending,-,-,-
+81,book_read.xml,@+id/menu_del_h_tag,@string/del_h_tag,删除h标签,阅读与朗读,P3,pending,-,-,-
+82,book_read.xml,@+id/menu_image_style,@string/image_style,图片样式,阅读与朗读,P3,pending,-,-,-
+83,book_read.xml,@+id/menu_update_toc,@string/update_toc,更新目录,阅读与朗读,P3,pending,-,-,-
+84,book_read.xml,@+id/menu_effective_replaces,@string/effective_replaces,起效的替换,阅读与朗读,P3,pending,-,-,-
+85,book_read.xml,@+id/menu_log,@string/log,日志,阅读与朗读,P3,pending,-,-,-
+86,book_read.xml,@+id/menu_help,@string/help,帮助,阅读与朗读,P3,pending,-,-,-
+87,book_read_change_source.xml,@+id/menu_chapter_change_source,@string/chapter_change_source,单章换源,阅读与朗读,P3,pending,-,-,-
+88,book_read_change_source.xml,@+id/menu_book_change_source,@string/book_change_source,整书换源,阅读与朗读,P3,pending,-,-,-
+89,book_read_record.xml,@+id/menu_sort,@string/sort,排序,阅读与朗读,P3,pending,-,-,-
+90,book_read_record.xml,@+id/menu_sort_name,@string/sort_by_name,名称排序,阅读与朗读,P3,pending,-,-,-
+91,book_read_record.xml,@+id/menu_sort_read_long,@string/reading_time_sort,阅读时长排序,阅读与朗读,P3,pending,-,-,-
+92,book_read_record.xml,@+id/menu_sort_read_time,@string/last_read_time_sort,阅读时间排序,阅读与朗读,P3,pending,-,-,-
+93,book_read_record.xml,@+id/menu_enable_record,@string/enable_record,开启记录,阅读与朗读,P3,pending,-,-,-
+94,book_read_refresh.xml,@+id/menu_refresh_dur,@string/menu_refresh_dur,刷新当前章节,阅读与朗读,P3,pending,-,-,-
+95,book_read_refresh.xml,@+id/menu_refresh_after,@string/menu_refresh_after,刷新之后章节,阅读与朗读,P3,pending,-,-,-
+96,book_read_refresh.xml,@+id/menu_refresh_all,@string/menu_refresh_all,刷新全部章节,阅读与朗读,P3,pending,-,-,-
+97,book_read_source.xml,@+id/menu_login,@string/login,登录,阅读与朗读,P3,pending,-,-,-
+98,book_read_source.xml,@+id/menu_chapter_pay,@string/chapter_pay,购买,阅读与朗读,P3,pending,-,-,-
+99,book_read_source.xml,@+id/menu_edit_source,@string/edit_book_source,编辑书源,阅读与朗读,P3,pending,-,-,-
+100,book_read_source.xml,@+id/menu_disable_source,@string/disable_book_source,禁用书源,阅读与朗读,P3,pending,-,-,-
+101,book_remote.xml,@+id/menu_refresh,@string/refresh,刷新,搜索/详情/目录,P2,done,codex,flutter test test/remote_books_service_test.dart test/remote_books_placeholder_view_test.dart test/widget_test.dart 通过; 手工路径: 书架->更多->远程书籍->右上角刷新,将 menu_refresh 收敛为 legado 同义“重载当前目录”语义: 刷新时清空当前目录列表并重新发起 WebDav PROPFIND 拉取 保留路径与返回上级状态联动 且失败分支统一可观测输出“获取webDav书籍出错”
+102,book_remote.xml,@+id/menu_sort,@string/sort,排序,搜索/详情/目录,P2,done,codex,flutter test test/remote_books_placeholder_view_test.dart test/remote_books_service_test.dart test/widget_test.dart 通过; 手工路径: 书架->更多->远程书籍->右上角排序,将 menu_sort 收敛为 legado 同义“顶栏排序入口+子菜单弹层”语义 补齐 名称排序/更新时间排序 菜单承载 并将具体排序行为留待 seq103/seq104 逐项收敛
+103,book_remote.xml,@+id/menu_sort_name,@string/sort_by_name,名称排序,搜索/详情/目录,P2,done,codex,flutter test test/remote_books_placeholder_view_test.dart test/remote_books_service_test.dart test/widget_test.dart 通过; 手工路径: 书架->更多->远程书籍->右上角排序->名称排序（再次点击名称排序）,将 menu_sort_name 收敛为 legado 同义“首次名称升序 再次点击切换降序并重载当前目录”语义 目录保持优先且文件名比较对齐 AlphanumComparator
+104,book_remote.xml,@+id/menu_sort_time,@string/sort_by_lastUpdateTime,更新时间排序,搜索/详情/目录,P2,done,codex,flutter test test/remote_books_placeholder_view_test.dart test/remote_books_service_test.dart test/widget_test.dart 通过; 手工路径: 书架->更多->远程书籍->右上角排序->更新时间排序（再次点击更新时间排序）,将 menu_sort_time 收敛为 legado 同义“首次切换时间升序 再次点击切换降序并重载当前目录”语义 目录保持优先且时间比较对齐 RemoteBookViewModel 默认排序状态流
+105,book_remote.xml,@+id/menu_server_config,@string/server_config,服务器配置,搜索/详情/目录,P2,done,codex,flutter test test/remote_books_placeholder_view_test.dart 通过; flutter test test/widget_test.dart --plain-name \"Bookshelf remote action opens remote books page\" 通过; 手工路径: 书架->更多->远程书籍->右上角更多->服务器配置->返回远程书籍页,将 menu_server_config 收敛为 legado 同义“服务器配置入口 + 关闭后重载目录”语义: 新增远程页更多菜单中的“服务器配置”动作并进入 WebDav 服务器配置页 保存后回写设置；从配置页返回时触发当前目录重载 对齐 RemoteBookActivity onDialogDismiss->initData->upPath
+106,book_remote.xml,@+id/menu_help,@string/help,帮助,搜索/详情/目录,P2,done,codex,flutter test test/remote_books_placeholder_view_test.dart 通过; 手工路径: 书架->更多->远程书籍->右上角更多->帮助,将 menu_help 收敛为 legado 同义“更多菜单帮助入口 -> webDavBookHelp 文档弹层”语义 并接入同源资产 assets/web/help/md/webDavBookHelp.md 保留文档加载失败可观测提示
+107,book_remote.xml,@+id/menu_log,@string/log,日志,搜索/详情/目录,P2,done,codex,flutter test test/remote_books_placeholder_view_test.dart 通过; 手工路径: 书架->更多->远程书籍->右上角更多->日志,将 menu_log 收敛为 legado 同义“更多菜单日志入口 -> AppLogDialog 弹层”语义 并保持 清空/暂无日志 可见反馈
+108,book_search.xml,@+id/menu_precision_search,@string/precision_search,精准搜索,搜索/详情/目录,P2,done,codex,flutter test test/search_view_precision_search_action_test.dart test/search_view_compile_test.dart 通过; 手工路径: 书架->搜索->右上角设置->精准搜索->再次打开设置确认勾选态,将 menu_precision_search 收敛为 legado 同义 checkable 语义: 搜索设置中“精准搜索”改为勾选态展示 点击后切换精确过滤并触发当前关键字重搜 对齐 SearchActivity menu_precision_search->setQuery(... true)
+109,book_search.xml,@+id/menu_source_manage,@string/book_source_manage,书源管理,搜索/详情/目录,P2,done,codex,flutter test test/search_view_source_manage_action_test.dart test/search_view_compile_test.dart 通过; 手工路径: 书架->搜索->右上角设置->书源管理,将 menu_source_manage 收敛为 legado 同义“搜索设置中的书源管理入口 -> 书源管理页”语义 并补齐 Linux/测试环境下 QuickJS 动态库缺失时的惰性降级以避免入口崩溃
+110,book_search.xml,@+id/menu_search_scope,@string/groups_or_source,多分组/书源,搜索/详情/目录,P2,done,codex,flutter test test/search_view_precision_search_action_test.dart test/search_view_source_manage_action_test.dart test/search_view_search_scope_action_test.dart test/search_scope_picker_view_compile_test.dart 通过; 手工路径: 书架->搜索->右上角设置->多分组/书源,将 menu_search_scope 收敛为 legado 同义“设置菜单一级入口直达搜索范围页”语义: 入口文案由“搜索范围”收敛为“多分组/书源” 点击后直接进入 SearchScopePickerView（不再经过扩展 quick sheet）并保留范围变更后自动重搜边界行为
+111,book_search.xml,@+id/menu_log,@string/log,日志,搜索/详情/目录,P2,done,codex,flutter test test/search_view_log_action_test.dart test/search_view_precision_search_action_test.dart test/search_view_source_manage_action_test.dart test/search_view_search_scope_action_test.dart test/search_view_compile_test.dart 通过; 手工路径: 书架->搜索->右上角设置->日志->弹出日志对话框并可清空,将 menu_log 收敛为 legado 同义“搜索设置日志入口 -> AppLogDialog 弹层”语义 并保持 清空/暂无日志 可见反馈
+112,book_search_scope.xml,@+id/menu_screen,@string/screen,筛选,搜索/详情/目录,P2,done,codex,flutter test test/search_scope_picker_view_menu_screen_test.dart test/search_scope_picker_helper_test.dart test/search_scope_picker_view_compile_test.dart test/search_view_search_scope_action_test.dart 通过; 手工路径: 书架->搜索->右上角设置->多分组/书源->切换书源模式->顶栏筛选输入乙组,将 menu_screen 收敛为 legado 同义“仅书源模式展示顶栏筛选入口”语义: 筛选输入框移动到导航栏 trailing 且分组模式隐藏 保持书源名/分组/URL/备注四字段筛选与模式切换后筛选词持续生效
+113,book_source.xml,@+id/action_sort,@string/sort,排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序,将书源管理顶栏排序入口标题由“排序选项”收敛为 legado 同义“排序”并补齐 action_sort 弹层触发回归用例
+114,book_source.xml,@+id/menu_sort_desc,@string/sort_desc,反序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->反序->再次打开排序确认勾选态,将 menu_sort_desc 收敛为 legado 同义“固定反序文案 + checkable 勾选态”语义: 移除“切换为降序/升序”扩展文案 点击后仅切换排序方向与勾选态
+115,book_source.xml,@+id/menu_sort_manual,@string/sort_manual,手动排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->权重->再次顶栏排序->手动排序,将 menu_sort_manual 收敛为 legado 同义“手动排序单选勾选项”语义: 从其它排序切回手动排序后仅手动项保持勾选 并恢复默认排序模式
+116,book_source.xml,@+id/menu_sort_auto,@string/sort_auto,智能排序,书源管理与换源,P4,pending,-,-,-
+117,book_source.xml,@+id/menu_sort_name,@string/sort_by_name,名称排序,书源管理与换源,P4,pending,-,-,-
+118,book_source.xml,@+id/menu_sort_url,@string/sort_by_url,地址排序,书源管理与换源,P4,pending,-,-,-
+119,book_source.xml,@+id/menu_sort_time,@string/sort_by_lastUpdateTime,更新时间排序,书源管理与换源,P4,pending,-,-,-
+120,book_source.xml,@+id/menu_sort_respondTime,@string/sort_by_respondTime,响应时间排序,书源管理与换源,P4,pending,-,-,-
+121,book_source.xml,@+id/menu_sort_enable,@string/is_enabled,是否启用,书源管理与换源,P4,pending,-,-,-
+122,book_source.xml,@+id/menu_group,@string/menu_action_group,分组,书源管理与换源,P4,pending,-,-,-
+123,book_source.xml,@+id/menu_group_manage,@string/group_manage,分组管理,书源管理与换源,P4,pending,-,-,-
+124,book_source.xml,@+id/menu_enabled_group,@string/enabled,已启用,书源管理与换源,P4,pending,-,-,-
+125,book_source.xml,@+id/menu_disabled_group,@string/disabled,已禁用,书源管理与换源,P4,pending,-,-,-
+126,book_source.xml,@+id/menu_group_login,@string/need_login,需要登录,书源管理与换源,P4,pending,-,-,-
+127,book_source.xml,@+id/menu_group_null,@string/no_group,未分组,书源管理与换源,P4,pending,-,-,-
+128,book_source.xml,@+id/menu_enabled_explore_group,@string/enabled_explore,已启用发现,书源管理与换源,P4,pending,-,-,-
+129,book_source.xml,@+id/menu_disabled_explore_group,@string/disabled_explore,已禁用发现,书源管理与换源,P4,pending,-,-,-
+130,book_source.xml,@+id/menu_add_book_source,@string/add_book_source,新建书源,书源管理与换源,P4,pending,-,-,-
+131,book_source.xml,@+id/menu_import_local,@string/import_local,本地导入,书源管理与换源,P4,pending,-,-,-
+132,book_source.xml,@+id/menu_import_onLine,@string/import_on_line,网络导入,书源管理与换源,P4,pending,-,-,-
+133,book_source.xml,@+id/menu_import_qr,@string/import_by_qr_code,二维码导入,书源管理与换源,P4,pending,-,-,-
+134,book_source.xml,@+id/menu_group_sources_by_domain,@string/group_sources_by_domain,按域名分组显示,书源管理与换源,P4,pending,-,-,-
+135,book_source.xml,@+id/menu_help,@string/help,帮助,书源管理与换源,P4,pending,-,-,-
+136,book_source_debug.xml,@+id/menu_scan,@string/scan_qr_code,扫描二维码,书源管理与换源,P4,pending,-,-,-
+137,book_source_debug.xml,@+id/menu_search_src,@string/search_src,搜索源码,书源管理与换源,P4,pending,-,-,-
+138,book_source_debug.xml,@+id/menu_book_src,@string/boo_src,书籍源码,书源管理与换源,P4,pending,-,-,-
+139,book_source_debug.xml,@+id/menu_toc_src,@string/toc_src,目录源码,书源管理与换源,P4,pending,-,-,-
+140,book_source_debug.xml,@+id/menu_content_src,@string/content_src,正文源码,书源管理与换源,P4,pending,-,-,-
+141,book_source_debug.xml,@+id/menu_refresh_explore,@string/refresh_explore,刷新发现,书源管理与换源,P4,pending,-,-,-
+142,book_source_debug.xml,@+id/menu_help,@string/help,帮助,书源管理与换源,P4,pending,-,-,-
+143,book_source_item.xml,@+id/menu_top,@string/to_top,置顶,书源管理与换源,P4,pending,-,-,-
+144,book_source_item.xml,@+id/menu_bottom,@string/to_bottom,置底,书源管理与换源,P4,pending,-,-,-
+145,book_source_item.xml,@+id/menu_login,@string/login,登录,书源管理与换源,P4,pending,-,-,-
+146,book_source_item.xml,@+id/menu_search,@string/search,搜索,书源管理与换源,P4,pending,-,-,-
+147,book_source_item.xml,@+id/menu_debug_source,@string/debug,调试,书源管理与换源,P4,pending,-,-,-
+148,book_source_item.xml,@+id/menu_del,@string/delete,删除,书源管理与换源,P4,pending,-,-,-
+149,book_source_item.xml,@+id/menu_enable_explore,@string/enable_explore,启用发现,书源管理与换源,P4,pending,-,-,-
+150,book_source_sel.xml,@+id/menu_enable_selection,@string/enable_selection,启用所选,书源管理与换源,P4,pending,-,-,-
+151,book_source_sel.xml,@+id/menu_disable_selection,@string/disable_selection,禁用所选,书源管理与换源,P4,pending,-,-,-
+152,book_source_sel.xml,@+id/menu_add_group,@string/add_group,添加分组,书源管理与换源,P4,pending,-,-,-
+153,book_source_sel.xml,@+id/menu_remove_group,@string/remove_group,移除分组,书源管理与换源,P4,pending,-,-,-
+154,book_source_sel.xml,@+id/menu_enable_explore,@string/enable_explore,启用发现,书源管理与换源,P4,pending,-,-,-
+155,book_source_sel.xml,@+id/menu_disable_explore,@string/disable_explore,禁用发现,书源管理与换源,P4,pending,-,-,-
+156,book_source_sel.xml,@+id/menu_top_sel,@string/selection_to_top,置顶所选,书源管理与换源,P4,pending,-,-,-
+157,book_source_sel.xml,@+id/menu_bottom_sel,@string/selection_to_bottom,置底所选,书源管理与换源,P4,pending,-,-,-
+158,book_source_sel.xml,@+id/menu_export_selection,@string/export_selection,导出所选,书源管理与换源,P4,pending,-,-,-
+159,book_source_sel.xml,@+id/menu_share_source,@string/share_selected_source,分享选中源,书源管理与换源,P4,pending,-,-,-
+160,book_source_sel.xml,@+id/menu_check_source,@string/check_select_source,校验所选,书源管理与换源,P4,pending,-,-,-
+161,book_source_sel.xml,@+id/menu_check_selected_interval,@string/check_selected_interval,选中所选区间,书源管理与换源,P4,pending,-,-,-
+162,book_toc.xml,@+id/menu_search,@string/search,搜索,搜索/详情/目录,P2,pending,-,-,-
+163,book_toc.xml,@+id/menu_toc_regex,@string/txt_toc_rule,TXT 目录规则,搜索/详情/目录,P2,pending,-,-,-
+164,book_toc.xml,@+id/menu_split_long_chapter,@string/split_long_chapter,拆分超长章节,搜索/详情/目录,P2,pending,-,-,-
+165,book_toc.xml,@+id/menu_reverse_toc,@string/reverse_toc,反转目录,搜索/详情/目录,P2,pending,-,-,-
+166,book_toc.xml,@+id/menu_use_replace,@string/use_replace,使用替换,搜索/详情/目录,P2,pending,-,-,-
+167,book_toc.xml,@+id/menu_load_word_count,@string/load_word_count,加载字数,搜索/详情/目录,P2,pending,-,-,-
+168,book_toc.xml,@+id/menu_export_bookmark,@string/export,导出,搜索/详情/目录,P2,pending,-,-,-
+169,book_toc.xml,@+id/menu_export_md,@string/export_md,导出(MD),搜索/详情/目录,P2,pending,-,-,-
+170,book_toc.xml,@+id/menu_log,@string/log,日志,搜索/详情/目录,P2,pending,-,-,-
+171,bookmark.xml,@+id/menu_export,@string/export,导出,书架/缓存/分组,P6,pending,-,-,-
+172,bookmark.xml,@+id/menu_export_md,@string/export_md,导出(MD),书架/缓存/分组,P6,pending,-,-,-
+173,bookshelf_manage.xml,@+id/menu_book_group,@string/group,分组,书架/缓存/分组,P6,pending,-,-,-
+174,bookshelf_manage.xml,@+id/menu_group_manage,@string/group_manage,分组管理,书架/缓存/分组,P6,pending,-,-,-
+175,bookshelf_manage.xml,@+id/menu_export_all_use_book_source,@string/export_all_use_book_source,导出所有书的书源,书架/缓存/分组,P6,pending,-,-,-
+176,bookshelf_manage.xml,@+id/menu_open_book_info_by_click_title,@string/open_book_info_by_click_title,点击书名打开详情,书架/缓存/分组,P6,pending,-,-,-
+177,bookshelf_menage_sel.xml,@+id/menu_del_selection,@string/delete,删除,书架/缓存/分组,P6,pending,-,-,-
+178,bookshelf_menage_sel.xml,@+id/menu_update_enable,@string/allow_update,允许更新,书架/缓存/分组,P6,pending,-,-,-
+179,bookshelf_menage_sel.xml,@+id/menu_update_disable,@string/disable_update,禁止更新,书架/缓存/分组,P6,pending,-,-,-
+180,bookshelf_menage_sel.xml,@+id/menu_add_to_group,@string/add_to_group,加入分组,书架/缓存/分组,P6,pending,-,-,-
+181,bookshelf_menage_sel.xml,@+id/menu_change_source,@string/change_source_batch,批量换源,书架/缓存/分组,P6,pending,-,-,-
+182,bookshelf_menage_sel.xml,@+id/menu_clear_cache,@string/clear_cache,清理缓存,书架/缓存/分组,P6,pending,-,-,-
+183,bookshelf_menage_sel.xml,@+id/menu_check_selected_interval,@string/check_selected_interval,选中所选区间,书架/缓存/分组,P6,pending,-,-,-
+184,change_cover.xml,@+id/menu_start_stop,@string/stop,停止,系统与工具,P10,pending,-,-,-
+185,change_source.xml,@+id/menu_screen,@string/screen,筛选,书源管理与换源,P4,pending,-,-,-
+186,change_source.xml,@+id/menu_start_stop,@string/stop,停止,书源管理与换源,P4,pending,-,-,-
+187,change_source.xml,@+id/menu_source_manage,@string/book_source_manage,书源管理,书源管理与换源,P4,pending,-,-,-
+188,change_source.xml,@+id/menu_refresh_list,@string/refresh_list,刷新列表,书源管理与换源,P4,pending,-,-,-
+189,change_source.xml,@+id/menu_check_author,@string/checkAuthor,校验作者,书源管理与换源,P4,pending,-,-,-
+190,change_source.xml,@+id/menu_load_word_count,@string/load_word_count,加载字数,书源管理与换源,P4,pending,-,-,-
+191,change_source.xml,@+id/menu_load_info,@string/load_info,加载详情页,书源管理与换源,P4,pending,-,-,-
+192,change_source.xml,@+id/menu_load_toc,@string/load_toc,加载目录,书源管理与换源,P4,pending,-,-,-
+193,change_source.xml,@+id/menu_group,@string/group,分组,书源管理与换源,P4,pending,-,-,-
+194,change_source.xml,@+id/menu_close,@string/close,关闭,书源管理与换源,P4,pending,-,-,-
+195,change_source_item.xml,@+id/menu_top_source,@string/to_top,置顶,书源管理与换源,P4,pending,-,-,-
+196,change_source_item.xml,@+id/menu_bottom_source,@string/to_bottom,置底,书源管理与换源,P4,pending,-,-,-
+197,change_source_item.xml,@+id/menu_edit_source,@string/edit_source,编辑源,书源管理与换源,P4,pending,-,-,-
+198,change_source_item.xml,@+id/menu_disable_source,@string/disable_source,禁用源,书源管理与换源,P4,pending,-,-,-
+199,change_source_item.xml,@+id/menu_delete_source,@string/delete_source,删除源,书源管理与换源,P4,pending,-,-,-
+200,code_edit.xml,@+id/menu_save,@string/action_save,保存,系统与工具,P10,pending,-,-,-
+201,content_edit.xml,@+id/menu_save,@string/action_save,保存,阅读与朗读,P3,pending,-,-,-
+202,content_edit.xml,@+id/menu_reset,@string/reset,重置,阅读与朗读,P3,pending,-,-,-
+203,content_edit.xml,@+id/menu_copy_all,@string/copy_all,拷贝所有,阅读与朗读,P3,pending,-,-,-
+204,content_search.xml,@+id/menu_enable_replace,@string/replace,替换,阅读与朗读,P3,pending,-,-,-
+205,content_select_action.xml,@+id/menu_replace,@string/replace,替换,阅读与朗读,P3,pending,-,-,-
+206,content_select_action.xml,@+id/menu_copy,@android:string/copy,copy,阅读与朗读,P3,pending,-,-,-
+207,content_select_action.xml,@+id/menu_bookmark,@string/bookmark,书签,阅读与朗读,P3,pending,-,-,-
+208,content_select_action.xml,@+id/menu_aloud,@string/read_aloud,朗读,阅读与朗读,P3,pending,-,-,-
+209,content_select_action.xml,@+id/menu_dict,@string/dict,字典,阅读与朗读,P3,pending,-,-,-
+210,content_select_action.xml,@+id/menu_search_content,@string/search_content,全文搜索,阅读与朗读,P3,pending,-,-,-
+211,content_select_action.xml,@+id/menu_browser,@string/browser,浏览器,阅读与朗读,P3,pending,-,-,-
+212,content_select_action.xml,@+id/menu_share_str,@string/share,分享,阅读与朗读,P3,pending,-,-,-
+213,crash_log.xml,@+id/menu_clear,@string/clear,清除,系统与工具,P10,pending,-,-,-
+214,dialog_text.xml,@+id/menu_close,@string/close,关闭,系统与工具,P10,pending,-,-,-
+215,dict_rule.xml,@+id/menu_add,@string/create,新建,规则与净化,P5,pending,-,-,-
+216,dict_rule.xml,@+id/menu_import_local,@string/import_local,本地导入,规则与净化,P5,pending,-,-,-
+217,dict_rule.xml,@+id/menu_import_onLine,@string/import_on_line,网络导入,规则与净化,P5,pending,-,-,-
+218,dict_rule.xml,@+id/menu_import_qr,@string/import_by_qr_code,二维码导入,规则与净化,P5,pending,-,-,-
+219,dict_rule.xml,@+id/menu_import_default,@string/import_default_rule,导入默认规则,规则与净化,P5,pending,-,-,-
+220,dict_rule.xml,@+id/menu_help,@string/help,帮助,规则与净化,P5,pending,-,-,-
+221,dict_rule_edit.xml,@+id/menu_save,@string/action_save,保存,规则与净化,P5,pending,-,-,-
+222,dict_rule_edit.xml,@+id/menu_copy_rule,@string/copy_rule,拷贝规则,规则与净化,P5,pending,-,-,-
+223,dict_rule_edit.xml,@+id/menu_paste_rule,@string/paste_rule,粘贴规则,规则与净化,P5,pending,-,-,-
+224,dict_rule_sel.xml,@+id/menu_enable_selection,@string/enable_selection,启用所选,规则与净化,P5,pending,-,-,-
+225,dict_rule_sel.xml,@+id/menu_disable_selection,@string/disable_selection,禁用所选,规则与净化,P5,pending,-,-,-
+226,dict_rule_sel.xml,@+id/menu_export_selection,@string/export_selection,导出所选,规则与净化,P5,pending,-,-,-
+227,direct_link_upload_config.xml,@+id/menu_copy_rule,@string/copy_rule,拷贝规则,导入导出与备份,P8,pending,-,-,-
+228,direct_link_upload_config.xml,@+id/menu_paste_rule,@string/paste_rule,粘贴规则,导入导出与备份,P8,pending,-,-,-
+229,direct_link_upload_config.xml,@+id/menu_import_default,@string/import_default_rule,导入默认规则,导入导出与备份,P8,pending,-,-,-
+230,explore_item.xml,@+id/menu_edit,@string/edit,编辑,系统与工具,P10,pending,-,-,-
+231,explore_item.xml,@+id/menu_top,@string/to_top,置顶,系统与工具,P10,pending,-,-,-
+232,explore_item.xml,@+id/menu_login,@string/login,登录,系统与工具,P10,pending,-,-,-
+233,explore_item.xml,@+id/menu_search,@string/search,搜索,系统与工具,P10,pending,-,-,-
+234,explore_item.xml,@+id/menu_refresh,@string/refresh,刷新,系统与工具,P10,pending,-,-,-
+235,explore_item.xml,@+id/menu_del,@string/delete,删除,系统与工具,P10,pending,-,-,-
+236,file_chooser.xml,@+id/menu_create,@string/create_folder,创建文件夹,导入导出与备份,P8,pending,-,-,-
+237,file_long_click.xml,@+id/menu_del,@string/delete,删除,导入导出与备份,P8,pending,-,-,-
+238,font_select.xml,@+id/menu_default,@string/default_font,默认字体,阅读与朗读,P3,pending,-,-,-
+239,font_select.xml,@+id/menu_other,@string/other_folder,其它目录,阅读与朗读,P3,pending,-,-,-
+240,group_manage.xml,@+id/menu_add,@string/add_group,添加分组,书架/缓存/分组,P6,pending,-,-,-
+241,import_book.xml,@+id/menu_select_folder,@string/select_folder,选择文件夹,导入导出与备份,P8,pending,-,-,-
+242,import_book.xml,@+id/menu_sort,@string/sort,排序,导入导出与备份,P8,pending,-,-,-
+243,import_book.xml,@+id/menu_sort_name,@string/sort_by_name,名称排序,导入导出与备份,P8,pending,-,-,-
+244,import_book.xml,@+id/menu_sort_size,@string/sort_by_size,大小排序,导入导出与备份,P8,pending,-,-,-
+245,import_book.xml,@+id/menu_sort_time,@string/sort_by_time,时间排序,导入导出与备份,P8,pending,-,-,-
+246,import_book.xml,@+id/menu_scan_folder,@string/scan_folder,智能扫描,导入导出与备份,P8,pending,-,-,-
+247,import_book.xml,@+id/menu_import_file_name,@string/import_file_name,导入文件名,导入导出与备份,P8,pending,-,-,-
+248,import_book_sel.xml,@+id/menu_del_selection,@string/delete,删除,导入导出与备份,P8,pending,-,-,-
+249,import_replace.xml,@+id/menu_new_group,@string/diy_source_group,自定义源分组,导入导出与备份,P8,pending,-,-,-
+250,import_source.xml,@+id/menu_new_group,@string/diy_source_group,自定义源分组,导入导出与备份,P8,pending,-,-,-
+251,import_source.xml,@+id/menu_select_new_source,@string/select_new_source,选中新增源,导入导出与备份,P8,pending,-,-,-
+252,import_source.xml,@+id/menu_select_update_source,@string/select_update_source,选中更新源,导入导出与备份,P8,pending,-,-,-
+253,import_source.xml,@+id/menu_keep_original_name,@string/keep_original_name,保留原名,导入导出与备份,P8,pending,-,-,-
+254,import_source.xml,@+id/menu_keep_group,@string/keep_group,保留分组,导入导出与备份,P8,pending,-,-,-
+255,import_source.xml,@+id/menu_keep_enable,@string/keep_enable,保留启用状态,导入导出与备份,P8,pending,-,-,-
+256,keyboard_assists_config.xml,@+id/menu_add,@string/add,添加,阅读与朗读,P3,pending,-,-,-
+257,main_bnv.xml,@+id/menu_bookshelf,@string/bookshelf,书架,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->底栏书架标签->连续两次点击书架触发回顶,与 legado MainActivity 300ms 双击回顶语义同义
+258,main_bnv.xml,@+id/menu_discovery,@string/discovery,发现,主入口与导航,P1,done,codex,flutter test test/discovery_view_compile_test.dart test/widget_test.dart 通过; 手工路径: 启动应用->切到发现标签->连续两次点击发现触发收拢或回顶,与 legado MainActivity 300ms 双击压缩语义同义
+259,main_bnv.xml,@+id/menu_rss,@string/rss,订阅,主入口与导航,P1,done,codex,flutter test test/widget_test.dart test/discovery_view_compile_test.dart test/rss_subscription_view_compile_test.dart 通过; 手工路径: 启动应用->底栏订阅标签可见并可切换,文案与 legado 同义
+260,main_bnv.xml,@+id/menu_my_config,@string/my,我的,主入口与导航,P1,done,codex,flutter test test/widget_test.dart test/discovery_view_compile_test.dart test/rss_subscription_view_compile_test.dart 通过; 手工路径: 启动应用->底栏我的标签可见并可切换,与 legado 导航行为同义
+261,main_bookshelf.xml,@+id/menu_search,@string/search,搜索,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架顶栏搜索按钮->进入搜索页,与 legado menu_search 启动 SearchActivity 语义同义
+262,main_bookshelf.xml,@+id/menu_update_toc,@string/update_toc,更新目录,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->更新目录->空书架提示无可更新网络书籍,与 legado menu_update_toc 触发更新语义同义
+263,main_bookshelf.xml,@+id/menu_add_local,@string/book_local,添加本地,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->添加本地->触发本地导入链路 与 legado menu_add_local 语义同义,文案由“本机导入”收敛为“添加本地”
+264,main_bookshelf.xml,@+id/menu_remote,@string/add_remote_book,远程书籍,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->远程书籍->进入远程书籍页 与 legado menu_remote 导航语义同义,文案由“远程导入”收敛为“远程书籍”并移除仅提示占位
+265,main_bookshelf.xml,@+id/menu_add_url,@string/add_url,添加网址,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->添加网址->弹出添加书籍网址对话框->输入网址后触发添加链路 与 legado menu_add_url 语义同义,文案由“URL 导入”收敛为“添加网址”并接入可取消的添加中流程
+266,main_bookshelf.xml,@+id/menu_bookshelf_manage,@string/bookshelf_management,书架管理,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->书架管理->进入书架管理页 与 legado menu_bookshelf_manage 导航语义同义,由占位提示收敛为页面导航入口
+267,main_bookshelf.xml,@+id/menu_download,@string/cache_export,缓存/导出,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->缓存/导出->进入缓存导出页 与 legado menu_download 导航语义同义,文案由“缓存导出”收敛为“缓存/导出”并从占位提示改为页面导航入口
+268,main_bookshelf.xml,@+id/menu_group_manage,@string/group_manage,分组管理,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->分组管理->弹出分组管理对话框 与 legado menu_group_manage 弹窗入口语义同义,由占位提示收敛为弹窗承载入口并保持对话框层级触发
+269,main_bookshelf.xml,@+id/menu_bookshelf_layout,@string/bookshelf_layout,书架布局,主入口与导航,P1,done,codex,flutter test test/widget_test.dart test/app_settings_test.dart 通过; 手工路径: 启动应用->书架更多菜单->书架布局->弹出确认式配置弹窗->修改分组样式/开关/视图/排序后点确定生效,与 legado menu_bookshelf_layout 的配置入口语义同义
+270,main_bookshelf.xml,@+id/menu_export_bookshelf,@string/export_bookshelf,导出书单,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->导出书单->选择保存路径->导出成功弹窗可复制路径,文案由“导出书架”收敛为“导出书单”并补齐成功弹窗复制路径语义
+271,main_bookshelf.xml,@+id/menu_import_bookshelf,@string/import_bookshelf,导入书单,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->导入书单->导入书单弹窗可输入url/json或选择文件->确定后进入导入流程 与 legado menu_import_bookshelf 入口语义同义,文案由“导入书架”收敛为“导入书单”并补齐url/json输入+选择文件双入口; 支持http/https链接或JSON数组导入并沿用现有导入进度展示
+272,main_bookshelf.xml,@+id/menu_log,@string/log,日志,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->书架更多菜单->日志->弹出日志对话框并可清空,将书架日志入口从“异常日志页跳转”收敛为 legado 同义“日志弹层”语义并保持可清空与空态可见
+273,main_explore.xml,@+id/menu_group,@string/group,分组,主入口与导航,P1,done,codex,flutter test test/discovery_view_compile_test.dart test/widget_test.dart 通过; 手工路径: 启动应用->发现页右上角分组按钮->弹出分组菜单->选择分组后查询框写入 group:分组 并即时筛选,与 legado main_explore/menu_group 动态分组筛选语义同义
+274,main_my.xml,@+id/menu_help,@string/help,帮助,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->底栏我的->右上角帮助->弹出帮助文档对话框,补齐 legado appHelp.md 资产与“我的”页帮助入口; 点击后读取 appHelp 并以对话框展示帮助文档语义
+275,main_rss.xml,@+id/menu_rss_star,@string/favorite,收藏,主入口与导航,P1,done,codex,flutter test test/widget_test.dart 通过; 手工路径: 启动应用->底栏订阅->顶栏星标收藏->进入收藏页 与 legado menu_rss_star 跳转收藏页语义同义,补齐 RSS 顶栏收藏入口的定向回归用例并保持收藏页标题语义为“收藏”
+276,main_rss.xml,@+id/menu_group,@string/group,分组,主入口与导航,P1,done,codex,flutter test test/rss_subscription_view_group_menu_test.dart test/widget_test.dart 通过; 手工路径: 启动应用->底栏订阅->顶栏分组->弹出动态分组菜单->选择分组后筛选文案显示 group:分组 且仅按启用分组筛选,将订阅页分组入口从含“全部”的选项面板收敛为 legado 同义动态分组菜单并去除扩展项
+277,main_rss.xml,@+id/menu_rss_config,@string/setting,设置,主入口与导航,P1,done,codex,flutter test test/widget_test.dart --plain-name \"RSS settings action opens source manage page\" 通过; flutter test test/rss_subscription_view_group_menu_test.dart 通过,确认订阅页顶栏设置入口保持 legado menu_rss_config 一级触发语义并进入订阅源管理页
+278,open_url_confirm.xml,@+id/menu_disable_source,@string/disable_source,禁用源,导入导出与备份,P8,pending,-,-,-
+279,open_url_confirm.xml,@+id/menu_delete_source,@string/delete_source,删除源,导入导出与备份,P8,pending,-,-,-
+280,qr_code_scan.xml,@+id/action_choose_from_gallery,@string/gallery,图库,系统与工具,P10,pending,-,-,-
+281,replace_edit.xml,@+id/menu_save,@string/action_save,保存,规则与净化,P5,pending,-,-,-
+282,replace_edit.xml,@+id/menu_copy_rule,@string/copy_rule,拷贝规则,规则与净化,P5,pending,-,-,-
+283,replace_edit.xml,@+id/menu_paste_rule,@string/paste_rule,粘贴规则,规则与净化,P5,pending,-,-,-
+284,replace_rule.xml,@+id/menu_group,@string/menu_action_group,分组,规则与净化,P5,pending,-,-,-
+285,replace_rule.xml,@+id/menu_group_manage,@string/group_manage,分组管理,规则与净化,P5,pending,-,-,-
+286,replace_rule.xml,@+id/menu_group_null,@string/no_group,未分组,规则与净化,P5,pending,-,-,-
+287,replace_rule.xml,@+id/menu_add_replace_rule,@string/add_replace_rule,新建替换,规则与净化,P5,pending,-,-,-
+288,replace_rule.xml,@+id/menu_import_local,@string/import_local,本地导入,规则与净化,P5,pending,-,-,-
+289,replace_rule.xml,@+id/menu_import_onLine,@string/import_on_line,网络导入,规则与净化,P5,pending,-,-,-
+290,replace_rule.xml,@+id/menu_import_qr,@string/import_by_qr_code,二维码导入,规则与净化,P5,pending,-,-,-
+291,replace_rule.xml,@+id/menu_help,@string/help,帮助,规则与净化,P5,pending,-,-,-
+292,replace_rule_item.xml,@+id/menu_top,@string/to_top,置顶,规则与净化,P5,pending,-,-,-
+293,replace_rule_item.xml,@+id/menu_bottom,@string/to_bottom,置底,规则与净化,P5,pending,-,-,-
+294,replace_rule_item.xml,@+id/menu_del,@string/delete,删除,规则与净化,P5,pending,-,-,-
+295,replace_rule_sel.xml,@+id/menu_enable_selection,@string/enable_selection,启用所选,规则与净化,P5,pending,-,-,-
+296,replace_rule_sel.xml,@+id/menu_disable_selection,@string/disable_selection,禁用所选,规则与净化,P5,pending,-,-,-
+297,replace_rule_sel.xml,@+id/menu_top_sel,@string/selection_to_top,置顶所选,规则与净化,P5,pending,-,-,-
+298,replace_rule_sel.xml,@+id/menu_bottom_sel,@string/selection_to_bottom,置底所选,规则与净化,P5,pending,-,-,-
+299,replace_rule_sel.xml,@+id/menu_export_selection,@string/export_selection,导出所选,规则与净化,P5,pending,-,-,-
+300,rss_articles.xml,@+id/menu_login,@string/login,登录,RSS,P7,pending,-,-,-
+301,rss_articles.xml,@+id/menu_refresh_sort,@string/refresh_sort,刷新分类,RSS,P7,pending,-,-,-
+302,rss_articles.xml,@+id/menu_set_source_variable,@string/set_source_variable,设置源变量,RSS,P7,pending,-,-,-
+303,rss_articles.xml,@+id/menu_edit_source,@string/edit_source,编辑源,RSS,P7,pending,-,-,-
+304,rss_articles.xml,@+id/menu_switch_layout,@string/switchLayout,切换布局,RSS,P7,pending,-,-,-
+305,rss_articles.xml,@+id/menu_read_record,@string/read_record,阅读记录,RSS,P7,pending,-,-,-
+306,rss_articles.xml,@+id/menu_clear,@string/clear,清除,RSS,P7,pending,-,-,-
+307,rss_favorites.xml,@+id/menu_group,@string/group,分组,RSS,P7,pending,-,-,-
+308,rss_favorites.xml,@+id/menu_del_group,@string/delete_select_group,删除当前分组,RSS,P7,pending,-,-,-
+309,rss_favorites.xml,@+id/menu_del_all,@string/delete_all,删除所有,RSS,P7,pending,-,-,-
+310,rss_main_item.xml,@+id/menu_top,@string/to_top,置顶,RSS,P7,pending,-,-,-
+311,rss_main_item.xml,@+id/menu_edit,@string/edit,编辑,RSS,P7,pending,-,-,-
+312,rss_main_item.xml,@+id/menu_disable,@string/disable_source,禁用源,RSS,P7,pending,-,-,-
+313,rss_main_item.xml,@+id/menu_del,@string/delete,删除,RSS,P7,pending,-,-,-
+314,rss_read.xml,@+id/menu_rss_refresh,@string/refresh,刷新,RSS,P7,pending,-,-,-
+315,rss_read.xml,@+id/menu_rss_star,@string/favorite,收藏,RSS,P7,pending,-,-,-
+316,rss_read.xml,@+id/menu_share_it,@string/share,分享,RSS,P7,pending,-,-,-
+317,rss_read.xml,@+id/menu_aloud,@string/read_aloud,朗读,RSS,P7,pending,-,-,-
+318,rss_read.xml,@+id/menu_login,@string/login,登录,RSS,P7,pending,-,-,-
+319,rss_read.xml,@+id/menu_browser_open,@string/open_in_browser,浏览器打开,RSS,P7,pending,-,-,-
+320,rss_read_record.xml,@+id/menu_clear,@string/clear,清除,RSS,P7,pending,-,-,-
+321,rss_source.xml,@+id/menu_group,@string/menu_action_group,分组,RSS,P7,pending,-,-,-
+322,rss_source.xml,@+id/menu_group_manage,@string/group_manage,分组管理,RSS,P7,pending,-,-,-
+323,rss_source.xml,@+id/menu_enabled_group,@string/enabled,已启用,RSS,P7,pending,-,-,-
+324,rss_source.xml,@+id/menu_disabled_group,@string/disabled,已禁用,RSS,P7,pending,-,-,-
+325,rss_source.xml,@+id/menu_group_login,@string/need_login,需要登录,RSS,P7,pending,-,-,-
+326,rss_source.xml,@+id/menu_group_null,@string/no_group,未分组,RSS,P7,pending,-,-,-
+327,rss_source.xml,@+id/menu_add,@string/add_rss_source,新建订阅源,RSS,P7,pending,-,-,-
+328,rss_source.xml,@+id/menu_import_local,@string/import_local,本地导入,RSS,P7,pending,-,-,-
+329,rss_source.xml,@+id/menu_import_onLine,@string/import_on_line,网络导入,RSS,P7,pending,-,-,-
+330,rss_source.xml,@+id/menu_import_qr,@string/import_by_qr_code,二维码导入,RSS,P7,pending,-,-,-
+331,rss_source.xml,@+id/menu_import_default,@string/import_default_rule,导入默认规则,RSS,P7,pending,-,-,-
+332,rss_source.xml,@+id/menu_help,@string/help,帮助,RSS,P7,pending,-,-,-
+333,rss_source_debug.xml,@+id/menu_list_src,@string/list_src,列表源码,RSS,P7,pending,-,-,-
+334,rss_source_debug.xml,@+id/menu_content_src,@string/content_src,正文源码,RSS,P7,pending,-,-,-
+335,rss_source_item.xml,@+id/menu_top,@string/to_top,置顶,RSS,P7,pending,-,-,-
+336,rss_source_item.xml,@+id/menu_bottom,@string/to_bottom,置底,RSS,P7,pending,-,-,-
+337,rss_source_item.xml,@+id/menu_del,@string/delete,删除,RSS,P7,pending,-,-,-
+338,rss_source_sel.xml,@+id/menu_enable_selection,@string/enable_selection,启用所选,RSS,P7,pending,-,-,-
+339,rss_source_sel.xml,@+id/menu_disable_selection,@string/disable_selection,禁用所选,RSS,P7,pending,-,-,-
+340,rss_source_sel.xml,@+id/menu_add_group,@string/add_group,添加分组,RSS,P7,pending,-,-,-
+341,rss_source_sel.xml,@+id/menu_remove_group,@string/remove_group,移除分组,RSS,P7,pending,-,-,-
+342,rss_source_sel.xml,@+id/menu_top_sel,@string/selection_to_top,置顶所选,RSS,P7,pending,-,-,-
+343,rss_source_sel.xml,@+id/menu_bottom_sel,@string/selection_to_bottom,置底所选,RSS,P7,pending,-,-,-
+344,rss_source_sel.xml,@+id/menu_export_selection,@string/export_selection,导出所选,RSS,P7,pending,-,-,-
+345,rss_source_sel.xml,@+id/menu_share_source,@string/share_selected_source,分享选中源,RSS,P7,pending,-,-,-
+346,rss_source_sel.xml,@+id/menu_check_selected_interval,@string/check_selected_interval,选中所选区间,RSS,P7,pending,-,-,-
+347,save.xml,@+id/menu_save,@string/action_save,保存,导入导出与备份,P8,pending,-,-,-
+348,search_view.xml,@+id/menu_search,@string/search,搜索,搜索/详情/目录,P2,pending,-,-,-
+349,server_config.xml,@+id/menu_save,@string/action_save,保存,导入导出与备份,P8,pending,-,-,-
+350,servers.xml,@+id/menu_add,@string/create,新建,导入导出与备份,P8,pending,-,-,-
+351,source_edit.xml,@+id/menu_save,@string/action_save,保存,书源管理与换源,P4,pending,-,-,-
+352,source_edit.xml,@+id/menu_debug_source,@string/debug_source,调试源,书源管理与换源,P4,pending,-,-,-
+353,source_edit.xml,@+id/menu_login,@string/login,登录,书源管理与换源,P4,pending,-,-,-
+354,source_edit.xml,@+id/menu_search,@string/search,搜索,书源管理与换源,P4,pending,-,-,-
+355,source_edit.xml,@+id/menu_clear_cookie,@string/cookie,清除 Cookie,书源管理与换源,P4,pending,-,-,-
+356,source_edit.xml,@+id/menu_auto_complete,@string/auto_complete,自动补全,书源管理与换源,P4,pending,-,-,-
+357,source_edit.xml,@+id/menu_copy_source,@string/copy_source,拷贝源,书源管理与换源,P4,pending,-,-,-
+358,source_edit.xml,@+id/menu_paste_source,@string/paste_source,粘贴源,书源管理与换源,P4,pending,-,-,-
+359,source_edit.xml,@+id/menu_set_source_variable,@string/set_source_variable,设置源变量,书源管理与换源,P4,pending,-,-,-
+360,source_edit.xml,@+id/menu_qr_code_camera,@string/import_by_qr_code,二维码导入,书源管理与换源,P4,pending,-,-,-
+361,source_edit.xml,@+id/menu_share_qr,@string/qr_share,二维码分享,书源管理与换源,P4,pending,-,-,-
+362,source_edit.xml,@+id/menu_share_str,@string/str_share,字符串分享,书源管理与换源,P4,pending,-,-,-
+363,source_edit.xml,@+id/menu_help,@string/help,帮助,书源管理与换源,P4,pending,-,-,-
+364,source_login.xml,@+id/menu_ok,@string/ok,确认,书源管理与换源,P4,pending,-,-,-
+365,source_login.xml,@+id/menu_show_login_header,@string/show_login_header,查看登录头,书源管理与换源,P4,pending,-,-,-
+366,source_login.xml,@+id/menu_del_login_header,@string/del_login_header,删除登录头,书源管理与换源,P4,pending,-,-,-
+367,source_login.xml,@+id/menu_log,@string/log,日志,书源管理与换源,P4,pending,-,-,-
+368,source_picker.xml,@+id/menu_change_source_delay,@string/change_source_delay,换源间隔,书源管理与换源,P4,pending,-,-,-
+369,source_sub_item.xml,@+id/menu_del,@string/delete,删除,书源管理与换源,P4,pending,-,-,-
+370,source_subscription.xml,@+id/menu_add,@string/add,添加,书源管理与换源,P4,pending,-,-,-
+371,source_webview_login.xml,@+id/menu_ok,@string/ok,确认,书源管理与换源,P4,pending,-,-,-
+372,speak_engine.xml,@+id/menu_add,@string/add,添加,阅读与朗读,P3,pending,-,-,-
+373,speak_engine.xml,@+id/menu_default,@string/import_default_rule,导入默认规则,阅读与朗读,P3,pending,-,-,-
+374,speak_engine.xml,@+id/menu_import_local,@string/import_local,本地导入,阅读与朗读,P3,pending,-,-,-
+375,speak_engine.xml,@+id/menu_import_onLine,@string/import_on_line,网络导入,阅读与朗读,P3,pending,-,-,-
+376,speak_engine.xml,@+id/menu_export,@string/export,导出,阅读与朗读,P3,pending,-,-,-
+377,speak_engine_edit.xml,@+id/menu_save,@string/action_save,保存,阅读与朗读,P3,pending,-,-,-
+378,speak_engine_edit.xml,@+id/menu_login,@string/login,登录,阅读与朗读,P3,pending,-,-,-
+379,speak_engine_edit.xml,@+id/menu_show_login_header,@string/show_login_header,查看登录头,阅读与朗读,P3,pending,-,-,-
+380,speak_engine_edit.xml,@+id/menu_del_login_header,@string/del_login_header,删除登录头,阅读与朗读,P3,pending,-,-,-
+381,speak_engine_edit.xml,@+id/menu_copy_source,@string/copy_source,拷贝源,阅读与朗读,P3,pending,-,-,-
+382,speak_engine_edit.xml,@+id/menu_paste_source,@string/paste_source,粘贴源,阅读与朗读,P3,pending,-,-,-
+383,speak_engine_edit.xml,@+id/menu_log,@string/log,日志,阅读与朗读,P3,pending,-,-,-
+384,speak_engine_edit.xml,@+id/menu_help,@string/help,帮助,阅读与朗读,P3,pending,-,-,-
+385,theme_config.xml,@+id/menu_theme_mode,@string/theme_mode,主题模式,主题与外观,P9,pending,-,-,-
+386,theme_list.xml,@+id/menu_import,剪贴板导入,剪贴板导入,主题与外观,P9,pending,-,-,-
+387,txt_toc_rule.xml,@+id/menu_add,@string/add,添加,规则与净化,P5,pending,-,-,-
+388,txt_toc_rule.xml,@+id/menu_import_local,@string/import_local,本地导入,规则与净化,P5,pending,-,-,-
+389,txt_toc_rule.xml,@+id/menu_import_onLine,@string/import_on_line,网络导入,规则与净化,P5,pending,-,-,-
+390,txt_toc_rule.xml,@+id/menu_import_qr,@string/import_by_qr_code,二维码导入,规则与净化,P5,pending,-,-,-
+391,txt_toc_rule.xml,@+id/menu_import_default,@string/import_default_rule,导入默认规则,规则与净化,P5,pending,-,-,-
+392,txt_toc_rule.xml,@+id/menu_help,@string/help,帮助,规则与净化,P5,pending,-,-,-
+393,txt_toc_rule_edit.xml,@+id/menu_save,@string/action_save,保存,规则与净化,P5,pending,-,-,-
+394,txt_toc_rule_edit.xml,@+id/menu_copy_rule,@string/copy_rule,拷贝规则,规则与净化,P5,pending,-,-,-
+395,txt_toc_rule_edit.xml,@+id/menu_paste_rule,@string/paste_rule,粘贴规则,规则与净化,P5,pending,-,-,-
+396,txt_toc_rule_item.xml,@+id/menu_top,@string/to_top,置顶,规则与净化,P5,pending,-,-,-
+397,txt_toc_rule_item.xml,@+id/menu_bottom,@string/to_bottom,置底,规则与净化,P5,pending,-,-,-
+398,txt_toc_rule_item.xml,@+id/menu_del,@string/delete,删除,规则与净化,P5,pending,-,-,-
+399,txt_toc_rule_sel.xml,@+id/menu_enable_selection,@string/enable_selection,启用所选,规则与净化,P5,pending,-,-,-
+400,txt_toc_rule_sel.xml,@+id/menu_disable_selection,@string/disable_selection,禁用所选,规则与净化,P5,pending,-,-,-
+401,txt_toc_rule_sel.xml,@+id/menu_export_selection,@string/export_selection,导出所选,规则与净化,P5,pending,-,-,-
+402,verification_code.xml,@+id/menu_ok,@string/ok,确认,系统与工具,P10,pending,-,-,-
+403,verification_code.xml,@+id/menu_disable_source,@string/disable_source,禁用源,系统与工具,P10,pending,-,-,-
+404,verification_code.xml,@+id/menu_delete_source,@string/delete_source,删除源,系统与工具,P10,pending,-,-,-
+405,web_view.xml,@+id/menu_ok,@string/ok,确认,系统与工具,P10,pending,-,-,-
+406,web_view.xml,@+id/menu_open_in_browser,@string/open_in_browser,浏览器打开,系统与工具,P10,pending,-,-,-
+407,web_view.xml,@+id/menu_copy_url,@string/copy_url,拷贝 URL,系统与工具,P10,pending,-,-,-
+408,web_view.xml,@+id/menu_full_screen,@string/full_screen,全屏,系统与工具,P10,pending,-,-,-
+409,web_view.xml,@+id/menu_disable_source,@string/disable_source,禁用源,系统与工具,P10,pending,-,-,-
+410,web_view.xml,@+id/menu_delete_source,@string/delete_source,删除源,系统与工具,P10,pending,-,-,-

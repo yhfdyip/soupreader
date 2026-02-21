@@ -16,8 +16,10 @@ class DiscoveryFilterHelper {
       final key = raw.substring(6).trim();
       if (key.isEmpty) return input;
       return input
-          .where(
-              (source) => extractGroups(source.bookSourceGroup).contains(key))
+          .where((source) => _matchesLegacyGroupFilter(
+                source.bookSourceGroup,
+                key,
+              ))
           .toList(growable: false);
     }
 
@@ -38,6 +40,18 @@ class DiscoveryFilterHelper {
         .where((item) => item.isNotEmpty)
         .toSet()
         .toList(growable: false);
+  }
+
+  /// 对齐 legado `flowGroupExplore` SQL：
+  /// `bookSourceGroup = key` / `key,%` / `%,key` / `%,key,%`
+  /// 仅逗号作为分隔符。
+  static bool _matchesLegacyGroupFilter(String? rawGroup, String key) {
+    final group = rawGroup?.trim();
+    if (group == null || group.isEmpty) return false;
+    if (group == key) return true;
+    if (group.startsWith('$key,')) return true;
+    if (group.endsWith(',$key')) return true;
+    return group.contains(',$key,');
   }
 
   /// 对齐 legado ExploreFragment:

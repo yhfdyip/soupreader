@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import 'developer_tools_view.dart';
@@ -21,13 +22,6 @@ class OtherSettingsView extends StatefulWidget {
 class _OtherSettingsViewState extends State<OtherSettingsView> {
   final SettingsService _settingsService = SettingsService();
   late AppSettings _appSettings;
-
-  Color _accent(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    return isDark
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
-  }
 
   @override
   void initState() {
@@ -48,91 +42,61 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   }
 
   Future<void> _pickBookshelfViewMode() async {
-    await showCupertinoModalPopup<void>(
+    final selected = await showOptionPickerSheet<BookshelfViewMode>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('书架显示方式'),
-        actions: [
-          _modeAction(ctx, BookshelfViewMode.grid, '网格'),
-          _modeAction(ctx, BookshelfViewMode.list, '列表'),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
+      title: '书架显示方式',
+      currentValue: _appSettings.bookshelfViewMode,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: const [
+        OptionPickerItem<BookshelfViewMode>(
+          value: BookshelfViewMode.grid,
+          label: '网格',
         ),
-      ),
+        OptionPickerItem<BookshelfViewMode>(
+          value: BookshelfViewMode.list,
+          label: '列表',
+        ),
+      ],
     );
-  }
-
-  CupertinoActionSheetAction _modeAction(
-    BuildContext ctx,
-    BookshelfViewMode mode,
-    String label,
-  ) {
-    final selected = _appSettings.bookshelfViewMode == mode;
-    return CupertinoActionSheetAction(
-      onPressed: () async {
-        await _settingsService.saveAppSettings(
-          _appSettings.copyWith(bookshelfViewMode: mode),
-        );
-        if (ctx.mounted) Navigator.pop(ctx);
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label),
-          if (selected) ...[
-            const SizedBox(width: 8),
-            Icon(CupertinoIcons.checkmark, size: 18, color: _accent(context)),
-          ],
-        ],
+    if (selected == null) return;
+    await _settingsService.saveAppSettings(
+      _appSettings.copyWith(
+        bookshelfViewMode: selected,
+        bookshelfLayoutIndex: bookshelfLayoutIndexFromViewMode(selected),
       ),
     );
   }
 
   Future<void> _pickBookshelfSortMode() async {
-    await showCupertinoModalPopup<void>(
+    final selected = await showOptionPickerSheet<BookshelfSortMode>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('新书默认排序'),
-        actions: [
-          _sortAction(ctx, BookshelfSortMode.recentRead, '最近阅读'),
-          _sortAction(ctx, BookshelfSortMode.recentAdded, '最近加入'),
-          _sortAction(ctx, BookshelfSortMode.title, '书名'),
-          _sortAction(ctx, BookshelfSortMode.author, '作者'),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
+      title: '新书默认排序',
+      currentValue: _appSettings.bookshelfSortMode,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: const [
+        OptionPickerItem<BookshelfSortMode>(
+          value: BookshelfSortMode.recentRead,
+          label: '最近阅读',
         ),
-      ),
+        OptionPickerItem<BookshelfSortMode>(
+          value: BookshelfSortMode.recentAdded,
+          label: '最近加入',
+        ),
+        OptionPickerItem<BookshelfSortMode>(
+          value: BookshelfSortMode.title,
+          label: '书名',
+        ),
+        OptionPickerItem<BookshelfSortMode>(
+          value: BookshelfSortMode.author,
+          label: '作者',
+        ),
+      ],
     );
-  }
-
-  CupertinoActionSheetAction _sortAction(
-    BuildContext ctx,
-    BookshelfSortMode mode,
-    String label,
-  ) {
-    final selected = _appSettings.bookshelfSortMode == mode;
-    return CupertinoActionSheetAction(
-      onPressed: () async {
-        await _settingsService.saveAppSettings(
-          _appSettings.copyWith(bookshelfSortMode: mode),
-        );
-        if (ctx.mounted) Navigator.pop(ctx);
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label),
-          if (selected) ...[
-            const SizedBox(width: 8),
-            Icon(CupertinoIcons.checkmark, size: 18, color: _accent(context)),
-          ],
-        ],
+    if (selected == null) return;
+    await _settingsService.saveAppSettings(
+      _appSettings.copyWith(
+        bookshelfSortMode: selected,
+        bookshelfSortIndex: bookshelfLegacySortIndexFromMode(selected),
       ),
     );
   }

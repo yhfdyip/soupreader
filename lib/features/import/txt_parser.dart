@@ -80,6 +80,7 @@ class TxtParser {
     required String bookId,
     required String bookName,
     String? forcedCharset,
+    bool splitLongChapter = true,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) {
@@ -93,6 +94,7 @@ class TxtParser {
       filePath,
       charset: decoded.charset,
       forcedBookId: bookId,
+      splitLongChapter: splitLongChapter,
     );
   }
 
@@ -292,12 +294,16 @@ class TxtParser {
     String? filePath, {
     required String charset,
     String? forcedBookId,
+    bool splitLongChapter = true,
   }) {
     // 清理内容 - 统一换行符
     content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
     // 识别章节
-    final chapters = _splitChapters(content);
+    final chapters = _splitChapters(
+      content,
+      splitLongChapter: splitLongChapter,
+    );
 
     // 创建书籍
     final bookId = forcedBookId ?? _uuid.v4();
@@ -596,7 +602,10 @@ class TxtParser {
   }
 
   /// 分割章节
-  static List<_ChapterInfo> _splitChapters(String content) {
+  static List<_ChapterInfo> _splitChapters(
+    String content, {
+    bool splitLongChapter = true,
+  }) {
     // 尝试所有模式，找出匹配最多的
     RegExp? bestPattern;
     int maxMatches = 0;
@@ -620,6 +629,9 @@ class TxtParser {
 
     // 如果没有找到足够的章节（至少2章），按固定字数分章
     if (bestPattern == null || maxMatches < 2) {
+      if (!splitLongChapter) {
+        return _singleChapterFallback(content);
+      }
       return _splitByLength(content);
     }
 
@@ -651,7 +663,22 @@ class TxtParser {
       }
     }
 
-    return chapters.isEmpty ? _splitByLength(content) : chapters;
+    if (chapters.isEmpty) {
+      if (!splitLongChapter) {
+        return _singleChapterFallback(content);
+      }
+      return _splitByLength(content);
+    }
+    return chapters;
+  }
+
+  static List<_ChapterInfo> _singleChapterFallback(String content) {
+    return [
+      _ChapterInfo(
+        title: '正文',
+        content: content.trim(),
+      ),
+    ];
   }
 
   /// 按固定长度分章（备选方案）

@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/services/reader_tip_selection_helper.dart';
@@ -19,13 +20,6 @@ class ReadingTipSettingsView extends StatefulWidget {
 class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
-
-  Color _accent(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    return isDark
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
-  }
 
   @override
   void initState() {
@@ -235,37 +229,22 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
     required int current,
     required ValueChanged<int> onSelected,
   }) async {
-    await showCupertinoModalPopup<void>(
+    final selected = await showOptionPickerSheet<int>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(title),
-        actions: options.map((opt) {
-          final selected = opt.value == current;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onSelected(opt.value);
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(opt.label),
-                if (selected) ...[
-                  const SizedBox(width: 8),
-                  Icon(CupertinoIcons.checkmark,
-                      size: 18, color: _accent(context)),
-                ],
-              ],
+      title: title,
+      currentValue: current,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: options
+          .map(
+            (opt) => OptionPickerItem<int>(
+              value: opt.value,
+              label: opt.label,
             ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
+          )
+          .toList(growable: false),
     );
+    if (selected == null) return;
+    onSelected(selected);
   }
 
   Future<void> _pickTitleMode() async {

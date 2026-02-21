@@ -16,12 +16,12 @@ void main() {
       expect(value, '{"token":"abc"}');
     });
 
-    test('put empty variable equals remove', () async {
+    test('put empty variable keeps empty string', () async {
       await SourceVariableStore.putVariable(sourceKey, '{"a":1}');
       expect(await SourceVariableStore.getVariable(sourceKey), isNotNull);
 
       await SourceVariableStore.putVariable(sourceKey, '   ');
-      expect(await SourceVariableStore.getVariable(sourceKey), isNull);
+      expect(await SourceVariableStore.getVariable(sourceKey), '   ');
     });
 
     test('remove variable', () async {

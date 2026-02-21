@@ -41,9 +41,6 @@ class SearchBookInfoEditHelper {
     required SearchBookInfoEditDraft draft,
   }) {
     final normalized = draft.normalized();
-    final nextName = normalized.name.isEmpty ? original.title : normalized.name;
-    final nextAuthor =
-        normalized.author.isEmpty ? original.author : normalized.author;
     final nextCoverUrl =
         normalized.coverUrl.isEmpty ? null : normalized.coverUrl;
     final nextIntro = normalized.intro.isEmpty ? null : normalized.intro;
@@ -51,8 +48,8 @@ class SearchBookInfoEditHelper {
     // `Book.copyWith` 无法把 nullable 字段显式清空，因此这里按字段重建对象。
     return Book(
       id: original.id,
-      title: nextName,
-      author: nextAuthor,
+      title: normalized.name,
+      author: normalized.author,
       coverUrl: nextCoverUrl,
       intro: nextIntro,
       sourceId: original.sourceId,

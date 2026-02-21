@@ -26,15 +26,12 @@ class BooklistItem {
   }
 
   Map<String, dynamic> toJson() {
-    final json = <String, dynamic>{
+    return <String, dynamic>{
       // 对标 Legado 的书单导出字段
       'name': name,
       'author': author,
+      'intro': intro,
     };
-    if (intro != null) {
-      json['intro'] = intro;
-    }
-    return json;
   }
 }
 
@@ -122,9 +119,12 @@ class BookshelfImportParseResult {
 
 /// 书单导入导出（对标 Legado: `[{name, author, intro}]`）
 class BookshelfImportExportService {
+  static const int _maxImportDepth = 3;
+
   String exportToJson(List<Book> books) {
     final payload = books
-        .map((b) => BooklistItem(name: b.title, author: b.author, intro: b.intro))
+        .map((b) =>
+            BooklistItem(name: b.title, author: b.author, intro: b.intro))
         .map((item) => item.toJson())
         .toList(growable: false);
     return const JsonEncoder.withIndent('  ').convert(payload);
@@ -150,10 +150,10 @@ class BookshelfImportExportService {
         return BookshelfExportResult.cancelled();
       }
 
-      await File(outputPath).writeAsString(jsonString);
+      await File(outputPath).writeAsString(jsonString, encoding: utf8);
       return BookshelfExportResult.success(hint: outputPath);
     } catch (e) {
-      return BookshelfExportResult.error('导出失败: $e');
+      return BookshelfExportResult.error('导出书籍出错\n$e');
     }
   }
 
@@ -179,41 +179,105 @@ class BookshelfImportExportService {
         return BookshelfImportParseResult.error('无法读取文件内容');
       }
 
-      return importFromJson(content);
+      return importFromInput(content);
     } catch (e) {
       return BookshelfImportParseResult.error('导入失败: $e');
     }
+  }
+
+  Future<BookshelfImportParseResult> importFromInput(String rawInput) async {
+    return _importFromInput(rawInput, depth: 0);
+  }
+
+  Future<BookshelfImportParseResult> importFromUrl(String url) async {
+    return _importFromInput(url, depth: 0);
+  }
+
+  Future<BookshelfImportParseResult> _importFromInput(
+    String rawInput, {
+    required int depth,
+  }) async {
+    final text = rawInput.trim();
+    if (text.isEmpty) {
+      return BookshelfImportParseResult.error('格式不对');
+    }
+
+    if (_isAbsUrl(text)) {
+      if (depth >= _maxImportDepth) {
+        return BookshelfImportParseResult.error('导入链接重定向层级过深');
+      }
+      return _importFromUrlInternal(text, depth: depth + 1);
+    }
+
+    if (!_isJsonArray(text)) {
+      return BookshelfImportParseResult.error('格式不对');
+    }
+
+    return importFromJson(text);
+  }
+
+  Future<BookshelfImportParseResult> _importFromUrlInternal(
+    String url, {
+    required int depth,
+  }) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !_isHttpUri(uri)) {
+      return BookshelfImportParseResult.error('格式不对');
+    }
+
+    final httpClient = HttpClient();
+    try {
+      final request = await httpClient.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return BookshelfImportParseResult.error(
+            'HTTP 请求失败: ${response.statusCode}');
+      }
+      final content = await response.transform(utf8.decoder).join();
+      return _importFromInput(content, depth: depth);
+    } catch (e) {
+      return BookshelfImportParseResult.error('网络请求失败: $e');
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
+  bool _isAbsUrl(String text) {
+    final lower = text.toLowerCase();
+    return lower.startsWith('http://') || lower.startsWith('https://');
+  }
+
+  bool _isHttpUri(Uri uri) {
+    final scheme = uri.scheme.toLowerCase();
+    return scheme == 'http' || scheme == 'https';
+  }
+
+  bool _isJsonArray(String text) {
+    final trimmed = text.trim();
+    return trimmed.startsWith('[') && trimmed.endsWith(']');
   }
 
   BookshelfImportParseResult importFromJson(String jsonString) {
     try {
       final text = jsonString.trim();
       if (text.isEmpty) {
-        return BookshelfImportParseResult.error('内容为空');
+        return BookshelfImportParseResult.error('格式不对');
       }
 
       final dynamic data = json.decode(text);
+      if (data is! List) {
+        return BookshelfImportParseResult.error('格式不对');
+      }
+
       final items = <BooklistItem>[];
 
-      if (data is List) {
-        for (final item in data) {
-          if (item is Map) {
-            final map = item.map((k, v) => MapEntry(k.toString(), v));
-            final parsed = BooklistItem.fromJson(map);
-            if (parsed.name.isNotEmpty) {
-              items.add(parsed);
-            }
-          }
-        }
-      } else if (data is Map) {
-        // 容错：有人把单本书当成对象导出
-        final map = data.map((k, v) => MapEntry(k.toString(), v));
+      for (final item in data) {
+        if (item is! Map) continue;
+        final map = item.map((k, v) => MapEntry(k.toString(), v));
         final parsed = BooklistItem.fromJson(map);
         if (parsed.name.isNotEmpty) {
           items.add(parsed);
         }
-      } else {
-        return BookshelfImportParseResult.error('JSON 格式不支持');
       }
 
       if (items.isEmpty) {
