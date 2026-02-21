@@ -42,6 +42,7 @@ class ReaderCatalogSheet extends StatefulWidget {
   final ValueChanged<bool>? onUseReplaceChanged;
   final ValueChanged<bool>? onLoadWordCountChanged;
   final ValueChanged<bool>? onSplitLongChapterChanged;
+  final Future<void> Function(bool splitLongChapter)? onApplySplitLongChapter;
   final Future<void> Function()? onOpenLogs;
   final Future<void> Function()? onExportBookmark;
   final Future<void> Function()? onExportBookmarkMarkdown;
@@ -70,6 +71,7 @@ class ReaderCatalogSheet extends StatefulWidget {
     this.onUseReplaceChanged,
     this.onLoadWordCountChanged,
     this.onSplitLongChapterChanged,
+    this.onApplySplitLongChapter,
     this.onOpenLogs,
     this.onExportBookmark,
     this.onExportBookmarkMarkdown,
@@ -727,9 +729,29 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         }
         return;
       case ReaderLegacyTocMenuAction.splitLongChapter:
-        setState(() => _splitLongChapter = !_splitLongChapter);
-        widget.onSplitLongChapterChanged?.call(_splitLongChapter);
-        _showToast(_splitLongChapter ? '已开启分割长章节' : '已关闭分割长章节');
+        final next = !_splitLongChapter;
+        setState(() => _busy = true);
+        try {
+          if (widget.onApplySplitLongChapter != null) {
+            await widget.onApplySplitLongChapter!.call(next);
+          }
+          widget.onSplitLongChapterChanged?.call(next);
+          if (!mounted) return;
+          setState(() => _splitLongChapter = next);
+          if (next) {
+            _showToast('已开启“分割长章节”');
+          } else {
+            _showToast('已关闭“分割长章节”，重新加载正文可能需要更长时间');
+          }
+        } catch (error) {
+          if (mounted) {
+            _showToast('切换分割长章节失败：$error');
+          }
+        } finally {
+          if (mounted) {
+            setState(() => _busy = false);
+          }
+        }
         return;
       case ReaderLegacyTocMenuAction.exportBookmark:
         if (widget.onExportBookmark != null) {

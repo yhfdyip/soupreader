@@ -7,6 +7,7 @@ void main() {
       isOnline: true,
       isLocalTxt: false,
       isEpub: false,
+      showWebDavProgressActions: true,
     );
 
     expect(
@@ -39,6 +40,7 @@ void main() {
       isOnline: false,
       isLocalTxt: true,
       isEpub: false,
+      showWebDavProgressActions: false,
     );
 
     expect(actions.first, ReaderLegacyReadMenuAction.tocRule);
@@ -52,10 +54,22 @@ void main() {
       isOnline: false,
       isLocalTxt: false,
       isEpub: true,
+      showWebDavProgressActions: false,
     );
 
     expect(actions, contains(ReaderLegacyReadMenuAction.delRubyTag));
     expect(actions, contains(ReaderLegacyReadMenuAction.delHTag));
+  });
+
+  test('ReaderLegacyMenuHelper 未配置 WebDav 时隐藏进度动作', () {
+    final actions = ReaderLegacyMenuHelper.buildReadMenuActions(
+      isOnline: true,
+      isLocalTxt: false,
+      isEpub: false,
+      showWebDavProgressActions: false,
+    );
+    expect(actions, isNot(contains(ReaderLegacyReadMenuAction.getProgress)));
+    expect(actions, isNot(contains(ReaderLegacyReadMenuAction.coverProgress)));
   });
 
   test('ReaderLegacyMenuHelper 目录页菜单顺序对齐 legado', () {
@@ -66,11 +80,11 @@ void main() {
     expect(
       actions,
       <ReaderLegacyTocMenuAction>[
+        ReaderLegacyTocMenuAction.tocRule,
+        ReaderLegacyTocMenuAction.splitLongChapter,
         ReaderLegacyTocMenuAction.reverseToc,
         ReaderLegacyTocMenuAction.useReplace,
         ReaderLegacyTocMenuAction.loadWordCount,
-        ReaderLegacyTocMenuAction.tocRule,
-        ReaderLegacyTocMenuAction.splitLongChapter,
         ReaderLegacyTocMenuAction.log,
       ],
     );
@@ -88,6 +102,37 @@ void main() {
         ReaderLegacyTocMenuAction.exportMarkdown,
         ReaderLegacyTocMenuAction.log,
       ],
+    );
+  });
+
+  test('ReaderLegacyMenuHelper 换源分支顺序对齐 legado', () {
+    final actions = ReaderLegacyMenuHelper.buildChangeSourceMenuActions();
+    expect(
+      actions,
+      <ReaderLegacyChangeSourceMenuAction>[
+        ReaderLegacyChangeSourceMenuAction.chapter,
+        ReaderLegacyChangeSourceMenuAction.book,
+      ],
+    );
+    expect(
+      actions.map(ReaderLegacyMenuHelper.changeSourceMenuLabel).toList(),
+      <String>['章节换源', '书籍换源'],
+    );
+  });
+
+  test('ReaderLegacyMenuHelper 刷新分支顺序对齐 legado', () {
+    final actions = ReaderLegacyMenuHelper.buildRefreshMenuActions();
+    expect(
+      actions,
+      <ReaderLegacyRefreshMenuAction>[
+        ReaderLegacyRefreshMenuAction.current,
+        ReaderLegacyRefreshMenuAction.after,
+        ReaderLegacyRefreshMenuAction.all,
+      ],
+    );
+    expect(
+      actions.map(ReaderLegacyMenuHelper.refreshMenuLabel).toList(),
+      <String>['刷新当前章节', '刷新之后章节', '刷新全部章节'],
     );
   });
 }

@@ -48,6 +48,7 @@ class PageFactory {
   FontWeight? _fontWeight;
   bool _underline = false;
   bool _showTitle = true;
+  String _legacyImageStyle = 'DEFAULT';
 
   // 兼容旧调用方：保留单回调入口（建议改用 add/removeContentChangedListener）
   VoidCallback? onContentChanged;
@@ -113,6 +114,7 @@ class PageFactory {
     FontWeight? fontWeight,
     bool underline = false,
     bool showTitle = true,
+    String legacyImageStyle = 'DEFAULT',
   }) {
     _contentHeight = contentHeight;
     _contentWidth = contentWidth;
@@ -131,6 +133,9 @@ class PageFactory {
     _fontWeight = fontWeight;
     _underline = underline;
     _showTitle = showTitle;
+    _legacyImageStyle = legacyImageStyle.trim().isEmpty
+        ? 'DEFAULT'
+        : legacyImageStyle.trim().toUpperCase();
   }
 
   /// 分页所有章节
@@ -171,6 +176,7 @@ class PageFactory {
       titleBottomSpacing: _titleBottomSpacing,
       fontWeight: _fontWeight,
       underline: _underline,
+      imageStyle: _legacyImageStyle,
     );
 
     if (chapterIndex == _currentChapterIndex - 1) {

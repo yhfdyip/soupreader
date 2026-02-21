@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 import 'package:battery_plus/battery_plus.dart';
+import '../services/reader_image_marker_codec.dart';
+import '../services/reader_image_request_parser.dart';
 import 'legacy_justified_text.dart';
 import 'page_factory.dart';
 import 'simulation_page_painter.dart';
@@ -28,6 +31,9 @@ class PagedReaderWidget extends StatefulWidget {
   final String? searchHighlightQuery;
   final Color? searchHighlightColor;
   final Color? searchHighlightTextColor;
+  final String legacyImageStyle;
+  final VoidCallback? onImageSizeCacheUpdated;
+  final void Function(String src, Size resolvedSize)? onImageSizeResolved;
 
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
@@ -54,6 +60,9 @@ class PagedReaderWidget extends StatefulWidget {
     this.searchHighlightQuery,
     this.searchHighlightColor,
     this.searchHighlightTextColor,
+    this.legacyImageStyle = 'DEFAULT',
+    this.onImageSizeCacheUpdated,
+    this.onImageSizeResolved,
     // 翻页动画增强默认值
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
@@ -114,6 +123,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   ui.Image? _targetPageImage;
   bool _isCurImageLoading = false;
   bool _isTargetImageLoading = false;
+  final Set<String> _imageSizeTrackingInFlight = <String>{};
 
   // 手势拖拽期间尽量不做同步预渲染，避免卡顿
   bool _gestureInProgress = false;
@@ -253,6 +263,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
     _animController.dispose();
     _invalidatePictures();
+    _imageSizeTrackingInFlight.clear();
     super.dispose();
   }
 
@@ -294,19 +305,30 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   PageFactory get _factory => widget.pageFactory;
 
-  bool get _needsPictureCache =>
-      widget.pageTurnMode == PageTurnMode.simulation ||
-      widget.pageTurnMode == PageTurnMode.simulation2 ||
-      widget.pageTurnMode == PageTurnMode.slide ||
-      widget.pageTurnMode == PageTurnMode.cover ||
-      widget.pageTurnMode == PageTurnMode.none;
+  static const String _legacyImageStyleDefault = 'DEFAULT';
+  static const String _legacyImageStyleFull = 'FULL';
+  static const String _legacyImageStyleSingle = 'SINGLE';
 
-  bool get _needsShaderImages => widget.pageTurnMode == PageTurnMode.simulation;
+  PageTurnMode get _effectivePageTurnMode => widget.pageTurnMode;
+
+  bool _contentHasImageMarker(String content) {
+    return ReaderImageMarkerCodec.containsMarker(content);
+  }
+
+  bool get _needsPictureCache =>
+      _effectivePageTurnMode == PageTurnMode.simulation ||
+      _effectivePageTurnMode == PageTurnMode.simulation2 ||
+      _effectivePageTurnMode == PageTurnMode.slide ||
+      _effectivePageTurnMode == PageTurnMode.cover ||
+      _effectivePageTurnMode == PageTurnMode.none;
+
+  bool get _needsShaderImages =>
+      _effectivePageTurnMode == PageTurnMode.simulation;
 
   bool get _isLegacyNonSimulationMode =>
-      widget.pageTurnMode == PageTurnMode.slide ||
-      widget.pageTurnMode == PageTurnMode.cover ||
-      widget.pageTurnMode == PageTurnMode.none;
+      _effectivePageTurnMode == PageTurnMode.slide ||
+      _effectivePageTurnMode == PageTurnMode.cover ||
+      _effectivePageTurnMode == PageTurnMode.none;
 
   bool get _showHeader =>
       widget.settings.shouldShowHeader(showStatusBar: widget.showStatusBar);
@@ -418,7 +440,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       Paint()..color = widget.backgroundColor,
     );
 
-    if (content.isNotEmpty) {
+    final pictureContent = _contentForPictureSnapshot(content);
+    if (pictureContent.isNotEmpty) {
       final contentWidth =
           size.width - widget.padding.left - widget.padding.right;
       final contentHeight = size.height -
@@ -430,7 +453,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           widget.padding.left,
           topSafe + _topOffset + widget.padding.top,
         ),
-        content: content,
+        content: pictureContent,
         style: widget.textStyle,
         maxWidth: contentWidth,
         justify: widget.settings.textFullJustify,
@@ -780,6 +803,33 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
+  bool _shouldUsePicturePathForContent(String content) {
+    if (!_contentHasImageMarker(content)) {
+      return true;
+    }
+    final mode = _effectivePageTurnMode;
+    return mode == PageTurnMode.simulation || mode == PageTurnMode.simulation2;
+  }
+
+  String _contentForPictureSnapshot(String content) {
+    if (!_contentHasImageMarker(content)) {
+      return content;
+    }
+    final lines = content.replaceAll('\r\n', '\n').split('\n');
+    final buffer = StringBuffer();
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final text = ReaderImageMarkerCodec.decodeMetaLine(line) == null
+          ? line
+          : ReaderImageMarkerCodec.textFallbackPlaceholder;
+      buffer.write(text);
+      if (i != lines.length - 1) {
+        buffer.write('\n');
+      }
+    }
+    return buffer.toString();
+  }
+
   void _ensureCurrentPagePicture(
     Size size, {
     bool allowRecord = true,
@@ -787,6 +837,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _ensurePictureCacheSize(size);
     _syncAdjacentPictureAvailability();
     if (!allowRecord) return;
+    if (!_shouldUsePicturePathForContent(_factory.curPage)) {
+      _curPagePicture?.dispose();
+      _curPagePicture = null;
+      return;
+    }
     _curPagePicture ??=
         _recordPage(_factory.curPage, size, slot: PageRenderSlot.current);
   }
@@ -800,11 +855,21 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!allowRecord) return;
 
     if (direction == _PageDirection.prev && _factory.hasPrev()) {
-      _prevPagePicture ??=
-          _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
+      if (_shouldUsePicturePathForContent(_factory.prevPage)) {
+        _prevPagePicture ??=
+            _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
+      } else {
+        _prevPagePicture?.dispose();
+        _prevPagePicture = null;
+      }
     } else if (direction == _PageDirection.next && _factory.hasNext()) {
-      _nextPagePicture ??=
-          _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
+      if (_shouldUsePicturePathForContent(_factory.nextPage)) {
+        _nextPagePicture ??=
+            _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
+      } else {
+        _nextPagePicture?.dispose();
+        _nextPagePicture = null;
+      }
     }
   }
 
@@ -814,16 +879,26 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     // 相邻页：预渲染上一页/下一页，避免拖拽时临时生成导致卡顿
     if (_factory.hasPrev()) {
-      _prevPagePicture ??=
-          _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
+      if (_shouldUsePicturePathForContent(_factory.prevPage)) {
+        _prevPagePicture ??=
+            _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
+      } else {
+        _prevPagePicture?.dispose();
+        _prevPagePicture = null;
+      }
     } else {
       _prevPagePicture?.dispose();
       _prevPagePicture = null;
     }
 
     if (_factory.hasNext()) {
-      _nextPagePicture ??=
-          _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
+      if (_shouldUsePicturePathForContent(_factory.nextPage)) {
+        _nextPagePicture ??=
+            _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
+      } else {
+        _nextPagePicture?.dispose();
+        _nextPagePicture = null;
+      }
     } else {
       _nextPagePicture?.dispose();
       _nextPagePicture = null;
@@ -952,19 +1027,24 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _ensurePictureCacheSize(size);
     _syncAdjacentPictureAvailability();
 
-    if (_curPagePicture == null) {
+    if (_curPagePicture == null &&
+        _shouldUsePicturePathForContent(_factory.curPage)) {
       _curPagePicture =
           _recordPage(_factory.curPage, size, slot: PageRenderSlot.current);
       return true;
     }
 
-    if (_factory.hasPrev() && _prevPagePicture == null) {
+    if (_factory.hasPrev() &&
+        _prevPagePicture == null &&
+        _shouldUsePicturePathForContent(_factory.prevPage)) {
       _prevPagePicture =
           _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
       return true;
     }
 
-    if (_factory.hasNext() && _nextPagePicture == null) {
+    if (_factory.hasNext() &&
+        _nextPagePicture == null &&
+        _shouldUsePicturePathForContent(_factory.nextPage)) {
       _nextPagePicture =
           _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
       return true;
@@ -1018,7 +1098,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   void _startTurnAnimation() {
     if (_direction == _PageDirection.none) return;
-    if (widget.pageTurnMode == PageTurnMode.none) {
+    final effectiveMode = _effectivePageTurnMode;
+    if (effectiveMode == PageTurnMode.none) {
       if (_needsPictureCache) {
         final size = MediaQuery.of(context).size;
         _ensureDirectionTargetPicture(
@@ -1030,7 +1111,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _completeNoAnimationTurn();
       return;
     }
-    if (widget.pageTurnMode == PageTurnMode.simulation) {
+    if (effectiveMode == PageTurnMode.simulation) {
       unawaited(_startSimulationTurnWhenReady());
       return;
     }
@@ -1042,8 +1123,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         allowRecord: true,
       );
     }
-    if (widget.pageTurnMode == PageTurnMode.slide ||
-        widget.pageTurnMode == PageTurnMode.cover) {
+    if (effectiveMode == PageTurnMode.slide ||
+        effectiveMode == PageTurnMode.cover) {
       _onAnimStartHorizontalLegacy();
       return;
     }
@@ -1458,6 +1539,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
     final isRunning = _isMoved || _isRunning || _isStarted;
+    final effectiveMode = _effectivePageTurnMode;
     if (!isRunning) {
       // 静止态提前预渲染相邻页，避免首次拖拽时同步生成导致的卡顿
       _schedulePrecache();
@@ -1467,7 +1549,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 对于滑动/覆盖模式使用
     final offset = _touchX - _startX;
 
-    switch (widget.pageTurnMode) {
+    switch (effectiveMode) {
       case PageTurnMode.slide:
         if (!isRunning) {
           return _buildStaticRecordedPage(size);
@@ -1524,6 +1606,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     String fallbackContent, {
     required PageRenderSlot slot,
   }) {
+    if (_contentHasImageMarker(fallbackContent)) {
+      return _buildPageWidget(fallbackContent, slot: slot);
+    }
     // 对齐 legado：动画期间保持快照渲染路径稳定，避免因单帧缓存 miss 回退到 Widget
     // 引发页眉/正文二次重排。
     final resolvedPicture =
@@ -1960,7 +2045,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
       // === P3: 中间区域Y坐标强制调整（对标 Legado SimulationPageDelegate.onTouch）===
       double adjustedY = focusY;
-      if (widget.pageTurnMode == PageTurnMode.simulation) {
+      if (_effectivePageTurnMode == PageTurnMode.simulation) {
         // 中间区域：强制使用底边（仅保留中间区域点击的优化，移除上一页的强制锁定）
         // Fixed: Use 0.9 * height to create cone effect (avoid TouchY == CornerY)
         if (_startY > size.height / 3 && _startY < size.height * 2 / 3) {
@@ -2027,14 +2112,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 widget.padding.right,
                 bottomSafe + _bottomOffset + widget.padding.bottom,
               ),
-              child: LegacyJustifiedTextBlock(
-                content: content,
-                style: widget.textStyle,
-                justify: widget.settings.textFullJustify,
-                paragraphIndent: widget.settings.paragraphIndent,
-                applyParagraphIndent: false,
-                preserveEmptyLines: true,
-              ),
+              child: _buildPageBodyContent(content),
             ),
           ),
           if (_showAnyTipBar)
@@ -2046,6 +2124,298 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         ],
       ),
     );
+  }
+
+  Widget _buildPageBodyContent(String content) {
+    final blocks = _parsePageRenderBlocks(content);
+    if (!blocks.any((block) => block.isImage)) {
+      return LegacyJustifiedTextBlock(
+        content: content,
+        style: widget.textStyle,
+        justify: widget.settings.textFullJustify,
+        paragraphIndent: widget.settings.paragraphIndent,
+        applyParagraphIndent: false,
+        preserveEmptyLines: true,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) => _buildImageAwarePageBody(
+        blocks: blocks,
+        maxWidth: constraints.maxWidth,
+        maxHeight: constraints.maxHeight,
+      ),
+    );
+  }
+
+  String _normalizeLegacyImageStyleValue(String style) {
+    final normalized = style.trim().toUpperCase();
+    if (normalized.isEmpty) {
+      return _legacyImageStyleDefault;
+    }
+    return normalized;
+  }
+
+  List<_PagedRenderBlock> _parsePageRenderBlocks(String content) {
+    if (!_contentHasImageMarker(content)) {
+      return <_PagedRenderBlock>[_PagedRenderBlock.text(content)];
+    }
+    final lines = content.replaceAll('\r\n', '\n').split('\n');
+    final blocks = <_PagedRenderBlock>[];
+    final textBuffer = StringBuffer();
+
+    void flushText() {
+      final value = textBuffer.toString();
+      if (value.trim().isNotEmpty) {
+        blocks.add(_PagedRenderBlock.text(value));
+      }
+      textBuffer.clear();
+    }
+
+    for (final line in lines) {
+      final src = ReaderImageMarkerCodec.decodeLine(line);
+      if (src != null) {
+        flushText();
+        blocks.add(_PagedRenderBlock.image(src));
+      } else {
+        textBuffer.writeln(line);
+      }
+    }
+    flushText();
+
+    if (blocks.isEmpty) {
+      return <_PagedRenderBlock>[_PagedRenderBlock.text(content)];
+    }
+    return blocks;
+  }
+
+  Widget _buildImageAwarePageBody({
+    required List<_PagedRenderBlock> blocks,
+    required double maxWidth,
+    required double maxHeight,
+  }) {
+    final style = _normalizeLegacyImageStyleValue(widget.legacyImageStyle);
+    final spacing =
+        widget.settings.paragraphSpacing.clamp(4.0, 24.0).toDouble();
+    final children = <Widget>[];
+
+    for (var i = 0; i < blocks.length; i++) {
+      final block = blocks[i];
+      if (block.isImage) {
+        children.add(
+          _buildPagedImageBlock(
+            src: block.imageSrc ?? '',
+            imageStyle: style,
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+          ),
+        );
+      } else if ((block.text ?? '').trim().isNotEmpty) {
+        children.add(
+          LegacyJustifiedTextBlock(
+            content: block.text ?? '',
+            style: widget.textStyle,
+            justify: widget.settings.textFullJustify,
+            paragraphIndent: widget.settings.paragraphIndent,
+            applyParagraphIndent: false,
+            preserveEmptyLines: true,
+          ),
+        );
+      }
+      if (i != blocks.length - 1) {
+        children.add(SizedBox(height: spacing));
+      }
+    }
+
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
+  double _estimatePagedImageHeight({
+    required String imageStyle,
+    required double maxWidth,
+    required double maxHeight,
+  }) {
+    final width = maxWidth <= 0 ? 320.0 : maxWidth;
+    final base = (widget.textStyle.fontSize ?? 16) *
+        ((widget.textStyle.height ?? 1.5).clamp(1.0, 2.8));
+    final minHeight = base.clamp(14.0, maxHeight);
+    switch (imageStyle) {
+      case _legacyImageStyleSingle:
+        return maxHeight.clamp(minHeight, maxHeight).toDouble();
+      case _legacyImageStyleFull:
+        final candidate = width * 0.75;
+        return candidate.clamp(minHeight * 3, maxHeight).toDouble();
+      default:
+        final candidate = width * 0.62;
+        return candidate.clamp(minHeight * 2, maxHeight * 0.72).toDouble();
+    }
+  }
+
+  Widget _buildPagedImageBlock({
+    required String src,
+    required String imageStyle,
+    required double maxWidth,
+    required double maxHeight,
+  }) {
+    final request = ReaderImageRequestParser.parse(src);
+    final displaySrc = request.url.trim().isEmpty ? src.trim() : request.url;
+    final imageProvider = _resolvePagedImageProvider(request);
+    if (imageProvider == null) {
+      return _buildPagedImageFallback(displaySrc);
+    }
+    _trackPagedImageIntrinsicSize(
+      src: src,
+      imageProvider: imageProvider,
+    );
+
+    final constrainedHeight = _estimatePagedImageHeight(
+      imageStyle: imageStyle,
+      maxWidth: maxWidth,
+      maxHeight: maxHeight,
+    );
+    final forceFullWidth = imageStyle == _legacyImageStyleFull ||
+        imageStyle == _legacyImageStyleSingle;
+    final image = Image(
+      image: imageProvider,
+      width: forceFullWidth ? maxWidth : null,
+      fit: forceFullWidth ? BoxFit.fitWidth : BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const SizedBox(
+          width: double.infinity,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CupertinoActivityIndicator()),
+          ),
+        );
+      },
+      errorBuilder: (_, __, ___) => _buildPagedImageFallback(displaySrc),
+    );
+    final imageBox = ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: maxWidth,
+        maxHeight: constrainedHeight,
+      ),
+      child: image,
+    );
+    if (imageStyle == _legacyImageStyleSingle) {
+      return SizedBox(
+        height: constrainedHeight,
+        child: Center(child: imageBox),
+      );
+    }
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: _spacingForImage(imageStyle)),
+        child: imageBox,
+      ),
+    );
+  }
+
+  double _spacingForImage(String imageStyle) {
+    if (imageStyle == _legacyImageStyleSingle) {
+      return 0;
+    }
+    return (widget.settings.paragraphSpacing / 2).clamp(6.0, 20.0).toDouble();
+  }
+
+  Widget _buildPagedImageFallback(String src) {
+    final message = src.isEmpty ? '图片加载失败' : '图片加载失败：$src';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      alignment: Alignment.centerLeft,
+      child: Text(
+        message,
+        style: widget.textStyle.copyWith(
+          fontSize: ((widget.textStyle.fontSize ?? 16) - 2)
+              .clamp(10.0, 22.0)
+              .toDouble(),
+          color: (widget.textStyle.color ?? const Color(0xFF8B7961))
+              .withValues(alpha: 0.72),
+        ),
+      ),
+    );
+  }
+
+  ImageProvider<Object>? _resolvePagedImageProvider(
+      ReaderImageRequest request) {
+    final value = request.url.trim();
+    if (value.isEmpty) return null;
+    final lower = value.toLowerCase();
+    if (lower.startsWith('data:image')) {
+      final commaIndex = value.indexOf(',');
+      if (commaIndex <= 0 || commaIndex >= value.length - 1) {
+        return null;
+      }
+      try {
+        final bytes = base64Decode(value.substring(commaIndex + 1));
+        return MemoryImage(bytes);
+      } catch (_) {
+        return null;
+      }
+    }
+    final uri = Uri.tryParse(value);
+    if (uri == null) {
+      return null;
+    }
+    if (!uri.hasScheme) {
+      return null;
+    }
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      return null;
+    }
+    if (request.headers.isEmpty) {
+      return NetworkImage(value);
+    }
+    return NetworkImage(value, headers: request.headers);
+  }
+
+  void _trackPagedImageIntrinsicSize({
+    required String src,
+    required ImageProvider<Object> imageProvider,
+  }) {
+    final key = src.trim();
+    if (key.isEmpty) return;
+    if (ReaderImageMarkerCodec.lookupResolvedSize(key) != null) return;
+    if (_imageSizeTrackingInFlight.contains(key)) return;
+
+    _imageSizeTrackingInFlight.add(key);
+    final stream = imageProvider.resolve(const ImageConfiguration());
+    ImageStreamListener? listener;
+    listener = ImageStreamListener(
+      (ImageInfo info, bool synchronousCall) {
+        stream.removeListener(listener!);
+        _imageSizeTrackingInFlight.remove(key);
+        final changed = ReaderImageMarkerCodec.rememberResolvedSize(
+          key,
+          width: info.image.width.toDouble(),
+          height: info.image.height.toDouble(),
+        );
+        if (changed && mounted) {
+          widget.onImageSizeResolved?.call(
+            key,
+            Size(
+              info.image.width.toDouble(),
+              info.image.height.toDouble(),
+            ),
+          );
+          widget.onImageSizeCacheUpdated?.call();
+        }
+      },
+      onError: (Object error, StackTrace? stackTrace) {
+        stream.removeListener(listener!);
+        _imageSizeTrackingInFlight.remove(key);
+      },
+    );
+    stream.addListener(listener);
   }
 
   Widget _buildOverlay(
@@ -2159,6 +2529,28 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (text == null || text.isEmpty) return const SizedBox.shrink();
     return Text(text, style: style);
   }
+}
+
+class _PagedRenderBlock {
+  final String? text;
+  final String? imageSrc;
+
+  const _PagedRenderBlock._({
+    this.text,
+    this.imageSrc,
+  });
+
+  const _PagedRenderBlock.text(String value)
+      : this._(
+          text: value,
+        );
+
+  const _PagedRenderBlock.image(String src)
+      : this._(
+          imageSrc: src,
+        );
+
+  bool get isImage => imageSrc != null;
 }
 
 class _PagePicturePainter extends CustomPainter {

@@ -34,6 +34,17 @@ enum ReaderLegacyTocMenuAction {
   log,
 }
 
+enum ReaderLegacyChangeSourceMenuAction {
+  chapter,
+  book,
+}
+
+enum ReaderLegacyRefreshMenuAction {
+  current,
+  after,
+  all,
+}
+
 class ReaderLegacyMenuHelper {
   const ReaderLegacyMenuHelper._();
 
@@ -41,6 +52,7 @@ class ReaderLegacyMenuHelper {
     required bool isOnline,
     required bool isLocalTxt,
     required bool isEpub,
+    required bool showWebDavProgressActions,
   }) {
     final actions = <ReaderLegacyReadMenuAction>[];
     if (isOnline) {
@@ -60,8 +72,8 @@ class ReaderLegacyMenuHelper {
       ReaderLegacyReadMenuAction.addBookmark,
       ReaderLegacyReadMenuAction.editContent,
       ReaderLegacyReadMenuAction.pageAnim,
-      ReaderLegacyReadMenuAction.getProgress,
-      ReaderLegacyReadMenuAction.coverProgress,
+      if (showWebDavProgressActions) ReaderLegacyReadMenuAction.getProgress,
+      if (showWebDavProgressActions) ReaderLegacyReadMenuAction.coverProgress,
       if (isOnline) ReaderLegacyReadMenuAction.reverseContent,
       ReaderLegacyReadMenuAction.simulatedReading,
       ReaderLegacyReadMenuAction.enableReplace,
@@ -139,11 +151,11 @@ class ReaderLegacyMenuHelper {
       ];
     }
     return <ReaderLegacyTocMenuAction>[
+      if (isLocalTxt) ReaderLegacyTocMenuAction.tocRule,
+      if (isLocalTxt) ReaderLegacyTocMenuAction.splitLongChapter,
       ReaderLegacyTocMenuAction.reverseToc,
       ReaderLegacyTocMenuAction.useReplace,
       ReaderLegacyTocMenuAction.loadWordCount,
-      if (isLocalTxt) ReaderLegacyTocMenuAction.tocRule,
-      if (isLocalTxt) ReaderLegacyTocMenuAction.splitLongChapter,
       ReaderLegacyTocMenuAction.log,
     ];
   }
@@ -166,6 +178,43 @@ class ReaderLegacyMenuHelper {
         return '导出 Markdown';
       case ReaderLegacyTocMenuAction.log:
         return '日志';
+    }
+  }
+
+  static List<ReaderLegacyChangeSourceMenuAction>
+      buildChangeSourceMenuActions() {
+    return const <ReaderLegacyChangeSourceMenuAction>[
+      ReaderLegacyChangeSourceMenuAction.chapter,
+      ReaderLegacyChangeSourceMenuAction.book,
+    ];
+  }
+
+  static String changeSourceMenuLabel(
+      ReaderLegacyChangeSourceMenuAction action) {
+    switch (action) {
+      case ReaderLegacyChangeSourceMenuAction.chapter:
+        return '章节换源';
+      case ReaderLegacyChangeSourceMenuAction.book:
+        return '书籍换源';
+    }
+  }
+
+  static List<ReaderLegacyRefreshMenuAction> buildRefreshMenuActions() {
+    return const <ReaderLegacyRefreshMenuAction>[
+      ReaderLegacyRefreshMenuAction.current,
+      ReaderLegacyRefreshMenuAction.after,
+      ReaderLegacyRefreshMenuAction.all,
+    ];
+  }
+
+  static String refreshMenuLabel(ReaderLegacyRefreshMenuAction action) {
+    switch (action) {
+      case ReaderLegacyRefreshMenuAction.current:
+        return '刷新当前章节';
+      case ReaderLegacyRefreshMenuAction.after:
+        return '刷新之后章节';
+      case ReaderLegacyRefreshMenuAction.all:
+        return '刷新全部章节';
     }
   }
 }

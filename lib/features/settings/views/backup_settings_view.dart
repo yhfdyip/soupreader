@@ -79,6 +79,21 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
             header: const Text('WebDav 同步'),
             children: [
               CupertinoListTile.notched(
+                title: const Text('同步阅读进度'),
+                additionalInfo: const Text('进入退出阅读界面时同步阅读进度'),
+                trailing: CupertinoSwitch(
+                  value: _settingsService.appSettings.syncBookProgress,
+                  onChanged: (value) async {
+                    await _settingsService.saveAppSettings(
+                      _settingsService.appSettings
+                          .copyWith(syncBookProgress: value),
+                    );
+                    if (!mounted) return;
+                    setState(() {});
+                  },
+                ),
+              ),
+              CupertinoListTile.notched(
                 title: const Text('服务器地址'),
                 additionalInfo: Text(
                   _brief(_settingsService.appSettings.webDavUrl),

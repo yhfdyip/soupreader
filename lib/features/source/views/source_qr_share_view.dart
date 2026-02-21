@@ -16,10 +16,12 @@ class SourceQrShareView extends StatelessWidget {
     super.key,
     required this.text,
     required this.subject,
+    this.hintText = '使用其他设备扫码导入',
   });
 
   final String text;
   final String subject;
+  final String hintText;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +83,7 @@ class SourceQrShareView extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              '使用其他设备扫码导入',
+              hintText,
               style: TextStyle(
                 color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),

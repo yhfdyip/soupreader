@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/widgets.dart';
+import '../services/reader_image_marker_codec.dart';
 
 /// 阅读器分页代理
 /// 重构：完全对标 Legado TextChapterLayout 逻辑
@@ -7,6 +8,9 @@ import 'package:flutter/widgets.dart';
 class ReaderPageAgent {
   // === 配置参数 (对标 Legado) ===
   static const String defaultIndent = '　　'; // 默认两个全角空格
+  static const String _defaultImageStyle = 'DEFAULT';
+  static const String _imageStyleFull = 'FULL';
+  static const String _imageStyleSingle = 'SINGLE';
 
   // 段间距因子：由 ReadingSettings 传入 paragraphSpacing 控制
   // 如果 paragraphSpacing > 0，则在每段结束增加高度
@@ -32,6 +36,7 @@ class ReaderPageAgent {
     double titleBottomSpacing = 0,
     FontWeight? fontWeight,
     bool underline = false,
+    String imageStyle = _defaultImageStyle,
   }) {
     // 1. 准备画笔和通用样式
     final textStyle = TextStyle(
@@ -81,6 +86,7 @@ class ReaderPageAgent {
     StringBuffer currentPageContent = StringBuffer();
     double currentY = 0;
     double maxPageHeight = height - 1.0;
+    final normalizedImageStyle = _normalizeImageStyle(imageStyle);
 
     // 辅助函数：提交当前页
     void commitPage() {
@@ -112,6 +118,49 @@ class ReaderPageAgent {
         }
         currentPageContent.write('\n');
         currentY += emptyLineHeight;
+        continue;
+      }
+
+      final imageMeta = ReaderImageMarkerCodec.decodeMetaLine(paraText);
+      if (imageMeta != null) {
+        final marker = paraText.trim();
+        final intrinsicSize = _resolveImageIntrinsicSize(imageMeta);
+        final imageHeight = _estimateImageBlockHeight(
+          imageStyle: normalizedImageStyle,
+          maxPageHeight: maxPageHeight,
+          contentWidth: width,
+          fontSize: fontSize,
+          lineHeight: lineHeight,
+          imageSize: intrinsicSize,
+        );
+        final spacingHeight = paragraphSpacing > fontSize * 0.5
+            ? fontSize * lineHeight
+            : defaultParagraphSpacing;
+
+        if (normalizedImageStyle == _imageStyleSingle) {
+          if (currentPageContent.isNotEmpty) {
+            commitPage();
+          }
+          currentPageContent.write(marker);
+          currentY = imageHeight;
+          if (spacingHeight > 0 && currentY + spacingHeight <= maxPageHeight) {
+            currentPageContent.write('\n');
+            currentY += spacingHeight;
+          }
+          commitPage();
+          continue;
+        }
+
+        if (currentY + imageHeight > maxPageHeight) {
+          commitPage();
+        }
+        currentPageContent.write(marker);
+        currentPageContent.write('\n');
+        currentY += imageHeight;
+        if (spacingHeight > 0 && currentY + spacingHeight <= maxPageHeight) {
+          currentPageContent.write('\n');
+          currentY += spacingHeight;
+        }
         continue;
       }
 
@@ -203,5 +252,89 @@ class ReaderPageAgent {
     }
 
     return pages;
+  }
+
+  static String _normalizeImageStyle(String imageStyle) {
+    final normalized = imageStyle.trim().toUpperCase();
+    if (normalized.isEmpty) {
+      return _defaultImageStyle;
+    }
+    return normalized;
+  }
+
+  static double _estimateImageBlockHeight({
+    required String imageStyle,
+    required double maxPageHeight,
+    required double contentWidth,
+    required double fontSize,
+    required double lineHeight,
+    ui.Size? imageSize,
+  }) {
+    final width = contentWidth <= 0 ? 320.0 : contentWidth;
+    final minLineHeight = (fontSize * lineHeight).clamp(14.0, maxPageHeight);
+
+    if (imageSize != null &&
+        imageSize.width > 0 &&
+        imageSize.height > 0 &&
+        imageSize.width.isFinite &&
+        imageSize.height.isFinite) {
+      double renderWidth = imageSize.width;
+      double renderHeight = imageSize.height;
+      switch (imageStyle) {
+        case _imageStyleSingle:
+          renderWidth = width;
+          renderHeight = imageSize.height * renderWidth / imageSize.width;
+          if (renderHeight > maxPageHeight) {
+            renderWidth = renderWidth * maxPageHeight / renderHeight;
+            renderHeight = maxPageHeight;
+          }
+          break;
+        case _imageStyleFull:
+          renderWidth = width;
+          renderHeight = imageSize.height * renderWidth / imageSize.width;
+          if (renderHeight > maxPageHeight) {
+            renderWidth = renderWidth * maxPageHeight / renderHeight;
+            renderHeight = maxPageHeight;
+          }
+          break;
+        default:
+          if (renderWidth > width) {
+            renderHeight = renderHeight * width / renderWidth;
+            renderWidth = width;
+          }
+          if (renderHeight > maxPageHeight) {
+            renderWidth = renderWidth * maxPageHeight / renderHeight;
+            renderHeight = maxPageHeight;
+          }
+          break;
+      }
+      return renderHeight.clamp(minLineHeight, maxPageHeight).toDouble();
+    }
+
+    switch (imageStyle) {
+      case _imageStyleSingle:
+        return maxPageHeight.clamp(minLineHeight, maxPageHeight);
+      case _imageStyleFull:
+        final candidate = width * 0.75;
+        return candidate.clamp(minLineHeight * 3, maxPageHeight);
+      default:
+        final candidate = width * 0.62;
+        return candidate.clamp(minLineHeight * 2, maxPageHeight * 0.72);
+    }
+  }
+
+  static ui.Size? _resolveImageIntrinsicSize(ReaderImageMarkerMeta meta) {
+    final resolved = ReaderImageMarkerCodec.lookupResolvedSize(meta.src);
+    if (resolved != null &&
+        resolved.width > 0 &&
+        resolved.height > 0 &&
+        resolved.width.isFinite &&
+        resolved.height.isFinite) {
+      return resolved;
+    }
+    if (meta.hasDimensionHints) {
+      return ui.Size(meta.width!, meta.height!);
+    }
+    return null;
   }
 }

@@ -29,6 +29,9 @@ void main() {
     required List<Chapter> chapters,
     Map<int, String> initialDisplayTitlesByIndex = const <int, String>{},
     Future<String> Function(Chapter chapter)? resolveDisplayTitle,
+    bool isLocalTxtBook = false,
+    ValueChanged<bool>? onSplitLongChapterChanged,
+    Future<void> Function(bool splitLongChapter)? onApplySplitLongChapter,
   }) async {
     await tester.pumpWidget(
       CupertinoApp(
@@ -48,6 +51,9 @@ void main() {
           onDeleteBookmark: (_) async {},
           initialDisplayTitlesByIndex: initialDisplayTitlesByIndex,
           resolveDisplayTitle: resolveDisplayTitle,
+          isLocalTxtBook: isLocalTxtBook,
+          onSplitLongChapterChanged: onSplitLongChapterChanged,
+          onApplySplitLongChapter: onApplySplitLongChapter,
         ),
       ),
     );
@@ -96,5 +102,31 @@ void main() {
     expect(find.text('原始章节-零'), findsOneWidget);
     expect(find.text('显示章节-1'), findsOneWidget);
     expect(find.text('原始章节-一'), findsNothing);
+  });
+
+  testWidgets('ReaderCatalogSheet 分割长章节动作按 legado 状态流转', (tester) async {
+    final chapters = buildChapters();
+    bool? applied;
+    bool? changed;
+    await pumpCatalogSheet(
+      tester,
+      chapters: chapters,
+      isLocalTxtBook: true,
+      onApplySplitLongChapter: (next) async {
+        applied = next;
+      },
+      onSplitLongChapterChanged: (next) {
+        changed = next;
+      },
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(CupertinoIcons.ellipsis_circle));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('分割长章节'));
+    await tester.pumpAndSettle();
+
+    expect(applied, isTrue);
+    expect(changed, isTrue);
   });
 }

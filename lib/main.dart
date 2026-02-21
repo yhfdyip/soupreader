@@ -342,6 +342,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   late final CupertinoTabController _tabController;
+  final ValueNotifier<int> _bookshelfReselectSignal = ValueNotifier<int>(0);
   final ValueNotifier<int> _discoveryCompressSignal = ValueNotifier<int>(0);
   late List<_MainTabSpec> _tabs;
 
@@ -360,6 +361,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _tabController.dispose();
+    _bookshelfReselectSignal.dispose();
     _discoveryCompressSignal.dispose();
     super.dispose();
   }
@@ -385,8 +387,17 @@ class _MainScreenState extends State<MainScreen> {
   void _onTabTap(int index) {
     if (index < 0 || index >= _tabs.length) return;
     final tab = _tabs[index];
-    if (index == _tabController.index && tab.id == _MainTabId.discovery) {
-      _discoveryCompressSignal.value++;
+    if (index != _tabController.index) return;
+    switch (tab.id) {
+      case _MainTabId.bookshelf:
+        _bookshelfReselectSignal.value++;
+        return;
+      case _MainTabId.discovery:
+        _discoveryCompressSignal.value++;
+        return;
+      case _MainTabId.rss:
+      case _MainTabId.my:
+        return;
     }
   }
 
@@ -477,7 +488,9 @@ class _MainScreenState extends State<MainScreen> {
           builder: (context) {
             switch (tabId) {
               case _MainTabId.bookshelf:
-                return const BookshelfView();
+                return BookshelfView(
+                  reselectSignal: _bookshelfReselectSignal,
+                );
               case _MainTabId.discovery:
                 return DiscoveryView(
                   compressSignal: _discoveryCompressSignal,

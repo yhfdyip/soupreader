@@ -264,6 +264,57 @@ void main() {
       }
     });
 
+    test('正文清洗保留图片标签并绝对化 src（对齐 legado formatKeepImg）', () async {
+      final engine = RuleParserEngine();
+      final source = BookSource(
+        bookSourceUrl: 'https://example.com',
+        bookSourceName: 'test',
+        enabledCookieJar: false,
+        ruleContent: const ContentRule(
+          content: 'div#content@html',
+        ),
+      );
+
+      final responses = <String, String>{
+        'https://example.com/chapter/1':
+            '<html><body><div id="content"><p>前<img src="/a.jpg"/></p></div></body></html>',
+      };
+
+      final dio = RuleParserEngine.debugDioForTest();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final body = responses[options.uri.toString()];
+            if (body != null) {
+              handler.resolve(
+                Response<List<int>>(
+                  requestOptions: options,
+                  data: utf8.encode(body),
+                  statusCode: 200,
+                ),
+              );
+              return;
+            }
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                error: 'missing mock for ${options.uri}',
+              ),
+            );
+          },
+        ),
+      );
+
+      try {
+        final content = await engine.getContent(source, '/chapter/1');
+        expect(content, contains('前'));
+        expect(content, contains('<img src="https://example.com/a.jpg">'));
+        expect(content, isNot(contains('<p>')));
+      } finally {
+        dio.interceptors.removeLast();
+      }
+    });
+
     test('正文规则为空时返回章节链接', () async {
       final engine = RuleParserEngine();
       final source = BookSource(

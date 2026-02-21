@@ -20,6 +20,7 @@ void main() {
       bookshelfSortMode: BookshelfSortMode.title,
       searchScope: '玄幻,男频',
       bookInfoDeleteAlert: false,
+      syncBookProgress: false,
       webDavUrl: 'https://dav.example.com/root/',
       webDavAccount: 'reader',
       webDavPassword: 'secret',
@@ -37,6 +38,7 @@ void main() {
     expect(decoded.bookshelfSortMode, BookshelfSortMode.title);
     expect(decoded.searchScope, '玄幻,男频');
     expect(decoded.bookInfoDeleteAlert, false);
+    expect(decoded.syncBookProgress, false);
     expect(decoded.webDavUrl, 'https://dav.example.com/root/');
     expect(decoded.webDavAccount, 'reader');
     expect(decoded.webDavPassword, 'secret');
@@ -49,11 +51,13 @@ void main() {
       'showRSS': false,
       'defaultHomePage': 'my',
       'bookInfoDeleteAlert': 0,
+      'syncBookProgress': 0,
     });
     expect(fromLegacy.showDiscovery, false);
     expect(fromLegacy.showRss, false);
     expect(fromLegacy.defaultHomePage, MainDefaultHomePage.my);
     expect(fromLegacy.bookInfoDeleteAlert, false);
+    expect(fromLegacy.syncBookProgress, false);
 
     final fallback = AppSettings.fromJson({
       'showRss': '1',
@@ -62,6 +66,7 @@ void main() {
     expect(fallback.showRss, true);
     expect(fallback.defaultHomePage, MainDefaultHomePage.bookshelf);
     expect(fallback.bookInfoDeleteAlert, true);
+    expect(fallback.syncBookProgress, true);
     expect(fallback.webDavUrl, AppSettings.defaultWebDavUrl);
     expect(fallback.webDavAccount, isEmpty);
     expect(fallback.webDavPassword, isEmpty);
@@ -110,6 +115,7 @@ void main() {
         appearanceMode: AppAppearanceMode.light,
         wifiOnlyDownload: false,
         bookInfoDeleteAlert: false,
+        syncBookProgress: false,
       ),
     );
 
@@ -118,6 +124,7 @@ void main() {
     expect(service.appSettings.appearanceMode, AppAppearanceMode.light);
     expect(service.appSettings.wifiOnlyDownload, false);
     expect(service.appSettings.bookInfoDeleteAlert, false);
+    expect(service.appSettings.syncBookProgress, false);
   });
 
   test('SettingsService stores scroll offsets by chapter with fallback',
@@ -182,6 +189,27 @@ void main() {
       service.getBookRemoteUploadUrl('book-1'),
       'https://dav.example.com/books/demo.txt',
     );
+  });
+
+  test('SettingsService persists reader image size snapshot by book id',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = SettingsService();
+    await service.init();
+
+    const snapshot =
+        '{"v":1,"entries":{"https://example.com/a.jpg":[320.0,960.0]}}';
+    expect(service.getBookReaderImageSizeSnapshot('book-2'), isNull);
+
+    await service.saveBookReaderImageSizeSnapshot('book-2', snapshot);
+    expect(service.getBookReaderImageSizeSnapshot('book-2'), snapshot);
+
+    await service.saveBookReaderImageSizeSnapshot('book-2', '');
+    expect(service.getBookReaderImageSizeSnapshot('book-2'), isNull);
+
+    await service.saveBookReaderImageSizeSnapshot('book-2', snapshot);
+    await service.init();
+    expect(service.getBookReaderImageSizeSnapshot('book-2'), snapshot);
   });
 
   test(
@@ -332,22 +360,56 @@ void main() {
     expect(service.getBookCanUpdate('book-1'), isTrue);
     expect(service.getBookSplitLongChapter('book-1'), isTrue);
     expect(service.getBookUseReplaceRule('book-1'), isTrue);
+    expect(service.getBookReSegment('book-1'), isFalse);
+    expect(service.getBookImageStyle('book-1'), 'DEFAULT');
+    expect(service.getBookDelRubyTag('book-1'), isFalse);
+    expect(service.getBookDelHTag('book-1'), isFalse);
+    expect(
+      service.getChapterSameTitleRemoved('book-1', 'chapter-1'),
+      isFalse,
+    );
 
     await service.saveBookCanUpdate('book-1', false);
     await service.saveBookSplitLongChapter('book-1', false);
     await service.saveBookUseReplaceRule('book-1', false);
+    await service.saveBookReSegment('book-1', true);
+    await service.saveBookImageStyle('book-1', 'single');
+    await service.saveBookDelRubyTag('book-1', true);
+    await service.saveBookDelHTag('book-1', true);
+    await service.saveChapterSameTitleRemoved('book-1', 'chapter-1', true);
 
     expect(service.getBookCanUpdate('book-1'), isFalse);
     expect(service.getBookSplitLongChapter('book-1'), isFalse);
     expect(service.getBookUseReplaceRule('book-1'), isFalse);
+    expect(service.getBookReSegment('book-1'), isTrue);
+    expect(service.getBookImageStyle('book-1'), 'SINGLE');
+    expect(service.getBookDelRubyTag('book-1'), isTrue);
+    expect(service.getBookDelHTag('book-1'), isTrue);
+    expect(
+      service.getChapterSameTitleRemoved('book-1', 'chapter-1'),
+      isTrue,
+    );
 
     await service.init();
     expect(service.getBookCanUpdate('book-1'), isFalse);
     expect(service.getBookSplitLongChapter('book-1'), isFalse);
     expect(service.getBookUseReplaceRule('book-1'), isFalse);
+    expect(service.getBookReSegment('book-1'), isTrue);
+    expect(service.getBookImageStyle('book-1'), 'SINGLE');
+    expect(service.getBookDelRubyTag('book-1'), isTrue);
+    expect(service.getBookDelHTag('book-1'), isTrue);
+    expect(
+      service.getChapterSameTitleRemoved('book-1', 'chapter-1'),
+      isTrue,
+    );
     expect(service.getBookCanUpdate(''), isTrue);
     expect(service.getBookSplitLongChapter(''), isTrue);
     expect(service.getBookUseReplaceRule(''), isTrue);
+    expect(service.getBookReSegment(''), isFalse);
+    expect(service.getBookImageStyle(''), 'DEFAULT');
+    expect(service.getBookDelRubyTag(''), isFalse);
+    expect(service.getBookDelHTag(''), isFalse);
+    expect(service.getChapterSameTitleRemoved('', 'chapter-1'), isFalse);
   });
 
   test('SettingsService 兼容旧格式书籍级开关映射', () async {
@@ -358,6 +420,16 @@ void main() {
           '{"book-a":"false","book-b":"1","book-c":0,"book-d":true}',
       'book_use_replace_rule_map':
           '{"book-a":0,"book-b":"true","book-c":"0","book-d":1}',
+      'book_re_segment_map':
+          '{"book-a":0,"book-b":"true","book-c":"0","book-d":1}',
+      'book_image_style_map':
+          '{"book-a":"default","book-b":"full","book-c":"text","book-d":"single"}',
+      'book_del_ruby_tag_map':
+          '{"book-a":0,"book-b":"true","book-c":"0","book-d":1}',
+      'book_del_h_tag_map':
+          '{"book-a":"false","book-b":"1","book-c":0,"book-d":true}',
+      'chapter_same_title_removed_map':
+          '{"book-a::c1":0,"book-b::c2":"true","book-c::c3":"0","book-d::c4":1}',
     });
     final service = SettingsService();
     await service.init();
@@ -376,5 +448,30 @@ void main() {
     expect(service.getBookUseReplaceRule('book-b'), isTrue);
     expect(service.getBookUseReplaceRule('book-c'), isFalse);
     expect(service.getBookUseReplaceRule('book-d'), isTrue);
+
+    expect(service.getBookReSegment('book-a'), isFalse);
+    expect(service.getBookReSegment('book-b'), isTrue);
+    expect(service.getBookReSegment('book-c'), isFalse);
+    expect(service.getBookReSegment('book-d'), isTrue);
+
+    expect(service.getBookImageStyle('book-a'), 'DEFAULT');
+    expect(service.getBookImageStyle('book-b'), 'FULL');
+    expect(service.getBookImageStyle('book-c'), 'TEXT');
+    expect(service.getBookImageStyle('book-d'), 'SINGLE');
+
+    expect(service.getBookDelRubyTag('book-a'), isFalse);
+    expect(service.getBookDelRubyTag('book-b'), isTrue);
+    expect(service.getBookDelRubyTag('book-c'), isFalse);
+    expect(service.getBookDelRubyTag('book-d'), isTrue);
+
+    expect(service.getBookDelHTag('book-a'), isFalse);
+    expect(service.getBookDelHTag('book-b'), isTrue);
+    expect(service.getBookDelHTag('book-c'), isFalse);
+    expect(service.getBookDelHTag('book-d'), isTrue);
+
+    expect(service.getChapterSameTitleRemoved('book-a', 'c1'), isFalse);
+    expect(service.getChapterSameTitleRemoved('book-b', 'c2'), isTrue);
+    expect(service.getChapterSameTitleRemoved('book-c', 'c3'), isFalse);
+    expect(service.getChapterSameTitleRemoved('book-d', 'c4'), isTrue);
   });
 }

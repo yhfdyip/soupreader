@@ -22,6 +22,90 @@ class WebDavUploadResult {
   const WebDavUploadResult({required this.remoteUrl});
 }
 
+/// 与 legado `BookProgress` 字段保持兼容，并补充 soupreader 侧进度字段。
+class WebDavBookProgress {
+  final String name;
+  final String author;
+  final int durChapterIndex;
+  final int durChapterPos;
+  final int durChapterTime;
+  final String? durChapterTitle;
+  final double? chapterProgress;
+  final double? readProgress;
+  final int? totalChapters;
+
+  const WebDavBookProgress({
+    required this.name,
+    required this.author,
+    required this.durChapterIndex,
+    required this.durChapterPos,
+    required this.durChapterTime,
+    this.durChapterTitle,
+    this.chapterProgress,
+    this.readProgress,
+    this.totalChapters,
+  });
+
+  factory WebDavBookProgress.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic raw, {int fallback = 0}) {
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      if (raw is String) return int.tryParse(raw.trim()) ?? fallback;
+      return fallback;
+    }
+
+    double? parseDouble(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is double) return raw;
+      if (raw is num) return raw.toDouble();
+      if (raw is String) return double.tryParse(raw.trim());
+      return null;
+    }
+
+    String parseString(dynamic raw, {String fallback = ''}) {
+      if (raw == null) return fallback;
+      return raw.toString().trim();
+    }
+
+    final normalizedChapterProgress =
+        parseDouble(json['chapterProgress'])?.clamp(0.0, 1.0).toDouble();
+    final normalizedReadProgress =
+        parseDouble(json['readProgress'])?.clamp(0.0, 1.0).toDouble();
+
+    return WebDavBookProgress(
+      name: parseString(json['name']),
+      author: parseString(json['author']),
+      durChapterIndex: parseInt(json['durChapterIndex']),
+      durChapterPos: parseInt(json['durChapterPos']),
+      durChapterTime: parseInt(json['durChapterTime']),
+      durChapterTitle: parseString(json['durChapterTitle']).isEmpty
+          ? null
+          : parseString(json['durChapterTitle']),
+      chapterProgress: normalizedChapterProgress,
+      readProgress: normalizedReadProgress,
+      totalChapters: json.containsKey('totalChapters')
+          ? parseInt(json['totalChapters'], fallback: 0)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'name': name,
+      'author': author,
+      'durChapterIndex': durChapterIndex,
+      'durChapterPos': durChapterPos,
+      'durChapterTime': durChapterTime,
+      'durChapterTitle': durChapterTitle,
+      if (chapterProgress != null)
+        'chapterProgress': chapterProgress!.clamp(0.0, 1.0).toDouble(),
+      if (readProgress != null)
+        'readProgress': readProgress!.clamp(0.0, 1.0).toDouble(),
+      if (totalChapters != null) 'totalChapters': totalChapters,
+    };
+  }
+}
+
 class WebDavService {
   WebDavService({Dio? dio})
       : _dio = dio ??
@@ -65,12 +149,28 @@ class WebDavService {
     return '${buildRootUrl(settings)}books/';
   }
 
+  String buildBookProgressRootUrl(AppSettings settings) {
+    return '${buildRootUrl(settings)}bookProgress/';
+  }
+
   String buildBookUploadUrl(
     AppSettings settings, {
     required String fileName,
   }) {
     final encodedName = Uri.encodeComponent(fileName.trim());
     return '${buildBooksRootUrl(settings)}$encodedName';
+  }
+
+  String buildBookProgressUrl(
+    AppSettings settings, {
+    required String bookTitle,
+    required String bookAuthor,
+  }) {
+    final merged = '${bookTitle}_${bookAuthor}'.trim();
+    final normalized =
+        _normalizeProgressFileNameSegment(merged.isEmpty ? 'unknown' : merged);
+    final encodedName = Uri.encodeComponent(normalized);
+    return '${buildBookProgressRootUrl(settings)}$encodedName.json';
   }
 
   Future<void> validateConfig(AppSettings settings) async {
@@ -90,6 +190,14 @@ class WebDavService {
     final booksUri = Uri.parse(buildBooksRootUrl(settings));
     await _ensureDirectory(rootUri, settings);
     await _ensureDirectory(booksUri, settings);
+  }
+
+  Future<void> ensureProgressDirectories(AppSettings settings) async {
+    await validateConfig(settings);
+    final rootUri = Uri.parse(buildRootUrl(settings));
+    final progressUri = Uri.parse(buildBookProgressRootUrl(settings));
+    await _ensureDirectory(rootUri, settings);
+    await _ensureDirectory(progressUri, settings);
   }
 
   Future<WebDavUploadResult> uploadLocalBook({
@@ -140,6 +248,91 @@ class WebDavService {
       uri: uploadUri,
       response: response,
     );
+  }
+
+  Future<void> uploadBookProgress({
+    required WebDavBookProgress progress,
+    required AppSettings settings,
+  }) async {
+    await ensureProgressDirectories(settings);
+    final uploadUri = Uri.parse(
+      buildBookProgressUrl(
+        settings,
+        bookTitle: progress.name,
+        bookAuthor: progress.author,
+      ),
+    );
+    final payload = utf8.encode(json.encode(progress.toJson()));
+    final response = await _request(
+      method: 'PUT',
+      uri: uploadUri,
+      settings: settings,
+      data: payload,
+      extraHeaders: const <String, String>{
+        'Content-Type': 'application/json',
+      },
+    );
+    if (_isSuccessStatus(response.statusCode)) {
+      return;
+    }
+    throw _buildStatusException(
+      action: '上传进度',
+      uri: uploadUri,
+      response: response,
+    );
+  }
+
+  Future<WebDavBookProgress?> getBookProgress({
+    required String bookTitle,
+    required String bookAuthor,
+    required AppSettings settings,
+  }) async {
+    await validateConfig(settings);
+    final progressUri = Uri.parse(
+      buildBookProgressUrl(
+        settings,
+        bookTitle: bookTitle,
+        bookAuthor: bookAuthor,
+      ),
+    );
+    final response = await _request(
+      method: 'GET',
+      uri: progressUri,
+      settings: settings,
+    );
+    final code = response.statusCode ?? 0;
+    if (code == 404) {
+      return null;
+    }
+    if (!_isSuccessStatus(code)) {
+      throw _buildStatusException(
+        action: '获取进度',
+        uri: progressUri,
+        response: response,
+      );
+    }
+    final bytes = _responseBytes(response.data);
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+    final rawText = utf8.decode(bytes, allowMalformed: true).trim();
+    if (rawText.isEmpty) {
+      return null;
+    }
+    dynamic decoded;
+    try {
+      decoded = json.decode(rawText);
+    } catch (_) {
+      throw const WebDavOperationException('云端进度文件格式非法（非 JSON）');
+    }
+    if (decoded is! Map) {
+      throw const WebDavOperationException('云端进度文件格式非法（非对象结构）');
+    }
+    final jsonMap = <String, dynamic>{};
+    decoded.forEach((key, value) {
+      jsonMap['$key'] = value;
+    });
+    return WebDavBookProgress.fromJson(jsonMap);
   }
 
   Future<void> _ensureDirectory(Uri uri, AppSettings settings) async {
@@ -283,6 +476,20 @@ class WebDavService {
     final text = data.toString().trim();
     if (text.isEmpty) return null;
     return _trimLength(text);
+  }
+
+  List<int>? _responseBytes(Object? data) {
+    if (data == null) return null;
+    if (data is List<int>) return data;
+    if (data is String) return utf8.encode(data);
+    return utf8.encode(data.toString());
+  }
+
+  String _normalizeProgressFileNameSegment(String input) {
+    var normalized = input.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    normalized = normalized.replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.isEmpty) return 'unknown';
+    return normalized;
   }
 
   String _trimLength(String text, {int max = 120}) {

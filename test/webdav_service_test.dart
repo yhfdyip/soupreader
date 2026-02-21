@@ -44,6 +44,21 @@ void main() {
       );
     });
 
+    test('buildBookProgressUrl 对标 legado 生成进度文件路径', () {
+      const settings = AppSettings(
+        webDavUrl: 'https://dav.example.com/dav/',
+      );
+      final url = service.buildBookProgressUrl(
+        settings,
+        bookTitle: '三体/第一部',
+        bookAuthor: '刘慈欣',
+      );
+      expect(
+        url,
+        'https://dav.example.com/dav/bookProgress/%E4%B8%89%E4%BD%93_%E7%AC%AC%E4%B8%80%E9%83%A8_%E5%88%98%E6%85%88%E6%AC%A3.json',
+      );
+    });
+
     test('hasValidConfig 仅在账号密码齐全时为 true', () {
       expect(
         service.hasValidConfig(const AppSettings()),

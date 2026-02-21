@@ -353,7 +353,10 @@ class TxtParser {
 
     // 对标 legado：当内容“疑似硬换行”时，进行一次重新分段。
     // legado 完整实现：`io.legado.app.help.book.ContentHelp.reSegment`
-    return _reSegmentLikeLegado(trimmedLines).trim();
+    return reSegmentLikeLegado(
+      trimmedLines.join('\n'),
+      chapterTitle: '',
+    );
   }
 
   static List<String> _trimTrailingSpacesPerLine(List<String> lines) {
@@ -458,6 +461,31 @@ class TxtParser {
       return '$l $r';
     }
     return '$l$r';
+  }
+
+  /// 对标 legado 的“重新分段”入口（简化版，可用于阅读器菜单）。
+  static String reSegmentLikeLegado(
+    String content, {
+    required String chapterTitle,
+  }) {
+    var text = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
+    if (text.isEmpty) return '';
+    final lines = _trimTrailingSpacesPerLine(text.split('\n'));
+    if (lines.isEmpty) return '';
+    text = _reSegmentLikeLegado(lines).trim();
+
+    final safeChapterTitle = chapterTitle.trim();
+    if (safeChapterTitle.isEmpty) {
+      return text;
+    }
+    final paragraphs = text.split('\n');
+    if (paragraphs.isNotEmpty &&
+        paragraphs.first.trim() == safeChapterTitle &&
+        paragraphs.length > 1) {
+      paragraphs.removeAt(0);
+      return paragraphs.join('\n').trim();
+    }
+    return text;
   }
 
   /// 对标 legado 的“重新分段”思路（简化版）。

@@ -20,8 +20,24 @@ class SettingsService {
   static const String _keyBookSplitLongChapterMap =
       'book_split_long_chapter_map';
   static const String _keyBookUseReplaceRuleMap = 'book_use_replace_rule_map';
+  static const String _keyBookReSegmentMap = 'book_re_segment_map';
+  static const String _keyBookImageStyleMap = 'book_image_style_map';
+  static const String _keyChapterSameTitleRemovedMap =
+      'chapter_same_title_removed_map';
+  static const String _keyBookDelRubyTagMap = 'book_del_ruby_tag_map';
+  static const String _keyBookDelHTagMap = 'book_del_h_tag_map';
   static const String _keyBookRemoteUploadUrlMap = 'book_remote_upload_url_map';
+  static const String _keyBookReaderImageSizeSnapshotMap =
+      'book_reader_image_size_snapshot_map';
+  static const String _defaultImageStyle = 'DEFAULT';
+  static const Set<String> _validImageStyles = <String>{
+    'DEFAULT',
+    'FULL',
+    'TEXT',
+    'SINGLE',
+  };
   static const int _readingSettingsSchemaVersion = 3;
+  static const int _maxReaderImageSizeSnapshotBytes = 120 * 1024;
 
   late SharedPreferences _prefs;
   late ReadingSettings _readingSettings;
@@ -30,7 +46,13 @@ class SettingsService {
   Map<String, bool> _bookCanUpdateMap = <String, bool>{};
   Map<String, bool> _bookSplitLongChapterMap = <String, bool>{};
   Map<String, bool> _bookUseReplaceRuleMap = <String, bool>{};
+  Map<String, bool> _bookReSegmentMap = <String, bool>{};
+  Map<String, String> _bookImageStyleMap = <String, String>{};
+  Map<String, bool> _chapterSameTitleRemovedMap = <String, bool>{};
+  Map<String, bool> _bookDelRubyTagMap = <String, bool>{};
+  Map<String, bool> _bookDelHTagMap = <String, bool>{};
   Map<String, String> _bookRemoteUploadUrlMap = <String, String>{};
+  Map<String, String> _bookReaderImageSizeSnapshotMap = <String, String>{};
   final ValueNotifier<ReadingSettings> _readingSettingsNotifier =
       ValueNotifier(const ReadingSettings());
   final ValueNotifier<AppSettings> _appSettingsNotifier =
@@ -95,8 +117,18 @@ class SettingsService {
         _decodeBoolMap(_prefs.getString(_keyBookSplitLongChapterMap));
     _bookUseReplaceRuleMap =
         _decodeBoolMap(_prefs.getString(_keyBookUseReplaceRuleMap));
+    _bookReSegmentMap = _decodeBoolMap(_prefs.getString(_keyBookReSegmentMap));
+    _bookImageStyleMap =
+        _decodeStringMap(_prefs.getString(_keyBookImageStyleMap));
+    _chapterSameTitleRemovedMap =
+        _decodeBoolMap(_prefs.getString(_keyChapterSameTitleRemovedMap));
+    _bookDelRubyTagMap =
+        _decodeBoolMap(_prefs.getString(_keyBookDelRubyTagMap));
+    _bookDelHTagMap = _decodeBoolMap(_prefs.getString(_keyBookDelHTagMap));
     _bookRemoteUploadUrlMap =
         _decodeStringMap(_prefs.getString(_keyBookRemoteUploadUrlMap));
+    _bookReaderImageSizeSnapshotMap =
+        _decodeStringMap(_prefs.getString(_keyBookReaderImageSizeSnapshotMap));
   }
 
   Map<String, bool> _decodeBoolMap(String? rawJson) {
@@ -225,6 +257,120 @@ class SettingsService {
     );
   }
 
+  bool getBookReSegment(String bookId, {bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    return _bookReSegmentMap[key] ?? fallback;
+  }
+
+  Future<void> saveBookReSegment(String bookId, bool enabled) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    _bookReSegmentMap = Map<String, bool>.from(_bookReSegmentMap)
+      ..[key] = enabled;
+    await _persistBoolMap(_keyBookReSegmentMap, _bookReSegmentMap);
+  }
+
+  String getBookImageStyle(
+    String bookId, {
+    String fallback = _defaultImageStyle,
+  }) {
+    if (!_isInitialized) return _normalizeImageStyle(fallback);
+    final key = bookId.trim();
+    if (key.isEmpty) return _normalizeImageStyle(fallback);
+    final value = _bookImageStyleMap[key];
+    if (value == null || value.trim().isEmpty) {
+      return _normalizeImageStyle(fallback);
+    }
+    return _normalizeImageStyle(value);
+  }
+
+  Future<void> saveBookImageStyle(String bookId, String style) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final normalized = _normalizeImageStyle(style);
+    _bookImageStyleMap = Map<String, String>.from(_bookImageStyleMap)
+      ..[key] = normalized;
+    await _persistStringMap(_keyBookImageStyleMap, _bookImageStyleMap);
+  }
+
+  String _normalizeImageStyle(String raw) {
+    final normalized = raw.trim().toUpperCase();
+    if (_validImageStyles.contains(normalized)) {
+      return normalized;
+    }
+    return _defaultImageStyle;
+  }
+
+  String? _chapterSameTitleRemovedKey(String bookId, String chapterId) {
+    final safeBookId = bookId.trim();
+    final safeChapterId = chapterId.trim();
+    if (safeBookId.isEmpty || safeChapterId.isEmpty) return null;
+    return '$safeBookId::$safeChapterId';
+  }
+
+  bool getChapterSameTitleRemoved(
+    String bookId,
+    String chapterId, {
+    bool fallback = false,
+  }) {
+    if (!_isInitialized) return fallback;
+    final key = _chapterSameTitleRemovedKey(bookId, chapterId);
+    if (key == null) return fallback;
+    return _chapterSameTitleRemovedMap[key] ?? fallback;
+  }
+
+  Future<void> saveChapterSameTitleRemoved(
+    String bookId,
+    String chapterId,
+    bool removed,
+  ) async {
+    if (!_isInitialized) return;
+    final key = _chapterSameTitleRemovedKey(bookId, chapterId);
+    if (key == null) return;
+    _chapterSameTitleRemovedMap = Map<String, bool>.from(
+      _chapterSameTitleRemovedMap,
+    )..[key] = removed;
+    await _persistBoolMap(
+      _keyChapterSameTitleRemovedMap,
+      _chapterSameTitleRemovedMap,
+    );
+  }
+
+  bool getBookDelRubyTag(String bookId, {bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    return _bookDelRubyTagMap[key] ?? fallback;
+  }
+
+  Future<void> saveBookDelRubyTag(String bookId, bool enabled) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    _bookDelRubyTagMap = Map<String, bool>.from(_bookDelRubyTagMap)
+      ..[key] = enabled;
+    await _persistBoolMap(_keyBookDelRubyTagMap, _bookDelRubyTagMap);
+  }
+
+  bool getBookDelHTag(String bookId, {bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    return _bookDelHTagMap[key] ?? fallback;
+  }
+
+  Future<void> saveBookDelHTag(String bookId, bool enabled) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    _bookDelHTagMap = Map<String, bool>.from(_bookDelHTagMap)..[key] = enabled;
+    await _persistBoolMap(_keyBookDelHTagMap, _bookDelHTagMap);
+  }
+
   String? getBookRemoteUploadUrl(String bookId) {
     if (!_isInitialized) return null;
     final key = bookId.trim();
@@ -246,6 +392,47 @@ class SettingsService {
       ..[key] = value;
     await _persistStringMap(
         _keyBookRemoteUploadUrlMap, _bookRemoteUploadUrlMap);
+  }
+
+  String? getBookReaderImageSizeSnapshot(String bookId) {
+    if (!_isInitialized) return null;
+    final key = bookId.trim();
+    if (key.isEmpty) return null;
+    final value = _bookReaderImageSizeSnapshotMap[key]?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> saveBookReaderImageSizeSnapshot(
+    String bookId,
+    String snapshotJson,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final value = snapshotJson.trim();
+    if (value.isEmpty) {
+      if (_bookReaderImageSizeSnapshotMap.containsKey(key)) {
+        _bookReaderImageSizeSnapshotMap =
+            Map<String, String>.from(_bookReaderImageSizeSnapshotMap)
+              ..remove(key);
+        await _persistStringMap(
+          _keyBookReaderImageSizeSnapshotMap,
+          _bookReaderImageSizeSnapshotMap,
+        );
+      }
+      return;
+    }
+    if (value.length > _maxReaderImageSizeSnapshotBytes) {
+      return;
+    }
+    _bookReaderImageSizeSnapshotMap =
+        Map<String, String>.from(_bookReaderImageSizeSnapshotMap)
+          ..[key] = value;
+    await _persistStringMap(
+      _keyBookReaderImageSizeSnapshotMap,
+      _bookReaderImageSizeSnapshotMap,
+    );
   }
 
   Future<void> _migrateReadingSettingsSchema({

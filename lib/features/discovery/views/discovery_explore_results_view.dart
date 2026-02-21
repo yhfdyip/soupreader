@@ -147,11 +147,6 @@ class _DiscoveryExploreResultsViewState
 
     return AppCupertinoPageScaffold(
       title: widget.exploreName,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: _loading ? null : () => _loadMore(forceRefresh: true),
-        child: const Icon(CupertinoIcons.refresh),
-      ),
       child: Column(
         children: [
           Padding(

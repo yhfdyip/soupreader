@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -21,7 +22,12 @@ import '../models/book.dart';
 
 /// 书架页面 - 纯 iOS 原生风格
 class BookshelfView extends StatefulWidget {
-  const BookshelfView({super.key});
+  final ValueListenable<int>? reselectSignal;
+
+  const BookshelfView({
+    super.key,
+    this.reselectSignal,
+  });
 
   @override
   State<BookshelfView> createState() => _BookshelfViewState();
@@ -31,6 +37,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   bool _isGridView = true;
   // 与 legado 一致：图墙/列表都可展示“更新中”状态。
   final Set<String> _updatingBookIds = <String>{};
+  final ScrollController _scrollController = ScrollController();
   late final BookRepository _bookRepo;
   late final ImportService _importService;
   late final SettingsService _settingsService;
@@ -42,6 +49,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   bool _isImporting = false;
   bool _isUpdatingCatalog = false;
   String? _initError;
+  int? _lastExternalReselectVersion;
 
   @override
   void initState() {
@@ -60,6 +68,8 @@ class _BookshelfViewState extends State<BookshelfView> {
       );
       _isGridView = _settingsService.appSettings.bookshelfViewMode ==
           BookshelfViewMode.grid;
+      _lastExternalReselectVersion = widget.reselectSignal?.value;
+      widget.reselectSignal?.addListener(_onExternalReselectSignal);
       _loadBooks();
       _booksSubscription = _bookRepo.watchAllBooks().listen((books) {
         if (!mounted) return;
@@ -77,9 +87,37 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   @override
+  void didUpdateWidget(covariant BookshelfView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reselectSignal == widget.reselectSignal) return;
+    oldWidget.reselectSignal?.removeListener(_onExternalReselectSignal);
+    _lastExternalReselectVersion = widget.reselectSignal?.value;
+    widget.reselectSignal?.addListener(_onExternalReselectSignal);
+  }
+
+  @override
   void dispose() {
     _booksSubscription?.cancel();
+    widget.reselectSignal?.removeListener(_onExternalReselectSignal);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onExternalReselectSignal() {
+    final version = widget.reselectSignal?.value;
+    if (version == null) return;
+    if (_lastExternalReselectVersion == version) return;
+    _lastExternalReselectVersion = version;
+    _scrollToTop();
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+    );
   }
 
   void _loadBooks() {
@@ -600,6 +638,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
       child: GridView.builder(
+        controller: _scrollController,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
           childAspectRatio: 0.56,
@@ -733,6 +772,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     final scheme = theme.colorScheme;
 
     return ListView.separated(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: _books.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),

@@ -60,6 +60,7 @@ class AppSettings {
   final List<String> searchScopeSourceUrls;
   final bool searchShowCover;
   final bool bookInfoDeleteAlert;
+  final bool syncBookProgress;
   final String webDavUrl;
   final String webDavAccount;
   final String webDavPassword;
@@ -81,6 +82,7 @@ class AppSettings {
     this.searchScopeSourceUrls = const <String>[],
     this.searchShowCover = true,
     this.bookInfoDeleteAlert = true,
+    this.syncBookProgress = true,
     this.webDavUrl = defaultWebDavUrl,
     this.webDavAccount = '',
     this.webDavPassword = '',
@@ -235,6 +237,10 @@ class AppSettings {
         json['bookInfoDeleteAlert'],
         true,
       ),
+      syncBookProgress: parseBoolWithDefault(
+        json['syncBookProgress'] ?? json['sync_book_progress'],
+        true,
+      ),
       webDavUrl: parseString(
         json['webDavUrl'] ?? json['webdavUrl'] ?? defaultWebDavUrl,
       ),
@@ -265,6 +271,7 @@ class AppSettings {
       'searchScopeSourceUrls': searchScopeSourceUrls,
       'searchShowCover': searchShowCover,
       'bookInfoDeleteAlert': bookInfoDeleteAlert,
+      'syncBookProgress': syncBookProgress,
       'webDavUrl': webDavUrl,
       'webDavAccount': webDavAccount,
       'webDavPassword': webDavPassword,
@@ -288,6 +295,7 @@ class AppSettings {
     List<String>? searchScopeSourceUrls,
     bool? searchShowCover,
     bool? bookInfoDeleteAlert,
+    bool? syncBookProgress,
     String? webDavUrl,
     String? webDavAccount,
     String? webDavPassword,
@@ -311,6 +319,7 @@ class AppSettings {
           searchScopeSourceUrls ?? this.searchScopeSourceUrls,
       searchShowCover: searchShowCover ?? this.searchShowCover,
       bookInfoDeleteAlert: bookInfoDeleteAlert ?? this.bookInfoDeleteAlert,
+      syncBookProgress: syncBookProgress ?? this.syncBookProgress,
       webDavUrl: webDavUrl ?? this.webDavUrl,
       webDavAccount: webDavAccount ?? this.webDavAccount,
       webDavPassword: webDavPassword ?? this.webDavPassword,

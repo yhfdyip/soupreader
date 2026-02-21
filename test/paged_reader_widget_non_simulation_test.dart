@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:soupreader/features/reader/models/reading_settings.dart';
+import 'package:soupreader/features/reader/services/reader_image_marker_codec.dart';
 import 'package:soupreader/features/reader/widgets/page_factory.dart';
 import 'package:soupreader/features/reader/widgets/paged_reader_widget.dart';
 
@@ -180,5 +181,43 @@ void main() {
     await tester.pump();
     await _finishTurnAnimation(tester);
     expect(factory.currentPageIndex, 0);
+  });
+
+  testWidgets('图片页在 cover 模式应可完成翻页', (tester) async {
+    final marker = ReaderImageMarkerCodec.encode(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/w8AAusB9Y8Zs2gAAAAASUVORK5CYII=',
+    );
+    final factory = PageFactory();
+    final content =
+        List<String>.filled(120, '用于填充分页的正文内容').join('\n') + '\n$marker\n尾段文本';
+    factory.setChapters(
+      <ChapterData>[
+        ChapterData(title: '第一章', content: content),
+      ],
+      0,
+    );
+    factory.setLayoutParams(
+      contentHeight: 120,
+      contentWidth: 220,
+      fontSize: 20,
+      lineHeight: 1.4,
+      legacyImageStyle: 'SINGLE',
+    );
+    factory.paginateAll();
+    expect(factory.totalPages, greaterThan(1));
+
+    await tester.pumpWidget(
+      _buildReader(
+        factory: factory,
+        mode: PageTurnMode.cover,
+      ),
+    );
+    await tester.pump();
+
+    expect(factory.currentPageIndex, 0);
+    await tester.tapAt(const Offset(370, 420));
+    await tester.pump();
+    await _finishTurnAnimation(tester);
+    expect(factory.currentPageIndex, 1);
   });
 }

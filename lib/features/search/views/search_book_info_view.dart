@@ -30,6 +30,7 @@ import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_login_form_view.dart';
+import '../../source/views/source_qr_share_view.dart';
 import '../../source/views/source_web_verify_view.dart';
 import '../services/search_book_info_edit_helper.dart';
 import '../services/search_book_info_menu_helper.dart';
@@ -620,7 +621,16 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       _showMessage('当前书籍缺少可分享的链接');
       return;
     }
-    await _copyText(_buildSharePayload(), '已复制分享内容');
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceQrShareView(
+          text: _buildSharePayload(),
+          subject: _displayName.trim().isEmpty ? '书籍二维码' : _displayName.trim(),
+          hintText: '使用其他设备扫码分享书籍',
+        ),
+      ),
+    );
   }
 
   Future<void> _openBookEdit() async {
@@ -709,8 +719,12 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       return;
     }
 
+    final now = DateTime.now();
     await _bookRepo.updateBook(
-      stored.copyWith(addedTime: DateTime.now()),
+      stored.copyWith(
+        addedTime: now,
+        lastReadTime: now,
+      ),
     );
     if (!mounted) return;
     setState(() {});
@@ -939,12 +953,23 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   Future<void> _toggleSplitLongChapter() async {
     final next = !_splitLongChapter;
-    setState(() => _splitLongChapter = next);
+    if (!mounted) return;
+    setState(() {
+      _splitLongChapter = next;
+      _loading = true;
+      _loadingToc = true;
+    });
     final id = _bookId?.trim() ?? '';
     if (_inBookshelf && id.isNotEmpty) {
       await _settingsService.saveBookSplitLongChapter(id, next);
     }
-    _showMessage(next ? '已开启“分割长章节”' : '已关闭“分割长章节”');
+    await _loadContext(silent: true);
+    if (!mounted) return;
+    if (!next) {
+      _showMessage('已关闭“分割长章节”，重新加载正文可能需要更长时间');
+      return;
+    }
+    _showMessage('已开启“分割长章节”');
   }
 
   Future<void> _toggleDeleteAlertEnabled() async {
@@ -1333,8 +1358,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     );
     final canSetVariable = source != null;
     final showAllowUpdate = source != null;
-    final canCopyBookUrl = _resolveBookUrl().isNotEmpty;
-    final canCopyTocUrl = _resolveTocUrl().isNotEmpty;
     const canClearCache = true;
     final showUpload = _isLocalBook();
     final showSplitLongChapter = _isLocalTxtBook();
@@ -1367,14 +1390,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
               },
               child: const Text('登录'),
             ),
-          if (_inBookshelf)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _pinBookToTop();
-              },
-              child: const Text('置顶'),
-            ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _pinBookToTop();
+            },
+            child: const Text('置顶'),
+          ),
           if (canSetVariable)
             CupertinoActionSheetAction(
               onPressed: () async {
@@ -1391,22 +1413,20 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
               },
               child: const Text('设置书籍变量'),
             ),
-          if (canCopyBookUrl)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _copyBookUrl();
-              },
-              child: const Text('复制书籍链接'),
-            ),
-          if (canCopyTocUrl)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _copyTocUrl();
-              },
-              child: const Text('复制目录链接'),
-            ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _copyBookUrl();
+            },
+            child: const Text('复制书籍链接'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _copyTocUrl();
+            },
+            child: const Text('复制目录链接'),
+          ),
           if (showAllowUpdate)
             CupertinoActionSheetAction(
               onPressed: () async {

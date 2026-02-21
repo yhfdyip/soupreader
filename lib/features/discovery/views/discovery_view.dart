@@ -108,22 +108,21 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   List<BookSource> _eligibleSources(List<BookSource> input) {
-    final eligible = input.where((source) {
-      final hasExplore = (source.exploreUrl ?? '').trim().isNotEmpty &&
-          source.ruleExplore != null;
-      return source.enabled && source.enabledExplore && hasExplore;
+    // 对齐 legado BookSourceDao.flowExplore：
+    // 仅以 enabledExplore + hasExploreUrl 作为发现页可见条件，并按 customOrder 升序。
+    final indexed = input.asMap().entries.where((entry) {
+      final source = entry.value;
+      final hasExploreUrl = (source.exploreUrl ?? '').trim().isNotEmpty;
+      return source.enabledExplore && hasExploreUrl;
     }).toList(growable: false);
 
-    eligible.sort((a, b) {
-      final byOrder = a.customOrder.compareTo(b.customOrder);
+    indexed.sort((a, b) {
+      final byOrder = a.value.customOrder.compareTo(b.value.customOrder);
       if (byOrder != 0) return byOrder;
-      final byWeight = b.weight.compareTo(a.weight);
-      if (byWeight != 0) return byWeight;
-      return a.bookSourceName
-          .toLowerCase()
-          .compareTo(b.bookSourceName.toLowerCase());
+      // customOrder 相同时保持原输入顺序，避免非 legacy 语义下的额外排序。
+      return a.key.compareTo(b.key);
     });
-    return eligible;
+    return indexed.map((entry) => entry.value).toList(growable: false);
   }
 
   List<String> _buildGroups(List<BookSource> sources) {
@@ -163,13 +162,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 _setQuery('group:$group');
               },
             ),
-          CupertinoActionSheetAction(
-            child: const Text('清空筛选'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _setQuery('');
-            },
-          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           child: const Text('取消'),
@@ -283,13 +275,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               _toTop(source);
             },
           ),
-          CupertinoActionSheetAction(
-            child: const Text('源内搜索'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _searchInSource(source);
-            },
-          ),
           if ((source.loginUrl ?? '').trim().isNotEmpty)
             CupertinoActionSheetAction(
               child: const Text('登录'),
@@ -298,6 +283,13 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 _openSourceLogin(source);
               },
             ),
+          CupertinoActionSheetAction(
+            child: const Text('搜索'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _searchInSource(source);
+            },
+          ),
           CupertinoActionSheetAction(
             child: const Text('刷新发现缓存'),
             onPressed: () {
@@ -540,7 +532,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     String subtitle;
     if (eligibleCount == 0) {
-      subtitle = '没有可用的发现书源\n请先导入带 exploreUrl/ruleExplore 的 Legado 书源';
+      subtitle = '没有可用的发现书源\n请先导入带 exploreUrl 的 Legado 书源';
     } else if (query.isNotEmpty) {
       subtitle = '当前筛选条件下无书源';
     } else {
@@ -638,12 +630,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                         ],
                       ],
                     ),
-                  ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(26, 26),
-                    onPressed: () => _showSourceActions(source),
-                    child: const Icon(CupertinoIcons.ellipsis),
                   ),
                 ],
               ),

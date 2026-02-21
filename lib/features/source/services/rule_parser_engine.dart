@@ -4896,7 +4896,10 @@ class RuleParserEngine {
       if (rule.replaceRegex != null && rule.replaceRegex!.trim().isNotEmpty) {
         processed = _applyReplaceRegex(processed, rule.replaceRegex!);
       }
-      final cleaned = _cleanContent(processed);
+      final cleaned = _cleanContent(
+        processed,
+        baseUrl: currentUrl,
+      );
       if (cleaned.trim().isNotEmpty) parts.add(cleaned);
 
       if (nextCandidates.isNotEmpty) {
@@ -6232,7 +6235,10 @@ class RuleParserEngine {
             contentRule.replaceRegex!.trim().isNotEmpty) {
           processed = _applyReplaceRegex(processed, contentRule.replaceRegex!);
         }
-        final cleaned = _cleanContent(processed);
+        final cleaned = _cleanContent(
+          processed,
+          baseUrl: currentUrl,
+        );
         if (cleaned.trim().isNotEmpty) parts.add(cleaned);
 
         if (nextCandidates.isNotEmpty) {
@@ -6415,7 +6421,10 @@ class RuleParserEngine {
             contentRule.replaceRegex!.isNotEmpty) {
           text = _applyReplaceRegex(text, contentRule.replaceRegex!);
         }
-        final cleaned = _cleanContent(text);
+        final cleaned = _cleanContent(
+          text,
+          baseUrl: currentUrl,
+        );
         if (cleaned.trim().isNotEmpty) parts.add(cleaned);
 
         if (nextCandidates.isNotEmpty) {
@@ -8660,9 +8669,16 @@ class RuleParserEngine {
   }
 
   /// 清理正文内容
-  String _cleanContent(String content) {
-    // 对齐 legado 的 HTML -> 文本清理策略（块级标签换行、不可见字符移除）
-    return HtmlTextFormatter.formatToPlainText(content);
+  String _cleanContent(
+    String content, {
+    required String baseUrl,
+  }) {
+    // 对齐 legado BookContent.analyzeContent + HtmlFormatter.formatKeepImg：
+    // 保留并绝对化 <img src="...">，供阅读层按图片样式渲染。
+    return HtmlTextFormatter.formatKeepImageTags(
+      content,
+      baseUrl: baseUrl,
+    );
   }
 }
 

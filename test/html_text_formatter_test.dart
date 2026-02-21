@@ -28,5 +28,27 @@ void main() {
       expect(HtmlTextFormatter.formatToPlainText(input), 'TextBold');
     });
   });
-}
 
+  group('HtmlTextFormatter.formatKeepImageTags', () {
+    test('keeps img tags and resolves src to absolute url', () {
+      final input = '<div>图前<img data-src="/img/a.jpg"/>图后</div>';
+      final output = HtmlTextFormatter.formatKeepImageTags(
+        input,
+        baseUrl: 'https://example.com/book/1',
+      );
+      expect(output, '　　图前<img src="https://example.com/img/a.jpg">图后');
+    });
+
+    test('keeps legado style image option suffix', () {
+      final input = '<p><img src="/i.jpg{Referer@https://example.com}"/></p>';
+      final output = HtmlTextFormatter.formatKeepImageTags(
+        input,
+        baseUrl: 'https://example.com/chapter/1',
+      );
+      expect(
+        output,
+        '　　<img src="https://example.com/i.jpg{Referer@https://example.com}">',
+      );
+    });
+  });
+}
