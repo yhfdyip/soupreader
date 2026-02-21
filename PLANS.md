@@ -6,37 +6,67 @@
 - 状态：`active`
 - 主执行文档：`docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`
 - 逐项跟踪台账：`docs/plans/2026-02-21-legado-feature-item-tracker.csv`
+- 功能项优先级队列：`docs/plans/2026-02-21-legado-feature-priority-queue.csv`
 - 执行口径：以 `seq=1..410` 为最小执行单元，一项一处理、一项一验收、一项一回填。
 
 ## 执行原则
 
 - 严格以 `../legado` 行为语义为第一标准。
 - 逐项串行推进，不并发处理同一功能链路。
+- 全量优先级执行顺序：`P1 -> P2 -> P3 -> P4 -> P5 -> P6 -> P8 -> P7 -> P10 -> P9`。
+- 具体功能项执行顺序以 `priority_order` 为准（见 `docs/plans/2026-02-21-legado-feature-priority-queue.csv`）。
+- 用户约束（2026-02-21）：`book_manga.xml` 全部功能先不做，统一标记 `blocked`，优先推进文字阅读链路（`book_read*.xml`、`book_toc.xml`、`book_info*.xml`）。
+- 细节项后置（2026-02-21）：排序/文案/拷贝/日志/帮助/主题类差异默认放到主功能完成后处理。
 - 每个功能项完成后，必须同步更新：
   - `docs/plans/2026-02-21-legado-feature-item-tracker.csv`（`status/owner/verify/notes`）
   - `docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`（`Progress/Decision Log`）
 - 未到“提交推送”阶段，不执行 `flutter analyze`。
 
+## 全量优先级（覆盖 410 项）
+
+| 优先级层 | Phase | 项数 | 排序依据 | 说明 |
+|---|---|---:|---|---|
+| S0 | P2 + P3 | 127 | 核心五段链路直接相关 | 优先完成搜索/详情/目录与阅读正文全链路 |
+| S1 | P4 + P5 | 131 | 核心链路关键依赖 | 书源管理与规则能力影响主链路可用性 |
+| S2 | P6 + P8 | 58 | 核心链路支撑能力 | 书架缓存分组、导入导出与备份能力 |
+| S3 | P7 | 47 | 独立业务域 | RSS 不阻塞主阅读链路 |
+| S4 | P10 + P9 | 26 | 收口域 | 系统工具与主题外观放在最后收口 |
+| HOLD | P3(book_manga) | 18 | 用户冻结 | 漫画功能暂缓，待解锁后恢复执行 |
+
+优先级落地规则：
+- `P1`（21 项）已完成，保持 `done`。
+- 所有未完成项按“优先级层 -> Phase -> seq 升序”执行。
+- 同一优先级层内不并行推进多个 Phase，避免跨域回归干扰。
+- 在同一优先级层内，进一步按 `docs/plans/2026-02-21-legado-feature-priority-queue.csv` 的 `priority_order` 执行到功能项（seq）级别。
+- `HOLD` 层不执行，直到收到“开始做漫画功能”的明确指令。
+- 标记为 `detail_later` 的项默认在对应模块主功能可用后再处理。
+
 ## Todo（依赖与串并行）
 
-| ID | 状态 | 并行性 | 依赖 | 任务 | 交付物 | 验证 |
-|---|---|---|---|---|---|---|
-| T00 | done | 串行 | 无 | 清理历史计划/进度文件并重建计划基线 | 新 `PLANS.md` + 新 ExecPlan + 新 410 项跟踪台账 | 文件存在且计数正确 |
-| T01 | done | 串行 | T00 | Phase P1：主入口与导航（21项）逐项迁移与验收 | 跟踪台账 P1 全部 `done` | 定向测试 + 手工路径 |
-| T02 | active | 串行 | T01 | Phase P2：搜索/详情/目录（38项）逐项迁移与验收 | 跟踪台账 P2 全部 `done` | 定向测试 + 手工路径 |
-| T03 | pending | 串行 | T02 | Phase P3：阅读与朗读（89项）逐项迁移与验收 | 跟踪台账 P3 全部 `done` | 定向测试 + 手工路径 |
-| T04 | pending | 串行 | T03 | Phase P4：书源管理与换源（85项）逐项迁移与验收 | 跟踪台账 P4 全部 `done` | 定向测试 + 手工路径 |
-| T05 | pending | 串行 | T04 | Phase P5：规则与净化（46项）逐项迁移与验收 | 跟踪台账 P5 全部 `done` | 定向测试 + 手工路径 |
-| T06 | pending | 串行 | T05 | Phase P6：书架/缓存/分组（31项）逐项迁移与验收 | 跟踪台账 P6 全部 `done` | 定向测试 + 手工路径 |
-| T07 | pending | 串行 | T06 | Phase P7：RSS（47项）逐项迁移与验收 | 跟踪台账 P7 全部 `done` | 定向测试 + 手工路径 |
-| T08 | pending | 串行 | T07 | Phase P8：导入导出与备份（27项）逐项迁移与验收 | 跟踪台账 P8 全部 `done` | 定向测试 + 手工路径 |
-| T09 | pending | 串行 | T08 | Phase P9：主题与外观（2项）逐项迁移与验收 | 跟踪台账 P9 全部 `done` | 定向测试 + 手工路径 |
-| T10 | pending | 串行 | T09 | Phase P10：系统与工具（24项）逐项迁移与验收 | 跟踪台账 P10 全部 `done` | 定向测试 + 手工路径 |
-| T11 | pending | 串行 | T10 | 全量复核与最终收口（410项） | 最终对照清单与收尾结论 | 仅提交前一次 `flutter analyze` |
+| ID | 优先级 | 状态 | 并行性 | 依赖 | 任务 | 交付物 | 验证 |
+|---|---|---|---|---|---|---|---|
+| T00 | - | done | 串行 | 无 | 清理历史计划/进度文件并重建计划基线 | 新 `PLANS.md` + 新 ExecPlan + 新 410 项跟踪台账 | 文件存在且计数正确 |
+| T01 | - | done | 串行 | T00 | Phase P1：主入口与导航（21项）逐项迁移与验收 | 跟踪台账 P1 全部 `done` | 定向测试 + 手工路径 |
+| T02 | S0 | active | 串行 | T01 | Phase P2：搜索/详情/目录（38项）逐项迁移与验收 | 跟踪台账 P2 全部 `done` | 定向测试 + 手工路径 |
+| T03 | S0 | pending | 串行 | T02 | Phase P3：阅读与朗读（文字链路）逐项迁移与验收 | 跟踪台账 P3（非漫画项）全部 `done` | 定向测试 + 手工路径 |
+| T03A | HOLD | blocked | 串行 | T11 | Phase P3：漫画链路（`book_manga.xml`，18项）冻结 | 跟踪台账漫画项保持 `blocked` | 待需求解锁 |
+| T04 | S1 | pending | 串行 | T03 | Phase P4：书源管理与换源（85项）逐项迁移与验收 | 跟踪台账 P4 全部 `done` | 定向测试 + 手工路径 |
+| T05 | S1 | pending | 串行 | T04 | Phase P5：规则与净化（46项）逐项迁移与验收 | 跟踪台账 P5 全部 `done` | 定向测试 + 手工路径 |
+| T06 | S2 | pending | 串行 | T05 | Phase P6：书架/缓存/分组（31项）逐项迁移与验收 | 跟踪台账 P6 全部 `done` | 定向测试 + 手工路径 |
+| T07 | S2 | pending | 串行 | T06 | Phase P8：导入导出与备份（27项）逐项迁移与验收 | 跟踪台账 P8 全部 `done` | 定向测试 + 手工路径 |
+| T08 | S3 | pending | 串行 | T07 | Phase P7：RSS（47项）逐项迁移与验收 | 跟踪台账 P7 全部 `done` | 定向测试 + 手工路径 |
+| T09 | S4 | pending | 串行 | T08 | Phase P10：系统与工具（24项）逐项迁移与验收 | 跟踪台账 P10 全部 `done` | 定向测试 + 手工路径 |
+| T10 | S4 | pending | 串行 | T09 | Phase P9：主题与外观（2项）逐项迁移与验收 | 跟踪台账 P9 全部 `done` | 定向测试 + 手工路径 |
+| T11 | 收口 | pending | 串行 | T10 | 全量复核与最终收口（410项） | 最终对照清单与收尾结论 | 仅提交前一次 `flutter analyze` |
 
 ## Progress（动态）
 
 - `2026-02-21`
+  - 新增执行约束：排序/文案/拷贝/日志/帮助/主题类差异归为 `detail_later`，默认后置到主功能完成后处理。
+  - 新增用户约束：漫画功能先不做，`book_manga.xml`（`seq46~63`）统一冻结为 `blocked`，优先推进文字阅读链路。
+  - 优先级队列重排：功能项级队列新增 `HOLD` 层，漫画项降级到末尾冻结区。
+  - 新增功能项级优先级输出：生成 `docs/plans/2026-02-21-legado-feature-priority-queue.csv`（`411` 行，含表头；覆盖全部 `410` 功能项），字段含 `priority_order/priority_tier/priority_score/priority_reason`，用于替代“仅模块级”排序。
+  - 计划重排：按“覆盖全部 410 项”的优先级模型重排执行顺序，调整为 `P2 -> P3 -> P4 -> P5 -> P6 -> P8 -> P7 -> P10 -> P9`，并在 Todo 中补充优先级层 `S0~S4`。
   - 完成 T00：已清空历史计划/进度文档，并重建新的单一主计划与 410 项跟踪台账。
   - 当前进入 T01：从 `P1 主入口与导航` 开始逐项推进。
   - 完成 `T01-seq257`（`main_bnv.xml / menu_bookshelf / 书架`）：修正重选触发为 legado 同义的 `300ms` 双击回顶语义；验证 `flutter test test/widget_test.dart` 通过。
@@ -93,7 +123,14 @@
   - 完成 `T02-seq113`（`book_source.xml / action_sort / 排序`）：将书源管理排序弹层父级标题由“排序选项”收敛为 legado 同义“排序”，并补齐“顶栏排序入口打开排序菜单”定向回归用例；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
   - 完成 `T02-seq114`（`book_source.xml / menu_sort_desc / 反序`）：将书源管理排序菜单中的动态切换文案（“切换为降序/升序”）收敛为 legado 同义固定“反序” checkable 语义，点击后仅切换排序方向与勾选态；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
   - 完成 `T02-seq115`（`book_source.xml / menu_sort_manual / 手动排序`）：补齐 legado 同义“手动排序单选勾选项”迁移证据，新增“先切到其它排序再切回手动”定向回归并确认仅“手动排序”保留勾选态；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
-  - 下一项：`seq116`（`book_source.xml / menu_sort_auto / 智能排序`）。
+  - 完成 `T02-seq116`（`book_source.xml / menu_sort_auto / 智能排序`）：将书源管理排序菜单该子项文案由“权重”收敛为 legado 同义“智能排序”，并补齐“点击后单选勾选态保持”的页面级回归用例；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
+  - 完成 `T02-seq117`（`book_source.xml / menu_sort_name / 名称排序`）：将书源管理排序菜单该子项文案由“名称”收敛为 legado 同义“名称排序”，并补齐“点击后单选勾选态保持”的页面级回归用例；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
+  - 完成 `T02-seq118`（`book_source.xml / menu_sort_url / 地址排序`）：将书源管理排序菜单该子项文案由“地址”收敛为 legado 同义“地址排序”，并补齐“点击后单选勾选态保持”的页面级回归用例；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
+  - 完成 `T02-seq119`（`book_source.xml / menu_sort_time / 更新时间排序`）：将书源管理排序菜单该子项文案由“更新时间”收敛为 legado 同义“更新时间排序”，并补齐“更新时间排序勾选态保持 + 反序联动勾选态保持”的页面级回归用例；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
+  - 完成 `T02-seq120`（`book_source.xml / menu_sort_respondTime / 响应时间排序`）：将书源管理排序菜单该子项文案由“响应时间”收敛为 legado 同义“响应时间排序”，并补齐“点击后单选勾选态保持”的页面级回归用例；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
+  - 完成 `T02-seq121`（`book_source.xml / menu_sort_enable / 是否启用`）：将书源管理排序菜单该子项文案由“启用状态”收敛为 legado 同义“是否启用”，并修正 `enabled` 排序在反序场景的边界语义为“仅反转启用分组、同组名称保持正序”；验证 `flutter test test/source_list_view_sort_action_test.dart` 通过。
+  - 完成 `T02-seq122`（`book_source.xml / menu_group / 分组`）：将书源管理顶栏分组入口图标由 `folder` 收敛为 legado `ic_groups` 同义的分组语义图标，并补齐“分组入口弹层触发 + 动态分组写入 `group:` 即时筛选”的页面级回归证据；验证 `flutter test test/source_list_view_sort_action_test.dart test/search_view_source_manage_action_test.dart` 通过。
+  - 下一项：`seq123`（`book_source.xml / menu_group_manage / 分组管理`）。
 
 ## 说明
 

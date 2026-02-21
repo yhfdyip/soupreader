@@ -44,24 +44,24 @@ seq,menu_file,item_id,title_ref,title_zh,domain,phase,status,owner,verify,notes
 43,book_info.xml,@+id/menu_clear_cache,@string/clear_cache,清理缓存,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_clear_cache_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->清理缓存->确认弹窗提示“成功清理缓存”并校验不再出现“当前书籍不在书架，无法清理缓存/暂无可清理的章节缓存/已清理缓存：x章”扩展提示；非书架详情同样执行清理并验证无“无法清理缓存”拦截提示,将 menu_clear_cache 收敛为 legado 同义语义：不依赖书架状态 点击即执行清理并统一提示“成功清理缓存”；补齐非书架场景的 ephemeral 书籍清理回归，并修复 Chapter.copyWith 无法显式置空 content 导致清理后内存缓存残留的问题
 44,book_info.xml,@+id/menu_log,@string/log,日志,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_view_log_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->右上角更多->日志->弹出日志对话框并可清空,将详情页 menu_log 从“异常日志”页面跳转收敛为 legado menu_log->AppLogDialog 同义弹层语义（标题“日志” 空态“暂无日志”）
 45,book_info_edit.xml,@+id/menu_save,@string/action_save,保存,搜索/详情/目录,P2,done,codex,flutter test test/search_book_info_edit_helper_test.dart test/search_book_info_view_edit_action_test.dart test/search_book_info_view_compile_test.dart 通过; 手工路径: 书架打开书籍详情->点击编辑->编辑页右上角保存并返回详情页,将 menu_save 保存语义收敛为 legado 同义: 保存按钮文案固定“保存” 保存后直接返回详情页且不追加“书籍信息已保存”扩展提示 字段按输入值落库（作者空白不回退旧值）并补齐保存失败可观测提示
-46,book_manga.xml,@+id/menu_change_source,@string/change_origin,换源,阅读与朗读,P3,pending,-,-,-
-47,book_manga.xml,@+id/menu_refresh,@string/refresh,刷新,阅读与朗读,P3,pending,-,-,-
-48,book_manga.xml,@+id/menu_catalog,@string/chapter_list,目录,阅读与朗读,P3,pending,-,-,-
-49,book_manga.xml,@+id/menu_pre_manga_number,@string/pre_download,预下载,阅读与朗读,P3,pending,-,-,-
-50,book_manga.xml,@+id/menu_disable_manga_scale,@string/disable_manga_scale,禁用漫画缩放,阅读与朗读,P3,pending,-,-,-
-51,book_manga.xml,@+id/menu_disable_click_scroll,@string/disable_manga_click_scroll,禁用点击翻页,阅读与朗读,P3,pending,-,-,-
-52,book_manga.xml,@+id/menu_enable_auto_page,@string/enable_auto_page_scroll,开启自动翻页,阅读与朗读,P3,pending,-,-,-
-53,book_manga.xml,@+id/menu_enable_auto_scroll,@string/enable_auto_scroll,开启滚动,阅读与朗读,P3,pending,-,-,-
-54,book_manga.xml,@+id/menu_manga_auto_page_speed,@string/manga_auto_page_speed,翻页速度 %s,阅读与朗读,P3,pending,-,-,-
-55,book_manga.xml,@+id/menu_enable_horizontal_scroll,@string/enable_manga_horizontal_scroll,水平滚动,阅读与朗读,P3,pending,-,-,-
-56,book_manga.xml,@+id/menu_disable_horizontal_page_snap,@string/disable_horizontal_page_snap,禁用水平翻页效果,阅读与朗读,P3,pending,-,-,-
-57,book_manga.xml,@+id/menu_disable_manga_page_anim,@string/disable_manga_page_anim,禁用翻页动画,阅读与朗读,P3,pending,-,-,-
-58,book_manga.xml,@+id/menu_manga_footer_config,@string/manga_footer_config,页脚配置,阅读与朗读,P3,pending,-,-,-
-59,book_manga.xml,@+id/menu_manga_color_filter,@string/manga_color_filter,滤镜,阅读与朗读,P3,pending,-,-,-
-60,book_manga.xml,@+id/menu_hide_manga_title,@string/hide_manga_title,隐藏漫画列表标题,阅读与朗读,P3,pending,-,-,-
-61,book_manga.xml,@+id/menu_epaper_manga,@string/manga_epaper,墨水屏,阅读与朗读,P3,pending,-,-,-
-62,book_manga.xml,@+id/menu_epaper_manga_setting,@string/manga_epaper_stting,墨水屏设置,阅读与朗读,P3,pending,-,-,-
-63,book_manga.xml,@+id/menu_gray_manga,@string/enable_manga_gray,开启图片灰色,阅读与朗读,P3,pending,-,-,-
+46,book_manga.xml,@+id/menu_change_source,@string/change_origin,换源,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+47,book_manga.xml,@+id/menu_refresh,@string/refresh,刷新,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+48,book_manga.xml,@+id/menu_catalog,@string/chapter_list,目录,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+49,book_manga.xml,@+id/menu_pre_manga_number,@string/pre_download,预下载,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+50,book_manga.xml,@+id/menu_disable_manga_scale,@string/disable_manga_scale,禁用漫画缩放,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+51,book_manga.xml,@+id/menu_disable_click_scroll,@string/disable_manga_click_scroll,禁用点击翻页,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+52,book_manga.xml,@+id/menu_enable_auto_page,@string/enable_auto_page_scroll,开启自动翻页,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+53,book_manga.xml,@+id/menu_enable_auto_scroll,@string/enable_auto_scroll,开启滚动,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+54,book_manga.xml,@+id/menu_manga_auto_page_speed,@string/manga_auto_page_speed,翻页速度 %s,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+55,book_manga.xml,@+id/menu_enable_horizontal_scroll,@string/enable_manga_horizontal_scroll,水平滚动,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+56,book_manga.xml,@+id/menu_disable_horizontal_page_snap,@string/disable_horizontal_page_snap,禁用水平翻页效果,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+57,book_manga.xml,@+id/menu_disable_manga_page_anim,@string/disable_manga_page_anim,禁用翻页动画,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+58,book_manga.xml,@+id/menu_manga_footer_config,@string/manga_footer_config,页脚配置,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+59,book_manga.xml,@+id/menu_manga_color_filter,@string/manga_color_filter,滤镜,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+60,book_manga.xml,@+id/menu_hide_manga_title,@string/hide_manga_title,隐藏漫画列表标题,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+61,book_manga.xml,@+id/menu_epaper_manga,@string/manga_epaper,墨水屏,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+62,book_manga.xml,@+id/menu_epaper_manga_setting,@string/manga_epaper_stting,墨水屏设置,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
+63,book_manga.xml,@+id/menu_gray_manga,@string/enable_manga_gray,开启图片灰色,阅读与朗读,P3,blocked,-,-,用户要求: 先做文字阅读，漫画功能暂缓
 64,book_read.xml,@+id/menu_change_source,@string/change_origin,换源,阅读与朗读,P3,pending,-,-,-
 65,book_read.xml,@+id/menu_refresh,@string/refresh,刷新,阅读与朗读,P3,pending,-,-,-
 66,book_read.xml,@+id/menu_download,@string/offline_cache,离线缓存,阅读与朗读,P3,pending,-,-,-
@@ -113,14 +113,14 @@ seq,menu_file,item_id,title_ref,title_zh,domain,phase,status,owner,verify,notes
 112,book_search_scope.xml,@+id/menu_screen,@string/screen,筛选,搜索/详情/目录,P2,done,codex,flutter test test/search_scope_picker_view_menu_screen_test.dart test/search_scope_picker_helper_test.dart test/search_scope_picker_view_compile_test.dart test/search_view_search_scope_action_test.dart 通过; 手工路径: 书架->搜索->右上角设置->多分组/书源->切换书源模式->顶栏筛选输入乙组,将 menu_screen 收敛为 legado 同义“仅书源模式展示顶栏筛选入口”语义: 筛选输入框移动到导航栏 trailing 且分组模式隐藏 保持书源名/分组/URL/备注四字段筛选与模式切换后筛选词持续生效
 113,book_source.xml,@+id/action_sort,@string/sort,排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序,将书源管理顶栏排序入口标题由“排序选项”收敛为 legado 同义“排序”并补齐 action_sort 弹层触发回归用例
 114,book_source.xml,@+id/menu_sort_desc,@string/sort_desc,反序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->反序->再次打开排序确认勾选态,将 menu_sort_desc 收敛为 legado 同义“固定反序文案 + checkable 勾选态”语义: 移除“切换为降序/升序”扩展文案 点击后仅切换排序方向与勾选态
-115,book_source.xml,@+id/menu_sort_manual,@string/sort_manual,手动排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->权重->再次顶栏排序->手动排序,将 menu_sort_manual 收敛为 legado 同义“手动排序单选勾选项”语义: 从其它排序切回手动排序后仅手动项保持勾选 并恢复默认排序模式
-116,book_source.xml,@+id/menu_sort_auto,@string/sort_auto,智能排序,书源管理与换源,P4,pending,-,-,-
-117,book_source.xml,@+id/menu_sort_name,@string/sort_by_name,名称排序,书源管理与换源,P4,pending,-,-,-
-118,book_source.xml,@+id/menu_sort_url,@string/sort_by_url,地址排序,书源管理与换源,P4,pending,-,-,-
-119,book_source.xml,@+id/menu_sort_time,@string/sort_by_lastUpdateTime,更新时间排序,书源管理与换源,P4,pending,-,-,-
-120,book_source.xml,@+id/menu_sort_respondTime,@string/sort_by_respondTime,响应时间排序,书源管理与换源,P4,pending,-,-,-
-121,book_source.xml,@+id/menu_sort_enable,@string/is_enabled,是否启用,书源管理与换源,P4,pending,-,-,-
-122,book_source.xml,@+id/menu_group,@string/menu_action_group,分组,书源管理与换源,P4,pending,-,-,-
+115,book_source.xml,@+id/menu_sort_manual,@string/sort_manual,手动排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->智能排序->再次顶栏排序->手动排序,将 menu_sort_manual 收敛为 legado 同义“手动排序单选勾选项”语义: 从其它排序切回手动排序后仅手动项保持勾选 并恢复默认排序模式
+116,book_source.xml,@+id/menu_sort_auto,@string/sort_auto,智能排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->智能排序->再次顶栏排序确认勾选态,将 menu_sort_auto 收敛为 legado 同义“智能排序单选勾选项”语义: 菜单文案由“权重”收敛为“智能排序” 点击后切换为权重排序模式并保持单选勾选态
+117,book_source.xml,@+id/menu_sort_name,@string/sort_by_name,名称排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->名称排序->再次顶栏排序确认勾选态,将 menu_sort_name 收敛为 legado 同义“名称排序单选勾选项”语义: 菜单文案由“名称”收敛为“名称排序” 点击后切换为名称排序模式并保持单选勾选态
+118,book_source.xml,@+id/menu_sort_url,@string/sort_by_url,地址排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->地址排序->再次打开排序确认勾选态,将 menu_sort_url 收敛为 legado 同义“地址排序单选勾选项”语义: 菜单文案由“地址”收敛为“地址排序” 点击后切换为 URL 排序并保持单选勾选态
+119,book_source.xml,@+id/menu_sort_time,@string/sort_by_lastUpdateTime,更新时间排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径(待回归): 搜索->设置->书源管理->顶栏排序->更新时间排序->反序->再次打开排序确认勾选态,将 menu_sort_time 收敛为 legado 同义“更新时间排序单选勾选项”语义: 菜单文案由“更新时间”收敛为“更新时间排序” 点击后切换为更新时间排序并保持单选勾选态; 补齐“更新时间排序+反序”联动回归证据
+120,book_source.xml,@+id/menu_sort_respondTime,@string/sort_by_respondTime,响应时间排序,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->响应时间排序->再次打开排序确认勾选态,将 menu_sort_respondTime 收敛为 legado 同义“响应时间排序单选勾选项”语义: 菜单文案由“响应时间”收敛为“响应时间排序” 点击后切换为响应时间排序并保持单选勾选态
+121,book_source.xml,@+id/menu_sort_enable,@string/is_enabled,是否启用,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏排序->是否启用->反序->观察列表顺序,将 menu_sort_enable 收敛为 legado 同义“是否启用单选勾选项”语义: 菜单文案由“启用状态”收敛为“是否启用” 并修正反序边界为“仅反转启用分组 同组内名称保持正序”
+122,book_source.xml,@+id/menu_group,@string/menu_action_group,分组,书源管理与换源,P4,done,codex,flutter test test/source_list_view_sort_action_test.dart test/search_view_source_manage_action_test.dart 通过; 手工路径: 搜索->设置->书源管理->顶栏分组->选择动态分组,将 menu_group 收敛为 legado 同义“顶栏一级分组入口 + 动态分组 group: 即时筛选”语义: 入口图标由 folder 收敛为分组语义图标 并补齐分组弹层触发与动态分组筛选回归证据
 123,book_source.xml,@+id/menu_group_manage,@string/group_manage,分组管理,书源管理与换源,P4,pending,-,-,-
 124,book_source.xml,@+id/menu_enabled_group,@string/enabled,已启用,书源管理与换源,P4,pending,-,-,-
 125,book_source.xml,@+id/menu_disabled_group,@string/disabled,已禁用,书源管理与换源,P4,pending,-,-,-

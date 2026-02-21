@@ -11,6 +11,8 @@
 
 ### 目标
 - 建立并使用统一的 410 项逐项跟踪台账，确保每个功能项都有状态与验证证据。
+- 建立功能项（seq）级优先级队列，避免仅模块级排序造成执行粒度过粗。
+- 在阅读域内执行“文字优先、漫画冻结”策略，先保障文字阅读链路可用性。
 - 以 legado 为第一标准完成迁移级别收敛：交互路径、状态流转、边界处理、错误可观测、文案语义与菜单触发逻辑同义。
 - 在单项推进过程中持续回填计划文档，避免无记录偏航。
 
@@ -58,8 +60,10 @@
 - 验证：台账行数为 `411`（含表头；功能项 410）。
 
 ### Step 1：按 Phase 串行逐项推进（进行中）
-- 执行顺序固定：`P1 -> P2 -> P3 -> P4 -> P5 -> P6 -> P7 -> P8 -> P9 -> P10`。
-- 每个 Phase 内按 `seq` 升序逐项推进（不可跳项，不可并项）。
+- 执行顺序固定：`P1 -> P2 -> P3 -> P4 -> P5 -> P6 -> P8 -> P7 -> P10 -> P9`。
+- 每个 Phase 内按功能项优先级队列推进（`priority_order`）；若同分再按 `seq` 升序（不可跳项，不可并项）。
+- 用户约束（2026-02-21）：`book_manga.xml`（`seq46~63`）全部冻结为 `blocked`，不进入当前执行流。
+- 用户约束（2026-02-21）：排序/文案/拷贝/日志/帮助/主题类项标记为 `detail_later`，默认后置到主功能完成后处理。
 - 每完成一项，立即更新 tracker 行状态与验证证据。
 
 ### Step 2：阶段收口
@@ -73,20 +77,44 @@
 - 输出：最终对照清单与风险结论。
 - 提交前检查：仅执行一次 `flutter analyze`（仅在提交推送阶段）。
 
+## 全量优先级模型（覆盖 410 项）
+
+优先级分层：
+- `S0`：核心五段链路直接相关功能（`P2 + P3`）。
+- `S1`：核心链路关键依赖功能（`P4 + P5`）。
+- `S2`：核心链路支撑能力（`P6 + P8`）。
+- `S3`：独立业务域（`P7`）。
+- `S4`：系统工具与外观收口（`P10 + P9`）。
+- `HOLD`：用户冻结项（当前为漫画链路 `book_manga.xml`）。
+
+优先级落地规则：
+1. `P1` 保持 `done`，不回退。  
+2. 未完成项统一按 `优先级层 -> Phase -> seq 升序` 执行。  
+3. 同优先级层内不并行推进多个 Phase，避免跨域回归干扰。  
+4. `HOLD` 层不执行，直到需求方明确解锁。  
+
+功能项级排序输出：
+- 文件：`docs/plans/2026-02-21-legado-feature-priority-queue.csv`
+- 覆盖：`410` 项（文件共 `411` 行，含表头）
+- 字段：`priority_order, seq, phase, menu_file, item_id, title_zh, current_status, priority_tier, priority_score, priority_reason`
+- 用法：执行时优先按 `priority_order` 取下一项；`priority_tier` 仅用于分层可视化，不替代 `priority_order`。
+- 细节后置标记：`priority_reason` 含 `detail_later` 的项默认后置执行。
+
 ## Phase 拆分（全量 410 项）
 
-| Phase | 领域 | 项数 | 状态 | 依赖 |
-|---|---|---:|---|---|
-| P1 | 主入口与导航 | 21 | `done` | Step 0 |
-| P2 | 搜索/详情/目录 | 38 | `active` | P1 |
-| P3 | 阅读与朗读 | 89 | `pending` | P2 |
-| P4 | 书源管理与换源 | 85 | `pending` | P3 |
-| P5 | 规则与净化 | 46 | `pending` | P4 |
-| P6 | 书架/缓存/分组 | 31 | `pending` | P5 |
-| P7 | RSS | 47 | `pending` | P6 |
-| P8 | 导入导出与备份 | 27 | `pending` | P7 |
-| P9 | 主题与外观 | 2 | `pending` | P8 |
-| P10 | 系统与工具 | 24 | `pending` | P9 |
+| Phase | 领域 | 项数 | 优先级层 | 状态 | 执行顺序 |
+|---|---|---:|---|---|---:|
+| P1 | 主入口与导航 | 21 | - | `done` | 1 |
+| P2 | 搜索/详情/目录 | 38 | S0 | `active` | 2 |
+| P3 | 阅读与朗读（文字） | 71 | S0 | `pending` | 3 |
+| P3(book_manga) | 阅读与朗读（漫画） | 18 | HOLD | `blocked` | - |
+| P4 | 书源管理与换源 | 85 | S1 | `pending` | 4 |
+| P5 | 规则与净化 | 46 | S1 | `pending` | 5 |
+| P6 | 书架/缓存/分组 | 31 | S2 | `pending` | 6 |
+| P8 | 导入导出与备份 | 27 | S2 | `pending` | 7 |
+| P7 | RSS | 47 | S3 | `pending` | 8 |
+| P10 | 系统与工具 | 24 | S4 | `pending` | 9 |
+| P9 | 主题与外观 | 2 | S4 | `pending` | 10 |
 
 ## 风险与回滚
 
@@ -120,6 +148,10 @@
 ## Progress（动态）
 
 - `2026-02-21`
+  - 接收约束“先主功能、细节靠后”：在优先级队列中对排序/文案/拷贝/日志/帮助/主题类项增加 `detail_later` 后置标记，并下调排序分数。
+  - 接收约束“漫画相关功能先不做，先做文字阅读”：将 `book_manga.xml`（`seq46~63`，18项）标记为 `blocked` 并下沉到 `HOLD` 层；当前阅读域仅推进文字链路。
+  - 按需求补齐“功能项级优先级排序”：新增 `docs/plans/2026-02-21-legado-feature-priority-queue.csv`，将全部 `410` 项下钻到 `seq` 级排序，避免仅按 Phase 粗排。
+  - 按需求完成“全功能排优先级”重排：新增 `S0~S4` 全量优先级模型，覆盖 tracker 全部 `410` 项；Phase 执行顺序调整为 `P1 -> P2 -> P3 -> P4 -> P5 -> P6 -> P8 -> P7 -> P10 -> P9`。
   - 已完成 Step 0：重建计划体系与 410 项跟踪台账。
   - 当前推进：P1（主入口与导航）逐项处理中。
   - 已完成 `P1-seq257`：`main_bnv.xml / @+id/menu_bookshelf / 书架`。
@@ -817,9 +849,107 @@
     - 文案：已同义（菜单项文案保持“手动排序”，与 legado `@string/sort_manual` 一致）。
     - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
     - 交互触发：已同义（点击“手动排序”后仅切换 `_sortMode=manual` 并关闭菜单，对齐 legado `menu_sort_manual -> sort=Default -> upBookSource(...)` 触发语义）。
-    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 权重 -> 再次顶栏排序 -> 手动排序`（确认切回后仅“手动排序”带勾选）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 智能排序 -> 再次顶栏排序 -> 手动排序`（确认切回后仅“手动排序”带勾选）。
   - 兼容影响：无旧书源兼容性影响；本序号仅补齐 `menu_sort_manual` 的单选勾选态回归证据，不改动书源排序算法与持久化结构。
-  - 下一项：`seq116`（`book_source.xml / @+id/menu_sort_auto / 智能排序`）。
+  - 已完成 `P2-seq116`：`book_source.xml / @+id/menu_sort_auto / 智能排序`。
+  - `P2-seq116` 差异点清单（实施前）：
+    - legado `menu_sort_auto` 文案为“智能排序”，且属于 `menu_group_sort` 单选组 checkable 子项；Flutter 端当前文案为“权重”，存在用户可见语义偏差。
+    - Flutter 端虽已存在 `_SourceSortMode.weight` 排序逻辑，但缺少以“智能排序”文案触发并保持单选勾选态的定向回归证据。
+    - tracker `seq116` 仍为 `pending`，缺少可复现验证记录，无法闭环迁移证据。
+  - `P2-seq116` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_auto` 一致）。
+    - 状态：已同义（点击后切换到 `_SourceSortMode.weight`，再次打开菜单仅“智能排序”保留勾选态）。
+    - 异常：已同义（仅切换本地排序模式，不新增静默失败分支）。
+    - 文案：已同义（菜单项文案由“权重”收敛为 legado 同义“智能排序”）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“智能排序”后仅切换 `_sortMode=weight` 并关闭菜单，对齐 legado `menu_sort_auto -> sort=Weight -> upBookSource(...)` 触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 智能排序 -> 再次顶栏排序`（确认“智能排序”勾选态保持）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_sort_auto` 文案与勾选态证据，不改动排序算法与持久化结构。
+  - 已完成 `P2-seq117`：`book_source.xml / @+id/menu_sort_name / 名称排序`。
+  - `P2-seq117` 差异点清单（实施前）：
+    - legado `menu_sort_name` 文案为“名称排序”，且属于 `menu_group_sort` 单选组 checkable 子项；Flutter 端当前文案为“名称”，存在用户可见语义偏差。
+    - Flutter 端虽已存在 `_SourceSortMode.name` 排序逻辑，但缺少以“名称排序”文案触发并保持单选勾选态的定向回归证据。
+    - tracker `seq117` 仍为 `pending`，缺少可复现验证记录，无法闭环迁移证据。
+  - `P2-seq117` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_name` 一致）。
+    - 状态：已同义（点击后切换到 `_SourceSortMode.name`，再次打开菜单仅“名称排序”保留勾选态）。
+    - 异常：已同义（仅切换本地排序模式，不新增静默失败分支）。
+    - 文案：已同义（菜单项文案由“名称”收敛为 legado 同义“名称排序”）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“名称排序”后仅切换 `_sortMode=name` 并关闭菜单，对齐 legado `menu_sort_name -> sort=Name -> upBookSource(...)` 触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 名称排序 -> 再次顶栏排序`（确认“名称排序”勾选态保持）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_sort_name` 文案与勾选态证据，不改动排序算法与持久化结构。
+  - 已完成 `P2-seq118`：`book_source.xml / @+id/menu_sort_url / 地址排序`。
+  - `P2-seq118` 差异点清单（实施前）：
+    - legado `menu_sort_url` 文案为“地址排序”，且属于 `menu_group_sort` 单选组 checkable 子项；Flutter 端当前文案为“地址”，存在用户可见语义偏差。
+    - Flutter 端虽已存在 `_SourceSortMode.url` 排序逻辑，但缺少以“地址排序”文案触发并保持单选勾选态的定向回归证据。
+    - tracker `seq118` 仍为 `pending`，缺少可复现验证记录，无法闭环迁移证据。
+  - `P2-seq118` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_url` 一致）。
+    - 状态：已同义（点击后切换到 `_SourceSortMode.url`，再次打开菜单仅“地址排序”保留勾选态）。
+    - 异常：已同义（仅切换本地排序模式，不新增静默失败分支）。
+    - 文案：已同义（菜单项文案由“地址”收敛为 legado 同义“地址排序”）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“地址排序”后仅切换 `_sortMode=url` 并关闭菜单，对齐 legado `menu_sort_url -> sort=Url -> upBookSource(...)` 触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 地址排序 -> 再次顶栏排序`（确认“地址排序”勾选态保持）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_sort_url` 文案与勾选态证据，不改动排序算法与持久化结构。
+  - 已完成 `P2-seq119`：`book_source.xml / @+id/menu_sort_time / 更新时间排序`。
+  - `P2-seq119` 差异点清单（实施前）：
+    - legado `menu_sort_time` 文案为“更新时间排序”，且属于 `menu_group_sort` 单选组 checkable 子项；Flutter 端当前文案为“更新时间”，存在用户可见语义偏差。
+    - Flutter 端虽已存在 `_SourceSortMode.update` 排序逻辑，但缺少以“更新时间排序”文案触发并保持单选勾选态的定向回归证据。
+    - tracker `seq119` 仍为 `pending`，缺少可复现验证记录，无法闭环迁移证据。
+  - `P2-seq119` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_time` 一致）。
+    - 状态：已同义（点击后切换到 `_SourceSortMode.update`，再次打开菜单仅“更新时间排序”保留勾选态；切换“反序”后该勾选态保持）。
+    - 异常：已同义（仅切换本地排序模式与方向，不新增静默失败分支）。
+    - 文案：已同义（菜单项文案由“更新时间”收敛为 legado 同义“更新时间排序”）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“更新时间排序”后仅切换 `_sortMode=update` 并关闭菜单，对齐 legado `menu_sort_time -> sort=Update -> upBookSource(...)` 触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径（待回归）`书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 更新时间排序 -> 反序 -> 再次顶栏排序`（确认“更新时间排序”“反序”勾选态保持）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_sort_time` 文案与勾选态证据，不改动排序算法与持久化结构。
+  - 已完成 `P2-seq120`：`book_source.xml / @+id/menu_sort_respondTime / 响应时间排序`。
+  - `P2-seq120` 差异点清单（实施前）：
+    - legado `menu_sort_respondTime` 文案为“响应时间排序”，且属于 `menu_group_sort` 单选组 checkable 子项；Flutter 端当前文案为“响应时间”，存在用户可见语义偏差。
+    - Flutter 端虽已存在 `_SourceSortMode.respond` 排序逻辑，但缺少以“响应时间排序”文案触发并保持单选勾选态的定向回归证据。
+    - tracker `seq120` 仍为 `pending`，缺少可复现验证记录，无法闭环迁移证据。
+  - `P2-seq120` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_respondTime` 一致）。
+    - 状态：已同义（点击后切换到 `_SourceSortMode.respond`，再次打开菜单仅“响应时间排序”保留勾选态）。
+    - 异常：已同义（仅切换本地排序模式，不新增静默失败分支）。
+    - 文案：已同义（菜单项文案由“响应时间”收敛为 legado 同义“响应时间排序”）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“响应时间排序”后仅切换 `_sortMode=respond` 并关闭菜单，对齐 legado `menu_sort_respondTime -> sort=Respond -> upBookSource(...)` 触发语义）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 响应时间排序 -> 再次顶栏排序`（确认“响应时间排序”勾选态保持）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_sort_respondTime` 文案与勾选态证据，不改动排序算法与持久化结构。
+  - 已完成 `P2-seq121`：`book_source.xml / @+id/menu_sort_enable / 是否启用`。
+  - `P2-seq121` 差异点清单（实施前）：
+    - legado `menu_sort_enable` 文案为“是否启用”，且属于 `menu_group_sort` 单选组 checkable 子项；Flutter 端当前文案为“启用状态”，存在用户可见语义偏差。
+    - legado 在 `BookSourceSort.Enable` 反序场景的边界是“仅反转启用分组，同组名称仍按正序比较”；Flutter 端当前实现按通用 `-compare` 反转，导致同组名称被反序，存在排序语义偏差。
+    - tracker `seq121` 仍为 `pending`，缺少“是否启用勾选态 + 反序边界排序”定向回归证据，无法闭环迁移证据。
+  - `P2-seq121` 逐项对照清单（实施后）：
+    - 入口：已同义（位于排序菜单一级子项，层级与 legado `menu_sort_enable` 一致）。
+    - 状态：已同义（点击后切换到 `_SourceSortMode.enabled`，再次打开菜单仅“是否启用”保留勾选态）。
+    - 异常：已同义（仅切换本地排序模式与方向，不新增静默失败分支）。
+    - 文案：已同义（菜单项文案由“启用状态”收敛为 legado 同义“是否启用”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 子项并通过前缀 `✓` 呈现单选勾选态，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击“是否启用”后仅切换 `_sortMode=enabled` 并关闭菜单，对齐 legado `menu_sort_enable -> sort=Enable -> upBookSource(...)` 触发语义；反序时仅反转启用分组，同组名称保持正序）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏排序 -> 是否启用 -> 反序 -> 观察列表顺序`（确认“禁用组在前，且同组名称保持正序”）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_sort_enable` 文案与排序边界语义，不改动书源数据结构与持久化字段。
+  - 已完成 `P2-seq122`：`book_source.xml / @+id/menu_group / 分组`。
+  - `P2-seq122` 差异点清单（实施前）：
+    - legado `menu_group` 为顶栏一级 action（`showAsAction=always`），图标语义为分组（`ic_groups`）；Flutter 端当前入口使用 `folder` 图标，存在入口图标语义偏差。
+    - 现有回归仅覆盖排序菜单，缺少 `menu_group` 入口触发与动态分组 `group:<组名>` 筛选链路的页面级证据，tracker `seq122` 仍为 `pending`。
+    - 搜索页进入书源管理的回归仍断言旧图标，无法反映 `menu_group` 入口语义收敛结果。
+  - `P2-seq122` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理顶栏保留一级“分组”入口，图标收敛为 `CupertinoIcons.square_grid_2x2` 以对齐 legado 分组动作语义）。
+    - 状态：已同义（点击入口后弹出“分组”动作面板，保持静态分组动作与动态分组列表同层级承载）。
+    - 异常：已同义（分组菜单为空时不新增额外失败分支，继续由页面现有空态承载）。
+    - 文案：已同义（分组菜单标题保持“分组”，与 legado `@string/menu_action_group` 语义一致）。
+    - 排版：已同义（使用 `CupertinoActionSheet` 承载分组菜单，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击动态分组项后写入 `group:<组名>` 并即时筛选，等价 legado `searchView.setQuery("group:${item.title}", true)`）。
+    - 验证：`flutter test test/source_list_view_sort_action_test.dart test/search_view_source_manage_action_test.dart` 通过；手工路径 `书架 -> 搜索 -> 右上角设置 -> 书源管理 -> 顶栏分组 -> 选择分组`（确认菜单弹出且列表按 `group:` 即时筛选）。
+  - 兼容影响：无旧书源兼容性影响；本序号仅收敛 `menu_group` 顶栏入口图标语义并补齐回归证据，不改动书源数据结构与筛选算法。
+  - 下一项：`seq123`（`book_source.xml / @+id/menu_group_manage / 分组管理`）。
 
 ## Surprises & Discoveries
 
@@ -856,6 +986,13 @@
 - `2026-02-21`：`P2-seq113` 对照 legado 时确认当前排序入口的唯一偏差在父级标题文案（“排序选项” vs “排序”）；本序号仅收敛父级语义与回归证据，排序子项行为继续按 `seq114~121` 串行推进。
 - `2026-02-21`：`P2-seq114` 对照 legado 时确认 `menu_sort_desc` 是固定“反序”checkable 项，不是“切换为降序/升序”的动态文案；Flutter 端已收敛为固定文案 + 勾选态并补齐定向回归。
 - `2026-02-21`：`P2-seq115` 对照 legado 时确认当前偏差属于“迁移证据缺口”而非实现缺口；已新增“先切换到其它排序再切回手动排序”的定向回归，用例固化 `menu_sort_manual` 单选勾选态语义。
+- `2026-02-21`：`P2-seq116` 对照 legado 时确认当前偏差集中在菜单文案（“权重” vs “智能排序”）与证据缺口；已收敛文案并新增“智能排序勾选态保持”定向回归，确保 `menu_sort_auto` 语义可复现。
+- `2026-02-21`：`P2-seq117` 对照 legado 时确认偏差集中在菜单文案（“名称” vs “名称排序”）与证据缺口；已收敛文案并新增“名称排序勾选态保持”定向回归，确保 `menu_sort_name` 语义可复现。
+- `2026-02-21`：`P2-seq118` 对照 legado 时确认偏差集中在菜单文案（“地址” vs “地址排序”）与证据缺口；已收敛文案并新增“地址排序勾选态保持”定向回归，确保 `menu_sort_url` 语义可复现。
+- `2026-02-21`：`P2-seq119` 对照 legado 时确认当前偏差集中在菜单文案（“更新时间” vs “更新时间排序”）与证据缺口；已收敛文案并新增“更新时间排序勾选态 + 反序联动勾选态”定向回归，确保 `menu_sort_time` 语义可复现。
+- `2026-02-21`：`P2-seq120` 对照 legado 时确认当前偏差集中在菜单文案（“响应时间” vs “响应时间排序”）与证据缺口；已收敛文案并新增“响应时间排序勾选态保持”定向回归，确保 `menu_sort_respondTime` 语义可复现。
+- `2026-02-21`：`P2-seq121` 对照 legado 时确认 `menu_sort_enable` 有两处偏差：菜单文案（“启用状态” vs “是否启用”）与反序边界（Flutter 误将同组名称也反序）；已收敛文案并补齐“是否启用 + 反序同组名称正序”回归，确保 `menu_sort_enable` 语义可复现。
+- `2026-02-21`：`P2-seq122` 对照 legado 时确认当前实现缺口主要是入口图标语义（`folder` vs `ic_groups`）和证据缺口（缺少分组入口触发/动态分组筛选用例）；已收敛图标并补齐页面级回归。
 
 ## Decision Log
 
@@ -912,6 +1049,13 @@
 - `2026-02-21` 决策 51：`P2-seq113` 采用“父级入口单项收敛”策略：仅修正 `action_sort` 父级标题文案并补齐入口触发回归，不提前并入 `menu_sort_desc/menu_sort_manual/...` 子项行为改动，确保严格按 tracker 序号串行推进。
 - `2026-02-21` 决策 52：`P2-seq114` 采用“反序子项单项收敛”策略：仅将排序菜单动态切换文案收敛为固定“反序”checkable 语义并补齐勾选态回归，不提前并入 `menu_sort_manual/menu_sort_auto/...` 排序模式改造，确保严格按 tracker 序号串行推进。
 - `2026-02-21` 决策 53：`P2-seq115` 采用“证据闭环优先”策略：保持现有 `menu_sort_manual` 业务实现不扩展，仅新增定向回归固化“从其它排序切回手动排序后手动项独占勾选”的 legado 语义，确保序号边界清晰且可复现。
+- `2026-02-21` 决策 54：`P2-seq116` 采用“文案同义先收敛 + 行为不扩展”策略：仅将排序子项展示由“权重”改为“智能排序”并补齐勾选态定向回归，排序比较逻辑继续复用既有 `_SourceSortMode.weight`，避免跨入后续 `seq117+` 子项实现。
+- `2026-02-21` 决策 55：`P2-seq117` 采用“文案同义先收敛 + 行为不扩展”策略：仅将排序子项展示由“名称”改为“名称排序”并补齐勾选态定向回归，排序比较逻辑继续复用既有 `_SourceSortMode.name` 与 `cnCompare` 等价比较，避免跨入后续 `seq118+` 子项实现。
+- `2026-02-21` 决策 56：`P2-seq118` 采用“文案同义先收敛 + 行为不扩展”策略：仅将排序子项展示由“地址”改为“地址排序”并补齐勾选态定向回归，排序比较逻辑继续复用既有 `_SourceSortMode.url`，避免跨入后续 `seq119+` 子项实现。
+- `2026-02-21` 决策 57：`P2-seq119` 采用“文案同义先收敛 + 行为不扩展”策略：仅将排序子项展示由“更新时间”改为“更新时间排序”并补齐勾选态与反序联动定向回归，排序比较逻辑继续复用既有 `_SourceSortMode.update` 与 `_sortAscending` 状态机，避免跨入后续 `seq120+` 子项实现。
+- `2026-02-21` 决策 58：`P2-seq120` 采用“文案同义先收敛 + 行为不扩展”策略：仅将排序子项展示由“响应时间”改为“响应时间排序”并补齐勾选态定向回归，排序比较逻辑继续复用既有 `_SourceSortMode.respond`，避免跨入后续 `seq121+` 子项实现。
+- `2026-02-21` 决策 59：`P2-seq121` 采用“文案同义 + 边界语义修正”策略：将 `menu_sort_enable` 展示文案收敛为“是否启用”，并单独处理 `enabled` 排序反序逻辑（仅反转启用分组，不反转同组名称），以精确复刻 legado `BookSourceSort.Enable` 的升降序语义。
+- `2026-02-21` 决策 60：`P2-seq122` 采用“入口语义最小收敛 + 证据闭环”策略：本序号仅收敛 `menu_group` 顶栏入口图标为分组语义并补齐“入口触发 + 动态 `group:` 筛选”回归，不提前并入 `seq123~129` 的分组子菜单文案/行为改造，保持严格串行。
 
 ## Outcomes & Retrospective
 
