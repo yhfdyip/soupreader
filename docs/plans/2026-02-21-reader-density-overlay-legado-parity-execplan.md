@@ -128,6 +128,9 @@
 - [done] 底部进度拖动条与四入口间距优化，缓解视觉拥挤。
 - [done] 自动阅读速度语义、控制面板入口和状态反馈对齐 legado。
 - [done] 阅读器自定义取色器对齐 legado 自由取色盘语义（拖拽色盘 + 色相条 + HEX + 最近使用）。
+- [done] 滚动模式页眉页脚样式与翻页模式提示层对齐，消除模式间观感分叉。
+- [done] “界面”弹窗简繁入口改为 legado 同义 `简/繁` 高亮态，并切换为三选一弹窗交互。
+- [done] 分页模式页眉/页脚边距设置接入完整链路（提示层绘制 + overlay + 分页高度计算）。
 - [done] 定向测试与计划记录回填。
 
 ## Surprises & Discoveries
@@ -140,6 +143,8 @@
 - 底部工具栏拥挤感主要由“滑杆区与入口区贴得过紧”引发，增加小幅垂直留白即可缓解，不需改控件尺寸。
 - 自动阅读若仅“定时翻页”而无面板反馈，用户容易误判为点击无效；需保留 legado 的底部控制面板语义来提供可观测状态。
 - `CupertinoAlertDialog` 内容区在 intrinsic 布局阶段不支持 `LayoutBuilder`；取色盘需改为固定面板尺寸以避免渲染断言。
+- legado 的滚动与非滚动模式共用 `PageView` 承载页眉页脚；若 Flutter 端拆成两套组件，极易出现样式漂移。
+- 简繁切换如果只显示“简繁”静态文案，用户难以感知当前方向；需要用 `简/繁` 双字高亮态直观暴露状态。
 
 ## Decision Log
 - 决策 1：保留用户自定义值，只迁移“旧默认值”字段，避免强制覆盖。
@@ -152,6 +157,8 @@
 - 决策 8：底部进度拖动条间距采用“小幅放松”策略（+3/+4dp 过渡），不调整功能热区。
 - 决策 9：自动阅读速度改回 legado 的“秒/页”模型，并以 `1-120` 范围对齐 `dialog_auto_read.xml` 的滑杆边界。
 - 决策 10：阅读器取色能力按 legado `TYPE_CUSTOM` 收敛为“自由取色盘为主 + 常用预设补充”，不再依赖少量样例色。
+- 决策 11：滚动模式保留独立组件但样式语义向 `PagedReaderWidget` 提示层收敛（透明层、文本化电量、一致字号与分割线节奏）。
+- 决策 12：简繁切换入口按 legado 改为 `简/繁` 高亮态 + 三选一弹窗，禁用循环切换以提升状态可见性与可预期性。
 
 ## Outcomes & Retrospective
 - 做了什么：完成正文密度参数与菜单分层联动收敛，补齐旧设置兼容迁移。
@@ -164,6 +171,7 @@
 - 增量收敛：优化底部进度拖动区与四入口区间距，底栏观感更松弛。
 - 增量收敛：自动阅读入口反馈、速度模型与控制面板结构完成 legado 同义回补。
 - 增量收敛：自定义颜色选择改为 legado 同义取色盘交互，并补齐 HEX 校验/最近使用回写测试。
+- 增量收敛：滚动模式页眉页脚去除实体背景栏，页码改为动态值，和其它翻页模式视觉语义一致。
 
 ## 2026-02-21 增量：界面/设置选项排查（第 23 批）
 
@@ -294,6 +302,47 @@
 ### 兼容影响
 - 低：`showReaderColorPickerDialog` 的函数签名与返回值不变，调用链无需改造。
 - 低：颜色仍以 `0xFFRRGGBB` 持久化，不涉及数据结构迁移。
+
+## 2026-02-21 增量：滚动模式页眉/状态栏样式对齐 legado（第 31 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt`
+- `/home/server/legado/app/src/main/res/layout/view_book_page.xml`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D14 | `simple_reader_view.dart` + `reader_status_bar.dart` | `ReadView` + `PageView` 统一页眉页脚渲染 | soupreader 滚动模式走独立实体栏，翻页模式走提示层；两者视觉样式与页码语义分叉 | 用户感知“滚动模式状态栏页眉和其它模式不一致” |
+
+### 逐项检查清单（本轮）
+- 入口：仅影响阅读页滚动模式页眉/页脚显示层，无新增入口。
+- 状态：菜单/搜索/自动阅读面板打开时，滚动模式仍按原逻辑隐藏页眉页脚。
+- 异常：电量获取异常保持兜底，不阻断阅读渲染。
+- 文案：页眉页脚内容项文案语义不变。
+- 排版：滚动模式由实体背景栏改为透明提示层，与翻页模式一致。
+- 交互触发：页码由固定 `1/1` 改为随章节进度动态变化。
+
+### 实施结果
+1. 滚动模式页眉/页脚样式收敛  
+   - 文件：`lib/features/reader/widgets/reader_status_bar.dart`。  
+   - 关键实现：
+     - 顶/底栏改为 `IgnorePointer + Padding` 的透明提示层，不再绘制实体背景色。
+     - 分割线节奏改为与翻页模式一致（页眉线在文本下方，页脚线在文本上方）。
+     - 电量显示改为纯文本百分比，避免滚动模式出现独有电池图标样式。
+     - 页眉字号调整为 `12`，页脚字号保持 `11`，对齐翻页模式提示文本。
+
+2. 滚动模式页码语义修复  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_resolveScrollTipTotalPages/_resolveScrollTipCurrentPage`。
+     - `ReaderHeaderBar/ReaderStatusBar` 传入的 `currentPage/totalPages` 改为动态值，不再固定 `1/1`。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart test/reading_tip_settings_view_test.dart`（通过）
+
+### 兼容影响
+- 低：仅调整滚动模式页眉/页脚视觉与页码展示，不影响正文解析、翻页逻辑与进度存储结构。
 
 ## 2026-02-21 增量：快速翻页跨章节卡顿优化（第 26 批）
 
@@ -504,3 +553,266 @@
 ### 兼容影响
 - 低：仅调整翻页渲染缓存的失效与刷新时机，不改章节索引、分页规则与菜单结构。
 - 低：不涉及持久化字段、数据库结构与书源请求链路。
+
+## 2026-02-21 增量：快速翻页空章节加载反馈修复（第 30 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/delegate/PageDelegate.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/delegate/HorizontalPageDelegate.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/entities/TextPage.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D22 | `simple_reader_view.dart` `_handlePageFactoryContentChanged` | legado 翻页委托中断后仍会继续对当前页刷新/填充 | soupreader 在 `_isHydratingChapterFromPageFactory=true` 时直接返回，当前章可能不触发水合 | 快速翻页到空章节时“无反馈/无进展” |
+| D23 | `simple_reader_view.dart` `_chapterContentInFlight` + UI loading | `TextPage` 默认有 `data_loading` 占位反馈 | soupreader 预取请求 `showLoading=false` 时，当前章命中在途请求但不显示加载反馈 | 用户感知界面“没反应” |
+| D24 | `simple_reader_view.dart` `_hydrateCurrentFactoryChapter` | legado 不会在手势中断后强制重定位到旧章 | soupreader 水合复用 `_loadChapter`，可能触发章节重定位副作用 | 快速翻页时状态流转不稳定 |
+
+### 逐项检查清单（本轮）
+- 入口：翻页点击/手势入口不变，无新增菜单或弹层。
+- 状态：快速翻页命中空章节时可见加载反馈；待水合章节按最新索引排队处理。
+- 异常：在途请求失败仍不阻塞阅读主流程，保持原回退策略。
+- 文案：不新增文案，沿用现有加载指示组件。
+- 排版：阅读页布局不变，仅控制顶部 loading 指示显示条件。
+- 交互触发：慢速/快速翻页都能进入章节加载链路，不被全局锁吞掉。
+
+### 实施结果
+1. PageFactory 水合补齐“最新章节排队”机制  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_activeHydratingChapterFromPageFactoryIndex/_pendingHydratingChapterFromPageFactoryIndex`。
+     - `_handlePageFactoryContentChanged` 在水合进行中不再直接丢弃，而是记录最新待水合章节并在当前任务结束后继续处理。
+
+2. 当前章节加载反馈与在途请求联动  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_isCurrentFactoryChapterLoading` 与 `_syncCurrentFactoryChapterLoadingState`。
+     - 将“当前章空内容 + 在途请求/水合进行中/排队中”映射为可见 loading 指示，覆盖预取在途场景。
+
+3. PageFactory 水合改为就地补齐，避免重定位副作用  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_hydrateCurrentFactoryChapter` 改为调用 `_prefetchChapterIfNeeded(showLoading: true)`。
+     - 保持当前位置语义，避免 `_loadChapter` 路径的跳章重定位。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+- `flutter test test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅调整翻页模式章节水合调度与加载反馈，不改章节持久化结构与书源规则语义。
+- 低：滚动模式链路不受影响；翻页模式仅增强空章节场景可观测性。
+
+## 2026-02-21 增量：字距显示精度对齐实际刻度（第 32 批）
+
+### legado 对照文件（本批复用，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D25 | `simple_reader_view.dart` `_legacyLetterSpacingLabel` | legado 字距 seekbar 为 `0.01` 级映射（`(it-50)/100f`） | soupreader 标签显示保留 1 位小数，和内部 `0.01` 步进不一致 | 用户误感为“字距每次只按 0.1 变化” |
+
+### 逐项检查清单（本轮）
+- 入口：仅读取“界面”弹层的字距显示标签，不改入口结构。
+- 状态：字距范围仍为 `-0.5 ~ 0.5`，内部步进仍为 `0.01`。
+- 异常：无新增异常路径。
+- 文案：仅数字格式变化，文案语义不变。
+- 排版：标签宽度与布局不变。
+- 交互触发：滑杆与 `- / +` 触发逻辑不变。
+
+### 实施结果
+1. 字距标签精度从 1 位提升到 2 位  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_legacyLetterSpacingLabel` 由 `toStringAsFixed(1)` 改为 `toStringAsFixed(2)`。
+     - 保持 `_settings.copyWith(letterSpacing: (progress - 50) / 100)` 不变，仅修正显示层精度。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart`（通过）
+
+### 兼容影响
+- 低：仅 UI 显示精度调整，不影响实际字距计算、持久化、章节排版流程。
+
+## 2026-02-21 增量：本地书籍入页性能收敛（第 33 批）
+
+### legado 对照文件（本批复用，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/provider/TextPageFactory.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D26 | `simple_reader_view.dart` `_initReader/_syncPageFactoryChapters` | legado 以当前阅读章节为中心逐步准备内容，不要求入页时全量重排全部章节 | soupreader 入页时会对所有章节执行 `_resolveChapterSnapshot`，本地书章节多时阻塞明显 | 用户进入本地书阅读页耗时偏长 |
+| D27 | `simple_reader_view.dart` `_loadChapter` | legado 切章优先保障当前章节可读，远端章节按需补齐 | soupreader 切章同步 `PageFactory` 默认全量后处理，切章前期 CPU 峰值高 | 本地书切入/恢复进度体感卡顿 |
+
+### 逐项检查清单（本轮）
+- 入口：书架/阅读历史打开本地书入口不变。
+- 状态：当前章节内容保持完整后处理；远端章节命中时仍会回到完整后处理链路。
+- 异常：远端章节占位快照不进入“已完全处理”状态，避免脏缓存。
+- 文案：无新增文案。
+- 排版：正文最终排版语义不变，仅调整处理时机。
+- 交互触发：翻页/滚动切章仍按既有触发链路执行。
+
+### 实施结果
+1. 初始化改为“近处完整、远端延迟”  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_initReader` 不再对全部章节直接 `_resolveChapterSnapshot`，改为 `_syncPageFactoryChapters(preferCachedForFarChapters: true)` 受控延迟远端处理。
+     - 新增 `_shouldDeferFarChapterTransforms`，本地书与滚动模式默认启用远端章节延迟。
+
+2. 切章同步链路接入延迟策略  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_loadChapter`（滚动/非滚动）同步 `PageFactory` 时传入 `preferCachedForFarChapters`，避免每次切章全量后处理。
+     - `_syncPageFactoryChapters` 对“远端且无缓存”章节改用 `_resolveDeferredChapterSnapshot`。
+
+3. 占位快照标识与新鲜度判定收敛  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_ResolvedChapterSnapshot` 新增 `isDeferredPlaceholder`。
+     - `_resolveChapterSnapshotFromBase` 忽略占位快照命中，确保命中章节后会执行完整正文后处理并回写缓存。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅优化初始化与章节同步时机，不改书源协议、章节存储结构与用户可见设置语义。
+
+## 2026-02-21 增量：滚动模式页眉/页脚边距回补（第 34 批）
+
+### legado 对照文件（本批复用，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D28 | `reader_status_bar.dart` 滚动模式页眉/页脚定位 | legado header/footer 绘制基线分别是 `topSafe + 6`、`bottomSafe + 6` | soupreader 滚动模式页眉/页脚直接贴 `safeArea + 用户padding`，当 padding 较小时贴边明显 | 用户感知“页眉页脚太贴顶部底部” |
+
+### 逐项检查清单（本轮）
+- 入口：阅读页滚动模式状态栏显示入口不变。
+- 状态：菜单/搜索/自动阅读面板打开时，页眉页脚仍按既有逻辑隐藏。
+- 异常：无新增异常路径。
+- 文案：无文案变更。
+- 排版：页眉/页脚距屏幕边缘增加固定 6dp。
+- 交互触发：仅视觉位置调整，不影响手势与点击。
+
+### 实施结果
+1. 滚动模式页脚增加底部边距  
+   - 文件：`lib/features/reader/widgets/reader_status_bar.dart`。  
+   - 关键实现：
+     - 新增 `_legacyTipEdgeInset = 6.0`。
+     - 页脚 `bottom` padding 改为 `safeArea + settings.footerPaddingBottom + 6.0`。
+
+2. 滚动模式页眉增加顶部边距  
+   - 文件：`lib/features/reader/widgets/reader_status_bar.dart`。  
+   - 关键实现：
+     - 页眉 `top` padding 改为 `safeArea + settings.headerPaddingTop + 6.0`。
+     - 保持原有 header/footer 分割线与字号节奏不变。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart test/reading_tip_settings_view_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅调整滚动模式提示层边距，不影响设置字段语义与阅读器主链路行为。
+
+## 2026-02-21 增量：简繁切换入口视觉态对齐 legado（第 35 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ChineseConverter.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt`
+- `/home/server/legado/app/src/main/res/values/arrays.xml`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D29 | `simple_reader_view.dart` “界面”弹窗快捷入口 | legado `ChineseConverter` 使用 `简/繁` 双字并按当前模式高亮单字 | soupreader 仅显示“简繁”静态文案，无法直观看到当前转换方向 | 用户反馈“界面显示不明显” |
+| D30 | `simple_reader_view.dart` 简繁点击交互 | legado 点击后弹出三选一列表（Off/繁转简/简转繁） | soupreader 使用循环切换，交互路径与 legado 不同 | 可预期性不足，误触后回退成本更高 |
+
+### 逐项检查清单（本轮）
+- 入口：“界面”弹窗工具条的简繁入口位置与热区保持不变。
+- 状态：`关闭/繁转简/简转繁` 三态可见；高亮态与当前设置同步。
+- 异常：非法类型值回退到 `off`，避免崩溃或显示异常。
+- 文案：采用 legado 同义 `简/繁` 状态文案与三选项语义。
+- 排版：沿用现有 chip 尺寸与边框，仅替换文案渲染方式。
+- 交互触发：点击入口弹出 ActionSheet，选择后即时更新阅读设置。
+
+### 实施结果
+1. 简繁入口改为 legado 同义状态文案  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_buildChineseConverterActionChipLabel`，将快捷入口文案改为 `简/繁`。
+     - `chineseConverterType=1` 时高亮“简”，`=2` 时高亮“繁”，`=0` 时不高亮。
+
+2. 点击交互改为三选一弹窗  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_chineseConverterOptions`（关闭/繁转简/简转繁）。
+     - 简繁入口点击后改为 `_showTipOptionPicker`，选择项后更新 `chineseConverterType`。
+     - 移除原先“按序循环切换”路径，避免与 legado 交互分叉。
+
+3. 芯片渲染函数扩展  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_buildReadStyleActionChip` 支持 `labelWidget`，用于承载富文本状态文案。
+     - 其余入口继续复用原 `label` 文案，行为保持不变。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅调整简繁入口显示与交互方式，不改简繁转换三态枚举、正文转换实现与设置持久化字段。
+
+## 2026-02-21 增量：分页模式页眉/页脚边距设置生效修复（第 36 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt`
+- `/home/server/legado/app/src/main/res/layout/view_book_page.xml`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/PaddingConfigDialog.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D31 | `paged_reader_widget.dart` `_paintHeaderFooter/_buildOverlay` | legado `PageView` 对 header/footer 使用独立 `setPadding`（top/bottom/left/right） | soupreader 分页模式提示层仍混用固定 `6` 与正文 `widget.padding`，未完整读取 `header/footer padding` | 用户调节页眉/页脚边距后视觉无明显变化 |
+| D32 | `simple_reader_view.dart` `_paginateContentLogicOnly` | legado 页内容高度受 header/footer 实际占位影响 | soupreader 分页高度仍按固定 `PagedReaderWidget.topOffset/bottomOffset=37` 计算 | 提示层即使位置变化，分页断点仍不随设置同步 |
+
+### 逐项检查清单（本轮）
+- 入口：边距弹窗“页眉/页脚”四向滑杆入口与热区保持不变。
+- 状态：调整 `header/footer padding` 后，分页模式页眉/页脚位置与正文可视区同时变化。
+- 异常：`padding` 极值下不发生崩溃，分割线仍按开关控制显示。
+- 文案：无新增文案，无业务语义变更。
+- 排版：页眉/页脚与正文保持清晰分层，分割线位置与 legado 同义。
+- 交互触发：拖动滑杆即时生效，翻页动画/静态页显示一致。
+
+### 实施结果
+1. 提示层占位高度改为统一动态计算  
+   - 文件：`lib/features/reader/widgets/paged_reader_widget.dart`。  
+   - 关键实现：
+     - 新增 `resolveHeaderSlotHeight/resolveFooterSlotHeight`，统一计算 `padding + 字号 + 分割线 + 6dp edge inset`。
+     - `_headerSlotHeight/_footerSlotHeight` 改为复用统一计算结果，避免不同路径重复实现造成漂移。
+
+2. 分页模式渲染路径统一接入 header/footer padding  
+   - 文件：`lib/features/reader/widgets/paged_reader_widget.dart`。  
+   - 关键实现：
+     - `_paintHeaderFooter`：页眉/页脚文本与分割线的 `x/y` 坐标改为基于 `headerPadding* / footerPadding*`。
+     - `_paintTipRow`：新增左右 padding 约束，居中文本按可用宽度居中，防止继续使用正文 padding。
+     - `_buildOverlay`：改为 `Stack + Positioned`，顶部/底部提示与分割线均按 header/footer padding 定位，不再使用固定容器内边距。
+
+3. 分页高度计算改为动态占位  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_paginateContentLogicOnly` 中 `topOffset/bottomOffset` 改为调用 `PagedReaderWidget.resolveHeaderSlotHeight/resolveFooterSlotHeight`。
+     - 移除固定 `37` 占位依赖，确保“边距设置 -> 分页高度 -> 断点”链路同步生效。
+
+### 验证与证据
+- `flutter test test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+- `flutter test test/simple_reader_view_compile_test.dart test/reading_tip_settings_view_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅修复分页模式提示层与分页高度计算一致性，不改设置字段、菜单结构与正文抓取链路。

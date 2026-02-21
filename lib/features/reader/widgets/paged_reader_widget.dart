@@ -41,8 +41,41 @@ class PagedReaderWidget extends StatefulWidget {
   final PageDirection pageDirection; // 翻页方向
   final int pageTouchSlop; // 翻页触发阈值（0=系统默认，1-9999=自定义）
 
+  // legado 提示层基线参数：用于分页模式的页眉/页脚占位计算（含边缘间距与分割线节奏）。
+  static const double _tipHeaderFontSize = 12.0;
+  static const double _tipFooterFontSize = 11.0;
+  static const double _tipEdgeInset = 6.0;
+  static const double _tipLineGap = 6.0;
+  static const double _tipDividerThickness = 0.5;
   static const double topOffset = 37;
   static const double bottomOffset = 37;
+
+  static double resolveHeaderSlotHeight({
+    required ReadingSettings settings,
+    required bool showStatusBar,
+  }) {
+    if (!settings.shouldShowHeader(showStatusBar: showStatusBar)) return 0.0;
+    final dividerHeight =
+        settings.showHeaderLine ? _tipLineGap + _tipDividerThickness : 0.0;
+    return _tipEdgeInset +
+        settings.headerPaddingTop +
+        _tipHeaderFontSize +
+        settings.headerPaddingBottom +
+        dividerHeight;
+  }
+
+  static double resolveFooterSlotHeight({
+    required ReadingSettings settings,
+  }) {
+    if (!settings.shouldShowFooter()) return 0.0;
+    final dividerHeight =
+        settings.showFooterLine ? _tipLineGap + _tipDividerThickness : 0.0;
+    return _tipEdgeInset +
+        settings.footerPaddingBottom +
+        _tipFooterFontSize +
+        settings.footerPaddingTop +
+        dividerHeight;
+  }
 
   const PagedReaderWidget({
     super.key,
@@ -373,10 +406,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
+  double get _headerSlotHeight {
+    return PagedReaderWidget.resolveHeaderSlotHeight(
+      settings: widget.settings,
+      showStatusBar: widget.showStatusBar,
+    );
+  }
+
+  double get _footerSlotHeight {
+    return PagedReaderWidget.resolveFooterSlotHeight(
+      settings: widget.settings,
+    );
+  }
+
   // 页眉/页脚占位保持稳定，避免仅隐藏提示条时正文发生上下跳动。
-  double get _topOffset => _hasHeaderSlot ? PagedReaderWidget.topOffset : 0.0;
-  double get _bottomOffset =>
-      _hasFooterSlot ? PagedReaderWidget.bottomOffset : 0.0;
+  double get _topOffset => _hasHeaderSlot ? _headerSlotHeight : 0.0;
+  double get _bottomOffset => _hasFooterSlot ? _footerSlotHeight : 0.0;
 
   void _applyStableSystemPadding({
     required EdgeInsets padding,
@@ -541,7 +586,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         widget.textStyle.copyWith(fontSize: 11, color: statusColor);
 
     if (_showHeader) {
-      final y = topSafe + 6;
+      final y = topSafe +
+          PagedReaderWidget._tipEdgeInset +
+          widget.settings.headerPaddingTop;
       _paintTipRow(
         canvas,
         size,
@@ -559,17 +606,28 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           widget.settings.headerRightContent,
           renderPosition: renderPosition,
         ),
+        leftPadding: widget.settings.headerPaddingLeft,
+        rightPadding: widget.settings.headerPaddingRight,
       );
       if (widget.settings.showHeaderLine) {
-        final lineY = y + headerStyle.fontSize!.toDouble() + 6;
+        final lineY = topSafe +
+            _headerSlotHeight -
+            (PagedReaderWidget._tipDividerThickness / 2);
         final paint = Paint()
           ..color = dividerColor
-          ..strokeWidth = 0.5;
-        canvas.drawLine(
-          Offset(widget.padding.left, lineY),
-          Offset(size.width - widget.padding.right, lineY),
-          paint,
-        );
+          ..strokeWidth = PagedReaderWidget._tipDividerThickness;
+        final lineStart =
+            widget.settings.headerPaddingLeft.clamp(0.0, size.width).toDouble();
+        final lineEnd = (size.width - widget.settings.headerPaddingRight)
+            .clamp(0.0, size.width)
+            .toDouble();
+        if (lineEnd > lineStart) {
+          canvas.drawLine(
+            Offset(lineStart, lineY),
+            Offset(lineEnd, lineY),
+            paint,
+          );
+        }
       }
     }
 
@@ -591,7 +649,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         text: TextSpan(text: sample, style: footerStyle),
         textDirection: ui.TextDirection.ltr,
       )..layout();
-      final y = size.height - bottomSafe - 6 - samplePainter.height;
+      final y = size.height -
+          bottomSafe -
+          PagedReaderWidget._tipEdgeInset -
+          widget.settings.footerPaddingBottom -
+          samplePainter.height;
       _paintTipRow(
         canvas,
         size,
@@ -609,17 +671,29 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           widget.settings.footerRightContent,
           renderPosition: renderPosition,
         ),
+        leftPadding: widget.settings.footerPaddingLeft,
+        rightPadding: widget.settings.footerPaddingRight,
       );
       if (widget.settings.showFooterLine) {
-        final lineY = y - 6;
+        final lineY = size.height -
+            bottomSafe -
+            _footerSlotHeight +
+            (PagedReaderWidget._tipDividerThickness / 2);
         final paint = Paint()
           ..color = dividerColor
-          ..strokeWidth = 0.5;
-        canvas.drawLine(
-          Offset(widget.padding.left, lineY),
-          Offset(size.width - widget.padding.right, lineY),
-          paint,
-        );
+          ..strokeWidth = PagedReaderWidget._tipDividerThickness;
+        final lineStart =
+            widget.settings.footerPaddingLeft.clamp(0.0, size.width).toDouble();
+        final lineEnd = (size.width - widget.settings.footerPaddingRight)
+            .clamp(0.0, size.width)
+            .toDouble();
+        if (lineEnd > lineStart) {
+          canvas.drawLine(
+            Offset(lineStart, lineY),
+            Offset(lineEnd, lineY),
+            paint,
+          );
+        }
       }
     }
   }
@@ -631,14 +705,23 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     TextStyle style,
     String? left,
     String? center,
-    String? right,
-  ) {
+    String? right, {
+    required double leftPadding,
+    required double rightPadding,
+  }) {
+    final safeLeft = leftPadding.clamp(0.0, size.width).toDouble();
+    final safeRight = rightPadding.clamp(0.0, size.width).toDouble();
+    final maxWidth = (size.width - safeLeft - safeRight).clamp(0.0, size.width);
+    if (maxWidth <= 0) return;
+
     if (left != null && left.isNotEmpty) {
       final painter = TextPainter(
         text: TextSpan(text: left, style: style),
         textDirection: ui.TextDirection.ltr,
-      )..layout();
-      painter.paint(canvas, Offset(widget.padding.left, y));
+        maxLines: 1,
+        ellipsis: '...',
+      )..layout(maxWidth: maxWidth);
+      painter.paint(canvas, Offset(safeLeft, y));
     }
     if (center != null && center.isNotEmpty) {
       final painter = TextPainter(
@@ -646,19 +729,20 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         textDirection: ui.TextDirection.ltr,
         maxLines: 1,
         ellipsis: '...',
-      )..layout(
-          maxWidth: size.width - widget.padding.left - widget.padding.right);
-      final x = (size.width - painter.width) / 2;
+      )..layout(maxWidth: maxWidth);
+      final x = safeLeft + (maxWidth - painter.width) / 2;
       painter.paint(canvas, Offset(x, y));
     }
     if (right != null && right.isNotEmpty) {
       final painter = TextPainter(
         text: TextSpan(text: right, style: style),
         textDirection: ui.TextDirection.ltr,
-      )..layout();
+        maxLines: 1,
+        ellipsis: '...',
+      )..layout(maxWidth: maxWidth);
       painter.paint(
         canvas,
-        Offset(size.width - widget.padding.right - painter.width, y),
+        Offset(size.width - safeRight - painter.width, y),
       );
     }
   }
@@ -2587,6 +2671,26 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     stream.addListener(listener);
   }
 
+  EdgeInsets _resolveTipHorizontalInsets(
+    double maxWidth, {
+    required double left,
+    required double right,
+  }) {
+    if (!maxWidth.isFinite || maxWidth <= 0) {
+      return EdgeInsets.zero;
+    }
+    var safeLeft = left.isFinite ? left.clamp(0.0, maxWidth).toDouble() : 0.0;
+    var safeRight =
+        right.isFinite ? right.clamp(0.0, maxWidth).toDouble() : 0.0;
+    final overflow = safeLeft + safeRight - maxWidth;
+    if (overflow > 0) {
+      final shrink = overflow / 2;
+      safeLeft = (safeLeft - shrink).clamp(0.0, maxWidth).toDouble();
+      safeRight = (safeRight - shrink).clamp(0.0, maxWidth).toDouble();
+    }
+    return EdgeInsets.only(left: safeLeft, right: safeRight);
+  }
+
   Widget _buildOverlay(
     double topSafe,
     double bottomSafe, {
@@ -2598,69 +2702,104 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final statusColor = _tipTextColor;
     final dividerColor = _tipDividerColor;
     final renderPosition = _factory.resolveRenderPosition(slot);
+    final headerStyle = widget.textStyle.copyWith(
+      fontSize: PagedReaderWidget._tipHeaderFontSize,
+      color: statusColor,
+    );
+    final footerStyle = widget.textStyle.copyWith(
+      fontSize: PagedReaderWidget._tipFooterFontSize,
+      color: statusColor,
+    );
 
     return IgnorePointer(
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          widget.padding.left,
-          6 + topSafe,
-          widget.padding.right,
-          6 + bottomSafe,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_showHeader)
-              _buildTipRowWidget(
-                _tipTextForHeader(
-                  widget.settings.headerLeftContent,
-                  renderPosition: renderPosition,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = constraints.maxWidth;
+          final headerInsets = _resolveTipHorizontalInsets(
+            maxWidth,
+            left: widget.settings.headerPaddingLeft,
+            right: widget.settings.headerPaddingRight,
+          );
+          final footerInsets = _resolveTipHorizontalInsets(
+            maxWidth,
+            left: widget.settings.footerPaddingLeft,
+            right: widget.settings.footerPaddingRight,
+          );
+          return Stack(
+            children: [
+              if (_showHeader)
+                Positioned(
+                  top: topSafe +
+                      PagedReaderWidget._tipEdgeInset +
+                      widget.settings.headerPaddingTop,
+                  left: headerInsets.left,
+                  right: headerInsets.right,
+                  child: _buildTipRowWidget(
+                    _tipTextForHeader(
+                      widget.settings.headerLeftContent,
+                      renderPosition: renderPosition,
+                    ),
+                    _tipTextForHeader(
+                      widget.settings.headerCenterContent,
+                      renderPosition: renderPosition,
+                    ),
+                    _tipTextForHeader(
+                      widget.settings.headerRightContent,
+                      renderPosition: renderPosition,
+                    ),
+                    headerStyle,
+                  ),
                 ),
-                _tipTextForHeader(
-                  widget.settings.headerCenterContent,
-                  renderPosition: renderPosition,
+              if (_showHeader && widget.settings.showHeaderLine)
+                Positioned(
+                  top: topSafe +
+                      _headerSlotHeight -
+                      PagedReaderWidget._tipDividerThickness,
+                  left: headerInsets.left,
+                  right: headerInsets.right,
+                  child: Container(
+                    height: PagedReaderWidget._tipDividerThickness,
+                    color: dividerColor,
+                  ),
                 ),
-                _tipTextForHeader(
-                  widget.settings.headerRightContent,
-                  renderPosition: renderPosition,
+              if (_showFooter && widget.settings.showFooterLine)
+                Positioned(
+                  bottom: bottomSafe +
+                      _footerSlotHeight -
+                      PagedReaderWidget._tipDividerThickness,
+                  left: footerInsets.left,
+                  right: footerInsets.right,
+                  child: Container(
+                    height: PagedReaderWidget._tipDividerThickness,
+                    color: dividerColor,
+                  ),
                 ),
-                widget.textStyle.copyWith(fontSize: 12, color: statusColor),
-              ),
-            if (_showHeader && widget.settings.showHeaderLine)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Container(
-                  height: 0.5,
-                  color: dividerColor,
+              if (_showFooter)
+                Positioned(
+                  bottom: bottomSafe +
+                      PagedReaderWidget._tipEdgeInset +
+                      widget.settings.footerPaddingBottom,
+                  left: footerInsets.left,
+                  right: footerInsets.right,
+                  child: _buildTipRowWidget(
+                    _tipTextForFooter(
+                      widget.settings.footerLeftContent,
+                      renderPosition: renderPosition,
+                    ),
+                    _tipTextForFooter(
+                      widget.settings.footerCenterContent,
+                      renderPosition: renderPosition,
+                    ),
+                    _tipTextForFooter(
+                      widget.settings.footerRightContent,
+                      renderPosition: renderPosition,
+                    ),
+                    footerStyle,
+                  ),
                 ),
-              ),
-            const Expanded(child: SizedBox.shrink()),
-            if (_showFooter && widget.settings.showFooterLine)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Container(
-                  height: 0.5,
-                  color: dividerColor,
-                ),
-              ),
-            if (_showFooter)
-              _buildTipRowWidget(
-                _tipTextForFooter(
-                  widget.settings.footerLeftContent,
-                  renderPosition: renderPosition,
-                ),
-                _tipTextForFooter(
-                  widget.settings.footerCenterContent,
-                  renderPosition: renderPosition,
-                ),
-                _tipTextForFooter(
-                  widget.settings.footerRightContent,
-                  renderPosition: renderPosition,
-                ),
-                widget.textStyle.copyWith(fontSize: 11, color: statusColor),
-              ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }

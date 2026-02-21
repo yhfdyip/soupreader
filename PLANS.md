@@ -185,6 +185,119 @@
 ### 10) Progress（动态）
 
 - `2026-02-21`（本轮补丁）
+  - T11 第三十六批收敛：修复分页模式页眉/页脚边距设置不生效。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/paged_reader_widget.dart`、`lib/features/reader/views/simple_reader_view.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - `PagedReaderWidget` 新增 `resolveHeaderSlotHeight/resolveFooterSlotHeight`，按 legado 语义把 `header/footer padding + 6dp 边缘间距 + 分割线间距` 统一折算为提示层占位高度。
+      - 分页渲染三条路径统一接入 `header/footer padding`：`_paintHeaderFooter`（Canvas）、`_buildOverlay`（Widget）、`_paintTipRow`（左右边距约束与居中范围）。
+      - `SimpleReaderView._paginateContentLogicOnly` 改为使用动态提示层占位，移除固定 `37` 高度依赖，避免“提示层变了但分页高度没跟上”。
+  - 本轮实施记录：
+    - 做了什么：打通分页阅读器页眉/页脚边距从设置到渲染、分页计算的完整链路。
+    - 为什么：用户反馈“边距中页眉页脚设置无效”；根因是分页模式仍存在固定常量路径（`6/37`）未读取 `ReadingSettings` 的 header/footer padding。
+    - 如何验证：
+      - `flutter test test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+      - `flutter test test/simple_reader_view_compile_test.dart test/reading_tip_settings_view_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅修复分页模式提示层与分页高度一致性，不改章节索引、菜单结构和网络链路。
+  - T11 当前状态：保持 `active`。继续按用户反馈收敛阅读器 C5 排版与交互细节。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第三十五批收敛：简繁切换入口视觉态与交互方式对齐 legado。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - “界面”弹窗快捷入口从固定文案“简繁”改为 `简/繁` 双字状态文案，按 legado 语义高亮当前转换方向（`繁转简` 高亮“简”，`简转繁` 高亮“繁”，关闭态不高亮）。
+      - 点击交互从“循环切换”改为“ActionSheet 三选一”（关闭/繁转简/简转繁），与 legado `ChineseConverter` 选择路径一致。
+  - 本轮实施记录：
+    - 做了什么：回补简繁切换入口的可视状态与选择交互，提升当前状态可感知性。
+    - 为什么：用户反馈“界面显示不明显”；对照 legado 后确认当前入口缺少 `简/繁` 高亮态且交互路径不一致。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅调整入口显示与选择交互，不改简繁转换三态枚举、正文转换逻辑与持久化字段。
+  - T11 当前状态：保持 `active`。继续按用户反馈收敛阅读器 C5 细节一致性。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第三十四批收敛：修复滚动模式页眉/页脚贴顶贴底。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/reader_status_bar.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - 对齐 legado 提示层边距语义，为滚动模式页眉/页脚增加固定边缘间距 `6dp`，避免文本贴屏幕边缘。
+      - 保留用户自定义 header/footer padding，在其基础上叠加边缘安全间距，不改变原设置项含义。
+  - 本轮实施记录：
+    - 做了什么：为滚动模式状态栏与页脚统一增加顶部/底部边距。
+    - 为什么：用户反馈“页眉页脚太贴顶部底部了”；对照 legado 绘制基线（header/footer 均有 `6dp` 安全间距）后回补。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart test/reading_tip_settings_view_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅调整滚动模式提示层位置，不改正文内容、菜单交互与设置持久化。
+  - T11 当前状态：保持 `active`。继续按用户反馈收敛阅读器视觉细节。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第三十三批收敛：优化本地书籍入页卡顿（章节延迟后处理）。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - `PageFactory` 初始化改为“当前/邻近章节完整处理，远端章节延迟处理”，降低本地书大目录首屏阻塞。
+      - `_loadChapter` 在滚动/翻页模式同步 `PageFactory` 时统一接入远端章节延迟策略，避免每次切章都触发全量正文后处理。
+      - 新增 `isDeferredPlaceholder` 快照标识，确保命中章节后会走完整正文后处理并回填分页数据，不改变最终语义。
+  - 本轮实施记录：
+    - 做了什么：将全量章节同步链路改为按需处理，优先保障当前阅读章节可用。
+    - 为什么：用户反馈“进入本地书籍很慢”；定位到入页阶段对全章节执行正文后处理导致阻塞。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅优化初始化与同步时机，不改章节数据源、正文规则与用户设置语义。
+  - T11 当前状态：保持 `active`。继续按用户反馈收敛阅读器性能与交互一致性。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第三十二批收敛：修复“界面弹层字距显示精度不足（误感为 0.1 步进）”。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - 仅调整 legacy 风格“界面”弹层字距标签格式，`toStringAsFixed(1) -> toStringAsFixed(2)`，与内部 `0.01` 步进一致。
+  - 本轮实施记录：
+    - 做了什么：将字距显示从 1 位小数提升到 2 位小数，消除“看起来像 0.1 跳变”的视觉误差。
+    - 为什么：用户反馈当前界面字距为 `-0.5~0.5`，需明确显示 `0.01` 级刻度。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart`（通过）
+    - 兼容影响：低。仅改显示精度，不改字距真实范围、步进与持久化字段。
+  - T11 当前状态：保持 `active`。继续按用户反馈收敛阅读器细节体验。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第三十一批收敛：修复滚动模式页眉/状态栏与其它翻页模式样式分叉。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/reader_status_bar.dart`、`lib/features/reader/views/simple_reader_view.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - 滚动模式页眉/页脚从实体背景栏改为透明提示层，分割线位置与字号节奏对齐翻页模式（header=12、footer=11）。
+      - 电量项改为文本百分比展示，消除滚动模式独有电池图标带来的观感差异。
+      - 滚动模式 `currentPage/totalPages` 从固定 `1/1` 改为按章节进度推导的动态值。
+  - 本轮实施记录：
+    - 做了什么：统一滚动模式与其它模式的页眉页脚视觉语义，并修复滚动模式页码语义。
+    - 为什么：用户反馈“滚动模式状态栏页眉与其它模式不同”；对照 legado `ReadView + PageView` 共用实现后确认当前 Flutter 存在模式分叉。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart test/reading_tip_settings_view_test.dart`（通过）
+    - 兼容影响：低。仅调整滚动模式提示层样式与页码显示，不改正文解析、章节索引和阅读设置结构。
+  - T11 当前状态：保持 `active`。滚动模式页眉/页脚分叉已收敛，继续推进 C5 其它偏差项。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第三十批收敛：修复“快速翻页到未加载章节时无反馈”。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`PLANS.md`。
+    - 关键实现：
+      - PageFactory 水合从“全局锁直接返回”改为“记录最新待水合章节并串行处理”，避免快速翻页时当前章节被跳过。
+      - 新增当前章节加载可视状态 `_isCurrentFactoryChapterLoading`，将“在途章节请求/水合排队”映射到 UI 指示，解决预取在途时无反馈问题。
+      - PageFactory 章节水合改为复用 `_prefetchChapterIfNeeded(showLoading: true)` 的就地补齐路径，不再走会强制跳章的 `_loadChapter` 重定位流程。
+  - 本轮实施记录：
+    - 做了什么：补齐快速翻页进入空章节时的加载反馈与水合排队机制。
+    - 为什么：用户反馈“翻页翻快了章节还在获取，但界面没有任何反应”；根因是水合锁与在途预取导致当前章反馈被吞掉。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+      - `flutter test test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅调整翻页模式章节水合时机与加载反馈，不改书源协议、章节索引和阅读设置模型。
+  - T11 当前状态：保持 `active`。快速翻页空章节反馈主偏差已收敛，后续按 C5 真机补“跨章连续快翻 + 慢源”证据。
+
+- `2026-02-21`（本轮补丁）
   - T11 第二十九批收敛：修复“快速翻页时内容视觉不更新”。
   - T11 代码收敛：
     - 代码变更：`lib/features/reader/widgets/paged_reader_widget.dart`、`test/paged_reader_widget_non_simulation_test.dart`、`PLANS.md`。
@@ -859,6 +972,7 @@
 
 ### 11) Surprises & Discoveries（动态）
 
+- `2026-02-21`：分页模式页眉/页脚边距“看起来无效”的根因不止渲染层：`PagedReaderWidget` 虽新增动态 `_topOffset/_bottomOffset`，但 `SimpleReaderView` 分页高度仍走固定 `37` 常量，导致设置变化无法完整反映到分页可视区。
 - `2026-02-21`：`textBottomJustify` 在 soupreader 里此前仅有配置开关，未接入分页渲染；根因是文本合成器缺少“页内剩余高度分摊”阶段。修复后确认只在“接近满页”条件触发分摊，避免短页被过度拉伸。
 - `2026-02-21`：`shareLayout` 在当前数据模型中没有布局参数承载（`ReadStyleConfig` 仅含背景/文字字段），导致开关可切但无语义落点；本轮按迁移例外流程标记 `blocked` 并改为“待迁移”提示。
 - `2026-02-21`：`翻页按键` 仍依赖平台级按键映射能力，当前保留可观测占位提示，继续维持 `blocked`。
@@ -902,6 +1016,7 @@
 
 ### 12) Decision Log（动态）
 
+- `2026-02-21`：分页模式页眉/页脚边距修复采用“统一占位计算源”策略：由 `PagedReaderWidget.resolveHeaderSlotHeight/resolveFooterSlotHeight` 同时服务 `PageFactory` 分页高度计算与提示层渲染，避免再次出现“显示层与分页层”分叉。
 - `2026-02-21`：T11 第二十三批对 `textBottomJustify` 采用“共享计算核心 + 双渲染链路复用”策略：`LegacyJustifyComposer` 同时服务 Widget 渲染与 Canvas 预渲染，避免不同翻页模式出现语义漂移。
 - `2026-02-21`：`shareLayout` 在未扩展样式布局快照模型前不再伪装可用，先收敛为 `blocked` 提示；后续回补方向为扩展 `ReadStyleConfig` 并在样式切换时按开关应用共享/独立布局。
 - `2026-02-21`：`翻页按键` 维持占位而不做虚假开关，待平台按键映射链路补齐后再解锁。
@@ -945,6 +1060,12 @@
 - `2026-02-21`：T11 对图片探测新增“失败类型分层采样 + source-level 遥测调参”策略：按 `timeout/auth/decode/other` 统计 EMA 与连续失败次数，动态增配探测预算并在高成功率时回收预算，避免慢源长期固定预算。
 
 ### 13) Outcomes & Retrospective（动态）
+
+- `2026-02-21`（第三十六批）：
+  - 做了什么：修复分页模式页眉/页脚边距设置在渲染层与分页层的断链问题，边距调节现在会同步影响提示层位置和正文分页可视区。
+  - 为什么：用户反馈“边距中页眉页脚设置无效”，定位到固定高度常量仍在分页计算链路中生效。
+  - 如何验证：`flutter test test/paged_reader_widget_non_simulation_test.dart --concurrency=1`、`flutter test test/simple_reader_view_compile_test.dart test/reading_tip_settings_view_test.dart --concurrency=1`（均通过）。
+  - 后续改进：补充分页模式页眉/页脚 padding 的行为测试，锁定“设置变化 -> 分页高度变化”链路。
 
 - `2026-02-21`（第二十三批）：
   - 做了什么：完成“界面/设置”选项排查并修复 `底部对齐` 假生效；将 `shareLayout` 与 `翻页按键` 记录为阻塞项并统一可观测提示。

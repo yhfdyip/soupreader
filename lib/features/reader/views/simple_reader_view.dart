@@ -262,6 +262,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _TipOption(0, '页内进度'),
     _TipOption(1, '章节进度'),
   ];
+  static const List<_TipOption> _chineseConverterOptions = [
+    _TipOption(ChineseConverterType.off, '关闭'),
+    _TipOption(ChineseConverterType.traditionalToSimplified, '繁转简'),
+    _TipOption(ChineseConverterType.simplifiedToTraditional, '简转繁'),
+  ];
   static const List<_TipOption> _tipColorOptions = [
     _TipOption(ReadingSettings.tipColorFollowContent, '同正文颜色'),
     _TipOption(_customColorPickerValue, '自定义'),
@@ -350,6 +355,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _isLoadingChapter = false;
   bool _isRestoringProgress = false;
   bool _isHydratingChapterFromPageFactory = false;
+  int? _activeHydratingChapterFromPageFactoryIndex;
+  int? _pendingHydratingChapterFromPageFactoryIndex;
+  bool _isCurrentFactoryChapterLoading = false;
   bool _chapterSeekConfirmed = false;
   final Map<String, Future<String>> _chapterContentInFlight =
       <String, Future<String>>{};
@@ -514,19 +522,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       final source = _sourceRepo.getSourceByUrl(_currentSourceUrl ?? '');
       _currentSourceName = source?.bookSourceName;
 
-      // 初始化 PageFactory：设置章节数据
-      final chapterDataList = List<ChapterData>.generate(
-        _chapters.length,
-        (index) {
-          final snapshot = _resolveChapterSnapshot(index);
-          return ChapterData(
-            title: snapshot.title,
-            content: snapshot.content,
-          );
-        },
-        growable: false,
+      // 初始化 PageFactory：仅当前/邻近章节使用完整快照，远端章节按需延迟处理，
+      // 降低本地书大目录首次进入的阻塞耗时。
+      _syncPageFactoryChapters(
+        centerIndex: _currentChapterIndex,
+        preferCachedForFarChapters: _shouldDeferFarChapterTransforms(),
       );
-      _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
 
       // 监听章节变化
       _pageFactory.addContentChangedListener(
@@ -1352,6 +1353,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       bool goToLastPage = false,
       double? targetChapterProgress}) async {
     if (index < 0 || index >= _chapters.length) return;
+    final deferFarChapterTransforms = _shouldDeferFarChapterTransforms();
 
     if (_settings.pageTurnMode == PageTurnMode.scroll) {
       _isRestoringProgress = restoreOffset;
@@ -1364,7 +1366,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         );
         if (!mounted) return;
         _updateBookmarkStatus();
-        _syncPageFactoryChapters();
+        _syncPageFactoryChapters(
+          centerIndex: index,
+          preferCachedForFarChapters: deferFarChapterTransforms,
+        );
         _syncReadAloudChapterContext();
         unawaited(_prefetchNeighborChapters(centerIndex: index));
       } finally {
@@ -1420,7 +1425,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _updateBookmarkStatus();
     _syncReadAloudChapterContext();
 
-    _syncPageFactoryChapters();
+    _syncPageFactoryChapters(
+      centerIndex: index,
+      preferCachedForFarChapters: deferFarChapterTransforms,
+    );
     unawaited(_prefetchNeighborChapters(centerIndex: index));
 
     // 如果是非滚动模式，需要在build后进行分页
@@ -1499,14 +1507,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final center = _chapters.isEmpty
         ? 0
         : (centerIndex ?? _currentChapterIndex).clamp(0, _chapters.length - 1);
+    var deferredFarSnapshotUsed = false;
     final chapterDataList = List<ChapterData>.generate(
       _chapters.length,
       (index) {
         final isNearChapter = (index - center).abs() <= 1;
-        final snapshot = _resolveChapterSnapshot(
-          index,
-          allowStale: preferCachedForFarChapters && !isNearChapter,
-        );
+        final snapshot = preferCachedForFarChapters && !isNearChapter
+            ? () {
+                final chapterId = _chapters[index].id;
+                final cached = _resolvedChapterSnapshotByChapterId[chapterId];
+                if (cached != null) {
+                  return cached;
+                }
+                deferredFarSnapshotUsed = true;
+                return _resolveDeferredChapterSnapshot(index);
+              }()
+            : _resolveChapterSnapshot(index);
         return ChapterData(
           title: snapshot.title,
           content: snapshot.content,
@@ -1519,9 +1535,34 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     } else {
       _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
     }
-    if (!preferCachedForFarChapters) {
+    if (deferredFarSnapshotUsed) {
+      _hasDeferredChapterTransformRefresh = true;
+    } else if (!preferCachedForFarChapters) {
       _hasDeferredChapterTransformRefresh = false;
     }
+  }
+
+  bool _shouldDeferFarChapterTransforms() {
+    if (_chapters.length <= 2) return false;
+    if (_settings.pageTurnMode == PageTurnMode.scroll) return true;
+    return _isCurrentBookLocal();
+  }
+
+  _ResolvedChapterSnapshot _resolveDeferredChapterSnapshot(int chapterIndex) {
+    final chapter = _chapters[chapterIndex];
+    final stage = _replaceStageCache[chapter.id];
+    final baseTitle = stage?.title ?? chapter.title;
+    final baseContent = stage?.content ?? (chapter.content ?? '');
+    return _ResolvedChapterSnapshot(
+      chapterId: chapter.id,
+      postProcessSignature: _chapterPostProcessSignature(chapter.id),
+      baseTitleHash: baseTitle.hashCode,
+      baseContentHash: baseContent.hashCode,
+      title: _postProcessTitle(baseTitle),
+      // 远端章节先复用基础内容，命中章节时再走完整正文后处理。
+      content: baseContent,
+      isDeferredPlaceholder: true,
+    );
   }
 
   int _chapterPostProcessSignature(String chapterId) {
@@ -1548,6 +1589,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final baseContentHash = baseContent.hashCode;
     final cached = _resolvedChapterSnapshotByChapterId[chapter.id];
     if (cached != null &&
+        !cached.isDeferredPlaceholder &&
         cached.postProcessSignature == signature &&
         cached.baseTitleHash == baseTitleHash &&
         cached.baseContentHash == baseContentHash) {
@@ -1715,26 +1757,88 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _paginateContentLogicOnly();
     }
 
-    if (!chapterChanged || _isHydratingChapterFromPageFactory) return;
+    if (!chapterChanged) {
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
 
     final chapter = _chapters[factoryChapterIndex];
     final hasContent = (chapter.content ?? '').trim().isNotEmpty;
-    if (hasContent) return;
-    if (_chapterContentInFlight.containsKey(chapter.id)) return;
+    if (hasContent) {
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
+    if (_isHydratingChapterFromPageFactory) {
+      _pendingHydratingChapterFromPageFactoryIndex = factoryChapterIndex;
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
 
     unawaited(_hydrateCurrentFactoryChapter(factoryChapterIndex));
   }
 
   Future<void> _hydrateCurrentFactoryChapter(int index) async {
-    if (_isHydratingChapterFromPageFactory) return;
     if (index < 0 || index >= _chapters.length) return;
+    if (_isHydratingChapterFromPageFactory) {
+      _pendingHydratingChapterFromPageFactoryIndex = index;
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
 
     _isHydratingChapterFromPageFactory = true;
+    _activeHydratingChapterFromPageFactoryIndex = index;
+    _syncCurrentFactoryChapterLoadingState();
     try {
-      await _loadChapter(index);
+      await _prefetchChapterIfNeeded(index, showLoading: true);
     } finally {
       _isHydratingChapterFromPageFactory = false;
+      _activeHydratingChapterFromPageFactoryIndex = null;
+      final pendingIndex = _pendingHydratingChapterFromPageFactoryIndex;
+      _pendingHydratingChapterFromPageFactoryIndex = null;
+      _syncCurrentFactoryChapterLoadingState();
+      if (pendingIndex != null &&
+          pendingIndex >= 0 &&
+          pendingIndex < _chapters.length &&
+          pendingIndex != index) {
+        unawaited(_hydrateCurrentFactoryChapter(pendingIndex));
+      }
     }
+  }
+
+  void _syncCurrentFactoryChapterLoadingState() {
+    if (!mounted) return;
+    if (_settings.pageTurnMode == PageTurnMode.scroll || _chapters.isEmpty) {
+      if (_isCurrentFactoryChapterLoading) {
+        setState(() {
+          _isCurrentFactoryChapterLoading = false;
+        });
+      }
+      return;
+    }
+
+    final factoryChapterIndex = _pageFactory.currentChapterIndex;
+    if (factoryChapterIndex < 0 || factoryChapterIndex >= _chapters.length) {
+      if (_isCurrentFactoryChapterLoading) {
+        setState(() {
+          _isCurrentFactoryChapterLoading = false;
+        });
+      }
+      return;
+    }
+
+    final chapter = _chapters[factoryChapterIndex];
+    final chapterContentEmpty = (chapter.content ?? '').trim().isEmpty;
+    final nextLoading = chapterContentEmpty &&
+        (_chapterContentInFlight.containsKey(chapter.id) ||
+            (_isHydratingChapterFromPageFactory &&
+                _activeHydratingChapterFromPageFactoryIndex ==
+                    factoryChapterIndex) ||
+            _pendingHydratingChapterFromPageFactoryIndex ==
+                factoryChapterIndex);
+    if (_isCurrentFactoryChapterLoading == nextLoading) return;
+    setState(() {
+      _isCurrentFactoryChapterLoading = nextLoading;
+    });
   }
 
   Future<void> _prefetchNeighborChapters({required int centerIndex}) async {
@@ -1754,7 +1858,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await Future.wait(tasks);
   }
 
-  Future<void> _prefetchChapterIfNeeded(int index) async {
+  Future<void> _prefetchChapterIfNeeded(
+    int index, {
+    bool showLoading = false,
+  }) async {
     if (index < 0 || index >= _chapters.length) return;
 
     final chapter = _chapters[index];
@@ -1763,7 +1870,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     try {
       if (content.trim().isEmpty) {
-        if (_chapterContentInFlight.containsKey(chapter.id)) return;
+        final inFlight = _chapterContentInFlight[chapter.id];
+        if (inFlight != null) {
+          _syncCurrentFactoryChapterLoadingState();
+          if (showLoading) {
+            await inFlight;
+            _syncCurrentFactoryChapterLoadingState();
+          }
+          return;
+        }
 
         final book = _bookRepo.getBookById(widget.bookId);
         final chapterUrl = (chapter.url ?? '').trim();
@@ -1776,7 +1891,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           chapter: chapter,
           index: index,
           book: book,
-          showLoading: false,
+          showLoading: showLoading,
         );
         fetchedFromSource = true;
       }
@@ -1830,12 +1945,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       showLoading: showLoading,
     );
     _chapterContentInFlight[chapter.id] = task;
+    _syncCurrentFactoryChapterLoadingState();
     try {
       return await task;
     } finally {
       if (identical(_chapterContentInFlight[chapter.id], task)) {
         _chapterContentInFlight.remove(chapter.id);
       }
+      _syncCurrentFactoryChapterLoadingState();
     }
   }
 
@@ -2113,8 +2230,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final showHeader =
         _settings.shouldShowHeader(showStatusBar: _settings.showStatusBar);
     final showFooter = _settings.shouldShowFooter();
-    final topOffset = showHeader ? PagedReaderWidget.topOffset : 0.0;
-    final bottomOffset = showFooter ? PagedReaderWidget.bottomOffset : 0.0;
+    final topOffset = showHeader
+        ? PagedReaderWidget.resolveHeaderSlotHeight(
+            settings: _settings,
+            showStatusBar: _settings.showStatusBar,
+          )
+        : 0.0;
+    final bottomOffset = showFooter
+        ? PagedReaderWidget.resolveFooterSlotHeight(
+            settings: _settings,
+          )
+        : 0.0;
 
     final contentHeight = screenHeight -
         topSafeInset -
@@ -4008,6 +4134,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         .clamp(0.0, 1.0);
   }
 
+  int _resolveScrollTipTotalPages() {
+    final total = _pageFactory.totalPages;
+    return total <= 0 ? 1 : total;
+  }
+
+  int _resolveScrollTipCurrentPage(int totalPages) {
+    if (totalPages <= 1) return 1;
+    final progress = _currentScrollChapterProgress.clamp(0.0, 1.0).toDouble();
+    final pageIndex = ChapterProgressUtils.pageIndexFromProgress(
+      progress: progress,
+      totalPages: totalPages,
+    );
+    return (pageIndex + 1).clamp(1, totalPages).toInt();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
@@ -4020,6 +4161,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 获取屏幕尺寸，确保固定全屏布局
     final screenSize = MediaQuery.of(context).size;
     final isScrollMode = _settings.pageTurnMode == PageTurnMode.scroll;
+    final scrollTipTotalPages = _resolveScrollTipTotalPages();
+    final scrollTipCurrentPage = _resolveScrollTipCurrentPage(
+      scrollTipTotalPages,
+    );
 
     // 阅读模式时阻止 iOS 边缘滑动返回（菜单显示时允许返回）
     return PopScope(
@@ -4092,8 +4237,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         bookTitle: widget.bookTitle,
                         bookProgress: _getBookProgress(),
                         chapterProgress: _getChapterProgress(),
-                        currentPage: 1,
-                        totalPages: 1,
+                        currentPage: scrollTipCurrentPage,
+                        totalPages: scrollTipTotalPages,
                       ),
 
                     // 顶部状态栏（滚动模式）
@@ -4112,8 +4257,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         bookTitle: widget.bookTitle,
                         bookProgress: _getBookProgress(),
                         chapterProgress: _getChapterProgress(),
-                        currentPage: 1,
-                        totalPages: 1,
+                        currentPage: scrollTipCurrentPage,
+                        totalPages: scrollTipTotalPages,
                       ),
 
                     // 顶部菜单
@@ -4176,7 +4321,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
                     if (_showSearchMenu) _buildSearchMenuOverlay(),
 
-                    if (_isLoadingChapter)
+                    if (_isLoadingChapter || _isCurrentFactoryChapterLoading)
                       Positioned(
                         top: MediaQuery.of(context).padding.top + 12,
                         right: 16,
@@ -7899,7 +8044,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   String _legacyLetterSpacingLabel(int progress) {
-    return ((progress - 50) / 100).toStringAsFixed(1);
+    return ((progress - 50) / 100).toStringAsFixed(2);
   }
 
   String _legacyLineSpacingLabel(int progress) {
@@ -8006,20 +8151,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                           ),
                           const Spacer(),
                           _buildReadStyleActionChip(
-                            label: '简繁',
+                            labelWidget: _buildChineseConverterActionChipLabel(
+                              _settings.chineseConverterType,
+                            ),
                             onTap: () {
-                              final modes = ChineseConverterType.values;
-                              final currentModeIndex =
-                                  modes.indexOf(_settings.chineseConverterType);
-                              final safeModeIndex =
-                                  currentModeIndex < 0 ? 0 : currentModeIndex;
-                              final nextMode =
-                                  modes[(safeModeIndex + 1) % modes.length];
-                              _updateSettingsFromSheet(
-                                setPopupState,
-                                _settings.copyWith(
-                                  chineseConverterType: nextMode,
-                                ),
+                              final currentType = ChineseConverterType.values
+                                      .contains(_settings.chineseConverterType)
+                                  ? _settings.chineseConverterType
+                                  : ChineseConverterType.off;
+                              _showTipOptionPicker(
+                                title: '简繁转换',
+                                options: _chineseConverterOptions,
+                                currentValue: currentType,
+                                onSelected: (value) {
+                                  _updateSettingsFromSheet(
+                                    setPopupState,
+                                    _settings.copyWith(
+                                      chineseConverterType: value,
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),
@@ -8973,9 +9124,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Widget _buildReadStyleActionChip({
-    required String label,
+    String? label,
+    Widget? labelWidget,
     required VoidCallback onTap,
   }) {
+    assert(label != null || labelWidget != null);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -8985,13 +9138,48 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: _uiBorder),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: _uiTextNormal,
-            fontSize: 14,
+        child: labelWidget ??
+            Text(
+              label ?? '',
+              style: TextStyle(
+                color: _uiTextNormal,
+                fontSize: 14,
+              ),
+            ),
+      ),
+    );
+  }
+
+  Widget _buildChineseConverterActionChipLabel(int converterType) {
+    final safeType = ChineseConverterType.values.contains(converterType)
+        ? converterType
+        : ChineseConverterType.off;
+    final baseStyle = TextStyle(
+      color: _uiTextNormal,
+      fontSize: 14,
+    );
+    final enabledStyle = baseStyle.copyWith(
+      color: _uiAccent,
+      fontWeight: FontWeight.w600,
+    );
+    return Text.rich(
+      TextSpan(
+        style: baseStyle,
+        children: [
+          TextSpan(
+            text: '简',
+            style: safeType == ChineseConverterType.traditionalToSimplified
+                ? enabledStyle
+                : baseStyle,
           ),
-        ),
+          const TextSpan(text: '/'),
+          TextSpan(
+            text: '繁',
+            style: safeType == ChineseConverterType.simplifiedToTraditional
+                ? enabledStyle
+                : baseStyle,
+          ),
+        ],
       ),
     );
   }
@@ -12090,6 +12278,7 @@ class _ResolvedChapterSnapshot {
   final int baseContentHash;
   final String title;
   final String content;
+  final bool isDeferredPlaceholder;
 
   const _ResolvedChapterSnapshot({
     required this.chapterId,
@@ -12098,6 +12287,7 @@ class _ResolvedChapterSnapshot {
     required this.baseContentHash,
     required this.title,
     required this.content,
+    this.isDeferredPlaceholder = false,
   });
 }
 

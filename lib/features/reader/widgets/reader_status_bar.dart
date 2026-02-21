@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../../../app/theme/colors.dart';
-import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
 
 /// 阅读器状态栏 - 支持电量显示和可配置内容
@@ -35,10 +34,11 @@ class ReaderStatusBar extends StatefulWidget {
   State<ReaderStatusBar> createState() => _ReaderStatusBarState();
 }
 
+const double _legacyTipEdgeInset = 6.0;
+
 class _ReaderStatusBarState extends State<ReaderStatusBar> {
   final Battery _battery = Battery();
   int _batteryLevel = 100;
-  BatteryState _batteryState = BatteryState.full;
   StreamSubscription<BatteryState>? _batteryStateSubscription;
 
   @override
@@ -56,13 +56,10 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
   Future<void> _initBattery() async {
     try {
       _batteryLevel = await _battery.batteryLevel;
-      _batteryState = await _battery.batteryState;
 
       _batteryStateSubscription =
           _battery.onBatteryStateChanged.listen((state) {
-        setState(() {
-          _batteryState = state;
-        });
+        setState(() {});
         _updateBatteryLevel();
       });
 
@@ -89,39 +86,41 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
       bottom: 0,
       left: 0,
       right: 0,
-      child: Container(
-        padding: EdgeInsets.only(
-          bottom:
-              MediaQuery.of(context).padding.bottom + widget.settings.footerPaddingBottom,
-          top: widget.settings.footerPaddingTop,
-          left: widget.settings.footerPaddingLeft,
-          right: widget.settings.footerPaddingRight,
-        ),
-        decoration: BoxDecoration(
-          color: widget.currentTheme.background,
-          border: widget.settings.showFooterLine
-              ? Border(
-                  top: BorderSide(
+      child: IgnorePointer(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: widget.settings.footerPaddingLeft,
+            right: widget.settings.footerPaddingRight,
+            top: widget.settings.footerPaddingTop,
+            bottom: MediaQuery.of(context).padding.bottom +
+                widget.settings.footerPaddingBottom +
+                _legacyTipEdgeInset,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.settings.showFooterLine)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Container(
+                    height: 0.5,
                     color: _lineColor,
-                    width: 0.5,
                   ),
-                )
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // 左侧内容
-            _buildFooterContent(widget.settings.footerLeftContent),
-            // 中间内容
-            Expanded(
-              child: Center(
-                child: _buildFooterContent(widget.settings.footerCenterContent),
+                ),
+              Row(
+                children: [
+                  _buildFooterContent(widget.settings.footerLeftContent),
+                  Expanded(
+                    child: Center(
+                      child: _buildFooterContent(
+                          widget.settings.footerCenterContent),
+                    ),
+                  ),
+                  _buildFooterContent(widget.settings.footerRightContent),
+                ],
               ),
-            ),
-            // 右侧内容
-            _buildFooterContent(widget.settings.footerRightContent),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -192,47 +191,10 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
 
   Widget _buildBatteryIndicator() {
     if (!widget.settings.showBattery) return const SizedBox.shrink();
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 电池图标
-        _buildBatteryIcon(),
-        const SizedBox(width: 4),
-        // 电量百分比
-        Text(
-          '$_batteryLevel%',
-          style: _textStyle,
-        ),
-      ],
+    return Text(
+      '$_batteryLevel%',
+      style: _textStyle,
     );
-  }
-
-  Widget _buildBatteryIcon() {
-    final isCharging = _batteryState == BatteryState.charging;
-    final color = _getBatteryColor();
-
-    return SizedBox(
-      width: 22,
-      height: 11,
-      child: CustomPaint(
-        painter: _BatteryPainter(
-          level: _batteryLevel,
-          color: color,
-          isCharging: isCharging,
-        ),
-      ),
-    );
-  }
-
-  Color _getBatteryColor() {
-    if (_batteryLevel <= 20) {
-      return AppDesignTokens.error;
-    } else if (_batteryLevel <= 50) {
-      return AppDesignTokens.warning;
-    } else {
-      return _textColor;
-    }
   }
 
   Widget _buildChapterTitle() {
@@ -301,7 +263,6 @@ class ReaderHeaderBar extends StatefulWidget {
 class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
   final Battery _battery = Battery();
   int _batteryLevel = 100;
-  BatteryState _batteryState = BatteryState.full;
   StreamSubscription<BatteryState>? _batteryStateSubscription;
 
   @override
@@ -319,12 +280,9 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
   Future<void> _initBattery() async {
     try {
       _batteryLevel = await _battery.batteryLevel;
-      _batteryState = await _battery.batteryState;
       _batteryStateSubscription =
           _battery.onBatteryStateChanged.listen((state) {
-        setState(() {
-          _batteryState = state;
-        });
+        setState(() {});
         _updateBatteryLevel();
       });
       if (mounted) setState(() {});
@@ -350,35 +308,41 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
       top: 0,
       left: 0,
       right: 0,
-      child: Container(
-        padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + widget.settings.headerPaddingTop,
-          bottom: widget.settings.headerPaddingBottom,
-          left: widget.settings.headerPaddingLeft,
-          right: widget.settings.headerPaddingRight,
-        ),
-        decoration: BoxDecoration(
-          color: widget.currentTheme.background,
-          border: widget.settings.showHeaderLine
-              ? Border(
-                  bottom: BorderSide(
-                    color: _lineColor,
-                    width: 0.5,
+      child: IgnorePointer(
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top +
+                widget.settings.headerPaddingTop +
+                _legacyTipEdgeInset,
+            bottom: widget.settings.headerPaddingBottom,
+            left: widget.settings.headerPaddingLeft,
+            right: widget.settings.headerPaddingRight,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  _buildHeaderContent(widget.settings.headerLeftContent),
+                  Expanded(
+                    child: Center(
+                      child: _buildHeaderContent(
+                          widget.settings.headerCenterContent),
+                    ),
                   ),
-                )
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildHeaderContent(widget.settings.headerLeftContent),
-            Expanded(
-              child: Center(
-                child: _buildHeaderContent(widget.settings.headerCenterContent),
+                  _buildHeaderContent(widget.settings.headerRightContent),
+                ],
               ),
-            ),
-            _buildHeaderContent(widget.settings.headerRightContent),
-          ],
+              if (widget.settings.showHeaderLine)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Container(
+                    height: 0.5,
+                    color: _lineColor,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -449,42 +413,10 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
 
   Widget _buildBatteryIndicator() {
     if (!widget.settings.showBattery) return const SizedBox.shrink();
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildBatteryIcon(),
-        const SizedBox(width: 4),
-        Text('$_batteryLevel%', style: _textStyle),
-      ],
+    return Text(
+      '$_batteryLevel%',
+      style: _textStyle,
     );
-  }
-
-  Widget _buildBatteryIcon() {
-    final isCharging = _batteryState == BatteryState.charging;
-    final color = _getBatteryColor();
-
-    return SizedBox(
-      width: 22,
-      height: 11,
-      child: CustomPaint(
-        painter: _BatteryPainter(
-          level: _batteryLevel,
-          color: color,
-          isCharging: isCharging,
-        ),
-      ),
-    );
-  }
-
-  Color _getBatteryColor() {
-    if (_batteryLevel <= 20) {
-      return AppDesignTokens.error;
-    } else if (_batteryLevel <= 50) {
-      return AppDesignTokens.warning;
-    } else {
-      return _textColor;
-    }
   }
 
   Widget _buildChapterTitle() {
@@ -517,80 +449,6 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
 
   TextStyle get _textStyle => TextStyle(
         color: _textColor,
-        fontSize: 11,
+        fontSize: 12,
       );
-}
-
-/// 电池图标绘制
-class _BatteryPainter extends CustomPainter {
-  final int level;
-  final Color color;
-  final bool isCharging;
-
-  _BatteryPainter({
-    required this.level,
-    required this.color,
-    required this.isCharging,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    // 电池外框
-    final bodyWidth = size.width - 3;
-    final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, bodyWidth, size.height),
-      const Radius.circular(2),
-    );
-    canvas.drawRRect(bodyRect, paint);
-
-    // 电池头
-    final headPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    canvas.drawRect(
-      Rect.fromLTWH(bodyWidth + 1, size.height * 0.25, 2, size.height * 0.5),
-      headPaint,
-    );
-
-    // 电量填充
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final fillWidth = (bodyWidth - 4) * (level / 100.0);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(2, 2, fillWidth, size.height - 4),
-        const Radius.circular(1),
-      ),
-      fillPaint,
-    );
-
-    // 充电图标
-    if (isCharging) {
-      final iconPaint = Paint()
-        ..color = CupertinoColors.systemGreen
-        ..style = PaintingStyle.fill;
-      final path = Path()
-        ..moveTo(size.width * 0.5, 2)
-        ..lineTo(size.width * 0.35, size.height * 0.5)
-        ..lineTo(size.width * 0.45, size.height * 0.5)
-        ..lineTo(size.width * 0.4, size.height - 2)
-        ..lineTo(size.width * 0.6, size.height * 0.4)
-        ..lineTo(size.width * 0.5, size.height * 0.4)
-        ..close();
-      canvas.drawPath(path, iconPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BatteryPainter oldDelegate) {
-    return level != oldDelegate.level ||
-        color != oldDelegate.color ||
-        isCharging != oldDelegate.isCharging;
-  }
 }
