@@ -67,12 +67,12 @@ import '../widgets/reader_status_bar.dart';
 import '../widgets/legacy_justified_text.dart';
 import '../widgets/reader_catalog_sheet.dart';
 import '../widgets/reader_color_picker_dialog.dart';
+import '../widgets/reader_padding_config_dialog.dart';
 import '../widgets/scroll_page_step_calculator.dart';
 import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
-import '../widgets/typography_settings_dialog.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -2253,30 +2253,53 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   bool get _isUiDark => _currentTheme.isDark;
 
+  bool get _menuFollowPageTone =>
+      _settings.readBarStyleFollowPage && !_readerUsesImageBackground;
+
   Color get _uiAccent =>
       _isUiDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
-  Color get _uiPanelBg =>
-      _isUiDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+  Color get _uiPanelBg => _menuFollowPageTone
+      ? _readerBackgroundBaseColor
+      : (_isUiDark
+          ? ReaderOverlayTokens.panelDark
+          : ReaderOverlayTokens.panelLight);
 
-  Color get _uiCardBg => _isUiDark
-      ? CupertinoColors.white.withValues(alpha: 0.1)
-      : AppDesignTokens.pageBgLight.withValues(alpha: 0.9);
+  Color get _uiCardBg {
+    if (_menuFollowPageTone) {
+      final overlay = _isUiDark
+          ? CupertinoColors.white.withValues(alpha: 0.06)
+          : CupertinoColors.black.withValues(alpha: 0.04);
+      return Color.alphaBlend(overlay, _uiPanelBg);
+    }
+    return _isUiDark
+        ? ReaderOverlayTokens.cardDark
+        : ReaderOverlayTokens.cardLight;
+  }
 
-  Color get _uiBorder => _isUiDark
-      ? CupertinoColors.white.withValues(alpha: 0.12)
-      : AppDesignTokens.borderLight;
+  Color get _uiBorder => _menuFollowPageTone
+      ? _uiTextStrong.withValues(alpha: _isUiDark ? 0.2 : 0.16)
+      : (_isUiDark
+          ? ReaderOverlayTokens.borderDark
+          : ReaderOverlayTokens.borderLight);
 
-  Color get _uiTextStrong =>
-      _isUiDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+  Color get _uiTextStrong => _menuFollowPageTone
+      ? _currentTheme.text
+      : (_isUiDark
+          ? ReaderOverlayTokens.textStrongDark
+          : ReaderOverlayTokens.textStrongLight);
 
-  Color get _uiTextNormal => _isUiDark
-      ? CupertinoColors.white.withValues(alpha: 0.7)
-      : AppDesignTokens.textNormal;
+  Color get _uiTextNormal => _menuFollowPageTone
+      ? _currentTheme.text.withValues(alpha: _isUiDark ? 0.72 : 0.7)
+      : (_isUiDark
+          ? ReaderOverlayTokens.textNormalDark
+          : ReaderOverlayTokens.textNormalLight);
 
-  Color get _uiTextSubtle => _isUiDark
-      ? CupertinoColors.white.withValues(alpha: 0.54)
-      : AppDesignTokens.textMuted;
+  Color get _uiTextSubtle => _menuFollowPageTone
+      ? _currentTheme.text.withValues(alpha: _isUiDark ? 0.56 : 0.52)
+      : (_isUiDark
+          ? ReaderOverlayTokens.textSubtleDark
+          : ReaderOverlayTokens.textSubtleLight);
 
   String? get _activeSearchHighlightQuery {
     if (!_showSearchMenu || _contentSearchHits.isEmpty) {
@@ -2288,7 +2311,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Color get _searchHighlightColor =>
-      _uiAccent.withValues(alpha: _isUiDark ? 0.34 : 0.22);
+      _uiAccent.withValues(alpha: _isUiDark ? 0.28 : 0.2);
 
   Color get _searchHighlightTextColor =>
       _isUiDark ? CupertinoColors.white : AppDesignTokens.textStrong;
@@ -3946,8 +3969,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         showSourceAction: !_isCurrentBookLocal(),
                         showChapterLink: !_isCurrentBookLocal(),
                         showTitleAddition: _settings.showReadTitleAddition,
-                        readBarStyleFollowPage:
-                            _settings.readBarStyleFollowPage,
+                        readBarStyleFollowPage: _menuFollowPageTone,
                       ),
 
                     // 右侧悬浮快捷栏（对标 legado 快捷动作区）
@@ -3981,8 +4003,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         onReadAloudLongPress: _openReadAloudDialogFromMenu,
                         onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
                         onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
-                        readBarStyleFollowPage:
-                            _settings.readBarStyleFollowPage,
+                        readBarStyleFollowPage: _menuFollowPageTone,
                         readAloudRunning: _readAloudSnapshot.isRunning,
                         readAloudPaused: _readAloudSnapshot.isPaused,
                       ),
@@ -5384,7 +5405,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final accent = _isUiDark
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
-    final navBtnBg = _uiPanelBg.withValues(alpha: _isUiDark ? 0.9 : 0.98);
+    final navBtnBg = _uiPanelBg.withValues(alpha: _isUiDark ? 0.94 : 0.95);
     final navBtnShadow = CupertinoColors.black.withValues(
       alpha: _isUiDark ? 0.32 : 0.12,
     );
@@ -5444,7 +5465,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
                       color:
-                          _uiCardBg.withValues(alpha: _isUiDark ? 0.4 : 0.72),
+                          _uiCardBg.withValues(alpha: _isUiDark ? 0.78 : 0.86),
                       border: Border(
                         bottom: BorderSide(
                           color: _uiBorder.withValues(alpha: 0.9),
@@ -5671,13 +5692,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
         decoration: BoxDecoration(
-          color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.64 : 0.84),
+          color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.78 : 0.9),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: _uiBorder),
           boxShadow: [
             BoxShadow(
               color: CupertinoColors.black
-                  .withValues(alpha: _isUiDark ? 0.24 : 0.1),
+                  .withValues(alpha: _isUiDark ? 0.2 : 0.08),
               blurRadius: 12,
               offset: const Offset(0, 5),
             ),
@@ -5744,8 +5765,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         height: 38,
         decoration: BoxDecoration(
           color: active
-              ? _uiAccent.withValues(alpha: 0.22)
-              : _uiPanelBg.withValues(alpha: _isUiDark ? 0.62 : 0.8),
+              ? _uiAccent.withValues(alpha: 0.18)
+              : _uiPanelBg.withValues(alpha: _isUiDark ? 0.86 : 0.9),
           borderRadius: BorderRadius.circular(19),
           border: Border.all(
             color: active ? _uiAccent : _uiBorder,
@@ -7653,6 +7674,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _showReadStyleDialog() {
     showCupertinoModalPopup<void>(
       context: context,
+      barrierColor: const Color(0x00000000),
       builder: (popupContext) => StatefulBuilder(
         builder: (context, setPopupState) {
           final textSizeProgress = _legacyTextSizeProgress();
@@ -7679,7 +7701,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
           return Container(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.82,
+              maxHeight: MediaQuery.of(context).size.height * 0.74,
             ),
             decoration: BoxDecoration(
               color: _uiPanelBg,
@@ -7755,10 +7777,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             onTap: () {
                               Navigator.of(popupContext).pop();
                               Future<void>.microtask(() {
-                                showTypographySettingsDialog(
+                                showReaderPaddingConfigDialog(
                                   this.context,
                                   settings: _settings,
                                   onSettingsChanged: _updateSettings,
+                                  isDarkMode: _isUiDark,
                                 );
                               });
                             },
@@ -8904,6 +8927,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _showLegacyMoreConfigDialog() {
     showCupertinoModalPopup<void>(
       context: context,
+      barrierColor: const Color(0x00000000),
       builder: (popupContext) => StatefulBuilder(
         builder: (context, setPopupState) {
           final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -8928,65 +8952,24 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _showLegacyTipConfigDialog() {
     showCupertinoModalPopup<void>(
       context: context,
+      barrierColor: const Color(0x00000000),
       builder: (popupContext) => StatefulBuilder(
-        builder: (context, setPopupState) => Container(
-          height: MediaQuery.of(context).size.height * 0.78,
-          decoration: BoxDecoration(
-            color: _uiPanelBg,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(14),
+        builder: (context, setPopupState) {
+          final bottomInset = MediaQuery.of(context).padding.bottom;
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.74 + bottomInset,
+            decoration: BoxDecoration(
+              color: _uiPanelBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(14),
+              ),
             ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Center(
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: _isUiDark
-                          ? CupertinoColors.white.withValues(alpha: 0.24)
-                          : AppDesignTokens.textMuted.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '信息',
-                          style: TextStyle(
-                            color: _uiTextStrong,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () => Navigator.pop(context),
-                        child: Icon(
-                          CupertinoIcons.xmark_circle_fill,
-                          color: _uiTextSubtle,
-                          size: 26,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: _buildLegacyTipConfigList(setPopupState),
-                ),
-              ],
+            child: SafeArea(
+              top: false,
+              child: _buildLegacyTipConfigList(setPopupState),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -8994,300 +8977,379 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Widget _buildLegacyTipConfigList(StateSetter setPopupState) {
     return SingleChildScrollView(
       key: const ValueKey('legacy_tip_config'),
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSettingsCard(
-            title: '正文标题',
-            child: Column(
-              children: [
-                _buildOptionRow(
-                  '显示隐藏',
-                  _titleModeLabel(_settings.titleMode),
-                  () {
-                    _showTipOptionPicker(
-                      title: '章节标题位置',
-                      options: _titleModeOptions,
-                      currentValue: _settings.titleMode,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(titleMode: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildSliderSetting(
-                  '标题字号',
-                  _settings.titleSize.toDouble(),
-                  0,
-                  10,
-                  (value) {
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(titleSize: value.round()),
-                    );
-                  },
-                  displayFormat: (value) => value.toInt().toString(),
-                ),
-                const SizedBox(height: 8),
-                _buildSliderSetting(
-                  '顶部间距',
-                  _settings.titleTopSpacing,
-                  0,
-                  100,
-                  (value) {
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(titleTopSpacing: value),
-                    );
-                  },
-                  displayFormat: (value) => value.toInt().toString(),
-                ),
-                const SizedBox(height: 8),
-                _buildSliderSetting(
-                  '底部间距',
-                  _settings.titleBottomSpacing,
-                  0,
-                  100,
-                  (value) {
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(titleBottomSpacing: value),
-                    );
-                  },
-                  displayFormat: (value) => value.toInt().toString(),
-                ),
-              ],
-            ),
+          _buildLegacyTipSectionTitle('正文标题'),
+          _buildLegacyTitleModeSegment(setPopupState),
+          _buildLegacyTipSliderRow(
+            label: '标题字号',
+            value: _settings.titleSize.toDouble(),
+            min: 0,
+            max: 10,
+            onChanged: (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(titleSize: value.round()),
+              );
+            },
+            displayFormat: (value) => value.toInt().toString(),
           ),
-          _buildSettingsCard(
-            title: '页眉',
-            child: Column(
-              children: [
-                _buildOptionRow(
-                  '显示隐藏',
-                  _headerModeLabel(_settings.headerMode),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉显示',
-                      options: _headerModeOptions,
-                      currentValue: _settings.headerMode,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(headerMode: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '左边',
-                  _headerTipLabel(_settings.headerLeftContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉左侧',
-                      options: _headerTipOptions,
-                      currentValue: _settings.headerLeftContent,
-                      onSelected: (value) {
-                        _applyTipSelectionFromSheet(
-                          setPopupState,
-                          slot: ReaderTipSlot.headerLeft,
-                          value: value,
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '中间',
-                  _headerTipLabel(_settings.headerCenterContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉中间',
-                      options: _headerTipOptions,
-                      currentValue: _settings.headerCenterContent,
-                      onSelected: (value) {
-                        _applyTipSelectionFromSheet(
-                          setPopupState,
-                          slot: ReaderTipSlot.headerCenter,
-                          value: value,
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '右边',
-                  _headerTipLabel(_settings.headerRightContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉右侧',
-                      options: _headerTipOptions,
-                      currentValue: _settings.headerRightContent,
-                      onSelected: (value) {
-                        _applyTipSelectionFromSheet(
-                          setPopupState,
-                          slot: ReaderTipSlot.headerRight,
-                          value: value,
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
+          _buildLegacyTipSliderRow(
+            label: '顶部间距',
+            value: _settings.titleTopSpacing,
+            min: 0,
+            max: 100,
+            onChanged: (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(titleTopSpacing: value),
+              );
+            },
+            displayFormat: (value) => value.toInt().toString(),
           ),
-          _buildSettingsCard(
-            title: '页脚',
-            child: Column(
-              children: [
-                _buildOptionRow(
-                  '显示隐藏',
-                  _footerModeLabel(_settings.footerMode),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页脚显示',
-                      options: _footerModeOptions,
-                      currentValue: _settings.footerMode,
-                      onSelected: (value) {
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(footerMode: value),
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '左边',
-                  _footerTipLabel(_settings.footerLeftContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页脚左侧',
-                      options: _footerTipOptions,
-                      currentValue: _settings.footerLeftContent,
-                      onSelected: (value) {
-                        _applyTipSelectionFromSheet(
-                          setPopupState,
-                          slot: ReaderTipSlot.footerLeft,
-                          value: value,
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '中间',
-                  _footerTipLabel(_settings.footerCenterContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页脚中间',
-                      options: _footerTipOptions,
-                      currentValue: _settings.footerCenterContent,
-                      onSelected: (value) {
-                        _applyTipSelectionFromSheet(
-                          setPopupState,
-                          slot: ReaderTipSlot.footerCenter,
-                          value: value,
-                        );
-                      },
-                    );
-                  },
-                ),
-                _buildOptionRow(
-                  '右边',
-                  _footerTipLabel(_settings.footerRightContent),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页脚右侧',
-                      options: _footerTipOptions,
-                      currentValue: _settings.footerRightContent,
-                      onSelected: (value) {
-                        _applyTipSelectionFromSheet(
-                          setPopupState,
-                          slot: ReaderTipSlot.footerRight,
-                          value: value,
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
+          _buildLegacyTipSliderRow(
+            label: '底部间距',
+            value: _settings.titleBottomSpacing,
+            min: 0,
+            max: 100,
+            onChanged: (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(titleBottomSpacing: value),
+              );
+            },
+            displayFormat: (value) => value.toInt().toString(),
           ),
-          _buildSettingsCard(
-            title: '页眉页脚',
-            child: Column(
-              children: [
-                _buildOptionRow(
-                  '文字颜色',
-                  _tipColorLabel(_settings.tipColor),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉页脚文字颜色',
-                      options: _tipColorOptions,
-                      currentValue: _settings.tipColor ==
-                              ReadingSettings.tipColorFollowContent
-                          ? ReadingSettings.tipColorFollowContent
-                          : _customColorPickerValue,
-                      onSelected: (value) {
-                        if (value == _customColorPickerValue) {
-                          unawaited(
-                            _showTipColorInputDialog(
-                              setPopupState,
-                              forDivider: false,
-                            ),
-                          );
-                          return;
-                        }
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(tipColor: value),
-                        );
-                      },
+          const SizedBox(height: 8),
+          _buildLegacyTipSectionTitle('页眉'),
+          _buildLegacyTipOptionRow(
+            '显示隐藏',
+            _headerModeLabel(_settings.headerMode),
+            () {
+              _showTipOptionPicker(
+                title: '页眉显示',
+                options: _headerModeOptions,
+                currentValue: _settings.headerMode,
+                onSelected: (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(headerMode: value),
+                  );
+                },
+              );
+            },
+          ),
+          _buildLegacyTipOptionRow(
+            '左边',
+            _headerTipLabel(_settings.headerLeftContent),
+            () {
+              _showTipOptionPicker(
+                title: '页眉左侧',
+                options: _headerTipOptions,
+                currentValue: _settings.headerLeftContent,
+                onSelected: (value) {
+                  _applyTipSelectionFromSheet(
+                    setPopupState,
+                    slot: ReaderTipSlot.headerLeft,
+                    value: value,
+                  );
+                },
+              );
+            },
+          ),
+          _buildLegacyTipOptionRow(
+            '中间',
+            _headerTipLabel(_settings.headerCenterContent),
+            () {
+              _showTipOptionPicker(
+                title: '页眉中间',
+                options: _headerTipOptions,
+                currentValue: _settings.headerCenterContent,
+                onSelected: (value) {
+                  _applyTipSelectionFromSheet(
+                    setPopupState,
+                    slot: ReaderTipSlot.headerCenter,
+                    value: value,
+                  );
+                },
+              );
+            },
+          ),
+          _buildLegacyTipOptionRow(
+            '右边',
+            _headerTipLabel(_settings.headerRightContent),
+            () {
+              _showTipOptionPicker(
+                title: '页眉右侧',
+                options: _headerTipOptions,
+                currentValue: _settings.headerRightContent,
+                onSelected: (value) {
+                  _applyTipSelectionFromSheet(
+                    setPopupState,
+                    slot: ReaderTipSlot.headerRight,
+                    value: value,
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          _buildLegacyTipSectionTitle('页脚'),
+          _buildLegacyTipOptionRow(
+            '显示隐藏',
+            _footerModeLabel(_settings.footerMode),
+            () {
+              _showTipOptionPicker(
+                title: '页脚显示',
+                options: _footerModeOptions,
+                currentValue: _settings.footerMode,
+                onSelected: (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(footerMode: value),
+                  );
+                },
+              );
+            },
+          ),
+          _buildLegacyTipOptionRow(
+            '左边',
+            _footerTipLabel(_settings.footerLeftContent),
+            () {
+              _showTipOptionPicker(
+                title: '页脚左侧',
+                options: _footerTipOptions,
+                currentValue: _settings.footerLeftContent,
+                onSelected: (value) {
+                  _applyTipSelectionFromSheet(
+                    setPopupState,
+                    slot: ReaderTipSlot.footerLeft,
+                    value: value,
+                  );
+                },
+              );
+            },
+          ),
+          _buildLegacyTipOptionRow(
+            '中间',
+            _footerTipLabel(_settings.footerCenterContent),
+            () {
+              _showTipOptionPicker(
+                title: '页脚中间',
+                options: _footerTipOptions,
+                currentValue: _settings.footerCenterContent,
+                onSelected: (value) {
+                  _applyTipSelectionFromSheet(
+                    setPopupState,
+                    slot: ReaderTipSlot.footerCenter,
+                    value: value,
+                  );
+                },
+              );
+            },
+          ),
+          _buildLegacyTipOptionRow(
+            '右边',
+            _footerTipLabel(_settings.footerRightContent),
+            () {
+              _showTipOptionPicker(
+                title: '页脚右侧',
+                options: _footerTipOptions,
+                currentValue: _settings.footerRightContent,
+                onSelected: (value) {
+                  _applyTipSelectionFromSheet(
+                    setPopupState,
+                    slot: ReaderTipSlot.footerRight,
+                    value: value,
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          _buildLegacyTipSectionTitle('页眉页脚'),
+          _buildLegacyTipOptionRow(
+            '文字颜色',
+            _tipColorLabel(_settings.tipColor),
+            () {
+              _showTipOptionPicker(
+                title: '页眉页脚文字颜色',
+                options: _tipColorOptions,
+                currentValue:
+                    _settings.tipColor == ReadingSettings.tipColorFollowContent
+                        ? ReadingSettings.tipColorFollowContent
+                        : _customColorPickerValue,
+                onSelected: (value) {
+                  if (value == _customColorPickerValue) {
+                    unawaited(
+                      _showTipColorInputDialog(
+                        setPopupState,
+                        forDivider: false,
+                      ),
                     );
-                  },
-                ),
-                _buildOptionRow(
-                  '分割线颜色',
-                  _tipDividerColorLabel(_settings.tipDividerColor),
-                  () {
-                    _showTipOptionPicker(
-                      title: '页眉页脚分割线颜色',
-                      options: _tipDividerColorOptions,
-                      currentValue: _settings.tipDividerColor ==
-                                  ReadingSettings.tipDividerColorDefault ||
-                              _settings.tipDividerColor ==
-                                  ReadingSettings.tipDividerColorFollowContent
-                          ? _settings.tipDividerColor
-                          : _customColorPickerValue,
-                      onSelected: (value) {
-                        if (value == _customColorPickerValue) {
-                          unawaited(
-                            _showTipColorInputDialog(
-                              setPopupState,
-                              forDivider: true,
-                            ),
-                          );
-                          return;
-                        }
-                        _updateSettingsFromSheet(
-                          setPopupState,
-                          _settings.copyWith(tipDividerColor: value),
-                        );
-                      },
+                    return;
+                  }
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(tipColor: value),
+                  );
+                },
+              );
+            },
+          ),
+          _buildLegacyTipOptionRow(
+            '分割线颜色',
+            _tipDividerColorLabel(_settings.tipDividerColor),
+            () {
+              _showTipOptionPicker(
+                title: '页眉页脚分割线颜色',
+                options: _tipDividerColorOptions,
+                currentValue: _settings.tipDividerColor ==
+                            ReadingSettings.tipDividerColorDefault ||
+                        _settings.tipDividerColor ==
+                            ReadingSettings.tipDividerColorFollowContent
+                    ? _settings.tipDividerColor
+                    : _customColorPickerValue,
+                onSelected: (value) {
+                  if (value == _customColorPickerValue) {
+                    unawaited(
+                      _showTipColorInputDialog(
+                        setPopupState,
+                        forDivider: true,
+                      ),
                     );
-                  },
-                ),
-              ],
-            ),
+                    return;
+                  }
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(tipDividerColor: value),
+                  );
+                },
+              );
+            },
           ),
           const SizedBox(height: 12),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLegacyTipSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: _uiAccent,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegacyTitleModeSegment(StateSetter setPopupState) {
+    final safeGroupValue = _settings.titleMode.clamp(0, 2).toInt();
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: _uiBorder.withValues(alpha: 0.55)),
+        ),
+      ),
+      child: CupertinoSlidingSegmentedControl<int>(
+        groupValue: safeGroupValue,
+        backgroundColor: _uiCardBg,
+        thumbColor: _uiAccent,
+        children: {
+          for (final option in _titleModeOptions)
+            option.value: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Text(
+                option.label,
+                style: TextStyle(
+                  color: _uiTextNormal,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        },
+        onValueChanged: (value) {
+          if (value == null) return;
+          _updateSettingsFromSheet(
+            setPopupState,
+            _settings.copyWith(titleMode: value),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLegacyTipOptionRow(
+    String label,
+    String value,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: _uiBorder.withValues(alpha: 0.55)),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: _uiTextStrong,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              value,
+              style: TextStyle(
+                color: _uiTextNormal,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegacyTipSliderRow({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required ValueChanged<double> onChanged,
+    required String Function(double) displayFormat,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: _uiBorder.withValues(alpha: 0.55)),
+        ),
+      ),
+      child: _buildSliderSetting(
+        label,
+        value,
+        min,
+        max,
+        onChanged,
+        displayFormat: displayFormat,
       ),
     );
   }
@@ -9875,12 +9937,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 const SizedBox(height: 12),
                 GestureDetector(
                   onTap: () {
-                    showTypographySettingsDialog(
+                    showReaderPaddingConfigDialog(
                       context,
                       settings: _settings,
-                      onSettingsChanged: (newSettings) {
-                        _updateSettingsFromSheet(setPopupState, newSettings);
-                      },
+                      onSettingsChanged: (newSettings) =>
+                          _updateSettingsFromSheet(
+                        setPopupState,
+                        newSettings,
+                      ),
+                      isDarkMode: _isUiDark,
                     );
                   },
                   child: Container(

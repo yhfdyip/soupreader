@@ -185,6 +185,64 @@
 ### 10) Progress（动态）
 
 - `2026-02-21`（本轮）
+  - T11 第十六批收敛：阅读器正文密度与菜单分层对齐 legado，修复“内容不满 + 配置态遮挡偏重 + 顶底与正文混淆”。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/models/reading_settings.dart`、`lib/features/reader/views/simple_reader_view.dart`、`lib/features/reader/widgets/reader_menus.dart`、`lib/features/reader/widgets/reader_bottom_menu.dart`、`test/reading_settings_test.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`。
+    - 关键实现：
+      - `ReadingSettings` 新增 `layoutPresetVersion`（v1->v2）和旧默认值迁移规则；仅迁移“仍为旧默认”的字段，保留用户自定义值。
+      - 正文默认参数对齐 legado v2：字号/行距/段距/正文边距收敛，提高单屏内容密度。
+      - `ReaderTopMenu` 收敛为实体背景层 + 下边界 + 阴影，减少正文穿透。
+      - `ReaderBottomMenuNew` 提升面板实体度并增加滑杆/入口分隔线，强化底栏与正文层级。
+      - `ReadStyle/MoreConfig/TipConfig` 弹层 barrier 改为透明；ReadStyle/TipConfig 高度收敛至 0.74 屏高语义，减轻配置态遮挡。
+  - 本轮实施记录：
+    - 做了什么：完成默认排版迁移、菜单视觉分层和配置态遮挡收敛的联动改造。
+    - 为什么：用户明确要求参考图观感与 legado 语义一致，重点是“正文优先 + 配置低干扰”。
+    - 如何验证：
+      - `flutter test test/reading_settings_test.dart test/simple_reader_view_compile_test.dart test/reader_top_menu_test.dart test/reader_bottom_menu_new_test.dart test/app_settings_test.dart`（通过）
+    - 兼容影响：低到中。`ReadingSettings` 增加版本字段并触发一次性旧默认迁移；不涉及数据库结构与书源链路。
+  - T11 当前状态：保持 `active`。本批次完成正文密度/菜单分层核心收敛，后续仅剩真机视觉回归与截图补证。
+
+- `2026-02-21`（本轮）
+  - T11 第十五批收敛：边距设置弹窗与信息设置弹窗按 legado 语义收口，并补齐页眉分割线默认值兼容。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/reader_padding_config_dialog.dart`、`lib/features/reader/views/simple_reader_view.dart`、`lib/features/reader/models/reading_settings.dart`、`PLANS.md`。
+    - 关键实现：
+      - 新增并接入 `ReaderPaddingConfigDialog`：结构改为 legado 平铺分段（页眉/正文/页脚 + 分割线开关 + 四向滑杆），去除卡片化与额外标题栏。
+      - `SimpleReaderView._showLegacyTipConfigDialog` 收敛为 legacy 列表结构；正文标题由二级选择弹层改为内联单选分段，贴齐 `TipConfigDialog` 的 RadioGroup 语义。
+      - `ReadingSettings.fromJson` 将 `showHeaderLine` 缺省回退修正为 `false`，与 legado 默认和本地构造默认一致，避免旧配置缺字段时出现分割线误显。
+  - 本轮实施记录：
+    - 做了什么：完成边距/信息两弹窗迁移收口，并修复配置兼容默认值偏差。
+    - 为什么：用户要求“与 legado 一致”；此前存在样式卡片化、标题模式交互路径不一致，以及 `showHeaderLine` 默认值漂移问题。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+      - 手工路径：C5（阅读器 -> 菜单 -> 边距/信息弹窗）待真机回归补图。
+    - 兼容影响：低。仅调整阅读器配置弹窗结构与默认值兼容，不改书源协议、目录解析与正文分页主链路。
+  - T11 当前状态：保持 `active`。本批次已完成弹窗收口，剩余差异继续按 C5 清单推进。
+
+- `2026-02-21`（本轮）
+  - T11 第十四批收敛：阅读页日/夜配色与浮层层级收敛，修复“夜间底栏发白 + 多层透明叠加压正文”的偏差。
+  - T11 代码收敛：
+    - 代码变更：`lib/app/theme/design_tokens.dart`、`lib/features/reader/views/simple_reader_view.dart`、`lib/features/reader/widgets/reader_bottom_menu.dart`、`lib/features/reader/widgets/reader_menus.dart`、`PLANS.md`。
+    - 关键实现：
+      - 新增 `ReaderOverlayTokens` 统一阅读浮层色板（panel/card/border/text）并在阅读页复用，避免分散 hardcode 导致日夜不一致。
+      - `ReaderThemeTokens` 收敛：日间改为更稳定纸色轴（`#F7F4EE`），夜间正文/分割色对齐 legacy 语义（`text #ADADAD`）。
+      - `SimpleReaderView` 新增 `_menuFollowPageTone`，将“阅读菜单样式随页面”限制为“仅纯色背景生效”，与 legacy `readBarStyleFollowPage && curBgType==0` 一致。
+      - 右侧快捷栏与搜索浮层降低透明叠加噪点（提高基底不透明度、收敛强调色 alpha），提升正文主次。
+      - `ReaderBottomMenuNew/ReaderTopMenu` 去除对 Shad 运行时色板的强依赖，改为“阅读主题暗亮度 + 统一浮层 token”驱动，避免夜间出现反向浅底。
+  - 本轮实施记录：
+    - 做了什么：重构阅读页日夜配色 token 与菜单着色链路，统一顶部菜单、底部菜单、右侧快捷栏、搜索浮层的层级规则。
+    - 为什么：legacy 阅读菜单在“是否跟随页面”“夜间明暗约束”上有明确语义；现有实现混用 `ShadTheme` 与局部 alpha 叠加，导致夜间控件层反白、长读干扰正文。
+    - 如何验证：
+      - `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+      - 手工路径：C5（阅读器 -> 切换日间/夜间 -> 打开顶部菜单/右侧快捷栏/底部菜单/搜索面板）待真机回归补图。
+    - 兼容影响：低。仅收敛阅读器 UI 颜色与浮层透明度策略，不改数据库、书源规则、同步协议与正文分页逻辑。
+  - T11 当前状态：保持 `active`。阅读页配色层级已收敛，剩余差异聚焦图片分页与极端慢源场景（非本批次）。
+
+- `2026-02-21`（本轮）
   - T11 第十三批收敛：更新 `docs/migration/button-audit/content-c5-checklist.md`，回补“失败类型分层采样 + 按书源预算策略”证据，并收敛图片样式保留差异口径。
   - T11 代码收敛：
     - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`docs/migration/button-audit/content-c5-checklist.md`、`PLANS.md`。
@@ -578,6 +636,8 @@
 
 ### 11) Surprises & Discoveries（动态）
 
+- 边距/信息弹窗收口时发现 `ReadingSettings.fromJson` 对 `showHeaderLine` 的缺省回退为 `true`，与 legado `showHeaderLine=false` 语义不一致；旧配置缺字段会出现“无操作却显示分割线”的偏差，已改为 `false`。
+- legado `TipConfigDialog` 的“标题显示”是内联单选组而非二级弹层；若沿用 ActionSheet 会改变交互路径，已改为内联分段控件。
 - 发现 legacy 菜单规模远高于直觉（`410` 项），必须使用台账驱动，不能靠页面肉眼扫。
 - soupreader 已有较多入口容器，但尚未形成“全量映射主键”，容易造成局部一致、全局遗漏。
 - 设置模块存在多处 `showNotImplemented`，适合作为“先有交互壳”策略，但需统一占位语义。
@@ -615,6 +675,8 @@
 
 ### 12) Decision Log（动态）
 
+- `2026-02-21`：T11 弹窗迁移采用“结构同义优先”策略：边距弹窗改为平铺分段列表；信息弹窗标题模式改为内联单选，不再使用二级 ActionSheet。
+- `2026-02-21`：`showHeaderLine` 兼容回退值改为 `false`，优先与 legado 默认语义保持一致，避免旧配置行为漂移。
 - `2026-02-20`：决定先做“按钮与交互壳”而非真实业务实现，符合当前需求与迁移节奏。
 - `2026-02-20`：扩展任务（T15）按规范先标记 `blocked`，等待明确“开始做扩展功能”指令。
 - `2026-02-20`：采用“台账 -> 映射 -> 批量迁移 -> 逐项对照”流水线，避免遗漏。
@@ -653,9 +715,9 @@
 
 ### 13) Outcomes & Retrospective（动态）
 
-- 阶段性结果（截至 T11 第十三批收敛）：
+- 阶段性结果（截至 T11 第十五批收敛）：
   - 已完成任务：`T00,T01,T02,T03,T04,T05,T05A,T06,T07,T08,T09,T10`。
   - 当前进行中：`T11`（正文链路按钮与交互同义）。
-  - 新增收益：C5 对照清单已覆盖十三批动作；正文图片链路新增“失败类型分层采样 + source-level 预算调参”，慢源/鉴权/解码异常场景的首帧命中稳定性继续提升。
+  - 新增收益：C5 对照清单已覆盖十五批动作；本轮完成边距/信息弹窗与 legado 语义收口，并修复页眉分割线默认值兼容偏差。
   - 当前缺口：极端不可达慢源（双阶段探测持续失败）下仍会回落估算分页，距离 legacy “全量首帧真实尺寸确定性”仍有尾部偏差。
-  - 回归状态：本轮定向测试 `simple_reader_view_compile_test`、`paged_reader_widget_non_simulation_test`、`paged_reader_widget_simulation_image_test`、`reader_image_marker_codec_test`、`reader_image_request_parser_test` 通过；仍未执行 `flutter analyze`（保留到 T18 提交前一次执行）。
+  - 回归状态：本轮定向测试 `simple_reader_view_compile_test`、`reader_top_menu_test`、`reader_bottom_menu_new_test` 通过；仍未执行 `flutter analyze`（保留到 T18 提交前一次执行）。

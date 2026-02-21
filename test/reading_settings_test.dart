@@ -43,6 +43,75 @@ void main() {
     expect(legacyDecoded.noAnimScrollPage, isFalse);
   });
 
+  test('ReadingSettings 使用 legado v2 正文排版默认值', () {
+    const defaults = ReadingSettings();
+    expect(defaults.layoutPresetVersion,
+        ReadingSettings.layoutPresetVersionLegadoV2);
+    expect(defaults.fontSize, ReadingSettings.legadoV2FontSize);
+    expect(defaults.lineHeight, ReadingSettings.legadoV2LineHeight);
+    expect(defaults.paragraphSpacing, ReadingSettings.legadoV2ParagraphSpacing);
+    expect(defaults.paddingLeft, ReadingSettings.legadoV2PaddingHorizontal);
+    expect(defaults.paddingRight, ReadingSettings.legadoV2PaddingHorizontal);
+    expect(defaults.paddingTop, ReadingSettings.legadoV2PaddingVertical);
+    expect(defaults.paddingBottom, ReadingSettings.legadoV2PaddingVertical);
+  });
+
+  test('ReadingSettings 迁移 v1 旧默认到 legado v2 并提升预设版本', () {
+    final legacyDecoded = ReadingSettings.fromJson(<String, dynamic>{
+      'layoutPresetVersion': ReadingSettings.layoutPresetVersionLegacy,
+      'fontSize': ReadingSettings.legacyV1FontSize,
+      'lineHeight': ReadingSettings.legacyV1LineHeight,
+      'paragraphSpacing': ReadingSettings.legacyV1ParagraphSpacing,
+      'marginHorizontal': ReadingSettings.legacyV1PaddingHorizontal,
+      'marginVertical': ReadingSettings.legacyV1MarginVertical,
+      'paddingLeft': ReadingSettings.legacyV1PaddingHorizontal,
+      'paddingRight': ReadingSettings.legacyV1PaddingHorizontal,
+      'paddingTop': ReadingSettings.legacyV1PaddingTop,
+      'paddingBottom': ReadingSettings.legacyV1PaddingBottom,
+      'headerPaddingLeft': ReadingSettings.legacyV1PaddingHorizontal,
+      'headerPaddingRight': ReadingSettings.legacyV1PaddingHorizontal,
+      'footerPaddingLeft': ReadingSettings.legacyV1PaddingHorizontal,
+      'footerPaddingRight': ReadingSettings.legacyV1PaddingHorizontal,
+    });
+
+    expect(legacyDecoded.layoutPresetVersion,
+        ReadingSettings.layoutPresetVersionLegadoV2);
+    expect(legacyDecoded.fontSize, ReadingSettings.legadoV2FontSize);
+    expect(legacyDecoded.lineHeight, ReadingSettings.legadoV2LineHeight);
+    expect(legacyDecoded.paragraphSpacing,
+        ReadingSettings.legadoV2ParagraphSpacing);
+    expect(
+        legacyDecoded.paddingLeft, ReadingSettings.legadoV2PaddingHorizontal);
+    expect(
+        legacyDecoded.paddingRight, ReadingSettings.legadoV2PaddingHorizontal);
+    expect(legacyDecoded.paddingTop, ReadingSettings.legadoV2PaddingVertical);
+    expect(
+        legacyDecoded.paddingBottom, ReadingSettings.legadoV2PaddingVertical);
+  });
+
+  test('ReadingSettings 迁移时保留用户自定义排版', () {
+    final customized = ReadingSettings.fromJson(<String, dynamic>{
+      'layoutPresetVersion': ReadingSettings.layoutPresetVersionLegacy,
+      'fontSize': 28.0,
+      'lineHeight': 1.6,
+      'paragraphSpacing': 9.0,
+      'paddingLeft': 30.0,
+      'paddingRight': 30.0,
+      'paddingTop': 12.0,
+      'paddingBottom': 10.0,
+    });
+
+    expect(customized.layoutPresetVersion,
+        ReadingSettings.layoutPresetVersionLegadoV2);
+    expect(customized.fontSize, 28.0);
+    expect(customized.lineHeight, 1.6);
+    expect(customized.paragraphSpacing, 9.0);
+    expect(customized.paddingLeft, 30.0);
+    expect(customized.paddingRight, 30.0);
+    expect(customized.paddingTop, 12.0);
+    expect(customized.paddingBottom, 10.0);
+  });
+
   test('ReadingSettings keeps shareLayout defaults and survives json roundtrip',
       () {
     const defaults = ReadingSettings();

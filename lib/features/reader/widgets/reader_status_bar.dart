@@ -91,10 +91,11 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
       right: 0,
       child: Container(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 4,
-          top: 4,
-          left: widget.settings.paddingLeft,
-          right: widget.settings.paddingRight,
+          bottom:
+              MediaQuery.of(context).padding.bottom + widget.settings.footerPaddingBottom,
+          top: widget.settings.footerPaddingTop,
+          left: widget.settings.footerPaddingLeft,
+          right: widget.settings.footerPaddingRight,
         ),
         decoration: BoxDecoration(
           color: widget.currentTheme.background,
@@ -351,10 +352,10 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
       right: 0,
       child: Container(
         padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 4,
-          bottom: 4,
-          left: widget.settings.paddingLeft,
-          right: widget.settings.paddingRight,
+          top: MediaQuery.of(context).padding.top + widget.settings.headerPaddingTop,
+          bottom: widget.settings.headerPaddingBottom,
+          left: widget.settings.headerPaddingLeft,
+          right: widget.settings.headerPaddingRight,
         ),
         decoration: BoxDecoration(
           color: widget.currentTheme.background,

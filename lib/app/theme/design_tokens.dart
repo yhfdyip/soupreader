@@ -42,6 +42,27 @@ class AppDesignTokens {
   static const Duration motionPageTurn = Duration(milliseconds: 300);
 }
 
+/// 阅读菜单与浮层的统一色板（对标 legado「正文优先」配色语义）。
+class ReaderOverlayTokens {
+  ReaderOverlayTokens._();
+
+  // 夜间：弱化纯黑穿透感，减少多层透明叠加导致的噪点。
+  static const Color panelDark = Color(0xFF17191D);
+  static const Color cardDark = Color(0xFF24272C);
+  static const Color borderDark = Color(0xFF3B414A);
+  static const Color textStrongDark = Color(0xFFE8ECF2);
+  static const Color textNormalDark = Color(0xFFB7C0CC);
+  static const Color textSubtleDark = Color(0xFF929CAA);
+
+  // 日间：拉开正文与操作层层级，避免“整屏泛白”。
+  static const Color panelLight = Color(0xFFFFFFFF);
+  static const Color cardLight = Color(0xFFF4F6FA);
+  static const Color borderLight = Color(0xFFD7DEE8);
+  static const Color textStrongLight = Color(0xFF1F2328);
+  static const Color textNormalLight = Color(0xFF5C6773);
+  static const Color textSubtleLight = Color(0xFF7A8592);
+}
+
 /// 阅读主题令牌：用于沉浸式阅读页面的核心颜色语义。
 class ReaderThemeToken {
   final String name;
@@ -70,10 +91,10 @@ class ReaderThemeTokens {
   /// 纸墨沉浸（日间）
   static const ReaderThemeToken day = ReaderThemeToken(
     name: '日间',
-    background: Color(0xFFFDFBF7),
-    text: Color(0xFF1A1A1A),
-    subText: Color(0xFF4A4A4A),
-    divider: Color(0xFFE0E0E0),
+    background: Color(0xFFF7F4EE),
+    text: Color(0xFF1F2328),
+    subText: Color(0xFF5C6773),
+    divider: Color(0xFFDFE4EA),
     accent: AppDesignTokens.brandPrimary,
   );
 
@@ -81,9 +102,9 @@ class ReaderThemeTokens {
   static const ReaderThemeToken night = ReaderThemeToken(
     name: '夜间',
     background: Color(0xFF000000),
-    text: Color(0xFFAAAAAA),
-    subText: Color(0xFF7A7A7A),
-    divider: Color(0xFF2A2A2A),
+    text: Color(0xFFADADAD),
+    subText: Color(0xFF8A94A0),
+    divider: Color(0xFF2F3440),
     accent: AppDesignTokens.brandSecondary,
   );
 
@@ -146,7 +167,7 @@ class ReaderThemeTokens {
   static const ReaderThemeToken amoled = ReaderThemeToken(
     name: '纯黑',
     background: Color(0xFF000000),
-    text: Color(0xFFAAAAAA),
+    text: Color(0xFFADADAD),
     subText: Color(0xFF6B7280),
     divider: Color(0xFF1F1F1F),
     accent: AppDesignTokens.brandSecondary,

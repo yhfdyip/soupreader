@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
@@ -76,24 +75,33 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ShadTheme.of(context).colorScheme;
     final followPage = widget.readBarStyleFollowPage;
-    final panelBg = followPage
-        ? widget.currentTheme.background.withValues(alpha: 0.96)
+    final panelBase = followPage
+        ? widget.currentTheme.background
         : (_isDarkMode
-            ? scheme.popover.withValues(alpha: 0.98)
-            : scheme.background.withValues(alpha: 0.97));
-    final panelForeground =
-        followPage ? widget.currentTheme.text : scheme.foreground;
+            ? ReaderOverlayTokens.panelDark
+            : ReaderOverlayTokens.panelLight);
+    final panelBg = panelBase.withValues(
+      alpha: followPage ? (_isDarkMode ? 0.98 : 0.97) : 1.0,
+    );
+    final panelForeground = followPage
+        ? widget.currentTheme.text
+        : (_isDarkMode
+            ? ReaderOverlayTokens.textStrongDark
+            : ReaderOverlayTokens.textStrongLight);
     final panelMutedForeground = followPage
-        ? widget.currentTheme.text.withValues(alpha: 0.62)
-        : scheme.mutedForeground;
+        ? widget.currentTheme.text.withValues(alpha: _isDarkMode ? 0.66 : 0.62)
+        : (_isDarkMode
+            ? ReaderOverlayTokens.textNormalDark
+            : ReaderOverlayTokens.textNormalLight);
     final panelBorder = followPage
-        ? widget.currentTheme.text.withValues(alpha: 0.22)
-        : scheme.border.withValues(alpha: _isDarkMode ? 0.72 : 0.58);
+        ? widget.currentTheme.text.withValues(alpha: _isDarkMode ? 0.30 : 0.24)
+        : (_isDarkMode
+            ? ReaderOverlayTokens.borderDark
+            : ReaderOverlayTokens.borderLight);
     final panelShadow = followPage
-        ? widget.currentTheme.text.withValues(alpha: 0.08)
-        : CupertinoColors.black.withValues(alpha: _isDarkMode ? 0.26 : 0.12);
+        ? widget.currentTheme.text.withValues(alpha: _isDarkMode ? 0.12 : 0.1)
+        : CupertinoColors.black.withValues(alpha: _isDarkMode ? 0.3 : 0.11);
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
     final brightnessTopOffset = widget.settings.showReadTitleAddition
@@ -143,6 +151,12 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                     _buildChapterSlider(
                       foreground: panelForeground,
                       mutedForeground: panelMutedForeground,
+                    ),
+                    Container(
+                      height: 0.9,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      color: panelBorder.withValues(
+                          alpha: _isDarkMode ? 0.78 : 0.62),
                     ),
                     _buildBottomTabs(foreground: panelForeground),
                   ],

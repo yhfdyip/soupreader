@@ -2,6 +2,25 @@ import 'package:flutter/cupertino.dart';
 
 /// 阅读设置模型
 class ReadingSettings {
+  // legacy 旧默认（v1）：用于历史数据识别与一次性迁移。
+  static const double legacyV1FontSize = 24.0;
+  static const double legacyV1LineHeight = 1.42;
+  static const double legacyV1ParagraphSpacing = 6.0;
+  static const double legacyV1PaddingHorizontal = 22.0;
+  static const double legacyV1PaddingTop = 5.0;
+  static const double legacyV1PaddingBottom = 4.0;
+  static const double legacyV1MarginVertical = 5.0;
+
+  // legado 对齐默认（v2）：正文更满、同屏信息密度更高。
+  static const double legadoV2FontSize = 20.0;
+  static const double legadoV2LineHeight = 1.2;
+  static const double legadoV2ParagraphSpacing = 2.0;
+  static const double legadoV2PaddingHorizontal = 16.0;
+  static const double legadoV2PaddingVertical = 6.0;
+
+  static const int layoutPresetVersionLegacy = 1;
+  static const int layoutPresetVersionLegadoV2 = 2;
+
   final double fontSize;
   final double lineHeight;
   final double letterSpacing;
@@ -26,6 +45,7 @@ class ReadingSettings {
   final bool brightnessViewOnRight; // 亮度侧边栏位置（true:右侧，false:左侧）
   final bool showReadTitleAddition; // 显示阅读标题附加信息（对标 showReadTitleAddition）
   final bool readBarStyleFollowPage; // 阅读菜单样式跟随页面（对标 readBarStyleFollowPage）
+  final int layoutPresetVersion; // 排版预设版本：用于历史默认值迁移
   final ProgressBarBehavior progressBarBehavior; // 进度条行为（页内/章节）
   final bool confirmSkipChapter; // 章节进度条跳转确认（对标 legado）
 
@@ -47,6 +67,14 @@ class ReadingSettings {
   final double paddingBottom;
   final double paddingLeft;
   final double paddingRight;
+  final double headerPaddingTop;
+  final double headerPaddingBottom;
+  final double headerPaddingLeft;
+  final double headerPaddingRight;
+  final double footerPaddingTop;
+  final double footerPaddingBottom;
+  final double footerPaddingLeft;
+  final double footerPaddingRight;
 
   // 点击区域配置 (9宫格)
   final Map<String, int> clickActions;
@@ -118,12 +146,12 @@ class ReadingSettings {
 
   const ReadingSettings({
     // 安装后默认值：尽量对齐 Legado 的阅读默认体验
-    this.fontSize = 24.0,
-    this.lineHeight = 1.42,
+    this.fontSize = legadoV2FontSize,
+    this.lineHeight = legadoV2LineHeight,
     this.letterSpacing = 0.0,
-    this.paragraphSpacing = 6.0,
-    this.marginHorizontal = 22.0,
-    this.marginVertical = 5.0,
+    this.paragraphSpacing = legadoV2ParagraphSpacing,
+    this.marginHorizontal = legadoV2PaddingHorizontal,
+    this.marginVertical = legadoV2PaddingVertical,
     // Legado 默认首套排版的纸色主题（本项目在 AppColors.readingThemes 末尾追加）
     this.themeIndex = 9,
     this.fontFamilyIndex = 0,
@@ -144,6 +172,7 @@ class ReadingSettings {
     this.brightnessViewOnRight = false,
     this.showReadTitleAddition = true,
     this.readBarStyleFollowPage = false,
+    this.layoutPresetVersion = layoutPresetVersionLegadoV2,
     this.progressBarBehavior = ProgressBarBehavior.page,
     this.confirmSkipChapter = true,
     // 新增字段默认值
@@ -157,10 +186,18 @@ class ReadingSettings {
     this.underline = false,
     this.shareLayout = true,
     this.readStyleConfigs = const <ReadStyleConfig>[],
-    this.paddingTop = 5.0,
-    this.paddingBottom = 4.0,
-    this.paddingLeft = 22.0,
-    this.paddingRight = 22.0,
+    this.paddingTop = legadoV2PaddingVertical,
+    this.paddingBottom = legadoV2PaddingVertical,
+    this.paddingLeft = legadoV2PaddingHorizontal,
+    this.paddingRight = legadoV2PaddingHorizontal,
+    this.headerPaddingTop = 4.0,
+    this.headerPaddingBottom = 4.0,
+    this.headerPaddingLeft = legadoV2PaddingHorizontal,
+    this.headerPaddingRight = legadoV2PaddingHorizontal,
+    this.footerPaddingTop = 4.0,
+    this.footerPaddingBottom = 4.0,
+    this.footerPaddingLeft = legadoV2PaddingHorizontal,
+    this.footerPaddingRight = legadoV2PaddingHorizontal,
     this.clickActions = const {},
     this.autoReadSpeed = 10,
     // 对标 legado：翻页动画时长固定为 300ms
@@ -281,6 +318,10 @@ class ReadingSettings {
       if (raw == '0' || raw.toLowerCase() == 'false') return false;
     }
     return fallback;
+  }
+
+  static bool _isCloseTo(double value, double target) {
+    return (value - target).abs() <= 0.0001;
   }
 
   static double _safeDouble(
@@ -454,17 +495,97 @@ class ReadingSettings {
                 : footerModeShow)
             : footerModeShow);
 
+    var layoutPresetVersion = _toInt(
+      json['layoutPresetVersion'],
+      layoutPresetVersionLegacy,
+    );
+    var fontSize = _toDouble(json['fontSize'], legacyV1FontSize);
+    var lineHeight = _toDouble(json['lineHeight'], legacyV1LineHeight);
+    const letterSpacing = 0.0;
+    var paragraphSpacing =
+        _toDouble(json['paragraphSpacing'], legacyV1ParagraphSpacing);
+    var marginHorizontal = json.containsKey('marginHorizontal')
+        ? _toDouble(json['marginHorizontal'], legacyV1PaddingHorizontal)
+        : _toDouble(json['paddingH'], legacyV1PaddingHorizontal);
+    var marginVertical = json.containsKey('marginVertical')
+        ? _toDouble(json['marginVertical'], legacyV1MarginVertical)
+        : _toDouble(json['paddingV'], legacyV1MarginVertical);
+    var paddingTop = _toDouble(json['paddingTop'], legacyV1PaddingTop);
+    var paddingBottom = _toDouble(json['paddingBottom'], legacyV1PaddingBottom);
+    var paddingLeft = _toDouble(json['paddingLeft'], legacyV1PaddingHorizontal);
+    var paddingRight =
+        _toDouble(json['paddingRight'], legacyV1PaddingHorizontal);
+    var headerPaddingTop = _toDouble(json['headerPaddingTop'], 4.0);
+    var headerPaddingBottom = _toDouble(json['headerPaddingBottom'], 4.0);
+    var headerPaddingLeft = _toDouble(
+      json['headerPaddingLeft'],
+      _toDouble(json['paddingLeft'], legacyV1PaddingHorizontal),
+    );
+    var headerPaddingRight = _toDouble(
+      json['headerPaddingRight'],
+      _toDouble(json['paddingRight'], legacyV1PaddingHorizontal),
+    );
+    var footerPaddingTop = _toDouble(json['footerPaddingTop'], 4.0);
+    var footerPaddingBottom = _toDouble(json['footerPaddingBottom'], 4.0);
+    var footerPaddingLeft = _toDouble(
+      json['footerPaddingLeft'],
+      _toDouble(json['paddingLeft'], legacyV1PaddingHorizontal),
+    );
+    var footerPaddingRight = _toDouble(
+      json['footerPaddingRight'],
+      _toDouble(json['paddingRight'], legacyV1PaddingHorizontal),
+    );
+
+    if (layoutPresetVersion < layoutPresetVersionLegadoV2) {
+      if (_isCloseTo(fontSize, legacyV1FontSize)) {
+        fontSize = legadoV2FontSize;
+      }
+      if (_isCloseTo(lineHeight, legacyV1LineHeight)) {
+        lineHeight = legadoV2LineHeight;
+      }
+      if (_isCloseTo(paragraphSpacing, legacyV1ParagraphSpacing)) {
+        paragraphSpacing = legadoV2ParagraphSpacing;
+      }
+      if (_isCloseTo(marginHorizontal, legacyV1PaddingHorizontal)) {
+        marginHorizontal = legadoV2PaddingHorizontal;
+      }
+      if (_isCloseTo(marginVertical, legacyV1MarginVertical)) {
+        marginVertical = legadoV2PaddingVertical;
+      }
+      if (_isCloseTo(paddingTop, legacyV1PaddingTop)) {
+        paddingTop = legadoV2PaddingVertical;
+      }
+      if (_isCloseTo(paddingBottom, legacyV1PaddingBottom)) {
+        paddingBottom = legadoV2PaddingVertical;
+      }
+      if (_isCloseTo(paddingLeft, legacyV1PaddingHorizontal)) {
+        paddingLeft = legadoV2PaddingHorizontal;
+      }
+      if (_isCloseTo(paddingRight, legacyV1PaddingHorizontal)) {
+        paddingRight = legadoV2PaddingHorizontal;
+      }
+      if (_isCloseTo(headerPaddingLeft, legacyV1PaddingHorizontal)) {
+        headerPaddingLeft = legadoV2PaddingHorizontal;
+      }
+      if (_isCloseTo(headerPaddingRight, legacyV1PaddingHorizontal)) {
+        headerPaddingRight = legadoV2PaddingHorizontal;
+      }
+      if (_isCloseTo(footerPaddingLeft, legacyV1PaddingHorizontal)) {
+        footerPaddingLeft = legadoV2PaddingHorizontal;
+      }
+      if (_isCloseTo(footerPaddingRight, legacyV1PaddingHorizontal)) {
+        footerPaddingRight = legadoV2PaddingHorizontal;
+      }
+      layoutPresetVersion = layoutPresetVersionLegadoV2;
+    }
+
     return ReadingSettings(
-      fontSize: _toDouble(json['fontSize'], 24.0),
-      lineHeight: _toDouble(json['lineHeight'], 1.42),
-      letterSpacing: _toDouble(json['letterSpacing'], 0.0),
-      paragraphSpacing: _toDouble(json['paragraphSpacing'], 6.0),
-      marginHorizontal: json.containsKey('marginHorizontal')
-          ? _toDouble(json['marginHorizontal'], 22.0)
-          : _toDouble(json['paddingH'], 22.0),
-      marginVertical: json.containsKey('marginVertical')
-          ? _toDouble(json['marginVertical'], 5.0)
-          : _toDouble(json['paddingV'], 5.0),
+      fontSize: fontSize,
+      lineHeight: lineHeight,
+      letterSpacing: _toDouble(json['letterSpacing'], letterSpacing),
+      paragraphSpacing: paragraphSpacing,
+      marginHorizontal: marginHorizontal,
+      marginVertical: marginVertical,
       themeIndex: _toInt(json['themeIndex'], 9),
       fontFamilyIndex: _toInt(json['fontFamilyIndex'], 0),
       pageTurnMode: safePageTurnMode,
@@ -483,6 +604,7 @@ class ReadingSettings {
       brightnessViewOnRight: _toBool(json['brightnessViewOnRight'], false),
       showReadTitleAddition: _toBool(json['showReadTitleAddition'], true),
       readBarStyleFollowPage: _toBool(json['readBarStyleFollowPage'], false),
+      layoutPresetVersion: layoutPresetVersion,
       progressBarBehavior:
           _parseProgressBarBehavior(json['progressBarBehavior']),
       confirmSkipChapter: _toBool(json['confirmSkipChapter'], true),
@@ -497,10 +619,18 @@ class ReadingSettings {
       underline: _toBool(json['underline'], false),
       shareLayout: _toBool(json['shareLayout'], true),
       readStyleConfigs: _parseReadStyleConfigs(json['readStyleConfigs']),
-      paddingTop: _toDouble(json['paddingTop'], 5.0),
-      paddingBottom: _toDouble(json['paddingBottom'], 4.0),
-      paddingLeft: _toDouble(json['paddingLeft'], 22.0),
-      paddingRight: _toDouble(json['paddingRight'], 22.0),
+      paddingTop: paddingTop,
+      paddingBottom: paddingBottom,
+      paddingLeft: paddingLeft,
+      paddingRight: paddingRight,
+      headerPaddingTop: headerPaddingTop,
+      headerPaddingBottom: headerPaddingBottom,
+      headerPaddingLeft: headerPaddingLeft,
+      headerPaddingRight: headerPaddingRight,
+      footerPaddingTop: footerPaddingTop,
+      footerPaddingBottom: footerPaddingBottom,
+      footerPaddingLeft: footerPaddingLeft,
+      footerPaddingRight: footerPaddingRight,
       clickActions: _parseClickActions(json['clickActions']),
       autoReadSpeed: _toInt(json['autoReadSpeed'], 10),
       // 对标 legado：翻页动画时长固定为 300ms（兼容读取旧字段但不生效）
@@ -522,7 +652,7 @@ class ReadingSettings {
           _toBool(json['hideHeader'], parsedHeaderMode == headerModeHide),
       hideFooter:
           _toBool(json['hideFooter'], parsedFooterMode == footerModeHide),
-      showHeaderLine: _toBool(json['showHeaderLine'], true),
+      showHeaderLine: _toBool(json['showHeaderLine'], false),
       showFooterLine: _toBool(json['showFooterLine'], true),
       headerMode: parsedHeaderMode,
       footerMode: parsedFooterMode,
@@ -567,6 +697,7 @@ class ReadingSettings {
       'brightnessViewOnRight': brightnessViewOnRight,
       'showReadTitleAddition': showReadTitleAddition,
       'readBarStyleFollowPage': readBarStyleFollowPage,
+      'layoutPresetVersion': layoutPresetVersion,
       'progressBarBehavior': progressBarBehavior.name,
       'confirmSkipChapter': confirmSkipChapter,
       // 新增字段
@@ -586,6 +717,14 @@ class ReadingSettings {
       'paddingBottom': paddingBottom,
       'paddingLeft': paddingLeft,
       'paddingRight': paddingRight,
+      'headerPaddingTop': headerPaddingTop,
+      'headerPaddingBottom': headerPaddingBottom,
+      'headerPaddingLeft': headerPaddingLeft,
+      'headerPaddingRight': headerPaddingRight,
+      'footerPaddingTop': footerPaddingTop,
+      'footerPaddingBottom': footerPaddingBottom,
+      'footerPaddingLeft': footerPaddingLeft,
+      'footerPaddingRight': footerPaddingRight,
       'clickActions': ClickAction.normalizeConfig(clickActions),
       'autoReadSpeed': autoReadSpeed,
       // 对标 legado：翻页动画时长固定 300ms
@@ -650,18 +789,22 @@ class ReadingSettings {
       fallback: keepScreenOn ? keepLightAlways : keepLightFollowSystem,
     );
     final safePageDirection = pageDirectionForMode(pageTurnMode);
+    final safeLayoutPresetVersion =
+        layoutPresetVersion < layoutPresetVersionLegadoV2
+            ? layoutPresetVersionLegadoV2
+            : layoutPresetVersion;
     return ReadingSettings(
       fontSize: _safeDouble(
         fontSize,
         min: 10.0,
         max: 60.0,
-        fallback: 24.0,
+        fallback: legadoV2FontSize,
       ),
       lineHeight: _safeDouble(
         lineHeight,
         min: 1.0,
         max: 4.0,
-        fallback: 1.42,
+        fallback: legadoV2LineHeight,
       ),
       letterSpacing: _safeDouble(
         letterSpacing,
@@ -673,19 +816,19 @@ class ReadingSettings {
         paragraphSpacing,
         min: 0.0,
         max: 80.0,
-        fallback: 6.0,
+        fallback: legadoV2ParagraphSpacing,
       ),
       marginHorizontal: _safeDouble(
         marginHorizontal,
         min: 0.0,
         max: 120.0,
-        fallback: 22.0,
+        fallback: legadoV2PaddingHorizontal,
       ),
       marginVertical: _safeDouble(
         marginVertical,
         min: 0.0,
         max: 120.0,
-        fallback: 5.0,
+        fallback: legadoV2PaddingVertical,
       ),
       themeIndex: safeThemeIndex,
       fontFamilyIndex: fontFamilyIndex < 0 ? 0 : fontFamilyIndex,
@@ -710,6 +853,7 @@ class ReadingSettings {
       brightnessViewOnRight: brightnessViewOnRight,
       showReadTitleAddition: showReadTitleAddition,
       readBarStyleFollowPage: readBarStyleFollowPage,
+      layoutPresetVersion: safeLayoutPresetVersion,
       progressBarBehavior: progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter,
       textBold: _safeInt(textBold, min: 0, max: 2, fallback: 0),
@@ -736,25 +880,73 @@ class ReadingSettings {
         paddingTop,
         min: 0.0,
         max: 120.0,
-        fallback: 5.0,
+        fallback: legadoV2PaddingVertical,
       ),
       paddingBottom: _safeDouble(
         paddingBottom,
         min: 0.0,
         max: 120.0,
-        fallback: 4.0,
+        fallback: legadoV2PaddingVertical,
       ),
       paddingLeft: _safeDouble(
         paddingLeft,
         min: 0.0,
         max: 120.0,
-        fallback: 22.0,
+        fallback: legadoV2PaddingHorizontal,
       ),
       paddingRight: _safeDouble(
         paddingRight,
         min: 0.0,
         max: 120.0,
-        fallback: 22.0,
+        fallback: legadoV2PaddingHorizontal,
+      ),
+      headerPaddingTop: _safeDouble(
+        headerPaddingTop,
+        min: 0.0,
+        max: 120.0,
+        fallback: 4.0,
+      ),
+      headerPaddingBottom: _safeDouble(
+        headerPaddingBottom,
+        min: 0.0,
+        max: 120.0,
+        fallback: 4.0,
+      ),
+      headerPaddingLeft: _safeDouble(
+        headerPaddingLeft,
+        min: 0.0,
+        max: 120.0,
+        fallback: legadoV2PaddingHorizontal,
+      ),
+      headerPaddingRight: _safeDouble(
+        headerPaddingRight,
+        min: 0.0,
+        max: 120.0,
+        fallback: legadoV2PaddingHorizontal,
+      ),
+      footerPaddingTop: _safeDouble(
+        footerPaddingTop,
+        min: 0.0,
+        max: 120.0,
+        fallback: 4.0,
+      ),
+      footerPaddingBottom: _safeDouble(
+        footerPaddingBottom,
+        min: 0.0,
+        max: 120.0,
+        fallback: 4.0,
+      ),
+      footerPaddingLeft: _safeDouble(
+        footerPaddingLeft,
+        min: 0.0,
+        max: 120.0,
+        fallback: legadoV2PaddingHorizontal,
+      ),
+      footerPaddingRight: _safeDouble(
+        footerPaddingRight,
+        min: 0.0,
+        max: 120.0,
+        fallback: legadoV2PaddingHorizontal,
       ),
       clickActions: ClickAction.normalizeConfig(
         Map<String, int>.from(clickActions),
@@ -841,6 +1033,7 @@ class ReadingSettings {
     bool? brightnessViewOnRight,
     bool? showReadTitleAddition,
     bool? readBarStyleFollowPage,
+    int? layoutPresetVersion,
     ProgressBarBehavior? progressBarBehavior,
     bool? confirmSkipChapter,
     // 新增字段
@@ -858,6 +1051,14 @@ class ReadingSettings {
     double? paddingBottom,
     double? paddingLeft,
     double? paddingRight,
+    double? headerPaddingTop,
+    double? headerPaddingBottom,
+    double? headerPaddingLeft,
+    double? headerPaddingRight,
+    double? footerPaddingTop,
+    double? footerPaddingBottom,
+    double? footerPaddingLeft,
+    double? footerPaddingRight,
     Map<String, int>? clickActions,
     int? autoReadSpeed,
     // 翻页动画增强
@@ -944,6 +1145,7 @@ class ReadingSettings {
           showReadTitleAddition ?? this.showReadTitleAddition,
       readBarStyleFollowPage:
           readBarStyleFollowPage ?? this.readBarStyleFollowPage,
+      layoutPresetVersion: layoutPresetVersion ?? this.layoutPresetVersion,
       progressBarBehavior: progressBarBehavior ?? this.progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter ?? this.confirmSkipChapter,
       // 新增字段
@@ -961,6 +1163,14 @@ class ReadingSettings {
       paddingBottom: paddingBottom ?? this.paddingBottom,
       paddingLeft: paddingLeft ?? this.paddingLeft,
       paddingRight: paddingRight ?? this.paddingRight,
+      headerPaddingTop: headerPaddingTop ?? this.headerPaddingTop,
+      headerPaddingBottom: headerPaddingBottom ?? this.headerPaddingBottom,
+      headerPaddingLeft: headerPaddingLeft ?? this.headerPaddingLeft,
+      headerPaddingRight: headerPaddingRight ?? this.headerPaddingRight,
+      footerPaddingTop: footerPaddingTop ?? this.footerPaddingTop,
+      footerPaddingBottom: footerPaddingBottom ?? this.footerPaddingBottom,
+      footerPaddingLeft: footerPaddingLeft ?? this.footerPaddingLeft,
+      footerPaddingRight: footerPaddingRight ?? this.footerPaddingRight,
       clickActions: clickActions ?? this.clickActions,
       autoReadSpeed: autoReadSpeed ?? this.autoReadSpeed,
       // 翻页动画增强

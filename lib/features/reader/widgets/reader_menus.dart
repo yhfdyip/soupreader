@@ -47,18 +47,24 @@ class ReaderTopMenu extends StatelessWidget {
     final chapterLabel = chapterTitle.trim().isEmpty ? '暂无章节' : chapterTitle;
     final chapterUrlLabel = chapterUrl?.trim() ?? '';
     final sourceActionLabel = source.isEmpty ? '书源' : source;
+    final isDarkTheme = currentTheme.isDark;
     final menuBgBase = readBarStyleFollowPage
         ? currentTheme.background
-        : const Color(0xFF000000);
+        : (isDarkTheme
+            ? ReaderOverlayTokens.panelDark
+            : const Color(0xFF1F2937));
+    final menuSurfaceColor = menuBgBase.withValues(
+      alpha: readBarStyleFollowPage ? (isDarkTheme ? 0.98 : 0.97) : 0.96,
+    );
     final menuPrimaryText =
         readBarStyleFollowPage ? currentTheme.text : CupertinoColors.white;
     final menuSecondaryText = menuPrimaryText.withValues(alpha: 0.78);
     final menuTertiaryText = menuPrimaryText.withValues(alpha: 0.62);
     final controlBg = menuBgBase.withValues(
-      alpha: readBarStyleFollowPage ? 0.42 : 0.30,
+      alpha: readBarStyleFollowPage ? (isDarkTheme ? 0.22 : 0.14) : 0.26,
     );
     final controlBorder = menuPrimaryText.withValues(
-      alpha: readBarStyleFollowPage ? 0.2 : 0.24,
+      alpha: readBarStyleFollowPage ? (isDarkTheme ? 0.32 : 0.26) : 0.24,
     );
 
     return Positioned(
@@ -73,27 +79,21 @@ class ReaderTopMenu extends StatelessWidget {
           bottom: 9,
         ),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              menuBgBase.withValues(
-                alpha: readBarStyleFollowPage ? 0.96 : 0.92,
-              ),
-              menuBgBase.withValues(
-                alpha: readBarStyleFollowPage ? 0.84 : 0.76,
-              ),
-              menuBgBase.withValues(
-                alpha: readBarStyleFollowPage ? 0.10 : 0.12,
-              ),
-            ],
-          ),
+          color: menuSurfaceColor,
           border: Border(
             bottom: BorderSide(
-              color: menuPrimaryText.withValues(alpha: 0.06),
-              width: 0.8,
+              color: menuPrimaryText.withValues(alpha: 0.18),
+              width: 0.9,
             ),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.black
+                  .withValues(alpha: isDarkTheme ? 0.22 : 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
