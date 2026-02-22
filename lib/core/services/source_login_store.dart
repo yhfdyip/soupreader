@@ -47,6 +47,16 @@ class SourceLoginStore {
     }
   }
 
+  static Future<String?> getLoginHeaderText(String sourceKey) async {
+    final key = _normalizeSourceKey(sourceKey);
+    if (key.isEmpty) return null;
+
+    final prefs = await SharedPreferences.getInstance();
+    final text = prefs.getString(_headerKey(key));
+    if (text == null || text.trim().isEmpty) return null;
+    return text;
+  }
+
   static Future<void> putLoginHeaderMap(
     String sourceKey,
     Map<String, String> headers,

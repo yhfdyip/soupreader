@@ -5,6 +5,16 @@ import '../../source/models/book_source.dart';
 import '../models/replace_rule.dart';
 import 'replace_rule_engine.dart';
 
+class ReplaceContentApplyTrace {
+  final String output;
+  final List<ReplaceRule> appliedRules;
+
+  const ReplaceContentApplyTrace({
+    required this.output,
+    required this.appliedRules,
+  });
+}
+
 class ReplaceRuleService {
   final ReplaceRuleRepository _repo;
   final SourceRepository _sourceRepo;
@@ -48,5 +58,35 @@ class ReplaceRuleService {
   }) async {
     final rules = getEffectiveRules(bookName: bookName, sourceUrl: sourceUrl);
     return _engine.applyToContent(content, rules);
+  }
+
+  Future<ReplaceContentApplyTrace> applyContentWithTrace(
+    String content, {
+    required String bookName,
+    required String? sourceUrl,
+  }) async {
+    final rules = getEffectiveRules(bookName: bookName, sourceUrl: sourceUrl);
+    if (rules.isEmpty) {
+      return ReplaceContentApplyTrace(
+        output: content,
+        appliedRules: <ReplaceRule>[],
+      );
+    }
+
+    var output = content;
+    final appliedRules = <ReplaceRule>[];
+    for (final rule in rules) {
+      if (!rule.scopeContent) continue;
+      final next = await _engine.applyToContent(output, <ReplaceRule>[rule]);
+      if (next != output) {
+        output = next;
+        appliedRules.add(rule);
+      }
+    }
+
+    return ReplaceContentApplyTrace(
+      output: output,
+      appliedRules: appliedRules,
+    );
   }
 }

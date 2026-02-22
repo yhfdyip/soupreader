@@ -6,12 +6,22 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
   required BuildContext context,
   required String keyword,
   required List<ReaderSourceSwitchCandidate> candidates,
+  required bool loadTocEnabled,
+  Future<void> Function(bool enabled)? onLoadTocChanged,
+  Future<void> Function()? onOpenSourceManage,
+  Future<List<ReaderSourceSwitchCandidate>> Function(
+    List<ReaderSourceSwitchCandidate> currentCandidates,
+  )? onRefreshCandidates,
 }) {
   return showCupertinoModalPopup<ReaderSourceSwitchCandidate>(
     context: context,
     builder: (_) => SourceSwitchCandidateSheet(
       keyword: keyword,
       candidates: candidates,
+      loadTocEnabled: loadTocEnabled,
+      onLoadTocChanged: onLoadTocChanged,
+      onOpenSourceManage: onOpenSourceManage,
+      onRefreshCandidates: onRefreshCandidates,
     ),
   );
 }
@@ -19,11 +29,21 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
 class SourceSwitchCandidateSheet extends StatefulWidget {
   final String keyword;
   final List<ReaderSourceSwitchCandidate> candidates;
+  final bool loadTocEnabled;
+  final Future<void> Function(bool enabled)? onLoadTocChanged;
+  final Future<void> Function()? onOpenSourceManage;
+  final Future<List<ReaderSourceSwitchCandidate>> Function(
+    List<ReaderSourceSwitchCandidate> currentCandidates,
+  )? onRefreshCandidates;
 
   const SourceSwitchCandidateSheet({
     super.key,
     required this.keyword,
     required this.candidates,
+    required this.loadTocEnabled,
+    this.onLoadTocChanged,
+    this.onOpenSourceManage,
+    this.onRefreshCandidates,
   });
 
   @override
@@ -35,10 +55,15 @@ class _SourceSwitchCandidateSheetState
     extends State<SourceSwitchCandidateSheet> {
   final TextEditingController _queryController = TextEditingController();
   String _query = '';
+  bool _openingSourceManage = false;
+  bool _refreshingCandidates = false;
+  bool _updatingLoadToc = false;
+  late bool _loadTocEnabled;
+  late List<ReaderSourceSwitchCandidate> _candidates;
 
   List<ReaderSourceSwitchCandidate> get _filteredCandidates {
     return ReaderSourceSwitchHelper.filterCandidates(
-      candidates: widget.candidates,
+      candidates: _candidates,
       query: _query,
     );
   }
@@ -46,7 +71,20 @@ class _SourceSwitchCandidateSheetState
   @override
   void initState() {
     super.initState();
+    _loadTocEnabled = widget.loadTocEnabled;
+    _candidates = List<ReaderSourceSwitchCandidate>.from(
+      widget.candidates,
+      growable: false,
+    );
     _queryController.addListener(_handleQueryChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant SourceSwitchCandidateSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.loadTocEnabled != widget.loadTocEnabled) {
+      _loadTocEnabled = widget.loadTocEnabled;
+    }
   }
 
   @override
@@ -61,6 +99,98 @@ class _SourceSwitchCandidateSheetState
     final value = _queryController.text;
     if (value == _query) return;
     setState(() => _query = value);
+  }
+
+  Future<void> _handleOpenSourceManage() async {
+    final onOpenSourceManage = widget.onOpenSourceManage;
+    if (onOpenSourceManage == null ||
+        _openingSourceManage ||
+        _refreshingCandidates) {
+      return;
+    }
+    setState(() => _openingSourceManage = true);
+    try {
+      await onOpenSourceManage();
+    } finally {
+      if (mounted) {
+        setState(() => _openingSourceManage = false);
+      }
+    }
+  }
+
+  Future<void> _handleRefreshCandidates() async {
+    final onRefreshCandidates = widget.onRefreshCandidates;
+    if (onRefreshCandidates == null ||
+        _refreshingCandidates ||
+        _openingSourceManage) {
+      return;
+    }
+    setState(() => _refreshingCandidates = true);
+    final currentCandidates = List<ReaderSourceSwitchCandidate>.from(
+      _filteredCandidates,
+      growable: false,
+    );
+    try {
+      final refreshed = await onRefreshCandidates(currentCandidates);
+      if (!mounted) return;
+      setState(() {
+        _candidates = List<ReaderSourceSwitchCandidate>.from(
+          refreshed,
+          growable: false,
+        );
+      });
+    } catch (_) {
+      // 与 legado 一致：刷新失败保持当前列表且不弹额外提示。
+    } finally {
+      if (mounted) {
+        setState(() => _refreshingCandidates = false);
+      }
+    }
+  }
+
+  Future<void> _handleToggleLoadToc() async {
+    final onLoadTocChanged = widget.onLoadTocChanged;
+    if (onLoadTocChanged == null || _updatingLoadToc) {
+      return;
+    }
+    final next = !_loadTocEnabled;
+    setState(() {
+      _loadTocEnabled = next;
+      _updatingLoadToc = true;
+    });
+    try {
+      await onLoadTocChanged(next);
+    } finally {
+      if (mounted) {
+        setState(() => _updatingLoadToc = false);
+      }
+    }
+  }
+
+  Future<void> _showMoreActions() async {
+    if (_openingSourceManage || _refreshingCandidates || _updatingLoadToc) {
+      return;
+    }
+    final action = await showCupertinoModalPopup<_SourceSwitchMenuAction>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(sheetContext).pop(_SourceSwitchMenuAction.loadToc);
+            },
+            child: Text(_loadTocEnabled ? '✓ 加载目录' : '加载目录'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(sheetContext).pop(),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (action == _SourceSwitchMenuAction.loadToc) {
+      await _handleToggleLoadToc();
+    }
   }
 
   @override
@@ -107,7 +237,7 @@ class _SourceSwitchCandidateSheetState
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '候选 ${widget.candidates.length} 条',
+                          '候选 ${_candidates.length} 条',
                           style: TextStyle(
                             fontSize: 13,
                             color: CupertinoColors.systemGrey.resolveFrom(
@@ -118,11 +248,53 @@ class _SourceSwitchCandidateSheetState
                       ],
                     ),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(32, 32),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('取消'),
+                  Row(
+                    children: [
+                      if (widget.onRefreshCandidates != null)
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(32, 32),
+                          onPressed:
+                              (_refreshingCandidates || _openingSourceManage)
+                                  ? null
+                                  : _handleRefreshCandidates,
+                          child: Text(
+                            _refreshingCandidates ? '刷新中' : '刷新列表',
+                          ),
+                        ),
+                      if (widget.onRefreshCandidates != null)
+                        const SizedBox(width: 12),
+                      if (widget.onOpenSourceManage != null)
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(32, 32),
+                          onPressed:
+                              (_openingSourceManage || _refreshingCandidates)
+                                  ? null
+                                  : _handleOpenSourceManage,
+                          child: const Text('书源管理'),
+                        ),
+                      const SizedBox(width: 12),
+                      if (widget.onLoadTocChanged != null)
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(32, 32),
+                          onPressed: (_openingSourceManage ||
+                                  _refreshingCandidates ||
+                                  _updatingLoadToc)
+                              ? null
+                              : _showMoreActions,
+                          child: const Text('更多'),
+                        ),
+                      if (widget.onLoadTocChanged != null)
+                        const SizedBox(width: 12),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(32, 32),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('取消'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -221,4 +393,8 @@ class _SourceSwitchCandidateSheetState
       ),
     );
   }
+}
+
+enum _SourceSwitchMenuAction {
+  loadToc,
 }

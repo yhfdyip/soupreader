@@ -16,6 +16,8 @@ class SettingsService {
   static const String _keyAppSettings = 'app_settings';
   static const String _keyReaderChapterUrlOpenInBrowser =
       'reader_chapter_url_open_in_browser';
+  static const String _keyReaderFontFolderPath = 'reader_font_folder_path';
+  static const String _keyReaderCustomFontPath = 'reader_custom_font_path';
   static const String _keyBookCanUpdateMap = 'book_can_update_map';
   static const String _keyBookSplitLongChapterMap =
       'book_split_long_chapter_map';
@@ -23,15 +25,27 @@ class SettingsService {
   static const String _keyBookUseReplaceRuleMap = 'book_use_replace_rule_map';
   static const String _keyTocUiUseReplace = 'toc_ui_use_replace';
   static const String _keyTocUiLoadWordCount = 'toc_ui_load_word_count';
+  static const String _keyChangeSourceLoadToc = 'changeSourceLoadToc';
+  static const String _keyBookPageAnimMap = 'book_page_anim_map';
   static const String _keyBookReSegmentMap = 'book_re_segment_map';
   static const String _keyBookImageStyleMap = 'book_image_style_map';
   static const String _keyChapterSameTitleRemovedMap =
       'chapter_same_title_removed_map';
   static const String _keyBookDelRubyTagMap = 'book_del_ruby_tag_map';
   static const String _keyBookDelHTagMap = 'book_del_h_tag_map';
+  static const String _keyBookReadSimulatingMap = 'book_read_simulating_map';
+  static const String _keyBookSimulatedStartChapterMap =
+      'book_simulated_start_chapter_map';
+  static const String _keyBookSimulatedDailyChaptersMap =
+      'book_simulated_daily_chapters_map';
+  static const String _keyBookSimulatedStartDateMap =
+      'book_simulated_start_date_map';
   static const String _keyBookRemoteUploadUrlMap = 'book_remote_upload_url_map';
   static const String _keyBookReaderImageSizeSnapshotMap =
       'book_reader_image_size_snapshot_map';
+  static const String _keyAudioPlayWakeLock = 'audioPlayWakeLock';
+  static const String _keyContentSelectSpeakMod = 'contentSelectSpeakMod';
+  static const String _keyEnableReadRecord = 'enableReadRecord';
   static const String _defaultImageStyle = 'DEFAULT';
   static const Set<String> _validImageStyles = <String>{
     'DEFAULT',
@@ -50,11 +64,16 @@ class SettingsService {
   Map<String, bool> _bookSplitLongChapterMap = <String, bool>{};
   Map<String, String> _bookTxtTocRuleMap = <String, String>{};
   Map<String, bool> _bookUseReplaceRuleMap = <String, bool>{};
+  Map<String, int> _bookPageAnimMap = <String, int>{};
   Map<String, bool> _bookReSegmentMap = <String, bool>{};
   Map<String, String> _bookImageStyleMap = <String, String>{};
   Map<String, bool> _chapterSameTitleRemovedMap = <String, bool>{};
   Map<String, bool> _bookDelRubyTagMap = <String, bool>{};
   Map<String, bool> _bookDelHTagMap = <String, bool>{};
+  Map<String, bool> _bookReadSimulatingMap = <String, bool>{};
+  Map<String, int> _bookSimulatedStartChapterMap = <String, int>{};
+  Map<String, int> _bookSimulatedDailyChaptersMap = <String, int>{};
+  Map<String, String> _bookSimulatedStartDateMap = <String, String>{};
   Map<String, String> _bookRemoteUploadUrlMap = <String, String>{};
   Map<String, String> _bookReaderImageSizeSnapshotMap = <String, String>{};
   final ValueNotifier<ReadingSettings> _readingSettingsNotifier =
@@ -70,6 +89,42 @@ class SettingsService {
       _appSettingsNotifier;
   bool get readerChapterUrlOpenInBrowser =>
       _prefs.getBool(_keyReaderChapterUrlOpenInBrowser) ?? false;
+  bool get enableReadRecord =>
+      !_isInitialized ? true : _prefs.getBool(_keyEnableReadRecord) ?? true;
+
+  String? getReaderFontFolderPath() {
+    if (!_isInitialized) return null;
+    final value = _prefs.getString(_keyReaderFontFolderPath)?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> saveReaderFontFolderPath(String? path) async {
+    if (!_isInitialized) return;
+    final normalized = (path ?? '').trim();
+    if (normalized.isEmpty) {
+      await _prefs.remove(_keyReaderFontFolderPath);
+      return;
+    }
+    await _prefs.setString(_keyReaderFontFolderPath, normalized);
+  }
+
+  String? getReaderCustomFontPath() {
+    if (!_isInitialized) return null;
+    final value = _prefs.getString(_keyReaderCustomFontPath)?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> saveReaderCustomFontPath(String? path) async {
+    if (!_isInitialized) return;
+    final normalized = (path ?? '').trim();
+    if (normalized.isEmpty) {
+      await _prefs.remove(_keyReaderCustomFontPath);
+      return;
+    }
+    await _prefs.setString(_keyReaderCustomFontPath, normalized);
+  }
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -123,6 +178,7 @@ class SettingsService {
         _decodeStringMap(_prefs.getString(_keyBookTxtTocRuleMap));
     _bookUseReplaceRuleMap =
         _decodeBoolMap(_prefs.getString(_keyBookUseReplaceRuleMap));
+    _bookPageAnimMap = _decodeIntMap(_prefs.getString(_keyBookPageAnimMap));
     _bookReSegmentMap = _decodeBoolMap(_prefs.getString(_keyBookReSegmentMap));
     _bookImageStyleMap =
         _decodeStringMap(_prefs.getString(_keyBookImageStyleMap));
@@ -131,6 +187,14 @@ class SettingsService {
     _bookDelRubyTagMap =
         _decodeBoolMap(_prefs.getString(_keyBookDelRubyTagMap));
     _bookDelHTagMap = _decodeBoolMap(_prefs.getString(_keyBookDelHTagMap));
+    _bookReadSimulatingMap =
+        _decodeBoolMap(_prefs.getString(_keyBookReadSimulatingMap));
+    _bookSimulatedStartChapterMap =
+        _decodeIntMap(_prefs.getString(_keyBookSimulatedStartChapterMap));
+    _bookSimulatedDailyChaptersMap =
+        _decodeIntMap(_prefs.getString(_keyBookSimulatedDailyChaptersMap));
+    _bookSimulatedStartDateMap =
+        _decodeStringMap(_prefs.getString(_keyBookSimulatedStartDateMap));
     _bookRemoteUploadUrlMap =
         _decodeStringMap(_prefs.getString(_keyBookRemoteUploadUrlMap));
     _bookReaderImageSizeSnapshotMap =
@@ -174,6 +238,43 @@ class SettingsService {
   }
 
   Future<void> _persistBoolMap(String key, Map<String, bool> value) async {
+    if (!_isInitialized) return;
+    await _prefs.setString(key, json.encode(value));
+  }
+
+  Map<String, int> _decodeIntMap(String? rawJson) {
+    if (rawJson == null || rawJson.trim().isEmpty) {
+      return <String, int>{};
+    }
+    try {
+      final decoded = json.decode(rawJson);
+      if (decoded is! Map) return <String, int>{};
+      final out = <String, int>{};
+      decoded.forEach((rawKey, rawValue) {
+        final key = '$rawKey'.trim();
+        if (key.isEmpty) return;
+        if (rawValue is int) {
+          out[key] = rawValue;
+          return;
+        }
+        if (rawValue is num) {
+          out[key] = rawValue.round();
+          return;
+        }
+        if (rawValue is String) {
+          final parsed = int.tryParse(rawValue.trim());
+          if (parsed != null) {
+            out[key] = parsed;
+          }
+        }
+      });
+      return out;
+    } catch (_) {
+      return <String, int>{};
+    }
+  }
+
+  Future<void> _persistIntMap(String key, Map<String, int> value) async {
     if (!_isInitialized) return;
     await _prefs.setString(key, json.encode(value));
   }
@@ -289,6 +390,31 @@ class SettingsService {
     );
   }
 
+  int? getBookPageAnim(String bookId) {
+    if (!_isInitialized) return null;
+    final key = bookId.trim();
+    if (key.isEmpty) return null;
+    final value = _bookPageAnimMap[key];
+    if (value == null) return null;
+    if (value < 0 || value > 4) return null;
+    return value;
+  }
+
+  Future<void> saveBookPageAnim(String bookId, int? pageAnim) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final nextMap = Map<String, int>.from(_bookPageAnimMap);
+    if (pageAnim == null) {
+      nextMap.remove(key);
+    } else {
+      final normalized = pageAnim.clamp(0, 4).toInt();
+      nextMap[key] = normalized;
+    }
+    _bookPageAnimMap = nextMap;
+    await _persistIntMap(_keyBookPageAnimMap, _bookPageAnimMap);
+  }
+
   bool getTocUiUseReplace({bool fallback = false}) {
     if (!_isInitialized) return fallback;
     return _prefs.getBool(_keyTocUiUseReplace) ?? fallback;
@@ -307,6 +433,42 @@ class SettingsService {
   Future<void> saveTocUiLoadWordCount(bool enabled) async {
     if (!_isInitialized) return;
     await _prefs.setBool(_keyTocUiLoadWordCount, enabled);
+  }
+
+  bool getChangeSourceLoadToc({bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyChangeSourceLoadToc) ?? fallback;
+  }
+
+  Future<void> saveChangeSourceLoadToc(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyChangeSourceLoadToc, enabled);
+  }
+
+  bool getAudioPlayUseWakeLock({bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyAudioPlayWakeLock) ?? fallback;
+  }
+
+  Future<void> saveAudioPlayUseWakeLock(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyAudioPlayWakeLock, enabled);
+  }
+
+  int getContentSelectSpeakMode({int fallback = 0}) {
+    if (!_isInitialized) return fallback;
+    final value = _prefs.getInt(_keyContentSelectSpeakMod) ?? fallback;
+    return value == 1 ? 1 : 0;
+  }
+
+  Future<void> saveContentSelectSpeakMode(int mode) async {
+    if (!_isInitialized) return;
+    await _prefs.setInt(_keyContentSelectSpeakMod, mode == 1 ? 1 : 0);
+  }
+
+  Future<void> saveEnableReadRecord(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyEnableReadRecord, enabled);
   }
 
   bool getBookReSegment(String bookId, {bool fallback = false}) {
@@ -421,6 +583,162 @@ class SettingsService {
     if (key.isEmpty) return;
     _bookDelHTagMap = Map<String, bool>.from(_bookDelHTagMap)..[key] = enabled;
     await _persistBoolMap(_keyBookDelHTagMap, _bookDelHTagMap);
+  }
+
+  bool getBookReadSimulating(String bookId, {bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    return _bookReadSimulatingMap[key] ?? fallback;
+  }
+
+  Future<void> saveBookReadSimulating(String bookId, bool enabled) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    _bookReadSimulatingMap = Map<String, bool>.from(_bookReadSimulatingMap)
+      ..[key] = enabled;
+    await _persistBoolMap(_keyBookReadSimulatingMap, _bookReadSimulatingMap);
+  }
+
+  int getBookSimulatedStartChapter(String bookId, {int fallback = 0}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    final value = _bookSimulatedStartChapterMap[key];
+    if (value == null) return fallback;
+    if (value < 0) return 0;
+    return value;
+  }
+
+  Future<void> saveBookSimulatedStartChapter(
+    String bookId,
+    int startChapter,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final normalized = startChapter < 0 ? 0 : startChapter;
+    _bookSimulatedStartChapterMap =
+        Map<String, int>.from(_bookSimulatedStartChapterMap)
+          ..[key] = normalized;
+    await _persistIntMap(
+      _keyBookSimulatedStartChapterMap,
+      _bookSimulatedStartChapterMap,
+    );
+  }
+
+  int getBookSimulatedDailyChapters(String bookId, {int fallback = 3}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    final value = _bookSimulatedDailyChaptersMap[key];
+    if (value == null) return fallback;
+    if (value < 0) return 0;
+    return value;
+  }
+
+  Future<void> saveBookSimulatedDailyChapters(
+    String bookId,
+    int dailyChapters,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final normalized = dailyChapters < 0 ? 0 : dailyChapters;
+    _bookSimulatedDailyChaptersMap =
+        Map<String, int>.from(_bookSimulatedDailyChaptersMap)
+          ..[key] = normalized;
+    await _persistIntMap(
+      _keyBookSimulatedDailyChaptersMap,
+      _bookSimulatedDailyChaptersMap,
+    );
+  }
+
+  DateTime? getBookSimulatedStartDate(String bookId) {
+    if (!_isInitialized) return null;
+    final key = bookId.trim();
+    if (key.isEmpty) return null;
+    final value = _bookSimulatedStartDateMap[key]?.trim();
+    if (value == null || value.isEmpty) return null;
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  Future<void> saveBookSimulatedStartDate(
+    String bookId,
+    DateTime? startDate,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final nextMap = Map<String, String>.from(_bookSimulatedStartDateMap);
+    if (startDate == null) {
+      nextMap.remove(key);
+    } else {
+      nextMap[key] = _formatDateOnly(_normalizeDateOnly(startDate));
+    }
+    _bookSimulatedStartDateMap = nextMap;
+    await _persistStringMap(
+      _keyBookSimulatedStartDateMap,
+      _bookSimulatedStartDateMap,
+    );
+  }
+
+  Future<void> saveBookSimulatedReadingConfig(
+    String bookId, {
+    required bool enabled,
+    required int startChapter,
+    required int dailyChapters,
+    required DateTime startDate,
+  }) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+
+    final safeStartChapter = startChapter < 0 ? 0 : startChapter;
+    final safeDailyChapters = dailyChapters < 0 ? 0 : dailyChapters;
+    final safeDate = _normalizeDateOnly(startDate);
+
+    _bookReadSimulatingMap = Map<String, bool>.from(_bookReadSimulatingMap)
+      ..[key] = enabled;
+    _bookSimulatedStartChapterMap =
+        Map<String, int>.from(_bookSimulatedStartChapterMap)
+          ..[key] = safeStartChapter;
+    _bookSimulatedDailyChaptersMap =
+        Map<String, int>.from(_bookSimulatedDailyChaptersMap)
+          ..[key] = safeDailyChapters;
+    _bookSimulatedStartDateMap = Map<String, String>.from(
+      _bookSimulatedStartDateMap,
+    )..[key] = _formatDateOnly(safeDate);
+
+    await Future.wait<void>([
+      _persistBoolMap(_keyBookReadSimulatingMap, _bookReadSimulatingMap),
+      _persistIntMap(
+        _keyBookSimulatedStartChapterMap,
+        _bookSimulatedStartChapterMap,
+      ),
+      _persistIntMap(
+        _keyBookSimulatedDailyChaptersMap,
+        _bookSimulatedDailyChaptersMap,
+      ),
+      _persistStringMap(
+        _keyBookSimulatedStartDateMap,
+        _bookSimulatedStartDateMap,
+      ),
+    ]);
+  }
+
+  DateTime _normalizeDateOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  String _formatDateOnly(DateTime value) {
+    final yyyy = value.year.toString().padLeft(4, '0');
+    final mm = value.month.toString().padLeft(2, '0');
+    final dd = value.day.toString().padLeft(2, '0');
+    return '$yyyy-$mm-$dd';
   }
 
   String? getBookRemoteUploadUrl(String bookId) {

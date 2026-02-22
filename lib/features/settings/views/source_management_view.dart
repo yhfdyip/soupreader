@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../reader/views/speak_engine_manage_view.dart';
 import '../../rss/views/rss_source_manage_view.dart';
 import '../../source/views/source_list_view.dart';
 import 'settings_placeholders.dart';
@@ -46,15 +47,15 @@ class SourceManagementView extends StatelessWidget {
               ),
               CupertinoListTile.notched(
                 title: const Text('语音管理'),
-                additionalInfo: const Text(
-                  SettingsUiTokens.plannedLabel,
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
-                ),
+                additionalInfo: const Text('系统/HTTP 引擎'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '语音管理（TTS）暂未实现',
-                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute<void>(
+                      builder: (context) => const SpeakEngineManageView(),
+                    ),
+                  );
+                },
               ),
             ],
           ),

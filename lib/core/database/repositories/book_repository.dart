@@ -102,13 +102,14 @@ class BookRepository {
     String bookId, {
     required int currentChapter,
     required double readProgress,
+    bool updateLastReadTime = true,
   }) async {
     final entity = getBookById(bookId);
     if (entity == null) return;
     final updated = entity.copyWith(
       currentChapter: currentChapter,
       readProgress: readProgress,
-      lastReadTime: DateTime.now(),
+      lastReadTime: updateLastReadTime ? DateTime.now() : entity.lastReadTime,
     );
     await addBook(updated);
   }

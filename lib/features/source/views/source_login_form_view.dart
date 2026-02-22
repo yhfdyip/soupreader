@@ -1,13 +1,21 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/services/cookie_store.dart';
 import '../../../core/services/source_login_store.dart';
 import '../models/book_source.dart';
+import '../services/source_cookie_scope_resolver.dart';
 import '../services/source_login_ui_helper.dart';
 import '../services/source_login_script_service.dart';
+
+enum _SourceLoginMenuAction {
+  showLoginHeader,
+  deleteLoginHeader,
+}
 
 class SourceLoginFormView extends StatefulWidget {
   final BookSource source;
@@ -60,6 +68,91 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
         ],
       ),
     );
+  }
+
+  Future<void> _showMoreMenu() async {
+    if (_loading || !mounted) return;
+    final selected = await showCupertinoModalPopup<_SourceLoginMenuAction>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              sheetContext,
+              _SourceLoginMenuAction.showLoginHeader,
+            ),
+            child: const Text('查看登录头'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(
+              sheetContext,
+              _SourceLoginMenuAction.deleteLoginHeader,
+            ),
+            child: const Text('删除登录头'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == _SourceLoginMenuAction.showLoginHeader) {
+      await _showLoginHeaderDialog();
+      return;
+    }
+    if (selected == _SourceLoginMenuAction.deleteLoginHeader) {
+      await _deleteLoginHeader();
+    }
+  }
+
+  Future<void> _showLoginHeaderDialog() async {
+    final key = widget.source.bookSourceUrl.trim();
+    final loginHeaderText =
+        key.isEmpty ? null : await SourceLoginStore.getLoginHeaderText(key);
+    if (!mounted) return;
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('登录头'),
+        content: loginHeaderText == null ? null : Text('\n$loginHeaderText'),
+        actions: [
+          if (loginHeaderText != null)
+            CupertinoDialogAction(
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: loginHeaderText),
+                );
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('复制文本'),
+            ),
+          if (loginHeaderText == null)
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('好'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteLoginHeader() async {
+    final key = widget.source.bookSourceUrl.trim();
+    if (key.isEmpty) return;
+    await SourceLoginStore.removeLoginHeader(key);
+    final cookieCandidates = SourceCookieScopeResolver.resolveClearCandidates(
+      key,
+    );
+    for (final uri in cookieCandidates) {
+      try {
+        await CookieStore.jar.delete(uri, true);
+      } catch (_) {
+        // 对齐 legado 语义：删除登录头动作为静默分支，不提示 Cookie 清理错误。
+      }
+    }
   }
 
   Future<void> _initFormData() async {
@@ -190,10 +283,22 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '登录',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: _loading ? null : _submit,
-        child: const Text('完成'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 30,
+            onPressed: _loading ? null : _submit,
+            child: const Text('完成'),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 30,
+            onPressed: _loading ? null : _showMoreMenu,
+            child: const Icon(CupertinoIcons.ellipsis),
+          ),
+        ],
       ),
       child: SafeArea(
         child: _loading

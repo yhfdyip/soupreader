@@ -1887,9 +1887,11 @@ class _SourceListViewState extends State<SourceListView> {
       _showMessage('当前未选择书源');
       return;
     }
-    final result = await _importExportService.exportToFile(sources);
+    final result = await _importExportService.exportToFile(
+      sources,
+      defaultFileName: 'bookSource.json',
+    );
     if (result.cancelled) {
-      _showMessage('导出取消');
       return;
     }
     if (!result.success) {

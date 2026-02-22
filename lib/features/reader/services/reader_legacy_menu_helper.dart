@@ -14,6 +14,7 @@ enum ReaderLegacyReadMenuAction {
   enableReplace,
   sameTitleRemoved,
   reSegment,
+  enableReview,
   delRubyTag,
   delHTag,
   imageStyle,
@@ -53,6 +54,7 @@ class ReaderLegacyMenuHelper {
     required bool isLocalTxt,
     required bool isEpub,
     required bool showWebDavProgressActions,
+    bool showReviewAction = false,
   }) {
     final actions = <ReaderLegacyReadMenuAction>[];
     if (isOnline) {
@@ -79,6 +81,7 @@ class ReaderLegacyMenuHelper {
       ReaderLegacyReadMenuAction.enableReplace,
       ReaderLegacyReadMenuAction.sameTitleRemoved,
       ReaderLegacyReadMenuAction.reSegment,
+      if (showReviewAction) ReaderLegacyReadMenuAction.enableReview,
       if (isEpub) ReaderLegacyReadMenuAction.delRubyTag,
       if (isEpub) ReaderLegacyReadMenuAction.delHTag,
       ReaderLegacyReadMenuAction.imageStyle,
@@ -107,31 +110,33 @@ class ReaderLegacyMenuHelper {
       case ReaderLegacyReadMenuAction.editContent:
         return '编辑正文';
       case ReaderLegacyReadMenuAction.pageAnim:
-        return '翻页动画';
+        return '翻页动画（本书）';
       case ReaderLegacyReadMenuAction.getProgress:
         return '获取进度';
       case ReaderLegacyReadMenuAction.coverProgress:
-        return '覆盖进度';
+        return '覆盖云端进度';
       case ReaderLegacyReadMenuAction.reverseContent:
-        return '正文倒序';
+        return '反转内容';
       case ReaderLegacyReadMenuAction.simulatedReading:
-        return '模拟阅读';
+        return '模拟追读';
       case ReaderLegacyReadMenuAction.enableReplace:
-        return '启用替换规则';
+        return '替换净化';
       case ReaderLegacyReadMenuAction.sameTitleRemoved:
-        return '同名标题去重';
+        return '移除重复标题';
       case ReaderLegacyReadMenuAction.reSegment:
         return '重新分段';
+      case ReaderLegacyReadMenuAction.enableReview:
+        return '段评';
       case ReaderLegacyReadMenuAction.delRubyTag:
-        return '删除 ruby 标签';
+        return '删除ruby标签';
       case ReaderLegacyReadMenuAction.delHTag:
-        return '删除 h 标签';
+        return '删除h标签';
       case ReaderLegacyReadMenuAction.imageStyle:
         return '图片样式';
       case ReaderLegacyReadMenuAction.updateToc:
         return '更新目录';
       case ReaderLegacyReadMenuAction.effectiveReplaces:
-        return '生效替换规则';
+        return '起效的替换';
       case ReaderLegacyReadMenuAction.log:
         return '日志';
       case ReaderLegacyReadMenuAction.help:
@@ -193,9 +198,9 @@ class ReaderLegacyMenuHelper {
       ReaderLegacyChangeSourceMenuAction action) {
     switch (action) {
       case ReaderLegacyChangeSourceMenuAction.chapter:
-        return '章节换源';
+        return '单章换源';
       case ReaderLegacyChangeSourceMenuAction.book:
-        return '书籍换源';
+        return '整书换源';
     }
   }
 

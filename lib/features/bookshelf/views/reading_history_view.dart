@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
+import '../../../core/services/settings_service.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../models/book.dart';
@@ -18,17 +19,27 @@ class ReadingHistoryView extends StatefulWidget {
 
 class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   late final BookRepository _bookRepo;
+  late final SettingsService _settingsService;
+  bool _enableReadRecord = true;
 
   @override
   void initState() {
     super.initState();
     _bookRepo = BookRepository(DatabaseService());
+    _settingsService = SettingsService();
+    _enableReadRecord = _settingsService.enableReadRecord;
   }
 
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '阅读记录',
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minSize: 28,
+        onPressed: _showTopActions,
+        child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+      ),
       child: StreamBuilder<List<Book>>(
         stream: _bookRepo.watchAllBooks(),
         builder: (context, snapshot) {
@@ -98,6 +109,30 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   }
 
   String _two(int v) => v.toString().padLeft(2, '0');
+
+  void _showTopActions() {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            child: Text('${_enableReadRecord ? '✓ ' : ''}开启记录'),
+            onPressed: () async {
+              Navigator.pop(context);
+              final nextValue = !_enableReadRecord;
+              await _settingsService.saveEnableReadRecord(nextValue);
+              if (!mounted) return;
+              setState(() => _enableReadRecord = nextValue);
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  }
 
   void _openReader(Book book) {
     Navigator.of(context, rootNavigator: true).push(

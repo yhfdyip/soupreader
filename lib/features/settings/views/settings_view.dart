@@ -12,6 +12,7 @@ import '../../../core/services/settings_service.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../bookshelf/views/reading_history_view.dart';
 import '../../reader/models/reading_settings.dart';
+import '../../reader/views/speak_engine_manage_view.dart';
 import '../../rss/views/rss_source_manage_view.dart';
 import '../../source/views/source_list_view.dart';
 import 'about_settings_view.dart';
@@ -231,11 +232,11 @@ class _SettingsViewState extends State<SettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('语音管理'),
-                additionalInfo: _plannedInfo(),
+                additionalInfo: const Text('系统/HTTP 引擎'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
+                onTap: () => _open(
                   context,
-                  title: '语音管理（TTS）暂未实现',
+                  const SpeakEngineManageView(),
                 ),
               ),
               CupertinoListTile.notched(

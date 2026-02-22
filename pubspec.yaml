@@ -98,6 +98,8 @@ flutter:
 
   assets:
     - assets/source/18PlusList.txt
+    - assets/source/dictRules.json
+    - assets/source/httpTTS.json
     - assets/rss/rssSources.json
     - assets/web/help/md/
     - assets/bg/

@@ -989,47 +989,42 @@ class _SearchViewState extends State<SearchView> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ShadInput(
-                          controller: _searchController,
-                          focusNode: _searchFocusNode,
-                          placeholder: const Text('请输入书名或作者名'),
-                          textInputAction: TextInputAction.search,
-                          leading: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(LucideIcons.search, size: 16),
-                          ),
-                          onChanged: (_) {
-                            if (_isSearching) {
-                              _cancelOngoingSearch();
-                              return;
-                            }
-                            if (_hasMore) {
-                              setState(() {
-                                // 对齐 legado onQueryTextChange：输入变更即隐藏“继续加载”入口。
-                                _hasMore = false;
-                              });
-                              return;
-                            }
-                            setState(() {});
-                          },
-                          onSubmitted: (_) => _search(),
-                        ),
+                  ShadInput(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    placeholder: const Text('搜索书名、作者'),
+                    textInputAction: TextInputAction.search,
+                    leading: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(LucideIcons.search, size: 16),
+                    ),
+                    trailing: CupertinoButton(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                      const SizedBox(width: 10),
-                      ShadButton(
-                        onPressed: _isSearching ? null : _search,
-                        leading: _isSearching
-                            ? const SizedBox.square(
-                                dimension: 16,
-                                child: CupertinoActivityIndicator(radius: 8),
-                              )
-                            : const Icon(LucideIcons.search),
-                        child: const Text('搜索'),
-                      ),
-                    ],
+                      minimumSize: const Size(28, 28),
+                      onPressed:
+                          _isSearching ? null : () => unawaited(_search()),
+                      child: _isSearching
+                          ? const CupertinoActivityIndicator(radius: 7)
+                          : const Icon(LucideIcons.search, size: 16),
+                    ),
+                    onChanged: (_) {
+                      if (_isSearching) {
+                        _cancelOngoingSearch();
+                        return;
+                      }
+                      if (_hasMore) {
+                        setState(() {
+                          // 对齐 legado onQueryTextChange：输入变更即隐藏“继续加载”入口。
+                          _hasMore = false;
+                        });
+                        return;
+                      }
+                      setState(() {});
+                    },
+                    onSubmitted: (_) => _search(),
                   ),
                   const SizedBox(height: 8),
                   GestureDetector(

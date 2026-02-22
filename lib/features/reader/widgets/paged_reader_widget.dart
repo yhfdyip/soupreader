@@ -13,6 +13,16 @@ import 'page_factory.dart';
 import 'simulation_page_painter.dart';
 import 'simulation_page_painter2.dart';
 
+class PagedReaderLongPressSelection {
+  const PagedReaderLongPressSelection({
+    required this.text,
+    required this.globalPosition,
+  });
+
+  final String text;
+  final Offset globalPosition;
+}
+
 /// 翻页阅读器组件（对标 Legado ReadView + flutter_novel）
 /// 核心优化：使用 PictureRecorder 预渲染页面，避免截图开销
 class PagedReaderWidget extends StatefulWidget {
@@ -35,6 +45,7 @@ class PagedReaderWidget extends StatefulWidget {
   final VoidCallback? onImageSizeCacheUpdated;
   final void Function(String src, Size resolvedSize)? onImageSizeResolved;
   final bool showTipBars;
+  final ValueChanged<PagedReaderLongPressSelection>? onTextLongPress;
 
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
@@ -98,6 +109,7 @@ class PagedReaderWidget extends StatefulWidget {
     this.onImageSizeCacheUpdated,
     this.onImageSizeResolved,
     this.showTipBars = true,
+    this.onTextLongPress,
     // 翻页动画增强默认值
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
@@ -1343,6 +1355,280 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
+  void _onLongPressStart(Offset globalPosition) {
+    if (!mounted) return;
+    if (!widget.enableGestures) return;
+    if (_isInteractionRunning) return;
+    final callback = widget.onTextLongPress;
+    if (callback == null) return;
+
+    final text = _resolveLongPressSelectedText(globalPosition).trim();
+    if (text.isEmpty) return;
+    callback(
+      PagedReaderLongPressSelection(
+        text: text,
+        globalPosition: globalPosition,
+      ),
+    );
+  }
+
+  String _resolveLongPressSelectedText(Offset globalPosition) {
+    final content = _factory.curPage;
+    if (content.trim().isEmpty) return '';
+
+    final size = MediaQuery.of(context).size;
+    final contentWidth =
+        size.width - widget.padding.left - widget.padding.right;
+    if (!contentWidth.isFinite || contentWidth <= 0) {
+      return '';
+    }
+
+    final systemPadding = _resolveStableSystemPadding();
+    final topSafe = systemPadding.top;
+    final renderPosition =
+        _factory.resolveRenderPosition(PageRenderSlot.current);
+    final titleData = _resolvePageTitleRenderData(
+      content: content,
+      renderPosition: renderPosition,
+    );
+    final bodyText = _stripImageMarkersFromContent(titleData.bodyContent);
+
+    final contentLeft = widget.padding.left;
+    final contentTopBase = topSafe + _topOffset + widget.padding.top;
+    var contentTop = contentTopBase;
+
+    if (titleData.shouldRenderTitle) {
+      final title = titleData.title!.trim();
+      if (title.isNotEmpty) {
+        final titlePainter = TextPainter(
+          text: TextSpan(text: title, style: _pageTitleStyle),
+          textDirection: ui.TextDirection.ltr,
+          textAlign: _pageTitleAlign,
+          maxLines: null,
+        )..layout(maxWidth: contentWidth);
+
+        final titleStart = contentTop + _pageTitleTopSpacing;
+        final titleEnd = titleStart + titlePainter.height;
+        if (globalPosition.dy >= titleStart && globalPosition.dy <= titleEnd) {
+          final localDx =
+              (globalPosition.dx - contentLeft).clamp(0.0, contentWidth);
+          final offset = titlePainter
+              .getPositionForOffset(Offset(localDx, 0))
+              .offset
+              .clamp(0, title.length - 1)
+              .toInt();
+          return _extractWordAtIndex(title, offset);
+        }
+      }
+      contentTop += _pageTitleTopSpacing +
+          _titlePainterHeight(titleData.title!, contentWidth) +
+          _pageTitleBottomSpacing;
+    }
+
+    if (bodyText.trim().isEmpty) {
+      return '';
+    }
+
+    final localY = globalPosition.dy - contentTop;
+    if (!localY.isFinite || localY < 0) {
+      return '';
+    }
+
+    final lines = LegacyJustifyComposer.composeContentLines(
+      content: bodyText,
+      style: widget.textStyle,
+      maxWidth: contentWidth,
+      justify: widget.settings.textFullJustify,
+      paragraphIndent: widget.settings.paragraphIndent,
+      applyParagraphIndent: false,
+      preserveEmptyLines: true,
+    );
+    if (lines.isEmpty) {
+      return '';
+    }
+
+    LegacyComposedLine? targetLine;
+    var lineStartY = 0.0;
+    for (final line in lines) {
+      final lineEndY = lineStartY + line.height;
+      if (localY <= lineEndY) {
+        targetLine = line;
+        break;
+      }
+      lineStartY = lineEndY;
+    }
+    targetLine ??= lines.last;
+
+    final localDx = (globalPosition.dx - contentLeft).clamp(0.0, contentWidth);
+    final charIndex = _resolveCharacterIndexInLine(
+      line: targetLine,
+      x: localDx,
+      style: widget.textStyle,
+      maxWidth: contentWidth,
+    );
+    return _extractWordAtIndex(targetLine.plainText, charIndex);
+  }
+
+  double _titlePainterHeight(String title, double maxWidth) {
+    final painter = TextPainter(
+      text: TextSpan(text: title, style: _pageTitleStyle),
+      textDirection: ui.TextDirection.ltr,
+      textAlign: _pageTitleAlign,
+      maxLines: null,
+    )..layout(maxWidth: maxWidth);
+    return painter.height;
+  }
+
+  String _stripImageMarkersFromContent(String content) {
+    final lines = content.replaceAll('\r\n', '\n').split('\n');
+    final buffer = StringBuffer();
+    var first = true;
+    for (final line in lines) {
+      if (ReaderImageMarkerCodec.decodeLine(line) != null) {
+        continue;
+      }
+      if (!first) {
+        buffer.writeln();
+      }
+      buffer.write(line);
+      first = false;
+    }
+    return buffer.toString();
+  }
+
+  int _resolveCharacterIndexInLine({
+    required LegacyComposedLine line,
+    required double x,
+    required TextStyle style,
+    required double maxWidth,
+  }) {
+    final text = line.plainText;
+    if (text.isEmpty) return -1;
+
+    if (!line.justified || line.segments.length <= 1) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: ui.TextDirection.ltr,
+        maxLines: 1,
+      )..layout(maxWidth: maxWidth);
+      return painter
+          .getPositionForOffset(Offset(x, 0))
+          .offset
+          .clamp(0, text.length - 1)
+          .toInt();
+    }
+
+    var cursor = 0;
+    var drawX = 0.0;
+    for (final segment in line.segments) {
+      final segmentText = segment.text;
+      for (var i = 0; i < segmentText.length; i++) {
+        final char = segmentText.substring(i, i + 1);
+        final width = _measureSingleCharWidth(char, style);
+        final center = drawX + width / 2;
+        if (x <= center) {
+          return cursor.clamp(0, text.length - 1).toInt();
+        }
+        drawX += width;
+        cursor += 1;
+      }
+      if (segment.extraAfter > 0) {
+        final center = drawX + segment.extraAfter / 2;
+        if (x <= center) {
+          return (cursor - 1).clamp(0, text.length - 1).toInt();
+        }
+        drawX += segment.extraAfter;
+      }
+    }
+    return text.length - 1;
+  }
+
+  double _measureSingleCharWidth(String char, TextStyle style) {
+    if (char.isEmpty) return 0;
+    final painter = TextPainter(
+      text: TextSpan(text: char, style: style),
+      textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+    )..layout(minWidth: 0, maxWidth: double.infinity);
+    return painter.width;
+  }
+
+  String _extractWordAtIndex(String text, int index) {
+    final normalized = text.trimRight();
+    if (normalized.isEmpty) return '';
+    var safeIndex = index.clamp(0, normalized.length - 1).toInt();
+    if (_isWhitespace(normalized[safeIndex])) {
+      final left = _findNearestNonWhitespace(
+        text: normalized,
+        start: safeIndex,
+        step: -1,
+      );
+      final right = _findNearestNonWhitespace(
+        text: normalized,
+        start: safeIndex,
+        step: 1,
+      );
+      if (left == null && right == null) return '';
+      if (left == null) {
+        safeIndex = right!;
+      } else if (right == null) {
+        safeIndex = left;
+      } else {
+        final leftDistance = (safeIndex - left).abs();
+        final rightDistance = (right - safeIndex).abs();
+        safeIndex = leftDistance <= rightDistance ? left : right;
+      }
+    }
+
+    final current = normalized[safeIndex];
+    if (!_isWordLike(current)) {
+      return current.trim();
+    }
+    final currentIsCjk = _isCjk(current);
+
+    var start = safeIndex;
+    while (start > 0) {
+      final previous = normalized[start - 1];
+      if (!_isWordLike(previous)) break;
+      if (currentIsCjk != _isCjk(previous)) break;
+      start -= 1;
+    }
+
+    var end = safeIndex + 1;
+    while (end < normalized.length) {
+      final next = normalized[end];
+      if (!_isWordLike(next)) break;
+      if (currentIsCjk != _isCjk(next)) break;
+      end += 1;
+    }
+
+    return normalized.substring(start, end).trim();
+  }
+
+  bool _isWhitespace(String value) => value.trim().isEmpty;
+
+  bool _isWordLike(String value) {
+    if (value.trim().isEmpty) return false;
+    return RegExp(r'[A-Za-z0-9_\u3400-\u9FFF]').hasMatch(value);
+  }
+
+  bool _isCjk(String value) => RegExp(r'[\u3400-\u9FFF]').hasMatch(value);
+
+  int? _findNearestNonWhitespace({
+    required String text,
+    required int start,
+    required int step,
+  }) {
+    var index = start;
+    while (true) {
+      index += step;
+      if (index < 0 || index >= text.length) return null;
+      if (!_isWhitespace(text[index])) {
+        return index;
+      }
+    }
+  }
+
   int _resolveClickAction(Offset position) {
     final size = MediaQuery.of(context).size;
     final col = (position.dx / size.width * 3).floor().clamp(0, 2);
@@ -1665,6 +1951,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapUp: (d) => _onTap(d.globalPosition),
+      onLongPressStart: (widget.enableGestures && !_isInteractionRunning)
+          ? (details) => _onLongPressStart(details.globalPosition)
+          : null,
       // 水平方向手势（仅在启用手势且为水平方向时）
       onHorizontalDragStart: (!isVertical && enableDrag) ? _onDragStart : null,
       onHorizontalDragUpdate:

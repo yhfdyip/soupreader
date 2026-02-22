@@ -10,20 +10,23 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/cookie_store.dart';
+import '../../../core/services/keyboard_assist_store.dart';
 import '../../../core/services/qr_scan_service.dart';
+import '../../../core/services/settings_service.dart';
 import '../../../core/services/source_variable_store.dart';
 import '../../../core/utils/legado_json.dart';
-import '../../search/views/search_view.dart';
+import '../../search/models/search_scope.dart';
 import '../../search/models/search_scope_group_helper.dart';
+import '../../search/views/search_view.dart';
 import '../constants/source_help_texts.dart';
 import '../models/book_source.dart';
 import '../services/source_cookie_scope_resolver.dart';
 import '../services/source_explore_kinds_service.dart';
 import '../services/source_import_export_service.dart';
 import '../services/source_legacy_save_service.dart';
-import '../services/source_login_ui_helper.dart';
 import '../services/source_login_url_resolver.dart';
 import '../services/source_rule_complete.dart';
+import 'keyboard_assists_config_sheet.dart';
 import 'source_debug_legacy_view.dart';
 import 'source_login_form_view.dart';
 import 'source_qr_share_view.dart';
@@ -118,6 +121,8 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   late final SourceExploreKindsService _exploreKindsService;
   late final SourceImportExportService _importExportService;
   late final SourceLegacySaveService _saveService;
+  final SettingsService _settingsService = SettingsService();
+  final KeyboardAssistStore _keyboardAssistStore = KeyboardAssistStore();
 
   int _tab = 0;
   bool _autoComplete = false;
@@ -772,7 +777,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
               Navigator.pop(popupContext);
               _importFromQrCode();
             },
-            child: const Text('扫码导入'),
+            child: const Text('二维码导入'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
@@ -814,6 +819,8 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Future<void> _showInsertActions() async {
+    final keyboardAssists = await _keyboardAssistStore.loadAll(type: 0);
+    if (!mounted) return;
     final fieldKey = _activeFieldKey;
     final onGroupField = fieldKey == 'bookSourceGroup';
     await showCupertinoModalPopup<void>(
@@ -821,6 +828,21 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('编辑工具'),
         actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _showKeyboardAssistsConfig();
+            },
+            child: const Text('辅助按键配置'),
+          ),
+          for (final assist in keyboardAssists)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(popupContext);
+                _insertTextToActiveField(assist.value);
+              },
+              child: Text(assist.key),
+            ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
@@ -866,6 +888,14 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           child: const Text('取消'),
         ),
       ),
+    );
+  }
+
+  Future<void> _showKeyboardAssistsConfig() async {
+    if (!mounted) return;
+    await showKeyboardAssistsConfigSheet(
+      context,
+      store: _keyboardAssistStore,
     );
   }
 
@@ -1183,26 +1213,21 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Future<void> _importFromQrCode() async {
-    final text = await QrScanService.scanText(context, title: '扫码导入书源');
+    final text = await QrScanService.scanText(context, title: '扫描二维码');
     final value = text?.trim();
     if (value == null || value.isEmpty) {
       return;
     }
     final result = await _importExportService.importFromText(value);
     if (!result.success || result.sources.isEmpty) {
-      _showMessage(result.errorMessage ?? '扫码内容无法识别');
+      final message = (result.errorMessage ?? '').trim();
+      _showMessage(message.isEmpty ? 'Error' : message);
       return;
     }
 
+    if (!mounted) return;
     final source = result.sources.first;
     _loadSourceToFields(source);
-    _savedSource = source;
-    _currentOriginalUrl = source.bookSourceUrl.trim().isEmpty
-        ? null
-        : source.bookSourceUrl.trim();
-    _savedSnapshot = _snapshotFor(source);
-    if (!mounted) return;
-    _showMessage('已从扫码内容载入书源');
   }
 
   Future<void> _saveAndOpenDebug() async {
@@ -1222,7 +1247,8 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     final saved = await _saveInternal(showSuccessMessage: false);
     if (saved == null || !mounted) return;
 
-    if (SourceLoginUiHelper.hasLoginUi(saved.loginUi)) {
+    final hasLoginUi = (saved.loginUi ?? '').trim().isNotEmpty;
+    if (hasLoginUi) {
       await Navigator.of(context).push(
         CupertinoPageRoute<void>(
           builder: (_) => SourceLoginFormView(source: saved),
@@ -1257,11 +1283,18 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     final saved = await _saveInternal(showSuccessMessage: false);
     if (saved == null || !mounted) return;
 
+    final nextScope = SearchScope.fromSource(saved);
+    final currentSettings = _settingsService.appSettings;
+    if (currentSettings.searchScope != nextScope) {
+      await _settingsService.saveAppSettings(
+        currentSettings.copyWith(searchScope: nextScope),
+      );
+    }
+    if (!mounted) return;
+
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SearchView.scoped(
-          sourceUrls: <String>[saved.bookSourceUrl],
-        ),
+        builder: (_) => const SearchView(),
       ),
     );
   }

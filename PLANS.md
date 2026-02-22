@@ -48,7 +48,7 @@
 |---|---|---|---|---|---|---|---|
 | T00 | - | done | 串行 | 无 | 清理历史计划/进度文件并重建计划基线 | 新 `PLANS.md` + 新 ExecPlan + 新 410 项跟踪台账 | 文件存在且计数正确 |
 | T01 | - | done | 串行 | T00 | Phase P1：主入口与导航（21项）逐项迁移与验收 | 跟踪台账 P1 全部 `done` | 定向测试 + 手工路径 |
-| T02 | S0 | active | 串行 | T01 | Phase P2：搜索/详情/目录（38项）逐项迁移与验收 | 跟踪台账 P2 全部 `done` | 定向测试 + 手工路径 |
+| T02 | S0 | blocked | 串行 | T01 | Phase P2：搜索/详情/目录（38项）逐项迁移与验收 | 跟踪台账 P2 全部 `done` | 定向测试 + 手工路径 |
 | T03 | S0 | pending | 串行 | T02 | Phase P3：阅读与朗读（文字链路）逐项迁移与验收 | 跟踪台账 P3（非漫画项）全部 `done` | 定向测试 + 手工路径 |
 | T03A | HOLD | blocked | 串行 | T11 | Phase P3：漫画链路（`book_manga.xml`，18项）冻结 | 跟踪台账漫画项保持 `blocked` | 待需求解锁 |
 | T04 | S1 | pending | 串行 | T03 | Phase P4：书源管理与换源（85项）逐项迁移与验收 | 跟踪台账 P4 全部 `done` | 定向测试 + 手工路径 |
@@ -63,6 +63,344 @@
 ## Progress（动态）
 
 - `2026-02-22`
+  - 状态变更：完成 `P4-seq366`（`source_login.xml / @+id/menu_del_login_header / 删除登录头`）后，主计划保持 `active`。
+  - 完成 `P4-seq366`（`source_login.xml / @+id/menu_del_login_header / 删除登录头`）：登录表单承载页“更多”菜单补齐 legado 同义“删除登录头”入口；点击后静默清理当前书源 `loginHeader_<sourceKey>` 缓存，并按书源 URL 作用域清理 Cookie，不触发保存、不跳转、不追加成功或失败提示。
+  - `P4-seq366` 差异点清单（实施前）：
+    - legado `SourceLoginDialog.menu_del_login_header` 点击后直接执行 `source.removeLoginHeader()`；`BaseSource.removeLoginHeader()` 会同步删除 `loginHeader_<getKey()>` 缓存与对应 Cookie，属于静默状态清理动作。
+    - Flutter `SourceLoginFormView` 此前“更多”菜单仅有“查看登录头”，缺少 `menu_del_login_header` 入口，无法在登录页内删除登录头缓存并清理登录态 Cookie。
+  - `P4-seq366` 逐项对照清单（实施后）：
+    - 入口：已同义（登录表单页“更多”菜单新增“删除登录头”）。
+    - 状态：已同义（点击后删除 `loginHeader_<sourceKey>`，并按 `SourceCookieScopeResolver.resolveClearCandidates` 清理该书源 URL 作用域 Cookie）。
+    - 异常：已同义（书源键为空或 Cookie 清理失败时静默返回，不追加扩展提示）。
+    - 文案：已同义（动作文案固定“删除登录头”）。
+    - 排版：已同义（入口承载在登录页右上角 `CupertinoActionSheet` 的“更多”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理/搜索/发现/阅读 -> 触发登录表单页 -> 右上角更多 -> 删除登录头`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 登录(表单) -> 右上角更多 -> 删除登录头 -> 查看登录头`（校验删除后“登录头”弹窗仅显示标题，且全流程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del_login_header` 的静默删除语义，不改动登录脚本执行、书源保存结构与其它菜单流程。
+  - 下一项：继续推进 `P4-seq368`（`source_picker.xml / @+id/menu_change_source_delay / 换源间隔`；`P4-seq367` 为 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq365`（`source_login.xml / @+id/menu_show_login_header / 查看登录头`）后，主计划保持 `active`。
+  - 完成 `P4-seq365`（`source_login.xml / @+id/menu_show_login_header / 查看登录头`）：登录表单承载页补齐 legado 同义“更多 -> 查看登录头”入口；点击后按当前书源键读取登录头缓存并弹出“登录头”只读对话框，有缓存时展示原始文本并提供“复制文本”动作，无缓存时仅展示标题，不触发保存/登录/跳转副作用。
+  - `P4-seq365` 差异点清单（实施前）：
+    - legado `SourceLoginDialog` 在 `source_login.xml` 中定义 `menu_show_login_header`，点击后执行 `alert(title=login_header)`，存在登录头缓存时展示文本并提供复制动作。
+    - Flutter `SourceLoginFormView` 此前仅有“完成”按钮，缺少登录页内“查看登录头”入口，无法复刻 legado 同层级状态流。
+  - `P4-seq365` 逐项对照清单（实施后）：
+    - 入口：已同义（登录表单页右上角补齐“更多”菜单并包含“查看登录头”）。
+    - 状态：已同义（点击后弹出“登录头”对话框；有缓存展示原始文本并可复制，无缓存仅标题）。
+    - 异常：已同义（书源键为空或缓存缺失时保持只读空态，不新增扩展错误提示）。
+    - 文案：已同义（菜单文案“查看登录头”；对话框标题“登录头”；复制动作“复制文本”）。
+    - 排版：已同义（入口位于登录表单页顶栏“更多”动作层级，承载为 `CupertinoActionSheet + CupertinoAlertDialog`，平台差异可接受）。
+    - 交互触发：已同义（`书源管理/搜索/发现/阅读 -> 触发登录表单页 -> 右上角更多 -> 查看登录头`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 登录(表单) -> 右上角更多 -> 查看登录头`（校验弹窗标题“登录头”，有缓存时显示原始 JSON 且“复制文本”可写入剪贴板）；手工路径 `无登录头缓存时重复上述步骤`（校验仅显示标题且不触发额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_show_login_header` 的查看与复制语义，不改动登录脚本执行、Cookie 持久化及书源保存结构。
+  - 下一项：继续推进 `P4-seq366`（`source_login.xml / @+id/menu_del_login_header / 删除登录头`）。
+  - 状态变更：完成 `P4-seq360`（`source_edit.xml / @+id/menu_qr_code_camera / 二维码导入`）后，主计划保持 `active`。
+  - 完成 `P4-seq360`（`source_edit.xml / @+id/menu_qr_code_camera / 二维码导入`）：书源编辑页“更多”菜单收敛 legado 同义“二维码导入”入口；点击后进入扫码承载页并在识别成功后仅回填当前编辑表单，不触发保存、不重置“未保存修改”判定，也不追加扩展成功提示，保持 legado `qrCodeResult.launch -> importSource -> upSourceView` 状态流。
+  - `P4-seq360` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.menu_qr_code_camera` 仅触发 `qrCodeResult.launch()`；扫码回调成功后执行 `viewModel.importSource(result) { upSourceView(source) }`，行为是“只回填表单，不落库、不标记已保存、不提示成功”。
+    - Flutter 侧此前入口文案为“扫码导入”，且扫码导入成功后会同步更新 `_savedSource/_savedSnapshot` 并提示“已从扫码内容载入书源”，导致导入后退出不再触发未保存确认，状态边界与 legado 不一致。
+  - `P4-seq360` 逐项对照清单（实施后）：
+    - 入口：已同义（书源编辑页“更多”菜单文案收敛为“二维码导入”）。
+    - 状态：已同义（扫码成功后仅回填当前编辑表单；不触发保存，不重置已保存快照，退出前仍按未保存修改确认）。
+    - 异常：已同义（扫码取消直接返回；解析失败提示沿用导入错误摘要，空摘要回落 `Error`）。
+    - 文案：已同义（菜单文案“二维码导入”；扫码页标题收敛为“扫描二维码”）。
+    - 排版：已同义（入口继续位于书源编辑页 `CupertinoActionSheet` 的“更多”层级）。
+    - 交互触发：已同义（`书源管理 -> 新建/编辑书源 -> 右上角更多 -> 二维码导入`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 二维码导入 -> 扫码载入`（校验扫码成功仅回填表单且无成功提示）；手工路径 `扫码载入后直接返回上一页`（校验仍弹“存在未保存修改，确认退出吗？”）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_qr_code_camera` 的入口文案与“仅回填不保存”状态边界，不改动书源导入解析器、存储结构和登录/Cookie 链路。
+  - 下一项：继续推进 `P4-seq365`（`source_login.xml / @+id/menu_show_login_header / 查看登录头`）。
+  - 状态变更：完成 `P4-seq354`（`source_edit.xml / @+id/menu_search / 搜索`）后，主计划保持 `active`。
+  - 完成 `P4-seq354`（`source_edit.xml / @+id/menu_search / 搜索`）：书源编辑页“更多”菜单收敛 legado 同义“搜索”入口，点击后保持“先保存当前书源，再进入搜索页且范围锁定当前书源”的状态流；实现上由“打开 `SearchView.scoped(sourceUrls)` 间接计算范围”收敛为“先显式写入 `searchScope=SearchScope.fromSource(saved)` 再打开搜索页”，对齐 legado `SearchActivity(searchScope=SearchScope(source))` 触发语义。
+  - `P4-seq354` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_search)` 固定执行 `save(getSource())` 成功后 `startActivity<SearchActivity> { putExtra("searchScope", SearchScope(source).toString()) }`，搜索范围写入是显式动作。
+    - Flutter 侧虽已具备“更多 -> 搜索”入口与“先保存再跳转”主链路，但此前通过 `SearchView.scoped(sourceUrls)` 在搜索页内部二次查库生成 scope，未在入口处显式写入 `searchScope`，与 legado 的触发语义存在实现层偏差。
+  - `P4-seq354` 逐项对照清单（实施后）：
+    - 入口：已同义（书源编辑页“更多”菜单保留“搜索”入口）。
+    - 状态：已同义（点击“搜索”先保存；保存成功后写入 `searchScope=当前书源` 并进入搜索页）。
+    - 异常：已同义（保存失败中断搜索跳转；不新增扩展成功提示）。
+    - 文案：已同义（动作文案固定“搜索”）。
+    - 排版：已同义（入口继续承载在书源编辑页 `CupertinoActionSheet` 的“更多”层级）。
+    - 交互触发：已同义（`书源管理 -> 新建/编辑书源 -> 右上角更多 -> 搜索`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 修改书源名称/分组 -> 右上角更多 -> 搜索 -> 搜索页查看范围`（校验点击后先保存；进入搜索页范围显示为当前书源；返回编辑页后已保存字段保持更新）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_search` 的搜索范围写入触发语义，不改动搜索执行引擎、书源存储结构与登录/Cookie 链路。
+  - 下一项：继续推进 `P4-seq360`（`source_edit.xml / @+id/menu_qr_code_camera / 二维码导入`）。
+  - 状态变更：完成 `P4-seq353`（`source_edit.xml / @+id/menu_login / 登录`）后，主计划保持 `active`。
+  - 完成 `P4-seq353`（`source_edit.xml / @+id/menu_login / 登录`）：书源编辑页“更多”菜单收敛 legado 同义“登录”入口；入口显隐继续仅由 `loginUrl` 控制，点击后先执行保存，再按 `loginUi` 是否为空分流登录承载页（非空走表单登录，空值走网页登录）。
+  - `P4-seq353` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onMenuOpened` 仅依据 `getSource().loginUrl` 控制 `menu_login` 显隐，`onCompatOptionsItemSelected(menu_login)` 固定执行“先保存再进入 SourceLoginActivity”链路；Flutter 侧虽已具备入口，但登录分流判断依赖 `parseRows(loginUi).isNotEmpty`，与 legado “`loginUi` 非空字符串即走表单承载”语义不完全一致。
+    - 当 `loginUi` 为非空但不可解析或空数组时，Flutter 侧会回落网页登录分支；legado 仍进入表单登录承载（由登录页内部处理字段解析），状态边界存在偏差。
+  - `P4-seq353` 逐项对照清单（实施后）：
+    - 入口：已同义（书源编辑页“更多”菜单仅在 `loginUrl` 非空时显示“登录”）。
+    - 状态：已同义（点击“登录”先保存当前编辑内容，再按 `loginUi` 非空/空值分流到表单登录/网页登录承载页）。
+    - 异常：已同义（保存失败中断登录链路；`loginUrl` 为空场景不展示入口，不新增扩展提示）。
+    - 文案：已同义（动作文案固定“登录”）。
+    - 排版：已同义（入口继续承载在“更多”动作面板，与 legado overflow 菜单层级同义）。
+    - 交互触发：已同义（`书源管理 -> 新建/编辑书源 -> 右上角更多 -> 登录`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 填写/清空 loginUrl 与 loginUi -> 右上角更多 -> 登录`（校验 `loginUrl` 为空时入口隐藏；`loginUrl` 非空时点击先保存；`loginUi` 非空走表单承载页，空值走网页登录承载页）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_login` 分流判定到 legado 同义语义，不改动书源保存结构、登录脚本执行与 Cookie 存储链路。
+  - 下一项：继续推进 `P4-seq354`（`source_edit.xml / @+id/menu_search / 搜索`）。
+  - 状态变更：完成 `P4-seq192`（`change_source.xml / @+id/menu_load_toc / 加载目录`）后，主计划保持 `active`。
+  - 完成 `P4-seq192`（`change_source.xml / @+id/menu_load_toc / 加载目录`）：阅读页“整书换源/单章换源”候选弹层补齐 legado 同义 `checkable` 入口“加载目录”；点击后仅切换全局开关并持久化为 `changeSourceLoadToc`，不自动刷新当前候选列表；后续候选刷新链路按该开关决定是否预加载目录并回填最新章节。
+  - `P4-seq192` 差异点清单（实施前）：
+    - legado `ChangeBookSourceDialog` 与 `ChangeChapterSourceDialog` 在 `menu_load_toc` 点击后仅执行 `AppConfig.changeSourceLoadToc = !item.isChecked` 与 `item.isChecked = !item.isChecked`，不触发刷新流程；Flutter 候选弹层此前缺失同义入口。
+    - Flutter 候选刷新链路此前固定为“仅搜索候选结果”，无法表达 legado 的“开启加载目录后刷新候选时预加载目录信息”分支。
+  - `P4-seq192` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层新增“更多 -> 加载目录”入口）。
+    - 状态：已同义（点击仅翻转 `changeSourceLoadToc` 并持久化；当前候选列表保持不变）。
+    - 异常：已同义（目录预加载失败按单源隔离，保留该候选原始搜索结果且不追加提示）。
+    - 文案：已同义（动作文案固定“加载目录”，勾选态以 `✓` 表达）。
+    - 排版：已同义（入口承载在候选弹层“更多”动作内，保持与现有顶部动作同层级）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 更多 -> 加载目录`）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮点击或长按 -> 整书换源或单章换源 -> 候选弹层 -> 更多 -> 加载目录`（校验勾选态可切换并持久化；切换时不自动刷新候选；手动“刷新列表”后按开关决定是否预加载目录）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_load_toc` 入口与候选刷新分支，不改动换源提交、目录匹配和正文替换主链路。
+  - 下一项：继续推进 `P4-seq353`（`source_edit.xml / @+id/menu_login / 登录`）。
+  - 状态变更：完成 `P4-seq188`（`change_source.xml / @+id/menu_refresh_list / 刷新列表`）后，主计划保持 `active`。
+  - 完成 `P4-seq188`（`change_source.xml / @+id/menu_refresh_list / 刷新列表`）：阅读页“整书换源”候选弹层补齐 legado 同义“刷新列表”动作；点击后按当前候选来源集合重新拉取候选结果并在弹层内热更新，刷新期间禁用“刷新列表/书源管理”防止并发触发，保持“刷新成功或失败均不追加提示”的状态边界。
+  - `P4-seq188` 差异点清单（实施前）：
+    - legado `ChangeBookSourceDialog.menu_refresh_list -> ChangeBookSourceViewModel.startRefreshList()` 是“基于当前候选列表逐项刷新”的独立动作，不等同于重新全量搜索；Flutter 候选弹层缺失该入口。
+    - Flutter 端此前候选列表为打开弹层时一次性快照，弹层内无法执行“刷新当前候选列表”。
+  - `P4-seq188` 逐项对照清单（实施后）：
+    - 入口：已同义（整书换源候选弹层顶部新增“刷新列表”动作）。
+    - 状态：已同义（点击后基于当前候选来源集合重拉搜索结果并覆盖候选列表；不自动选中、不自动提交换源）。
+    - 异常：已同义（单源刷新失败隔离处理；整体刷新失败保持当前候选列表且不弹扩展提示）。
+    - 文案：已同义（动作文案固定“刷新列表”，刷新中显示“刷新中”）。
+    - 排版：已同义（动作位于候选弹层标题区，与“书源管理/取消”同层级承载，平台差异可接受）。
+    - 交互触发：已同义（`阅读页(网络书) -> 顶部换源按钮长按 -> 整书换源 -> 候选弹层 -> 刷新列表`）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮长按 -> 整书换源 -> 刷新列表`（校验候选数量/内容会按当前候选来源集合刷新；刷新期间重复点击无效；无额外成功/失败提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_refresh_list` 的候选刷新入口与弹层内状态更新，不改动整书/单章换源提交、目录匹配与正文替换链路。
+  - 下一项：继续推进 `P4-seq192`（`change_source.xml / @+id/menu_load_toc / 加载目录`）。
+  - 状态变更：完成 `P4-seq187`（`change_source.xml / @+id/menu_source_manage / 书源管理`）后，主计划保持 `active`。
+  - 完成 `P4-seq187`（`change_source.xml / @+id/menu_source_manage / 书源管理`）：阅读页“换源”候选弹层补齐 legado 同义“书源管理”入口；点击后打开书源管理页，返回后保留当前候选弹层并可继续换源选择，保持“仅跳转管理页、不提交换源结果”的状态流。
+  - `P4-seq187` 差异点清单（实施前）：
+    - legado `change_source.xml` 在 `ChangeBookSourceDialog` 与 `ChangeChapterSourceDialog` 都定义并处理 `menu_source_manage -> startActivity<BookSourceActivity>()`；Flutter 端换源候选弹层缺失同义入口。
+    - Flutter 端此前只能先关闭换源候选弹层再从其它页面进入书源管理，交互层级与 legado “在换源页内直接管理书源”语义不一致。
+  - `P4-seq187` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层顶部新增“书源管理”动作）。
+    - 状态：已同义（点击后仅打开书源管理页；返回后候选弹层仍保留，可继续筛选/选择候选书源）。
+    - 异常：已同义（页面跳转失败沿用现有路由异常边界，不新增扩展提示分支）。
+    - 文案：已同义（动作文案固定“书源管理”）。
+    - 排版：已同义（候选弹层标题区承载“书源管理 + 取消”，平台差异可接受）。
+    - 交互触发：已同义（`阅读页 -> 换源(整书/单章) -> 候选弹层 -> 书源管理`）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮点击或长按 -> 单章换源/整书换源 -> 候选弹层 -> 书源管理 -> 返回`（校验可进入书源管理页，返回后候选弹层仍在且可继续选源）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_source_manage` 入口与路由触发，不改动换源匹配算法、目录抓取与正文替换链路。
+  - 下一项：继续推进 `P4-seq188`（`change_source.xml / @+id/menu_refresh_list / 刷新列表`）。
+  - 状态变更：完成 `P4-seq158`（`book_source_sel.xml / @+id/menu_export_selection / 导出所选`）后，主计划保持 `active`。
+  - 完成 `P4-seq158`（`book_source_sel.xml / @+id/menu_export_selection / 导出所选`）：书源多选“更多”菜单维持 legado 同义“导出所选”入口；导出动作默认文件名收敛为 `bookSource.json`，并将“取消导出”分支收敛为静默返回，保持“成功后展示导出路径并可复制”的反馈链路。
+  - `P4-seq158` 差异点清单（实施前）：
+    - legado `BookSourceActivity.menu_export_selection` 通过 `HandleFileContract.EXPORT` 固定导出名 `bookSource.json`；Flutter 端此前默认文件名为 `soupreader_sources_<timestamp>.json`，与 legado 语义不一致。
+    - legado 取消导出（`uri == null`）为静默边界；Flutter 端此前会弹出“导出取消”提示，存在行为偏差。
+  - `P4-seq158` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选菜单保留“导出所选”并触发批量导出）。
+    - 状态：已同义（导出集合继续按“全选/低比例/中高比例”规则计算后导出）。
+    - 异常：已同义（导出失败仍提示错误摘要；取消导出静默返回）。
+    - 文案：已同义（动作文案“导出所选”，成功弹层“导出成功”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` + `CupertinoAlertDialog` 承载，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选 -> 省略号 -> 导出所选`）。
+    - 验证：手工路径 `书源管理 -> 多选 -> 省略号 -> 导出所选`（校验默认文件名 `bookSource.json`；取消导出无提示；成功后显示导出路径并支持复制路径）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_export_selection` 的导出文件名与取消反馈边界，不改动书源解析、登录与发现链路。
+  - 下一项：继续推进 `P4-seq150`（`book_source_sel.xml / @+id/menu_enable_selection / 启用所选`）。
+  - 状态变更：完成 `P3-seq382`（`speak_engine_edit.xml / @+id/menu_paste_source / 粘贴源`）后，主计划保持 `active`。
+  - 完成 `P3-seq382`（`speak_engine_edit.xml / @+id/menu_paste_source / 粘贴源`）：朗读引擎编辑页“更多”菜单补齐 legado 同义“粘贴源”入口；点击后读取剪贴板并按 JSON 对象/数组解析，数组取首项回填表单，保持“仅回填、不自动保存、不跳转”的状态流。
+  - `P3-seq382` 差异点清单（实施前）：
+    - legado `speak_engine_edit.xml` 已提供 `menu_paste_source`；Flutter 编辑页“更多”菜单缺失该入口。
+    - legado `HttpTtsEditViewModel.importFromClip/importSource` 要求“剪贴板为空提示 `剪贴板为空`、仅接受 JSON 对象/数组、数组取首项、成功只回填表单不落库”；Flutter 端此前缺少该链路。
+  - `P3-seq382` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页“更多”菜单新增“粘贴源”）。
+    - 状态：已同义（粘贴成功仅回填当前编辑表单，不触发保存与跳转）。
+    - 异常：已同义（空剪贴板提示“剪贴板为空”；非对象/数组提示“格式不对”；解析异常展示错误摘要）。
+    - 文案：已同义（动作文案“粘贴源”与空剪贴板文案“剪贴板为空”）。
+    - 排版：已同义（`CupertinoActionSheet` 承载更多菜单动作，平台差异可接受）。
+    - 交互触发：已同义（`设置 -> 语音管理 -> 点击 HTTP 朗读引擎条目 -> 编辑页右上角更多 -> 粘贴源`）。
+    - 验证：手工路径 `设置 -> 语音管理 -> 点击 HTTP 朗读引擎条目 -> 编辑页右上角更多 -> 粘贴源`（校验空剪贴板提示“剪贴板为空”；粘贴 JSON 后表单被回填且未自动保存）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `speak_engine_edit/menu_paste_source` 入口与表单回填语义，不改动朗读规则存储结构与登录缓存链路。
+  - 下一项：继续推进 `P4-seq158`（`book_source_sel.xml / @+id/menu_export_selection / 导出所选`）。
+  - 状态变更：完成 `P3-seq377`（`speak_engine_edit.xml / @+id/menu_save / 保存`）后，主计划保持 `active`。
+  - 完成 `P3-seq377`（`speak_engine_edit.xml / @+id/menu_save / 保存`）：朗读引擎编辑页顶栏补齐 legado 同义一级“保存”入口；点击后按当前表单回写 HTTP 朗读引擎规则并提示“保存成功”，保持“保存后留在当前编辑页、不触发登录流程”的状态流。
+  - `P3-seq377` 差异点清单（实施前）：
+    - legado `speak_engine_edit.xml` 将 `menu_save` 设为 `showAsAction=always`；Flutter 编辑页仅保留“更多”入口，缺失同层级一级“保存”动作。
+    - legado `HttpTtsEditDialog.menu_save -> viewModel.save(dataFromView()) -> toastOnUi("保存成功")` 为“显式保存并提示成功、页面不关闭”语义；Flutter 端此前仅“更多->登录”会触发保存，缺少独立保存链路。
+  - `P3-seq377` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页顶栏新增一级“保存”动作，与“更多”并列）。
+    - 状态：已同义（点击“保存”后按当前表单落库，停留当前页面且不自动关闭）。
+    - 异常：已同义（保存失败弹出可观测提示 `保存失败：<错误>`，不触发额外流程）。
+    - 文案：已同义（成功反馈固定“保存成功”）。
+    - 排版：已同义（`保存 + 更多` 顶栏并列动作，符合 `Shadcn + Cupertino` 迁移口径）。
+    - 交互触发：已同义（`设置 -> 语音管理 -> 点击 HTTP 朗读引擎条目 -> 编辑页右上角保存`）。
+    - 验证：手工路径 `设置 -> 语音管理 -> 点击 HTTP 朗读引擎条目 -> 编辑页右上角保存`（校验保存后出现“保存成功”提示、页面不关闭；返回列表后可见规则已更新）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `speak_engine_edit/menu_save` 入口与显式保存语义，不改动导入导出格式、登录缓存与朗读执行链路。
+  - 下一项：继续推进 `P3-seq382`（`speak_engine_edit.xml / @+id/menu_paste_source / 粘贴源`）。
+  - 状态变更：完成 `P3-seq372`（`speak_engine.xml / @+id/menu_add / 添加`）后，主计划保持 `active`。
+  - 完成 `P3-seq372`（`speak_engine.xml / @+id/menu_add / 添加`）：语音管理页顶栏补齐 legado 同义一级“添加”入口；点击后创建空白 HTTP 朗读引擎草稿并进入编辑承载页，保持“仅进入编辑页、不自动保存”的状态流。
+  - `P3-seq372` 差异点清单（实施前）：
+    - legado `SpeakEngineDialog` 工具栏包含 `menu_add`（`showAsAction=always`），点击直接打开 `HttpTtsEditDialog`；Flutter 端仅有“更多”入口，缺失同层级一级“添加”动作。
+    - legado `menu_add` 不直接写库，保存由编辑页 `menu_save` 触发；Flutter 端缺少“新建草稿 + 打开编辑页”的独立触发链路。
+  - `P3-seq372` 逐项对照清单（实施后）：
+    - 入口：已同义（语音管理页右上角新增 `+` 一级入口）。
+    - 状态：已同义（点击后进入空白编辑页；返回不自动新增规则）。
+    - 异常：已同义（导入/导出进行中禁用添加按钮，避免并发触发冲突）。
+    - 文案：已同义（空态提示补充“添加或更多菜单导入默认规则”）。
+    - 排版：已同义（顶栏 `添加 + 更多` 并列动作布局）。
+    - 交互触发：已同义（`设置 -> 语音管理 -> 添加 -> 编辑朗读引擎`）。
+    - 验证：手工路径 `设置 -> 语音管理 -> 右上角添加 -> 编辑朗读引擎 -> 返回`（校验可进入空白编辑页，返回后列表无自动新增项）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `speak_engine/menu_add` 入口与新建草稿跳转，不改动导入导出规则结构与朗读执行链路。
+  - 下一项：继续推进 `P3-seq377`（`speak_engine_edit.xml / @+id/menu_save / 保存`）。
+  - 状态变更：完成 `P3-seq256`（`keyboard_assists_config.xml / @+id/menu_add / 添加`）后，主计划保持 `active`。
+  - 完成 `P3-seq256`（`keyboard_assists_config.xml / @+id/menu_add / 添加`）：在书源编辑页“编辑工具”菜单补齐 legado 同义“辅助按键配置”入口；进入配置弹层后新增顶部“添加”动作，点击后弹出“辅助按键”双输入框（`key/value`），确认后按 `serialNo=max+1` 追加并持久化，返回编辑工具可直接点击新增按键插入 `value`。
+  - `P3-seq256` 差异点清单（实施前）：
+    - legado `KeyboardToolPop.helpAlert` 固定将“辅助按键配置”作为一级入口，点击后进入 `KeyboardAssistsConfig`；Flutter 端书源编辑页“编辑工具”缺失该入口。
+    - legado `KeyboardAssistsConfig.menu_add -> editKey(null)` 要求“弹出 `key/value` 双输入框 + 确认后 `serialNo=max+1` 持久化”；Flutter 端缺失对应配置存储与新增链路。
+  - `P3-seq256` 逐项对照清单（实施后）：
+    - 入口：已同义（书源编辑页“编辑工具”新增“辅助按键配置”入口并可打开配置弹层）。
+    - 状态：已同义（点击“添加”后弹出 `key/value` 编辑框；确认后新项按 `serialNo` 追加并持久化，重新打开编辑工具可见）。
+    - 异常：已同义（`key` 为空阻止保存并提示；取消不落盘）。
+    - 文案：已同义（“辅助按键配置 / 辅助按键 / 添加 / 取消 / 确定 / key / value”）。
+    - 排版：已同义（`CupertinoPopupSurface + CupertinoActionSheet + CupertinoAlertDialog` 承载弹层与动作，平台差异可接受）。
+    - 交互触发：已同义（编辑工具 -> 辅助按键配置 -> 添加 -> 输入 key/value -> 确定；随后在编辑工具直接点击新增项插入 `value`）。
+    - 验证：手工路径 `书源编辑页 -> 选中任意规则输入框 -> 右侧魔棒“编辑工具” -> 辅助按键配置 -> 添加 -> 输入 key/value -> 确定 -> 关闭 -> 再次打开编辑工具点击新增项`（校验新增项出现且可插入 value）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `keyboard_assists_config/menu_add` 的配置入口与新增持久化链路，不改动书源解析、搜索/目录/正文抓取主链路。
+  - 下一项：继续推进 `P3-seq372`（`speak_engine.xml / @+id/menu_add / 添加`）。
+  - 状态变更：完成 `P3-seq238`（`font_select.xml / @+id/menu_default / 默认字体`）后，主计划保持 `active`。
+  - 完成 `P3-seq238`（`font_select.xml / @+id/menu_default / 默认字体`）：阅读页“选择字体”弹层顶部补齐 legado 同义“默认字体”入口；点击后弹出“系统内置字体样式”选项（系统默认字体/系统衬线字体/系统等宽字体），确认后清空自定义字体路径并立即应用所选系统字体，随后关闭字体弹层。
+  - `P3-seq238` 差异点清单（实施前）：
+    - legado `FontSelectDialog` 顶栏菜单含 `menu_default`，点击后固定弹出 `system_typefaces` 三项列表；当前 Flutter 字体弹层仅有“其它目录”，缺失同层级入口。
+    - legado 选择默认字体后执行 `AppConfig.systemTypefaces = i -> onDefaultFontChange(selectFont("")) -> dismiss`；当前 Flutter 缺失“清空自定义字体并关闭字体弹层”的同义状态流。
+  - `P3-seq238` 逐项对照清单（实施后）：
+    - 入口：已同义（字体弹层顶部新增“默认字体”入口，触发层级与 legado `menu_default` 一致）。
+    - 状态：已同义（选择系统字体后清空自定义字体路径，并即时应用系统字体样式）。
+    - 异常：已同义（取消选择不改动当前字体状态，不追加提示）。
+    - 文案：已同义（入口文案固定“默认字体”；弹层标题“系统内置字体样式”；选项为“系统默认字体/系统衬线字体/系统等宽字体”）。
+    - 排版：已同义（`CupertinoButton + CupertinoActionSheet` 承载菜单与选项，平台差异可接受）。
+    - 交互触发：已同义（确认选项后依次完成“清空自定义字体 -> 应用系统字体 -> 关闭字体弹层”）。
+    - 验证：`flutter test test/reader_top_menu_test.dart`、`flutter test test/reader_search_navigation_helper_test.dart` 通过；`flutter test test/simple_reader_view_compile_test.dart` 失败（现存编译问题：`simple_reader_view.dart:4968` 空安全报错、`reader_dict_lookup_sheet.dart:170` `SelectableText` 未定义）；手工路径 `阅读页 -> 样式弹层 -> 字体 -> 默认字体 -> 选择系统默认字体/系统衬线字体/系统等宽字体`（校验选择后字体弹层关闭且正文字体立即变化）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_default` 的系统字体选择与自定义字体清理语义，不改动书源解析、搜索/目录/正文抓取及换源链路。
+  - 下一项：继续推进 `P3-seq256`（`keyboard_assists_config.xml / @+id/menu_add / 添加`）。
+  - 状态变更：完成 `P3-seq212`（`content_select_action.xml / @+id/menu_share_str / 分享`）后，主计划保持 `active`。
+  - 完成 `P3-seq212`（`content_select_action.xml / @+id/menu_share_str / 分享`）：翻页阅读长按“文本操作”菜单新增“分享”；点击后按 legado `TextActionMenu.menu_share_str -> Context.share(selectedText)` 同义调用系统文本分享。
+  - `P3-seq212` 差异点清单（实施前）：
+    - 文本操作菜单缺失 legado `menu_share_str` 入口，长按选中文本后无法从同层级菜单直接触发分享。
+    - Flutter 端尚未收敛该动作的异常边界；legado `Context.share` 采用 `runCatching` 静默吞错，不弹成功或失败提示。
+  - `P3-seq212` 逐项对照清单（实施后）：
+    - 入口：已同义（翻页阅读长按正文后，“文本操作”菜单补齐“分享”）。
+    - 状态：已同义（动作直接调用系统分享面板，载荷为选中文本）。
+    - 异常：已同义（分享失败静默吞掉，不追加错误提示）。
+    - 文案：已同义（动作文案固定“分享”）。
+    - 排版：已同义（`CupertinoActionSheet` 承载动作项，平台差异可接受）。
+    - 交互触发：已同义（点击“分享”即触发系统分享，不附加扩展流程）。
+    - 验证：手工路径 `阅读页(翻页模式) -> 长按正文词句 -> 文本操作 -> 分享`（校验系统分享面板可打开，分享内容为选中文本，且无额外成功/失败提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_share_str` 入口与分享动作，不改动书源解析、目录抓取与正文请求主链路。
+  - 下一项：继续推进 `P3-seq238`（`font_select.xml / @+id/menu_default / 默认字体`）。
+  - 状态变更：完成 `P3-seq211`（`content_select_action.xml / @+id/menu_browser / 浏览器`）后，主计划保持 `active`。
+  - 完成 `P3-seq211`（`content_select_action.xml / @+id/menu_browser / 浏览器`）：翻页阅读长按“文本操作”菜单新增“浏览器”；点击后按 legado `TextActionMenu.menu_browser` 同义分流，`selectedText` 为 `http/https` 绝对网址时走外部浏览器直开，否则按关键词发起网页搜索。
+  - `P3-seq211` 差异点清单（实施前）：
+    - 文本操作菜单缺失 legado `menu_browser` 入口，选中文本后无法执行“浏览器/网页搜索”动作。
+    - Flutter 端缺少该动作的同义分流边界（绝对网址直开与非网址搜索）及错误提示口径。
+  - `P3-seq211` 逐项对照清单（实施后）：
+    - 入口：已同义（翻页阅读长按正文后，“文本操作”菜单补齐“浏览器”）。
+    - 状态：已同义（`selectedText` 为 `http/https` 时外部浏览器直开；非网址文本走网页搜索）。
+    - 异常：已同义（打开失败时提示 `ERROR`；抛错时优先展示错误消息，为空时回退 `ERROR`）。
+    - 文案：已同义（动作文案固定“浏览器”）。
+    - 排版：已同义（`CupertinoActionSheet` 承载动作项，平台差异可接受）。
+    - 交互触发：已同义（点击“浏览器”立即按分流规则执行，不附加扩展流程）。
+    - 验证：手工路径 `阅读页(翻页模式) -> 长按正文词句 -> 文本操作 -> 浏览器`（校验 URL 文本外部直开与非 URL 文本网页搜索两条分支；失败分支提示符合预期）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_browser` 入口与动作分流，不改动书源解析、目录抓取与正文请求主链路。
+  - 下一项：继续推进 `P3-seq212`（`content_select_action.xml / @+id/menu_share_str / 分享`）。
+  - 状态变更：完成 `P3-seq209`（`content_select_action.xml / @+id/menu_dict / 字典`）后，主计划保持 `active`。
+  - 完成 `P3-seq209`（`content_select_action.xml / @+id/menu_dict / 字典`）：翻页阅读长按“文本操作”菜单新增“字典”；点击后按 legado 同义打开字典弹层，并以 `selectedText` 作为关键词执行词典规则查询，支持按启用规则切换后重新加载结果。
+  - `P3-seq209` 差异点清单（实施前）：
+    - 文本操作菜单缺失 legado `menu_dict` 入口，选中文本后无法直达词典查询。
+    - Flutter 端缺失词典规则默认资产与查询承载层，无法复刻 legado `DictDialog(word)` 的“规则切换 -> 查询展示”状态流。
+  - `P3-seq209` 逐项对照清单（实施后）：
+    - 入口：已同义（翻页阅读长按正文后，“文本操作”菜单补齐“字典”）。
+    - 状态：已同义（进入字典弹层默认加载首个启用规则，切换规则后重新发起查询）。
+    - 异常：已同义（无选中文本时静默返回；查询失败在结果区展示错误文本，保持流程不崩溃）。
+    - 文案：已同义（动作文案固定“字典”）。
+    - 排版：已同义（`Cupertino` 弹层承载规则 Tab 与查询结果，平台差异可接受）。
+    - 交互触发：已同义（点击“字典”打开弹层并用 `selectedText` 查询；切换 Tab 触发对应规则重查）。
+    - 验证：手工路径 `阅读页(翻页模式) -> 长按正文词句 -> 文本操作 -> 字典 -> 切换规则`（校验弹层打开、首个规则自动查询、切换规则后结果刷新）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_dict` 入口、默认词典规则资产与词典查询弹层，不改动书源解析、目录抓取与正文请求主链路。
+  - 下一项：继续推进 `P3-seq211`（`content_select_action.xml / @+id/menu_browser / 浏览器`）。
+  - 状态变更：完成 `P3-seq208`（`content_select_action.xml / @+id/menu_aloud / 朗读`）后，主计划保持 `active`。
+  - 完成 `P3-seq208`（`content_select_action.xml / @+id/menu_aloud / 朗读`）：翻页阅读长按“文本操作”菜单新增“朗读”；点击后按 legado 同义执行“朗读选择内容/从选择处开始一直朗读”双模式分流，长按文本操作菜单项可切换模式并持久化到 `contentSelectSpeakMod`。
+  - `P3-seq208` 差异点清单（实施前）：
+    - 文本操作菜单缺失 legado `menu_aloud` 入口，选中文本后无法直达朗读动作。
+    - 设置层缺失 `contentSelectSpeakMod` 同名持久化键，无法对齐 legado 的“长按切换朗读模式并跨次保留”语义。
+  - `P3-seq208` 逐项对照清单（实施后）：
+    - 入口：已同义（翻页阅读长按正文后，“文本操作”菜单补齐“朗读”）。
+    - 状态：已同义（默认模式朗读选中文本；切换后模式为“从选择处开始一直朗读”）。
+    - 异常：已同义（Web 平台继续提示“当前平台暂不支持语音朗读”；无选中文本时静默返回）。
+    - 文案：已同义（动作文案固定“朗读”；模式切换提示文案对齐 legado）。
+    - 排版：已同义（`CupertinoActionSheet` 承载动作项，平台差异可接受）。
+    - 交互触发：已同义（点击“朗读”按当前模式执行；长按文本操作菜单项切换模式并持久化）。
+    - 验证：手工路径 `阅读页(翻页模式) -> 长按正文词句 -> 文本操作 -> 朗读(点击/长按)`（校验点击按模式分流，长按后重进阅读页模式保持）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_aloud` 入口与模式持久化，不改动书源解析、目录抓取与正文请求协议。
+  - 下一项：继续推进 `P3-seq209`（`content_select_action.xml / @+id/menu_dict / 字典`）。
+  - 状态变更：完成 `P3-seq207`（`content_select_action.xml / @+id/menu_bookmark / 书签`）后，主计划保持 `active`。
+  - 完成 `P3-seq207`（`content_select_action.xml / @+id/menu_bookmark / 书签`）：翻页阅读长按“文本操作”菜单新增“书签”；点击后按 legado 同义进入书签编辑弹窗并预填选中文本，取消不落库，确定后新增书签并刷新书签状态。
+  - `P3-seq207` 差异点清单（实施前）：
+    - 文本操作菜单仅有“替换”，缺失 legado `menu_bookmark` 同层级入口。
+    - 现有书签编辑链路未接入“长按选中文本”上下文，无法同义复刻 `selectedText` 预填语义。
+  - `P3-seq207` 逐项对照清单（实施后）：
+    - 入口：已同义（长按正文后可见“书签”）。
+    - 状态：已同义（选中文本预填书签编辑弹窗正文）。
+    - 异常：已同义（草稿构建失败提示“创建书签失败”；取消不写库）。
+    - 文案：已同义（固定“书签”）。
+    - 排版：已同义（`CupertinoActionSheet + CupertinoAlertDialog` 承载，平台差异可接受）。
+    - 交互触发：已同义（点击“书签”进入编辑弹窗，确定后写库并刷新）。
+    - 验证：手工路径 `阅读页(翻页模式) -> 长按正文词句 -> 文本操作 -> 书签 -> 取消/确定`（校验取消后不新增书签，确定后目录书签页可见并可跳转）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_bookmark` 入口与既有书签编辑链路接线，不改动书源解析与正文抓取链路。
+  - 下一项：继续推进 `P3-seq208`（`content_select_action.xml / @+id/menu_aloud / 朗读`）。
+  - 状态变更：`P3-seq205`（`content_select_action.xml / @+id/menu_replace / 替换`）已按方案 A 落地，主计划由 `blocked` 恢复为 `active`。
+  - 完成 `P3-seq205`（`content_select_action.xml / @+id/menu_replace / 替换`）：补齐翻页阅读长按文本动作入口，长按正文后弹出“文本操作 -> 替换”；点击后按 legado 同义将 `selectedText` 逐行 `trim` 预填 `pattern`，并将 `scope` 预填为 `bookName;bookSourceUrl`；保存后回写规则并刷新当前章节。
+  - `P3-seq205` 差异点清单（实施前）：
+    - `paged_reader_widget.dart` 仅支持点击分区动作，无“长按选中文本 + 文本动作菜单”入口。
+    - `simple_reader_view.dart` 缺少 `menu_replace` 从 `selectedText` 跳转替换规则编辑页的链路。
+  - `P3-seq205` 逐项对照清单（实施后）：
+    - 入口：已同义（翻页阅读长按正文可进入文本操作菜单）。
+    - 状态：已同义（按长按位置提取词级选中文本并作为动作上下文）。
+    - 异常：已同义（无可用选中文本时静默返回；保存前不写库）。
+    - 文案：已同义（动作文案固定“替换”）。
+    - 排版：已同义（`CupertinoActionSheet` 承载文本动作，平台差异可接受）。
+    - 交互触发：已同义（`selectedText` 逐行 `trim` 后预填 `pattern`，`scope=bookName;bookSourceUrl`，保存后刷新当前章节）。
+    - 验证：手工路径 `阅读页(翻页模式) -> 长按正文词句 -> 文本操作 -> 替换 -> 保存规则`（校验默认 `pattern/scope` 预填正确且保存后正文刷新）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐阅读页文本动作入口与 `menu_replace` 链路，不改动书源解析、目录与正文抓取链路。
+  - 下一项：继续推进 `P3-seq207`（`content_select_action.xml / @+id/menu_bookmark / 书签`）。
+  - 状态变更：主计划由 `active` 调整为 `blocked`，当前阻塞项为 `P3-seq205`（`content_select_action.xml / @+id/menu_replace / 替换`）。
+  - `P3-seq205` 阻塞记录（执行前确认 legado 后）：
+    - 原因：legado `menu_replace` 依赖 `TextActionMenu.selectedText`（选中文本）并进入 `ReplaceEditActivity(pattern=selectedText, scope=bookName;bookSourceUrl)`；当前 Flutter 阅读正文链路（`paged_reader_widget.dart + simple_reader_view.dart`）未提供文本选区能力与选区回调，无法等价复刻该触发语义。
+    - 影响范围：`seq205(menu_replace)` 主流程不可继续；同文件后续依赖选区语义的项（如 `seq206~209`）存在同类风险，需要在该能力确认后再推进。
+    - 替代方案：
+      - A：先补齐“阅读页选中文本 + 文本操作菜单”基础设施，再按 legado 原语义迁移 `menu_replace`（推荐）。
+      - B：经需求方确认后，临时改为“手动输入关键词后进入替换编辑”的降级流程（非同义，需显式批准）。
+    - 回补计划：待需求方确认方案后解除 `blocked`；若选 A，先完成选区基础设施最小闭环（选区、菜单、回调、清理）再回补 `menu_replace`；若选 B，记录例外并在后续补回 legado 同义选区链路。
+  - 完成 `P3-seq204`（`content_search.xml / @+id/menu_enable_replace / 替换`）：对齐 legado `SearchContentActivity.menu_enable_replace` 的 `checkable` 语义，在阅读页全文搜索面板顶栏补齐“更多 -> 替换”入口；点击仅翻转搜索态开关，不自动重跑搜索。
+  - `P3-seq204` 差异点清单（实施前）：
+    - 当前全文搜索面板缺少 `content_search.xml` 对应菜单入口，无法表达 legado 同义的“替换”勾选态。
+    - 当前全文搜索链路固定按原始正文检索，缺少“按搜索开关决定是否应用替换规则”的分支。
+  - `P3-seq204` 逐项对照清单（实施后）：
+    - 入口：已同义（全文搜索面板顶栏补齐“更多 -> 替换”入口）。
+    - 状态：已同义（菜单项按 `✓ 替换` 表达勾选态）。
+    - 异常：已同义（仅本地状态切换，无新增异常提示分支）。
+    - 文案：已同义（固定“替换”）。
+    - 排版：已同义（Cupertino ActionSheet 承载 checkable 入口，平台差异可接受）。
+    - 交互触发：已同义（点击仅切换开关，不自动重跑；下次搜索按开关与书籍替换净化总开关共同决定是否应用替换规则）。
+    - 验证：手工路径 `阅读页 -> 搜索正文 -> 输入关键词搜索 -> 搜索面板顶栏更多 -> 替换 -> 再次搜索`（校验勾选态切换生效且只影响搜索流程）；手工路径 `阅读页 -> 搜索正文 -> 退出`（校验退出后开关恢复默认关闭）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐全文搜索菜单入口与搜索链路替换开关，不改动书源解析、目录与正文抓取链路。
+  - 阻塞项：`seq205`（`content_select_action.xml / @+id/menu_replace / 替换`），待需求方确认“先补选区基础设施”或“接受临时降级方案”后继续。
+  - 完成 `P3-seq93`（`book_read_record.xml / @+id/menu_enable_record / 开启记录`）：对齐 legado `ReadRecordActivity.menu_enable_record` 的 `checkable` 语义，在“阅读记录”页右上角更多菜单补齐“开启记录”入口；菜单打开按 `enableReadRecord` 回显勾选，点击后仅翻转开关并持久化，不追加提示。
+  - `P3-seq93` 差异点清单（实施前）：
+    - 当前“阅读记录”页缺少 legado 同层级的 `menu_enable_record` 入口，无法表达“开启记录”勾选态与切换动作。
+    - 当前设置层缺少 `enableReadRecord` 同名持久化键；阅读进度落盘始终刷新 `lastReadTime`，无法体现“关闭记录后不再累计记录时间”的边界。
+  - `P3-seq93` 逐项对照清单（实施后）：
+    - 入口：已同义（阅读记录页补齐右上角更多菜单“开启记录”动作）。
+    - 状态：已同义（菜单项通过 `✓` 勾选态回显 `enableReadRecord` 当前值）。
+    - 异常：已同义（仅本地设置读写；无新增异常提示分支）。
+    - 文案：已同义（固定“开启记录”）。
+    - 排版：已同义（Cupertino ActionSheet 承载 checkable 文案，平台差异可接受）。
+    - 交互触发：已同义（点击即翻转开关并落盘，重进页面后勾选态保持）。
+    - 验证：手工路径 `设置 -> 功能 & 设置 -> 阅读记录 -> 右上角更多 -> 开启记录`（校验勾选态切换与重进页面保持）；手工路径 `阅读页 -> 退出 -> 查看阅读记录列表`（校验关闭“开启记录”后仍保存章节进度但不刷新 `lastReadTime`）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_enable_record` 入口与设置边界，不改动书源解析、目录与正文抓取链路。
+  - 完成 `P3-seq9`（`audio_play.xml / @+id/menu_wake_lock / 音频服务唤醒锁`）：播放菜单补齐 legado 同义 `checkable` 入口，点击后仅翻转开关并持久化到同名键 `audioPlayWakeLock`。
+  - 验证：手工路径 `阅读页 -> 底部菜单长按朗读 -> 播放 -> 音频服务唤醒锁`（校验勾选态切换与重进菜单保持）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐菜单入口与设置持久化，不改动书源解析与正文链路。
   - 完成规范调整：按需求“开发完成不要编写 test”更新 `AGENTS.md`，在第 3 章新增强制条款“开发完成后禁止新增、编写或改造测试用例（除非需求方明确要求）”。
   - 同步收敛验收口径：`2.3` 命令验证示例改为仅 `flutter analyze`；第 3 章中途校验改为“仅手工回归路径”；迁移级别任务的回归验证改为“手工回归验证”；第 4 章“如何验证”改为“`flutter analyze` 或手工路径”。
   - 变更原因：需求方明确要求“开发完成不要编写 test”，需将仓库协作规范改为禁止新增测试代码。
@@ -191,9 +529,99 @@
   - 验证：手工路径 `阅读页 -> 阅读操作 -> 添加书签`、`阅读页 -> 九宫格点击动作(添加书签)`、`阅读页 -> 目录/书签 -> 选择书签`（校验弹窗标题“书签”、章节标题展示、内容/备注输入框可编辑、取消不落库、确定后新增可见并可按进度跳转）。
   - 兼容影响：无旧书源兼容性破坏；本序号仅收敛书签交互语义与书签跳转进度恢复，未改动书源解析与网络链路。
   - 完成 `T02-seq70`（`book_read.xml / @+id/menu_edit_content / 编辑内容`）：对齐 legado `menu_edit_content -> ContentEditDialog` 的异常与加载边界，补齐正文抓取失败时“记录日志 + 回退当前显示内容 + 保持入口可继续”的兜底语义，避免异常中断编辑链路；编辑页“重置”期间增加全屏遮罩与整页交互锁定，贴齐 legado `loadState` 下不可交互语义，同时保持关闭/返回自动保存行为不变。
-  - 验证：手工路径 `阅读页 -> 阅读操作 -> 编辑正文 -> 重置`、`阅读页 -> 阅读操作 -> 编辑正文 -> 关闭`、`阅读页 -> 阅读操作 -> 正文倒序`（校验重置期间全屏 loading 与交互锁定、关闭自动保存、正文抓取失败时提示“获取正文失败，已回退当前显示内容”且日志节点可观测）。
+  - 验证：手工路径 `阅读页 -> 阅读操作 -> 编辑正文 -> 重置`、`阅读页 -> 阅读操作 -> 编辑正文 -> 关闭`、`阅读页 -> 阅读操作 -> 反转内容`（校验重置期间全屏 loading 与交互锁定、关闭自动保存、正文抓取失败时提示“获取正文失败，已回退当前显示内容”且日志节点可观测）。
   - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_edit_content` 的异常兜底与重置加载态，不改动书源解析规则与网络请求参数。
-  - 下一项：`seq71`（`book_read.xml / @+id/menu_page_anim / 翻页动画（本书）`）。
+  - 完成 `T02-seq71`（`book_read.xml / @+id/menu_page_anim / 翻页动画（本书）`）：将阅读操作菜单 `menu_page_anim` 从“打开界面设置”收敛为 legado 同义单选弹层（默认/覆盖/滑动/仿真/滚动/无）；新增本书翻页动画持久化键 `book_page_anim_map` 并在阅读会话初始化与全局设置变更时叠加覆盖，避免菜单动作误写全局设置；样式面板修改全局翻页动画时同步清除本书覆盖，对齐 legado `book.setPageAnim(-1)` 边界。
+  - 验证：`flutter test test/reader_legacy_menu_helper_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径 `阅读页 -> 阅读操作 -> 翻页动画（本书）`（校验单选项文案、切换后即时生效、本书覆盖与全局设置互不污染）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_page_anim` 的入口语义与书籍级翻页动画状态流转，不改动书源解析规则与正文抓取链路。
+  - 完成 `T02-seq72`（`book_read.xml / @+id/menu_get_progress / 拉取云端进度`）：将“获取进度”链路收敛为 legado 同义“静默同步 + 条件确认 + 越界不覆盖”语义；无配置/空目录/云端无数据时静默返回，云端进度落后本地时保留确认框“当前进度超过云端，是否覆盖为云端进度？”，云端进度领先时仅在章节索引合法范围内才应用同步；兼容 legado 原始 `durChapterPos`（字符位点）场景时，存在章节内容则按内容长度估算章节进度；拉取失败收敛为日志节点 `reader.menu.get_progress.failed`，不追加失败 toast。
+  - 验证：手工路径 `阅读页(已配置 WebDav) -> 阅读操作 -> 获取进度`（校验云端无数据静默返回、落后分支弹确认框、领先分支直接同步、越界索引不覆盖本地进度、失败仅写日志）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_get_progress` 的状态流转与日志可观测边界，不改动书源规则、Cookie 与正文抓取链路。
+  - 完成 `T02-seq73`（`book_read.xml / @+id/menu_cover_progress / 覆盖云端进度`）：将“覆盖云端进度”链路收敛为 legado 同义“静默守卫 + 先保存后上传 + 失败可观测”语义；同步开关关闭/无 WebDav 配置/空目录时保持静默返回，不再弹扩展提示；上传成功提示收敛为 legado 同义“上传成功”；上传失败补齐日志节点 `reader.menu.cover_progress.failed` 并保留失败提示；同时将阅读操作菜单文案从“覆盖进度”收敛为“覆盖云端进度”。
+  - 验证：手工路径 `阅读页(已配置 WebDav) -> 阅读操作 -> 覆盖云端进度`（校验守卫分支静默返回、成功提示“上传成功”、失败提示“上传进度失败\n<原因>”且异常日志可观测）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_cover_progress` 的提示/日志/文案语义，不改动书源规则、Cookie 与正文抓取链路。
+  - 完成 `T02-seq74`（`book_read.xml / @+id/menu_reverse_content / 反转内容`）：对齐 legado `menu_reverse_content -> reverseContent` 语义，阅读操作菜单文案由“正文倒序”收敛为“反转内容”；动作从“按行倒序 + 缺正文提示 + 兜底拉取正文”收敛为“按字符级倒序 + 仅处理当前章节已缓存正文 + 缺失静默返回”，并在反转后立即回写章节缓存并重载当前章节。
+  - 验证：手工路径 `阅读页(网络书且当前章节已缓存正文) -> 阅读操作 -> 反转内容`（校验入口仅在线书显示、点击后正文按字符倒序、无缓存正文时静默返回且无扩展提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_reverse_content` 的正文反转算法与缺失内容边界，不改动书源规则、Cookie 与正文抓取链路。
+  - 完成 `T02-seq75`（`book_read.xml / @+id/menu_simulated_reading / 模拟追读`）：将阅读操作菜单该项从“自动阅读占位开关”收敛为 legado 同义“配置弹窗（启用/起始章节/每日章节/开始日期）-> 落盘 -> 重载阅读会话”；补齐 `simulatedTotalChapterNum` 同义计算，并将目录可见章节数、底部章节导航、自动翻页/朗读切章边界统一收敛到可读章节上限。
+  - 验证：`flutter test test/simple_reader_view_compile_test.dart`、`flutter test test/reader_legacy_menu_helper_test.dart`、`flutter test test/reader_catalog_sheet_test.dart`；手工路径 `阅读页 -> 阅读操作 -> 模拟追读`（校验启用开关、起始章节、每日章节、开始日期可保存并立即影响可读章节范围）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛阅读会话可读章节边界与菜单交互语义，不改动书源规则、Cookie 与抓取链路。
+  - 完成 `T02-seq76`（`book_read.xml / @+id/menu_enable_replace / 替换净化`）：将阅读操作菜单该项文案由“启用替换规则”收敛为 legado 同义“替换净化”，并移除切换后扩展 toast，保持 legado 同义“点击即切换书籍级替换开关并刷新正文”的状态流转。
+  - 验证：`flutter test test/reader_legacy_menu_helper_test.dart`、`flutter test test/simple_reader_view_compile_test.dart`；手工路径 `阅读页 -> 阅读操作 -> 替换净化`（校验勾选态与书籍级 `useReplaceRule` 同步，切换后正文即时按替换规则刷新且无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛菜单文案与反馈语义，不改动替换规则引擎与书源解析链路。
+  - 完成 `T02-seq77`（`book_read.xml / @+id/menu_same_title_removed / 移除重复标题`）：将阅读操作菜单该项文案由“同名标题去重”收敛为 legado 同义“移除重复标题”；勾选态由“章节级配置态”收敛为 legado 同义“当前章节实际发生重复标题移除”；点击后动作收敛为 `!sameTitleRemoved` 翻转章节级开关并重载当前章节，且仅在“当前章节未移除且已处于启用态”提示“未找到可移除的重复标题”，章节缺失场景保持静默返回。
+  - 验证：`flutter test test/reader_legacy_menu_helper_test.dart`、`flutter test test/simple_reader_view_compile_test.dart`；手工路径 `阅读页 -> 阅读操作 -> 移除重复标题`（校验文案、勾选态、提示边界与重载链路）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_same_title_removed` 文案与状态语义，不改动书源规则与正文抓取链路。
+  - 完成 `T02-seq78`（`book_read.xml / @+id/menu_re_segment / 重新分段`）：将阅读操作菜单该项收敛为 legado 同义“固定 checkable 文案 + 点击即切换书籍级 `reSegment` + 立即重载当前章节（无扩展提示）”；重载前先保存当前阅读进度，再按当前章节恢复位点，避免 `restoreOffset` 读取旧进度导致位置漂移。
+  - 验证：手工路径 `阅读页 -> 阅读操作 -> 重新分段`（校验勾选态切换、正文即时重载、无扩展提示、重载后阅读位置保持）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_re_segment` 的状态切换与重载位点语义，不改动书源规则与正文抓取链路。
+  - 完成 `T02-seq79`（`book_read.xml / @+id/menu_enable_review / 段评`）：对齐 legado 当前可执行语义，保留该入口为“结构存在但默认隐藏且不可触发”；在菜单模型层补齐 `enableReview` 隐藏占位动作并保持默认 `showReviewAction=false`，事件分发分支保持 no-op，避免引入扩展流程。
+  - 验证：手工路径 `阅读页 -> 阅读操作`（校验菜单中不出现“段评”且其后续项顺序不变）；代码对照 `legado book_read.xml(menu_enable_review visible=false)` 与 `legado ReadBookActivity` 注释分支确认默认不可触发语义。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐隐藏入口的结构同义与触发边界，不改动正文渲染与书源链路。
+  - 完成 `T02-seq80`（`book_read.xml / @+id/menu_del_ruby_tag / 删除ruby标签`）：对齐 legado `menu_del_ruby_tag` 语义，阅读操作菜单文案由“删除 ruby 标签”收敛为“删除ruby标签”；清理规则由“删除 `ruby/rt/rp` 标签”收敛为仅删除 `rt/rp`，保留 `ruby` 包裹标签；切换动作后的刷新链路由“清缓存并保留当前章内存正文”收敛为全量清缓存并重载当前章节，贴齐 legado `refreshContentAll`。
+  - 验证：手工路径 `阅读页(EPUB书籍) -> 阅读操作 -> 删除ruby标签`（校验入口仅 EPUB 显示、勾选态切换、切换后当前章节重载且文本中 ruby 注音标签按 `rt/rp` 删除生效）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 EPUB 正文后处理与菜单文案/刷新语义，不改动书源解析与网络链路。
+  - 完成 `T02-seq81`（`book_read.xml / @+id/menu_del_h_tag / 删除h标签`）：对齐 legado `menu_del_h_tag` 语义，阅读操作菜单文案由“删除 h 标签”收敛为“删除h标签”；`h` 标签清理规则由“仅移除 `h1~h6` 标签本身、保留标签内文本”收敛为“移除 `h1~h6` 整段节点内容（含标题文本）”，贴齐 legado `select("h1, h2, h3, h4, h5, h6").remove()`。
+  - 验证：手工路径 `阅读页(EPUB书籍) -> 阅读操作 -> 删除h标签`（校验入口仅 EPUB 显示、勾选态切换后章节内 `h1~h6` 整段节点内容被移除、切换后全量清缓存并重载当前章节且无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 EPUB 正文 `h` 标签清理边界与菜单文案语义，不改动书源解析与网络链路。
+  - 完成 `T02-seq82`（`book_read.xml / @+id/menu_image_style / 图片样式`）：对齐 legado `menu_image_style` 语义，保持 `DEFAULT/FULL/TEXT/SINGLE` 四档样式书籍级持久化；将 `SINGLE` 联动从“全局改覆盖翻页”收敛为“仅当前书籍写入覆盖翻页（pageAnim=0）”，避免污染全局设置。
+  - 验证：手工路径 `阅读页 -> 阅读操作 -> 图片样式 -> 选择 DEFAULT/FULL/TEXT/SINGLE`（校验样式即时生效；`SINGLE` 分支仅影响当前书籍翻页动画，切换其它书籍不受影响）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_image_style` 的联动作用域，不改动书源解析与正文抓取链路。
+  - 完成 `T02-seq84`（`book_read.xml / @+id/menu_effective_replaces / 起效的替换`）：对齐 legado `menu_effective_replaces -> EffectiveReplacesDialog` 语义，阅读操作菜单该项由“跳转规则总列表页”收敛为“当前章节起效替换弹层”；列表仅展示当前章节正文实际命中的替换规则，并在简繁转换开启时追加“繁简转换”项。点击规则进入规则编辑页，点击“繁简转换”打开模式选择；发生编辑后按 legado `replaceRuleChanged` 语义清理阶段缓存并重载当前章节。
+  - 验证：手工路径 `阅读页 -> 阅读操作 -> 起效的替换`（校验弹层标题、命中规则列表、简繁转换开启时出现“繁简转换”项）；手工路径 `起效的替换 -> 选择规则 -> 保存` 与 `起效的替换 -> 繁简转换 -> 切换模式`（校验返回后当前章节即时按新规则/新转换模式重载）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_effective_replaces` 入口语义与替换规则可见性，不改动书源解析、网络请求与正文抓取链路。
+  - 完成 `T02-seq348`（`search_view.xml / @+id/menu_search / 搜索`）：对齐 legado `menu_search` 的单入口语义，将搜索区由“输入框 + 独立搜索按钮”收敛为“单一搜索输入控件内提交动作（控件内搜索图标 + 键盘搜索）”；同时将占位文案收敛为 legado 同义“搜索书名、作者”。
+  - 验证：手工路径 `搜索页 -> 输入关键字 -> 点击输入框内搜索图标`、`搜索页 -> 输入关键字 -> 键盘搜索`（校验两条路径均触发搜索；输入变化时会停止搜索并隐藏“继续加载”入口）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛搜索入口形态与文案语义，不改动搜索规则解析、缓存键与书源请求链路。
+  - 完成 `T02-seq5`（`audio_play.xml / @+id/menu_change_source / 换源`）：对齐 legado `AudioPlayActivity` 顶栏换源动作语义，将底部菜单“朗读”长按入口从占位提示收敛为“播放”菜单，并补齐“换源”动作；点击后复用整书换源候选链路，保持主触发路径与边界可观测。
+  - 验证：手工路径 `阅读页 -> 底部菜单长按朗读 -> 播放 -> 换源`（校验出现“换源”入口且点击后进入换源候选弹层）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `audio_play/menu_change_source` 的入口与触发语义，不改动书源规则、目录匹配与正文抓取链路。
+  - 完成 `T02-seq6`（`audio_play.xml / @+id/menu_login / 登录`）：对齐 legado `AudioPlayActivity` 的登录入口语义，在“播放”菜单补齐“登录”动作，并按 `loginUrl` 非空控制可见性；点击后复用书源登录主链路（`loginUi` 表单登录或网页登录）。
+  - 验证：手工路径 `阅读页(网络书且书源配置 loginUrl) -> 底部菜单长按朗读 -> 播放 -> 登录`（校验 `loginUrl` 非空时展示登录入口并可进入登录流程；`loginUrl` 为空时不展示该入口）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `audio_play/menu_login` 的入口显隐与触发语义，不改动书源解析、目录匹配与正文抓取链路。
+  - 完成 `T02-seq8`（`audio_play.xml / @+id/menu_edit_source / 编辑书源`）：对齐 legado `AudioPlayActivity` 的 `menu_edit_source` 语义，在“播放”菜单补齐“编辑书源”动作并复用阅读域书源编辑链路；点击后进入书源编辑页，取消返回不刷新，保存返回后刷新当前书源展示，对齐 legado `RESULT_OK -> viewModel.upSource()` 回调边界。
+  - 验证：手工路径 `阅读页(网络书) -> 底部菜单长按朗读 -> 播放 -> 编辑书源`（校验可进入编辑页、取消返回不刷新、保存返回后刷新当前书源展示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `audio_play/menu_edit_source` 的入口与回调边界，不改动书源解析、目录匹配与正文抓取链路。
+  - 完成 `T02-seq87`（`book_read_change_source.xml / @+id/menu_chapter_change_source / 单章换源`）：对齐 legado `menu_chapter_change_source -> ChangeChapterSourceDialog` 语义，将章节换源链路从“选源后自动匹配章节并立即替换”收敛为“先选候选书源 -> 再手动选择目标章节 -> 替换当前章节正文”；并移除章节换源成功 toast，保持成功分支静默回到阅读正文。
+  - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮长按 -> 单章换源 -> 选择候选书源 -> 选择目标章节`（校验当前章节正文被替换、章节索引不变、无扩展成功提示）；手工路径 `同链路 -> 取消章节选择`（校验取消不落库不改正文）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛单章换源交互与正文替换边界，不改动整书换源、书源落库与目录持久化链路。
+  - 完成 `T02-seq88`（`book_read_change_source.xml / @+id/menu_book_change_source / 整书换源`）：对齐 legado `menu_book_change_source -> ChangeBookSourceDialog` 语义，长按“换源”分支菜单该项文案由“书籍换源”收敛为 legado 同义“整书换源”；整书换源成功后保持 legado 同义静默成功边界，不再弹“已切换到：书源名”扩展提示。
+  - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮长按 -> 整书换源 -> 选择候选书源`（校验分支菜单文案为“整书换源”、切源后目录/正文刷新生效且无成功 toast）；手工路径 `阅读页(网络书) -> 顶部换源按钮点击`（校验默认点击与长按“整书换源”触发链路一致）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_book_change_source` 文案与成功反馈语义，不改动整书换源候选匹配、目录落库与正文抓取链路。
+  - 完成 `T02-seq210`（`content_select_action.xml / @+id/menu_search_content / 全文搜索`）：对齐 legado `TextActionMenu.menu_search_content -> openSearchActivity(selectedText)` 语义，将阅读页“搜索正文”从“仅当前章节命中”收敛为“跨章节全文命中列表 + 跨章节跳转”。搜索流程保持 legacy 边界：空关键词不触发；在线书仅检索已缓存正文；本地书检索全章节已加载正文；搜索过程中重复发起会取消旧任务并以新关键词结果覆盖。
+  - 验证：`flutter test test/reader_search_navigation_helper_test.dart`、`flutter test test/reader_top_menu_test.dart` 通过；手工路径 `阅读页 -> 搜索正文 -> 输入当前章节关键词` 与 `阅读页 -> 搜索正文 -> 输入其它章节关键词 -> 上一个/下一个`（校验结果面板展示“结果 x/y · 章节名”，可跨章节跳转并定位命中位置）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_search_content` 的命中范围与跳转语义，不改动书源解析、Cookie、目录刷新与换源链路。
+  - 完成 `T02-seq239`（`font_select.xml / @+id/menu_other / 其它目录`）：对齐 legado `FontSelectDialog.menu_other -> openFolder()` 语义，阅读页“选择字体”弹层补齐“其它目录”入口；点击后可重选字体目录并刷新 `ttf/otf` 候选列表。同步补齐目录路径与已选自定义字体路径持久化，保持“重进阅读后仍可回读并应用已选字体”的状态边界。
+  - 验证：`flutter test test/reader_top_menu_test.dart`、`flutter test test/reader_search_navigation_helper_test.dart`、`flutter test test/simple_reader_view_compile_test.dart` 通过；手工路径 `阅读页 -> 样式弹层 -> 字体 -> 其它目录 -> 选择目录`（校验候选字体列表刷新）、`阅读页 -> 样式弹层 -> 字体 -> 选择目录字体`（校验正文字体即时生效）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_other` 的目录重选与字体候选刷新语义，不改动书源解析、搜索/目录/正文抓取与换源链路。
+  - 完成 `T02-seq373`（`speak_engine.xml / @+id/menu_default / 导入默认规则`）：对齐 legado `SpeakEngineDialog.menu_default -> SpeakEngineViewModel.importDefault -> DefaultData.importDefaultHttpTTS` 语义，新增“语音管理 -> 朗读引擎”承载页与“导入默认规则”菜单动作；导入时仅替换默认规则（`id<0`）并保留用户自定义规则，默认规则数据源对齐 legado `defaultData/httpTTS.json`。
+  - 验证：手工路径 `设置 -> 语音管理 -> 右上角更多 -> 导入默认规则`（校验导入后“HTTP 朗读引擎”列表出现默认规则；重复导入不删除用户自定义规则）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐默认 HTTP 朗读规则导入语义与入口，不改动现有朗读执行链路。
+  - 完成 `T02-seq374`（`speak_engine.xml / @+id/menu_import_local / 本地导入`）：对齐 legado `SpeakEngineDialog.menu_import_local -> HandleFileContract(FILE, txt/json) -> ImportHttpTtsDialog` 语义，在“朗读引擎”页更多菜单补齐“本地导入”入口；补齐 `txt/json` 文件选择、导入候选预览与“新增/更新/已有”状态比对，默认仅勾选“新增/更新”项并支持全选/取消全选后批量导入，导入完成后即时刷新 HTTP 朗读引擎列表。
+  - 验证：`flutter test test/widget_test.dart`、`flutter test test/search_view_source_manage_action_test.dart` 通过；手工路径 `设置 -> 语音管理 -> 右上角更多 -> 本地导入 -> 选择 txt/json`（校验弹出“导入朗读引擎”列表、状态标签与默认勾选策略、导入后列表刷新）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_local` 本地导入与候选选择语义，不改动阅读朗读执行链路与书源规则结构。
+  - 完成 `T02-seq375`（`speak_engine.xml / @+id/menu_import_onLine / 网络导入`）：对齐 legado `SpeakEngineDialog.menu_import_onLine -> importAlert -> ImportHttpTtsDialog(url)` 语义，在“朗读引擎”页更多菜单补齐“网络导入”入口；点击后弹出 URL 输入与历史记录面板（支持点选回填与删除历史），确认后进入“导入朗读引擎”候选弹层，保持“新增/更新/已有”状态标记、默认仅勾选新增/更新、仅导入勾选项并在完成后刷新列表。
+  - 验证：手工路径 `设置 -> 语音管理 -> 右上角更多 -> 网络导入 -> 输入 URL -> 导入`（校验网络导入弹层、历史记录回填与删除、候选状态标记与默认勾选、确认后列表刷新、取消不落库）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_onLine` 网络导入入口与历史记录语义，不改动朗读执行链路与书源规则结构。
+  - 完成 `T02-seq376`（`speak_engine.xml / @+id/menu_export / 导出`）：对齐 legado `SpeakEngineDialog.menu_export -> HandleFileContract.EXPORT(fileData=httpTts.json)` 语义，在“朗读引擎”页更多菜单补齐“导出”入口；点击后导出当前 HTTP 朗读引擎列表到 `httpTts.json`（JSON 数组），取消导出不落盘；导出成功后弹出“导出成功”对话框并展示导出路径，支持“复制路径”动作。
+  - 验证：手工路径 `设置 -> 语音管理 -> 右上角更多 -> 导出`（校验默认文件名为 `httpTts.json`、文件内容为当前 HTTP 朗读引擎 JSON 数组、导出成功弹窗展示路径并支持复制路径）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export` 导出入口与成功反馈语义，不改动朗读执行链路与书源规则结构。
+  - 完成 `T02-seq378`（`speak_engine_edit.xml / @+id/menu_login / 登录`）：对齐 legado `HttpTtsEditDialog.menu_login` 语义，在 HTTP 朗读引擎编辑承载页补齐“更多 -> 登录”入口；点击后先按当前编辑表单回写规则，再按登录配置分流到登录页面（`loginUi` 非空进入表单登录，`loginUi` 为空进入网页登录）；`loginUrl` 为空时提示“登录url不能为空”并终止登录。
+  - 验证：手工路径 `设置 -> 语音管理 -> 点击 HTTP 朗读引擎条目 -> 编辑页右上角更多 -> 登录`（校验 `loginUrl` 为空时提示“登录url不能为空”；`loginUrl` 非空时先保存编辑输入再进入登录流程）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_login` 触发链路与保存时序，不改动朗读执行链路与导入导出规则结构。
+  - 完成 `T02-seq379`（`speak_engine_edit.xml / @+id/menu_show_login_header / 查看登录头`）：对齐 legado `HttpTtsEditDialog.menu_show_login_header` 语义，在 HTTP 朗读引擎编辑页“更多”菜单补齐“查看登录头”入口；点击后按当前规则 `id` 读取 `httpTts:<id>` 对应登录头缓存并弹出只读对话框，存在缓存时展示原始 JSON 文本，无缓存时仅显示标题“登录头”。
+  - 验证：手工路径 `设置 -> 语音管理 -> 点击 HTTP 朗读引擎条目 -> 编辑页右上角更多 -> 查看登录头`（校验弹窗标题“登录头”、有缓存时展示 JSON 文本、无缓存时仅显示标题、不会触发保存流程）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_show_login_header` 入口与展示语义，不改动朗读执行链路与导入导出规则结构。
+  - 完成 `T02-seq380`（`speak_engine_edit.xml / @+id/menu_del_login_header / 删除登录头`）：对齐 legado `HttpTtsEditDialog.menu_del_login_header -> dataFromView().removeLoginHeader()` 语义，在 HTTP 朗读引擎编辑页“更多”菜单补齐“删除登录头”入口；点击后按当前规则 `id` 映射 `httpTts:<id>` 键删除登录头缓存，不触发保存与登录流程，也不追加成功提示。
+  - 验证：手工路径 `设置 -> 语音管理 -> 点击 HTTP 朗读引擎条目 -> 编辑页右上角更多 -> 删除登录头 -> 查看登录头`（校验删除后“查看登录头”仅显示标题无缓存内容，且删除动作无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del_login_header` 删除入口与缓存清理语义，不改动朗读执行链路与导入导出规则结构。
+  - 完成 `T02-seq201`（`content_edit.xml / @+id/menu_save / 保存`）：对齐 legado `ContentEditDialog.menu_save -> save()` 的空正文边界，编辑正文保存链路由“无条件覆盖章节 content”收敛为“仅正文非空时落库覆盖”；保留保存后返回阅读页并即时重载当前章节的主流程。
+  - 验证：手工路径 `阅读页 -> 阅读操作 -> 编辑正文 -> 清空正文后点保存/关闭`（校验返回后当前章节正文不被空串覆盖）；手工路径 `阅读页 -> 阅读操作 -> 编辑正文 -> 修改正文后保存`（校验正文更新并即时生效）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_save` 的空内容保存边界，不改动书源解析、目录加载与正文抓取链路。
+  - 完成 `T02-seq202`（`content_edit.xml / @+id/menu_reset / 重置`）：对齐 legado `ContentEditDialog.menu_reset -> initContent(true)` 语义，重置链路由“失败时回退当前显示内容并弹窗提示”收敛为“先清缓存再重拉正文；失败静默保持当前编辑内容并记录日志”；同时补齐本地书重置时从本地文件回读章节正文，避免清缓存后无法恢复原文。
+  - 验证：手工路径 `阅读页(网络书) -> 阅读操作 -> 编辑正文 -> 重置`（校验重置后编辑框回填最新正文并刷新当前章节；重拉失败时无“重置失败”弹窗）；手工路径 `阅读页(本地 TXT/EPUB) -> 阅读操作 -> 编辑正文 -> 重置`（校验重置后从本地文件回填章节正文而不是回退当前显示内容）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_reset` 的重置来源与失败边界，不改动书源解析、目录加载与正文抓取主链路。
+  - 下一项：`seq204`（`content_search.xml / @+id/menu_enable_replace / 替换`）。
 
 ## 说明
 

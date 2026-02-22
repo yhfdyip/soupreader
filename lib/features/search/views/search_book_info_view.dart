@@ -2118,6 +2118,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       context: context,
       keyword: keyword,
       candidates: candidates,
+      loadTocEnabled: false,
     );
     if (selected == null) return;
     await _applySourceCandidate(selected);

@@ -577,15 +577,17 @@ class SourceImportExportService {
   }
 
   /// 导出书源到文件
-  Future<SourceExportFileResult> exportToFile(List<BookSource> sources) async {
+  Future<SourceExportFileResult> exportToFile(
+    List<BookSource> sources, {
+    String defaultFileName = 'bookSource.json',
+  }) async {
     try {
       final jsonString = exportToJson(sources);
 
       // 尝试保存文件
       final outputPath = await FilePicker.platform.saveFile(
         dialogTitle: '导出书源',
-        fileName:
-            'soupreader_sources_${DateTime.now().millisecondsSinceEpoch}.json',
+        fileName: defaultFileName,
         allowedExtensions: ['json'],
         type: FileType.custom,
       );
