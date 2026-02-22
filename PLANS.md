@@ -183,7 +183,17 @@
   - 完成 `T02-seq97`（`book_read_source.xml / menu_login / 登录`）：对齐 legado `menu_login -> SourceLoginActivity(key=bookSourceUrl)` 的实时触发语义，阅读页书源动作菜单点击“登录”后改为按 `bookSourceUrl` 回查当前书源再触发登录；`loginUrl` 为空保持入口隐藏，回查缺失统一提示“未找到书源”，避免 action sheet 打开期间使用过期书源快照。验证手工路径 `阅读页(网络书) -> 顶部书源名 -> 登录`（校验 `loginUrl` 为空不展示登录、非空点击可进入登录流程）。
   - 完成 `T02-seq98`（`book_read_source.xml / @+id/menu_chapter_pay / 购买`）：对齐 legado `menu_chapter_pay` 语义，书源动作菜单“购买”入口收敛为“仅 `loginUrl` 非空且当前章节 `isVip=true && isPay!=true` 显示”；点击后保留确认弹窗，确认分支改为按 `bookSourceUrl` 回查当前书源后执行 `payAction`，结果按 legado 分流为“绝对 URL 打开网页 / `isTrue` 返回值触发清缓存并刷新目录”；异常改为仅写日志 `执行购买操作出错`，移除扩展成功/失败提示。验证手工路径 `阅读页(网络书,VIP未购买章节) -> 顶部书源名 -> 章节购买 -> 确定`（校验显隐条件、URL 分支、truthy 分支与异常日志分支）。
   - 完成 `T02-seq99`（`book_read_source.xml / @+id/menu_edit_source / 编辑书源`）：对齐 legado `menu_edit_source -> openSourceEditActivity` 的实时触发语义，阅读页书源动作菜单点击“编辑书源”后改为按 `bookSourceUrl` 回查当前书源再打开编辑页；回查缺失统一提示“未找到书源”，避免 action sheet 打开期间使用过期书源快照；仅在编辑页保存返回时刷新阅读页书源显示，对齐 legado `RESULT_OK -> upBookSource/upMenuView` 回调边界。验证手工路径 `阅读页(网络书) -> 顶部书源名 -> 编辑书源`（校验可进入编辑页、弹层期间删除书源时提示“未找到书源”、取消返回不刷新、保存返回刷新书源显示）。
-  - 下一项：`seq100`（`book_read_source.xml / @+id/menu_disable_source / 禁用书源`）。
+  - 完成 `T02-seq100`（`book_read_source.xml / @+id/menu_disable_source / 禁用书源`）：对齐 legado `menu_disable_source -> disableSource()` 语义，阅读页书源动作菜单点击“禁用书源”后收敛为“按 `bookSourceUrl` 回查当前书源并直接写库禁用”；移除确认弹窗与“已禁用书源”扩展成功提示，避免偏离 legado 的直接执行路径；回查缺失统一提示“未找到书源”。验证手工路径 `阅读页(网络书) -> 顶部书源名 -> 禁用书源`（校验无确认弹窗、点击后书源立即变为禁用、无成功 toast）。
+  - 完成 `T02-seq164`（`book_toc.xml / @+id/menu_split_long_chapter / 拆分超长章节`）：目录页“更多”菜单补齐 legado 同义 `checkable` 入口“拆分超长章节”，仅本地 TXT 显示；点击后立即切换勾选态并触发本地 TXT 目录重建，目录列表实时刷新。验证手工路径 `书籍详情页 -> 查看目录 -> 更多 -> 拆分超长章节`（校验本地 TXT 显隐、勾选态同步、切换后目录即时刷新）。
+  - 完成 `T02-seq166`（`book_toc.xml / @+id/menu_use_replace / 使用替换`）：目录页“更多”菜单补齐 legado 同义 `checkable` 入口“使用替换”，标题固定且通过勾选态表达状态；点击后仅切换全局目录替换开关并即时重算目录展示标题，不追加成功提示；同时将该开关持久化为全局设置以保持跨页面一致。验证手工路径 `书籍详情页 -> 查看目录 -> 更多 -> 使用替换`（校验固定文案、勾选态切换、切换后目录标题即时刷新且无成功 toast）。
+  - 完成 `T02-seq167`（`book_toc.xml / @+id/menu_load_word_count / 加载字数`）：目录页“更多”菜单补齐 legado 同义 `checkable` 入口“加载字数”，标题固定并通过勾选态表达状态；新增全局持久化键 `toc_ui_load_word_count`（默认 `true`）并在详情目录页/阅读目录页统一读写。目录列表展示补齐“仅开关开启 + 章节存在可用字数字段时显示字数”的同义边界；当前实现先对齐已缓存章节的字数展示（按 legado 口径格式化为 `xx字/xx万字`），无可用字数字段时保持不显示。验证 `flutter test test/search_book_info_view_compile_test.dart`、`flutter test test/simple_reader_view_compile_test.dart`、`flutter test test/reader_catalog_sheet_test.dart` 通过；手工路径 `书籍详情页 -> 查看目录 -> 更多 -> 加载字数`（校验固定文案、勾选态切换、无成功提示、目录项字数按开关显隐）。
+  - 完成 `T02-seq69`（`book_read.xml / @+id/menu_add_bookmark / 添加书签`）：将阅读页“添加书签”从“有则删无则加”收敛为 legado 同义“弹出书签编辑框 -> 取消不保存 -> 确定新增”；阅读操作菜单与九宫格点击动作统一复用该流程，默认预填当前阅读页文本并记录章节进度，目录书签页点击书签后补齐按 `chapterPos` 恢复阅读进度。
+  - 验证：手工路径 `阅读页 -> 阅读操作 -> 添加书签`、`阅读页 -> 九宫格点击动作(添加书签)`、`阅读页 -> 目录/书签 -> 选择书签`（校验弹窗标题“书签”、章节标题展示、内容/备注输入框可编辑、取消不落库、确定后新增可见并可按进度跳转）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛书签交互语义与书签跳转进度恢复，未改动书源解析与网络链路。
+  - 完成 `T02-seq70`（`book_read.xml / @+id/menu_edit_content / 编辑内容`）：对齐 legado `menu_edit_content -> ContentEditDialog` 的异常与加载边界，补齐正文抓取失败时“记录日志 + 回退当前显示内容 + 保持入口可继续”的兜底语义，避免异常中断编辑链路；编辑页“重置”期间增加全屏遮罩与整页交互锁定，贴齐 legado `loadState` 下不可交互语义，同时保持关闭/返回自动保存行为不变。
+  - 验证：手工路径 `阅读页 -> 阅读操作 -> 编辑正文 -> 重置`、`阅读页 -> 阅读操作 -> 编辑正文 -> 关闭`、`阅读页 -> 阅读操作 -> 正文倒序`（校验重置期间全屏 loading 与交互锁定、关闭自动保存、正文抓取失败时提示“获取正文失败，已回退当前显示内容”且日志节点可观测）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_edit_content` 的异常兜底与重置加载态，不改动书源解析规则与网络请求参数。
+  - 下一项：`seq71`（`book_read.xml / @+id/menu_page_anim / 翻页动画（本书）`）。
 
 ## 说明
 

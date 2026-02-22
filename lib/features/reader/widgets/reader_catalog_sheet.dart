@@ -719,7 +719,6 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       case ReaderLegacyTocMenuAction.loadWordCount:
         setState(() => _loadWordCount = !_loadWordCount);
         widget.onLoadWordCountChanged?.call(_loadWordCount);
-        _showToast(_loadWordCount ? '已开启目录字数显示' : '已关闭目录字数显示');
         return;
       case ReaderLegacyTocMenuAction.tocRule:
         if (widget.onEditTocRule != null) {
@@ -793,6 +792,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         final isCurrent = originalIndex == widget.currentChapterIndex;
         final hasCache =
             chapter.isDownloaded && (chapter.content?.isNotEmpty ?? false);
+        final wordCount = _resolveChapterWordCountLabel(chapter);
 
         return GestureDetector(
           key: _chapterKeyFor(originalIndex),
@@ -838,6 +838,17 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (wordCount != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(
+                      wordCount,
+                      style: TextStyle(
+                        color: _textSubtle,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
                 if (hasCache)
                   Padding(
                     padding: EdgeInsets.only(right: 8),
@@ -871,6 +882,21 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         );
       },
     );
+  }
+
+  String? _resolveChapterWordCountLabel(Chapter chapter) {
+    if (!_loadWordCount) return null;
+    final content = chapter.content;
+    if (content == null || content.isEmpty) return null;
+    final words = content.length;
+    if (words <= 0) return null;
+    if (words > 10000) {
+      final value = (words / 10000.0)
+          .toStringAsFixed(1)
+          .replaceFirst(RegExp(r'\.0$'), '');
+      return '$value万字';
+    }
+    return '$words字';
   }
 
   Widget _buildBookmarkList() {

@@ -1562,10 +1562,98 @@
     - 交互触发：已同义（仅在编辑页保存返回时刷新阅读页书源显示，取消返回不刷新，对齐 legado `RESULT_OK` 回调边界）。
     - 验证：手工路径 `阅读页(网络书) -> 顶部书源名 -> 编辑书源`（校验进入编辑页、删除后回查提示、取消不刷新、保存后刷新）。
   - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_edit_source` 触发与回调边界，不改动书源保存规则与正文链路。
-  - 下一项：`seq100`（`book_read_source.xml / @+id/menu_disable_source / 禁用书源`）。
+  - 已完成 `P3-seq100`：`book_read_source.xml / @+id/menu_disable_source / 禁用书源`。
+  - `P3-seq100` 差异点清单（实施前）：
+    - legado `ReadMenu.menu_disable_source` 点击后直接回调 `disableSource()`，`ReadBookViewModel.disableSource()` 仅执行“将当前书源 `enabled=false` 写库”链路，不弹确认、不弹成功提示。
+    - Flutter 阅读页“禁用书源”当前实现为“确认弹窗 + 确认后提示‘已禁用书源’”，状态流转与 legado 直接执行语义不一致。
+    - Flutter 当前禁用动作直接使用 action sheet 打开时的 `BookSource` 快照调用 `updateSource(copyWith(enabled:false))`；在弹层期间书源被删除时，`updateSource` 的 upsert 语义可能把已删书源重新写回，偏离实时状态边界。
+  - `P3-seq100` 逐项对照清单（实施后）：
+    - 入口：已同义（书源动作弹层保留一级“禁用书源”入口）。
+    - 状态：已同义（点击后直接执行禁用写库，不再弹确认对话框，不再追加成功提示）。
+    - 异常：已同义（执行前按 `bookSourceUrl` 回查当前书源，缺失时提示“未找到书源”，避免使用过期快照写回已删除记录）。
+    - 文案：已同义（入口文案保持“禁用书源”，移除“确定禁用/已禁用书源”扩展文案）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载书源动作菜单，平台样式差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后按 `bookSourceUrl` 回查并写库 `enabled=false`，等价 legado `menu_disable_source -> disableSource()` 的直接触发语义）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部书源名 -> 禁用书源`（校验无确认弹窗、点击后立即禁用、无成功 toast）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_disable_source` 的触发与状态边界，不改动书源规则结构与阅读正文链路。
+  - 已完成 `P2-seq164`：`book_toc.xml / @+id/menu_split_long_chapter / 拆分超长章节`。
+  - `P2-seq164` 差异点清单（实施前）：
+    - legado `TocActivity` 在目录“更多”菜单 `menu_group_text` 下提供 `menu_split_long_chapter`（固定标题、checkable 勾选态），并且仅本地 TXT 显示；Flutter 目录页当前缺失该入口。
+    - legado 点击 `menu_split_long_chapter` 后会立即执行 `upBookAndToc(book)` 重建本地 TXT 目录；Flutter 仅在详情页提供“分割长章节”入口，目录页无法原位切换并即时生效。
+  - `P2-seq164` 逐项对照清单（实施后）：
+    - 入口：已同义（目录页“更多”菜单补齐“拆分超长章节”，层级与 legado 一致）。
+    - 状态：已同义（仅本地 TXT 显示该项，标题固定“拆分超长章节”，通过勾选态表达开关）。
+    - 异常：已同义（切换后沿用本地 TXT 目录重建链路，失败继续走既有可观测错误提示）。
+    - 文案：已同义（目录菜单文案收敛为“拆分超长章节”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载目录菜单，平台样式差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后立即切换勾选态并触发本地 TXT 目录重建，目录列表实时刷新，对齐 legado `menu_split_long_chapter -> upBookAndToc` 的即时生效语义）。
+    - 验证：手工路径 `书籍详情页 -> 查看目录 -> 更多 -> 拆分超长章节`（校验仅本地 TXT 显示、勾选态切换生效、目录列表即时刷新）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐目录页 `menu_split_long_chapter` 入口与触发链路，不改动网络书目录解析规则。
+  - 已完成 `P2-seq166`：`book_toc.xml / @+id/menu_use_replace / 使用替换`。
+  - `P2-seq166` 差异点清单（实施前）：
+    - legado `TocActivity` 在目录菜单 `menu_group_toc` 中提供 `menu_use_replace`（固定标题“使用替换”、checkable 勾选态），并在点击时仅切换 `AppConfig.tocUiUseReplace`。
+    - legado 点击后执行 `chapterListCallBack.clearDisplayTitle() -> upChapterList(searchKey)`，目录标题会即时按开关重算；当前 Flutter 目录页缺失该入口，标题始终应用替换规则，缺少目录级开关语义。
+    - legado `tocUiUseReplace` 为全局持久化偏好；当前 Flutter 无对应持久化键，目录替换开关无法跨页面保持一致。
+  - `P2-seq166` 逐项对照清单（实施后）：
+    - 入口：已同义（目录页“更多”菜单补齐“使用替换”checkable 入口，层级与 legado 一致）。
+    - 状态：已同义（标题固定“使用替换”，通过勾选态表达开关，不引入“开/关”动态文案）。
+    - 异常：已同义（切换后仅重算目录展示标题，单条标题处理失败时回退原始标题，不新增静默失败分支）。
+    - 文案：已同义（菜单文案固定“使用替换”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载目录菜单，视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后切换全局 `tocUiUseReplace` 并即时刷新目录展示标题，等价 legado `menu_use_replace -> clearDisplayTitle -> upChapterList` 状态流转）。
+    - 验证：手工路径 `书籍详情页 -> 查看目录 -> 更多 -> 使用替换`（校验固定文案+勾选态切换、切换后目录标题即时刷新、无成功提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐目录页 `menu_use_replace` 入口与标题展示开关，不改动书源规则解析与正文读取链路。
+  - 已完成 `P2-seq167`：`book_toc.xml / @+id/menu_load_word_count / 加载字数`。
+  - `P2-seq167` 差异点清单（实施前）：
+    - legado `TocActivity` 在目录菜单 `menu_group_toc` 中提供 `menu_load_word_count`（固定标题“加载字数”、checkable 勾选态），并在点击时仅切换 `AppConfig.tocCountWords`，随后调用 `chapterListCallBack.upAdapter()` 刷新目录适配器。
+    - legado `tocCountWords` 为全局持久化偏好，默认值 `true`；当前 Flutter 缺失对应持久化键，目录字数开关无法跨页面保持一致。
+    - 当前 Flutter 详情目录页“更多”菜单缺失“加载字数”入口，且目录列表未接入“按开关显示字数”的展示链路。
+  - `P2-seq167` 逐项对照清单（实施后）：
+    - 入口：已同义（目录页“更多”菜单补齐“加载字数”checkable 入口，层级与 legado 一致）。
+    - 状态：已同义（标题固定“加载字数”，通过勾选态表达开关；全局键 `toc_ui_load_word_count` 默认 `true`，与 legado `tocCountWords` 默认语义一致）。
+    - 异常：已同义（切换动作仅刷新目录展示状态；无可用字数字段时保持不显示且不报错）。
+    - 文案：已同义（菜单文案固定“加载字数”，未引入“已开启/已关闭”扩展提示）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载目录菜单，平台样式差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后切换全局 `toc_ui_load_word_count` 并即时刷新目录项字数显隐，等价 legado `menu_load_word_count -> upAdapter` 的刷新语义）。
+    - 验证：`flutter test test/search_book_info_view_compile_test.dart`、`flutter test test/simple_reader_view_compile_test.dart`、`flutter test test/reader_catalog_sheet_test.dart` 通过；手工路径 `书籍详情页 -> 查看目录 -> 更多 -> 加载字数`（校验固定文案+勾选态切换、无成功提示、目录项字数按开关显隐）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐目录页 `menu_load_word_count` 开关与字数展示链路，不改动书源规则结构。
+  - 已完成 `P3-seq69`：`book_read.xml / @+id/menu_add_bookmark / 添加书签`。
+  - `P3-seq69` 差异点清单（实施前）：
+    - legado `ReadBookActivity.menu_add_bookmark -> addBookmark()` 固定走“创建书签草稿并弹出 `BookmarkDialog` 编辑”语义；当前 Flutter 入口实现为 `_toggleBookmark()`，会出现“有则删无则加”的额外分支。
+    - legado `ReadView.click(action=7)` 也复用 `addBookmark()`；当前 Flutter 九宫格点击动作同样复用了 `_toggleBookmark()`，触发语义与 legado 不同。
+    - legado 书签跳转依赖 `chapterPos` 恢复阅读位置；当前 Flutter 目录书签点击仅跳章，不使用 `chapterPos`。
+  - `P3-seq69` 逐项对照清单（实施后）：
+    - 入口：已同义（阅读操作菜单 `menu_add_bookmark` 与九宫格点击动作 `addBookmark` 均统一接入 `_openAddBookmarkDialog()`）。
+    - 状态：已同义（弹窗标题固定“书签”，默认展示章节标题并提供“内容/备注”输入；取消不落库，确定才新增书签）。
+    - 异常：已同义（新增失败保持可观测提示“书签操作失败：<error>”，不引入静默失败分支）。
+    - 文案：已同义（“书签 / 内容 / 备注 / 取消 / 确定”）。
+    - 排版：已同义（使用 `CupertinoAlertDialog` 承载章节标题 + 双输入框 + 操作按钮，平台样式差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（目录书签点击新增 `chapterPos -> targetChapterProgress` 恢复路径，按书签进度回跳章节内位置）。
+    - 验证：手工路径 `阅读页 -> 阅读操作 -> 添加书签`、`阅读页 -> 九宫格点击动作(添加书签)`、`阅读页 -> 目录/书签 -> 选择书签`（校验弹窗展示、取消不落库、确定新增可见、书签跳转按进度恢复）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛书签交互与进度恢复语义，未改动书源解析与五段链路网络行为。
+  - 已完成 `P3-seq70`：`book_read.xml / @+id/menu_edit_content / 编辑内容`。
+  - `P3-seq70` 差异点清单（实施前）：
+    - legado `ReadBookActivity.menu_edit_content -> showDialogFragment(ContentEditDialog())` 打开编辑页后由 `ContentEditViewModel.loadStateLiveData` 统一驱动加载态；当前 Flutter 虽已具备编辑正文入口，但“重置正文”仅在操作区显示小型 loading，未对整体编辑区域做一致的交互锁定。
+    - legado `ContentEditViewModel.initContent` 通过 `execute` 包裹正文抓取异常，失败后不会中断编辑入口；当前 Flutter `_resolveCurrentChapterRawContentForMenu` 直接 await 抓取，异常会向上冒泡并打断“编辑正文/正文倒序”菜单链路。
+  - `P3-seq70` 逐项对照清单（实施后）：
+    - 入口：已同义（阅读操作菜单 `menu_edit_content` 继续走 `_openContentEditFromMenu()`，保持一级入口层级与 legado 一致）。
+    - 状态：已同义（编辑页 `reset` 期间新增全屏遮罩 + `CupertinoActivityIndicator`，并通过 `IgnorePointer` 锁定整页交互，等价 legado dialog 的加载中不可编辑语义）。
+    - 异常：已同义（正文抓取失败统一记录 `ExceptionLogService` 节点 `reader.menu.<action>.fetch_content_failed`，并回退当前显示内容继续流程；`edit_content/reverse_content` 场景补齐可观测提示“获取正文失败，已回退当前显示内容”）。
+    - 文案：已同义（菜单文案“编辑正文”与编辑页动作文案“关闭/保存/重置/复制全文”保持不变，未引入扩展成功提示）。
+    - 排版：已同义（继续使用 `CupertinoPageScaffold` 全屏编辑承载；新增遮罩仅用于加载态，属于 `Shadcn + Cupertino` 平台差异允许范围）。
+    - 交互触发：已同义（返回/关闭仍自动回传正文并落库；重置流程保持“清理缓存 -> 重新抓取 -> 回写章节 -> 重载当前章节”主链路）。
+    - 验证：手工路径 `阅读页 -> 阅读操作 -> 编辑正文 -> 重置`（校验重置期间全屏遮罩与不可交互）；`阅读页 -> 阅读操作 -> 编辑正文 -> 关闭`（校验关闭自动保存）；`阅读页 -> 阅读操作 -> 正文倒序`（校验正文抓取异常时仍可回退当前内容并弹出提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛正文编辑菜单的异常兜底与加载态交互，不改动书源规则、Cookie 与五段链路数据模型。
+  - 下一项：`seq71`（`book_read.xml / @+id/menu_page_anim / 翻页动画（本书）`）。
 
 ## Surprises & Discoveries
 
+- `2026-02-22`：对照 legado `ContentEditDialog + ContentEditViewModel` 时确认 `menu_edit_content` 的风险点不在入口缺失，而在“正文抓取异常不能中断编辑链路”；Flutter 端已将 `_resolveCurrentChapterRawContentForMenu` 收敛为“异常记录 + 回退当前内容 + 可观测提示”。
+- `2026-02-22`：`P3-seq69` 对照 legado 时确认“添加书签”在阅读菜单和九宫格点击动作都必须走同一“弹窗确认后新增”路径；Flutter 端原“有则删无则加”会把 legado 中不存在的删除分支暴露到一级入口，已统一收敛并补齐按 `chapterPos` 恢复书签跳转进度。
+- `2026-02-22`：对照 legado `TocActivity + ChapterListAdapter` 时确认 `menu_load_word_count` 的核心不在“新增字数计算”，而在“全局 checkable 开关 + 目录适配器刷新”；Flutter 端先收敛开关语义与持久化默认值，再在已缓存章节上补齐字数显隐，保证在现有章节模型下尽量等价。
+- `2026-02-22`：对照 legado `TocActivity` 时确认 `menu_use_replace` 不是“阅读替换规则开关”的别名，而是“目录展示层开关 + 全局持久化”的独立语义；本序号已将目录标题展示收敛为 `tocUiUseReplace && 书籍启用替换规则` 组合判断，并在目录页点击后即时重算标题。
+- `2026-02-22`：对照 legado `TocActivity` 时确认 `menu_split_long_chapter` 的关键不是“可改设置”，而是“目录页 checkable 入口 + 切换后立即重建目录”的组合语义；若只保留详情页入口会造成目录页状态流转缺口。本序号已补齐目录页入口并复用本地 TXT 即时重建链路。
+- `2026-02-22`：`P3-seq100` 对照 legado 时确认“禁用书源”核心风险不在开关写库，而在 Flutter `updateSource` 的 upsert 行为会放大弹层快照副作用：若弹层期间书源已被删除，直接用快照写库可能把记录重建；本序号已收敛为按 `bookSourceUrl` 实时回查后再禁用。
 - `2026-02-22`：`P3-seq99` 对照 legado 时确认“编辑书源”与“登录/购买”属于同类时序边界：若弹层打开后书源被删除，继续使用弹层快照会偏离 legado 的实时回查语义；本序号已统一改为按 `bookSourceUrl` 回查后再触发编辑。
 - `2026-02-22`：`P3-seq98` 对照 legado `String?.isTrue()` 时确认购买动作的“成功判定”不是仅 `true/1/ok`，而是“非空且不属于 `false|no|not|0`”即视为真；Flutter 端已按该口径收敛，避免 `payAction` 返回自定义 truthy 字符串时被误判为失败。
 - `2026-02-22`：`P3-seq97` 对照 legado 时确认阅读页“登录”动作与书源管理条目登录存在同类边界风险：若弹层打开后书源状态变化，直接使用快照对象会偏离“按当前书源状态触发”的语义；本序号已统一为按 `bookSourceUrl` 回查后再触发登录链路。
@@ -1654,6 +1742,7 @@
 
 ## Decision Log
 
+- `2026-02-22` 决策：`P3-seq69` 以 legado `ReadBookActivity.addBookmark()` 为准，统一采用“打开书签编辑弹窗并确认后新增”语义，不在该入口保留“已存在即删除”扩展分支；同时在目录书签跳转链路接入 `chapterPos` 进度恢复，确保添加与回跳语义闭环。
 - `2026-02-21` 决策 1：执行粒度下沉到单项（seq），避免模块级“完成但漏项”。
 - `2026-02-21` 决策 2：执行方式固定串行（不并行），优先稳定推进与可追溯。
 - `2026-02-21` 决策 3：基于需求“挨个处理所有功能”，全功能域纳入计划，不再仅限核心链路。
@@ -1755,12 +1844,23 @@
 - `2026-02-22` 决策 99：`P3-seq97` 采用“URL 回查优先”策略：阅读页 `menu_login` 点击后不再直接使用 action sheet 打开时的书源快照，而是按 `bookSourceUrl` 回查当前书源后再触发登录；缺失时提示“未找到书源”，以对齐 legado `SourceLoginActivity(key=bookSourceUrl)` 的实时状态边界并避免过期快照误触发。
 - `2026-02-22` 决策 100：`P3-seq98` 采用“显隐边界收敛 + 日志优先可观测”策略：`menu_chapter_pay` 显隐严格收敛为 `loginUrl && isVip && !isPay`，确认后按 `bookSourceUrl` 回查当前书源执行 `payAction`；结果分流对齐 legado `isAbsUrl / isTrue` 语义，异常统一写日志 `执行购买操作出错`，不追加扩展 toast。
 - `2026-02-22` 决策 101：`P3-seq99` 采用“实时回查 + 保存后刷新”策略：`menu_edit_source` 点击后不再使用弹层快照直接打开编辑页，而是按 `bookSourceUrl` 回查当前书源后再触发；仅在编辑页保存返回时刷新阅读页书源显示，取消返回不刷新，以对齐 legado `RESULT_OK -> upBookSource/upMenuView` 回调边界。
+- `2026-02-22` 决策 102：`P3-seq100` 采用“直接执行同义化 + 回查防重建”策略：移除禁用确认弹窗与成功 toast，动作收敛为点击即按 `bookSourceUrl` 回查当前书源并写库 `enabled=false`；回查缺失时仅提示“未找到书源”，避免使用弹层快照触发 upsert 重建已删除书源。
+- `2026-02-22` 决策 103：`P2-seq164` 采用“目录页 checkable 入口补齐 + 即时重建复用”策略：在目录页“更多”菜单补齐 `menu_split_long_chapter`，标题固定“拆分超长章节”并以勾选态表达状态；点击后复用本地 TXT 重建目录链路，保持“切换即生效”而不新增并行刷新实现。
+- `2026-02-22` 决策 104：`P2-seq166` 采用“全局目录开关持久化 + 展示层即时重算”策略：目录页“更多”菜单补齐 `menu_use_replace` 固定文案与勾选态，点击后仅切换全局 `tocUiUseReplace` 并立即重算目录展示标题，不追加成功提示；标题处理链路收敛为 `tocUiUseReplace && 书籍启用替换规则`，以对齐 legado 的目录展示边界。
+- `2026-02-22` 决策 105：`P2-seq167` 采用“开关语义优先 + 现有数据渐进承载”策略：先补齐 `menu_load_word_count` 的 checkable 入口、全局持久化默认值（`true`）与目录即时刷新，再基于现有章节缓存内容补齐字数展示（`xx字/xx万字`）；不引入章节表结构变更，避免在当前序号扩大到跨层数据迁移。
+- `2026-02-22` 决策 106：`P3-seq70` 采用“异常兜底优先 + 加载态交互锁定”策略：保持 `menu_edit_content` 入口与保存链路不变，仅将正文抓取异常收敛为“记录日志并回退当前显示内容”以避免中断菜单流程；同时在编辑页 `reset` 期间增加全屏遮罩与整页禁用，贴齐 legado `loadState` 的不可交互语义。
 
 ## Outcomes & Retrospective
 
+- `2026-02-22`：完成 `P3-seq70`（`menu_edit_content`）迁移闭环，已补齐正文抓取失败的可观测兜底（日志 + 回退 + 提示）以及编辑页重置期间全屏加载锁定；队列推进到下一项 `seq71(menu_page_anim)`。
+- `2026-02-22`：完成 `P3-seq69`（`menu_add_bookmark`）迁移闭环，阅读菜单与九宫格动作均收敛为“弹窗确认后新增”同义语义，并补齐目录书签按 `chapterPos` 恢复进度；队列推进到下一项 `seq70(menu_edit_content)`。
 - `2026-02-21`：完成 P1（主入口与导航）`21/21` 项逐项迁移与验收，全部为 `done`，无 `blocked` 项；阶段内所有入口均补齐了可复现验证证据。
 - `2026-02-22`：完成 `P3-seq95`（`menu_refresh_after`）迁移闭环，已补齐差异清单、逐项对照与可复现验证证据；队列推进到下一项 `seq96(menu_refresh_all)`。
 - `2026-02-22`：完成 `P3-seq96`（`menu_refresh_all`）迁移闭环，已补齐“首章起全量清缓存 + 无书源回落当前章节重载”的独立验证证据；队列推进到下一项 `seq97(menu_login)`。
 - `2026-02-22`：完成 `P3-seq97`（`menu_login`）迁移闭环，已补齐“按 `bookSourceUrl` 回查当前书源后触发登录”的实时状态边界证据；队列推进到下一项 `seq98(menu_chapter_pay)`。
 - `2026-02-22`：完成 `P3-seq98`（`menu_chapter_pay`）迁移闭环，已补齐“显隐条件、`isTrue` 判定与异常日志可观测”的同义证据；队列推进到下一项 `seq99(menu_edit_source)`。
 - `2026-02-22`：完成 `P3-seq99`（`menu_edit_source`）迁移闭环，已补齐“按 `bookSourceUrl` 实时回查再编辑 + 仅保存返回刷新”的同义证据；队列推进到下一项 `seq100(menu_disable_source)`。
+- `2026-02-22`：完成 `P3-seq100`（`menu_disable_source`）迁移闭环，已补齐“点击即禁用、无确认弹窗/无成功提示 + 按 `bookSourceUrl` 回查防止快照重建”的同义证据；队列推进到下一项 `seq164(menu_split_long_chapter)`。
+- `2026-02-22`：完成 `P2-seq164`（`menu_split_long_chapter`）迁移闭环，已补齐目录页 `checkable` 入口、仅本地 TXT 显示与切换后即时重建目录的同义证据；队列推进到下一项 `seq166(menu_use_replace)`。
+- `2026-02-22`：完成 `P2-seq166`（`menu_use_replace`）迁移闭环，已补齐目录页“使用替换”checkable 入口、全局持久化与目录标题即时重算的同义证据；队列推进到下一项 `seq167(menu_load_word_count)`。
+- `2026-02-22`：完成 `P2-seq167`（`menu_load_word_count`）迁移闭环，已补齐目录页“加载字数”checkable 入口、全局持久化默认值与目录即时刷新链路，并在已缓存章节上补齐字数显隐（`xx字/xx万字`）证据；队列推进到下一项 `seq69(menu_add_bookmark)`。

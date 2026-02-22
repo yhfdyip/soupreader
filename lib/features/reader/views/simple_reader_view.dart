@@ -188,7 +188,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   final Map<String, bool> _chapterPayByUrl = <String, bool>{};
   final Map<String, bool> _chapterSameTitleRemovedById = <String, bool>{};
   bool _tocUiUseReplace = false;
-  bool _tocUiLoadWordCount = false;
+  bool _tocUiLoadWordCount = true;
   bool _tocUiSplitLongChapter = false;
   bool _useReplaceRule = true;
   bool _reSegment = false;
@@ -429,6 +429,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
     _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
+    _tocUiUseReplace = _settingsService.getTocUiUseReplace();
+    _tocUiLoadWordCount = _settingsService.getTocUiLoadWordCount();
     _webDavService = WebDavService();
     _settings = _settingsService.readingSettings.sanitize();
     _useReplaceRule = _settingsService.getBookUseReplaceRule(
@@ -2780,7 +2782,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _previousChapter();
         break;
       case ClickAction.addBookmark:
-        _toggleBookmark();
+        unawaited(_openAddBookmarkDialog());
         break;
       case ClickAction.openChapterList:
         _showChapterList();
@@ -6510,6 +6512,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final initialRawContent = await _resolveCurrentChapterRawContentForMenu(
       chapter: chapter,
       chapterIndex: chapterIndex,
+      actionTag: 'edit_content',
+      showFetchFailureToast: true,
     );
     if (!mounted) return;
 
@@ -6575,6 +6579,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final resetRawContent = await _resolveCurrentChapterRawContentForMenu(
       chapter: cleared,
       chapterIndex: chapterIndex,
+      actionTag: 'edit_content_reset',
     );
     if (!mounted) {
       return resetRawContent;
@@ -6923,6 +6928,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Future<String> _resolveCurrentChapterRawContentForMenu({
     required Chapter chapter,
     required int chapterIndex,
+    required String actionTag,
+    bool showFetchFailureToast = false,
   }) async {
     var rawContent = chapter.content ?? '';
     if (rawContent.trim().isNotEmpty) {
@@ -6935,12 +6942,33 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         (book == null || !book.isLocal) &&
         _resolveActiveSourceUrl(book).isNotEmpty;
     if (canFetchFromSource) {
-      rawContent = await _fetchChapterContent(
-        chapter: chapter,
-        index: chapterIndex,
-        book: book,
-        showLoading: true,
-      );
+      try {
+        rawContent = await _fetchChapterContent(
+          chapter: chapter,
+          index: chapterIndex,
+          book: book,
+          showLoading: true,
+        );
+      } catch (error, stackTrace) {
+        ExceptionLogService().record(
+          node: 'reader.menu.$actionTag.fetch_content_failed',
+          message: '阅读页菜单正文拉取失败',
+          error: error,
+          stackTrace: stackTrace,
+          context: <String, dynamic>{
+            'bookId': widget.bookId,
+            'bookTitle': widget.bookTitle,
+            'chapterId': chapter.id,
+            'chapterIndex': chapterIndex,
+            'chapterUrl': chapterUrl,
+            'actionTag': actionTag,
+            'currentSourceUrl': _resolveActiveSourceUrl(book),
+          },
+        );
+        if (showFetchFailureToast && mounted) {
+          _showToast('获取正文失败，已回退当前显示内容');
+        }
+      }
     }
     if (rawContent.trim().isNotEmpty) {
       return rawContent;
@@ -6960,6 +6988,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final rawContent = await _resolveCurrentChapterRawContentForMenu(
       chapter: chapter,
       chapterIndex: chapterIndex,
+      actionTag: 'reverse_content',
+      showFetchFailureToast: true,
     );
     if (rawContent.trim().isEmpty) {
       _showToast('当前章节暂无可倒序的正文');
@@ -7498,7 +7528,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         await _showCharsetConfigFromMenu();
         return;
       case ReaderLegacyReadMenuAction.addBookmark:
-        await _toggleBookmark();
+        await _openAddBookmarkDialog();
         return;
       case ReaderLegacyReadMenuAction.editContent:
         await _openContentEditFromMenu();
@@ -7865,7 +7895,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             isDestructiveAction: true,
             onPressed: () async {
               Navigator.pop(sheetContext);
-              await _disableSourceFromReader(source);
+              await _disableSourceFromReader(source.bookSourceUrl);
             },
             child: const Text('禁用书源'),
           ),
@@ -8144,33 +8174,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     setState(() {});
   }
 
-  Future<void> _disableSourceFromReader(BookSource source) async {
-    final confirmed = await showCupertinoDialog<bool>(
-          context: context,
-          builder: (dialogContext) => CupertinoAlertDialog(
-            title: const Text('禁用书源'),
-            content: Text('\n确定禁用 ${source.bookSourceName}？'),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('取消'),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('禁用'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-
-    await _sourceRepo.updateSource(
-      source.copyWith(enabled: false),
-    );
-    if (!mounted) return;
-    _showToast('已禁用书源：${source.bookSourceName}');
+  Future<void> _disableSourceFromReader(String sourceUrl) async {
+    final source = _sourceRepo.getSourceByUrl(sourceUrl);
+    if (source == null) {
+      _showToast('未找到书源');
+      return;
+    }
+    await _sourceRepo.updateSource(source.copyWith(enabled: false));
   }
 
   Book _buildCurrentBookForSourceSwitch() {
@@ -12160,34 +12170,147 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  /// 切换当前位置的书签
-  Future<void> _toggleBookmark() async {
+  /// 以 legado 同义语义添加书签：打开编辑弹窗，确认后落库。
+  Future<void> _openAddBookmarkDialog() async {
+    final draft = _buildBookmarkDraft();
+    if (draft == null || !mounted) return;
+    final result = await _showBookmarkEditorDialog(draft);
+    if (result == null) return;
+
     try {
-      if (_hasBookmarkAtCurrent) {
-        // 删除书签
-        final bookmark =
-            _bookmarkRepo.getBookmarkAt(widget.bookId, _currentChapterIndex, 0);
-        if (bookmark != null) {
-          await _bookmarkRepo.removeBookmark(bookmark.id);
-        }
-      } else {
-        // 添加书签
-        await _bookmarkRepo.addBookmark(
-          bookId: widget.bookId,
-          bookName: widget.bookTitle,
-          bookAuthor: _bookAuthor,
-          chapterIndex: _currentChapterIndex,
-          chapterTitle: _currentTitle,
-          chapterPos: 0,
-          content:
-              _currentContent.substring(0, _currentContent.length.clamp(0, 50)),
-        );
-      }
+      await _bookmarkRepo.addBookmark(
+        bookId: widget.bookId,
+        bookName: widget.bookTitle,
+        bookAuthor: _bookAuthor,
+        chapterIndex: _currentChapterIndex,
+        chapterTitle: draft.chapterTitle,
+        chapterPos: draft.chapterPos,
+        content: _composeBookmarkPreview(
+          bookText: result.bookText,
+          note: result.note,
+        ),
+      );
       _updateBookmarkStatus();
     } catch (e) {
       if (!mounted) return;
       _showToast('书签操作失败：$e');
     }
+  }
+
+  _ReaderBookmarkDraft? _buildBookmarkDraft() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return null;
+    }
+    final fallbackTitle = _chapters[_currentChapterIndex].title.trim();
+    final chapterTitle =
+        _currentTitle.trim().isNotEmpty ? _currentTitle.trim() : fallbackTitle;
+    return _ReaderBookmarkDraft(
+      chapterTitle: chapterTitle.isEmpty
+          ? '第 ${_currentChapterIndex + 1} 章'
+          : chapterTitle,
+      chapterPos: _encodeCurrentBookmarkChapterPos(),
+      pageText: _resolveCurrentBookmarkText(),
+    );
+  }
+
+  Future<_ReaderBookmarkEditResult?> _showBookmarkEditorDialog(
+    _ReaderBookmarkDraft draft,
+  ) async {
+    final bookTextController = TextEditingController(text: draft.pageText);
+    final noteController = TextEditingController();
+    final result = await showCupertinoDialog<_ReaderBookmarkEditResult>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('书签'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              draft.chapterTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            CupertinoTextField(
+              controller: bookTextController,
+              placeholder: '内容',
+              maxLines: 3,
+            ),
+            const SizedBox(height: 8),
+            CupertinoTextField(
+              controller: noteController,
+              placeholder: '备注',
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.pop(
+                dialogContext,
+                _ReaderBookmarkEditResult(
+                  bookText: bookTextController.text,
+                  note: noteController.text,
+                ),
+              );
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    bookTextController.dispose();
+    noteController.dispose();
+    return result;
+  }
+
+  String _resolveCurrentBookmarkText() {
+    final pageText = _pageFactory.curPage.trim();
+    if (pageText.isNotEmpty) {
+      return pageText;
+    }
+    final content = _currentContent.trim();
+    if (content.isEmpty) {
+      return '';
+    }
+    final progress = _getChapterProgress().clamp(0.0, 1.0).toDouble();
+    final center =
+        (content.length * progress).round().clamp(0, content.length).toInt();
+    final start = (center - 90).clamp(0, content.length).toInt();
+    final end = (start + 180).clamp(0, content.length).toInt();
+    return content.substring(start, end).trim();
+  }
+
+  String _composeBookmarkPreview({
+    required String bookText,
+    required String note,
+  }) {
+    final trimmedText = bookText.trim();
+    final trimmedNote = note.trim();
+    if (trimmedText.isEmpty) {
+      return trimmedNote;
+    }
+    if (trimmedNote.isEmpty) {
+      return trimmedText;
+    }
+    return '$trimmedText\n\n笔记：$trimmedNote';
+  }
+
+  int _encodeCurrentBookmarkChapterPos() {
+    return (_getChapterProgress().clamp(0.0, 1.0) * 10000).round();
+  }
+
+  double _decodeBookmarkChapterProgress(int chapterPos) {
+    return (chapterPos / 10000.0).clamp(0.0, 1.0).toDouble();
   }
 
   /// 更新书签状态
@@ -12505,7 +12628,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         },
         onBookmarkSelected: (bookmark) {
           Navigator.pop(popupContext);
-          _loadChapter(bookmark.chapterIndex, restoreOffset: true);
+          final progress = _decodeBookmarkChapterProgress(bookmark.chapterPos);
+          _loadChapter(
+            bookmark.chapterIndex,
+            restoreOffset: true,
+            targetChapterProgress: progress,
+          );
         },
         onDeleteBookmark: (bookmark) async {
           await _bookmarkRepo.removeBookmark(bookmark.id);
@@ -12518,9 +12646,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         onUseReplaceChanged: (value) {
           _tocUiUseReplace = value;
           _catalogDisplayTitleCacheByChapterId.clear();
+          unawaited(_settingsService.saveTocUiUseReplace(value));
         },
         onLoadWordCountChanged: (value) {
           _tocUiLoadWordCount = value;
+          unawaited(_settingsService.saveTocUiLoadWordCount(value));
         },
         onSplitLongChapterChanged: (value) {
           _tocUiSplitLongChapter = value;
@@ -12689,70 +12819,88 @@ class _ReaderContentEditorPageState extends State<_ReaderContentEditorPage> {
         ),
         child: SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-            child: Column(
-              children: [
-                CupertinoTextField(
-                  controller: _titleController,
-                  placeholder: '章节标题',
-                  enabled: !_resetting,
-                  clearButtonMode: OverlayVisibilityMode.editing,
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    CupertinoButton(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              IgnorePointer(
+                ignoring: _resetting,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                  child: Column(
+                    children: [
+                      CupertinoTextField(
+                        controller: _titleController,
+                        placeholder: '章节标题',
+                        enabled: !_resetting,
+                        clearButtonMode: OverlayVisibilityMode.editing,
                       ),
-                      onPressed: _resetting ? null : _resetContent,
-                      child: const Text('重置'),
-                    ),
-                    const SizedBox(width: 8),
-                    CupertinoButton(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            onPressed: _resetting ? null : _resetContent,
+                            child: const Text('重置'),
+                          ),
+                          const SizedBox(width: 8),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            onPressed: _resetting ? null : _copyAll,
+                            child: const Text('复制全文'),
+                          ),
+                        ],
                       ),
-                      onPressed: _resetting ? null : _copyAll,
-                      child: const Text('复制全文'),
-                    ),
-                    if (_resetting) ...[
-                      const SizedBox(width: 8),
-                      const CupertinoActivityIndicator(),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemBackground.resolveFrom(
+                              context,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: CupertinoColors.systemGrey4
+                                  .resolveFrom(context),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: CupertinoTextField(
+                            controller: _contentController,
+                            enabled: !_resetting,
+                            maxLines: null,
+                            expands: true,
+                            keyboardType: TextInputType.multiline,
+                            textAlignVertical: TextAlignVertical.top,
+                            clearButtonMode: OverlayVisibilityMode.never,
+                            padding: const EdgeInsets.all(12),
+                            decoration: null,
+                          ),
+                        ),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Expanded(
+              ),
+              if (_resetting)
+                Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBackground.resolveFrom(
-                        context,
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: CupertinoColors.systemGrey4.resolveFrom(context),
-                        width: 0.8,
-                      ),
+                      color: CupertinoColors.systemBackground
+                          .resolveFrom(context)
+                          .withValues(alpha: 0.78),
                     ),
-                    child: CupertinoTextField(
-                      controller: _contentController,
-                      enabled: !_resetting,
-                      maxLines: null,
-                      expands: true,
-                      keyboardType: TextInputType.multiline,
-                      textAlignVertical: TextAlignVertical.top,
-                      clearButtonMode: OverlayVisibilityMode.never,
-                      padding: const EdgeInsets.all(12),
-                      decoration: null,
+                    child: const Center(
+                      child: CupertinoActivityIndicator(radius: 14),
                     ),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -12954,6 +13102,28 @@ class _ReaderOfflineCacheRange {
   const _ReaderOfflineCacheRange({
     required this.startIndex,
     required this.endIndex,
+  });
+}
+
+class _ReaderBookmarkDraft {
+  final String chapterTitle;
+  final int chapterPos;
+  final String pageText;
+
+  const _ReaderBookmarkDraft({
+    required this.chapterTitle,
+    required this.chapterPos,
+    required this.pageText,
+  });
+}
+
+class _ReaderBookmarkEditResult {
+  final String bookText;
+  final String note;
+
+  const _ReaderBookmarkEditResult({
+    required this.bookText,
+    required this.note,
   });
 }
 

@@ -21,6 +21,8 @@ class SettingsService {
       'book_split_long_chapter_map';
   static const String _keyBookTxtTocRuleMap = 'book_txt_toc_rule_map';
   static const String _keyBookUseReplaceRuleMap = 'book_use_replace_rule_map';
+  static const String _keyTocUiUseReplace = 'toc_ui_use_replace';
+  static const String _keyTocUiLoadWordCount = 'toc_ui_load_word_count';
   static const String _keyBookReSegmentMap = 'book_re_segment_map';
   static const String _keyBookImageStyleMap = 'book_image_style_map';
   static const String _keyChapterSameTitleRemovedMap =
@@ -285,6 +287,26 @@ class SettingsService {
       _keyBookUseReplaceRuleMap,
       _bookUseReplaceRuleMap,
     );
+  }
+
+  bool getTocUiUseReplace({bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyTocUiUseReplace) ?? fallback;
+  }
+
+  Future<void> saveTocUiUseReplace(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyTocUiUseReplace, enabled);
+  }
+
+  bool getTocUiLoadWordCount({bool fallback = true}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyTocUiLoadWordCount) ?? fallback;
+  }
+
+  Future<void> saveTocUiLoadWordCount(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyTocUiLoadWordCount, enabled);
   }
 
   bool getBookReSegment(String bookId, {bool fallback = false}) {

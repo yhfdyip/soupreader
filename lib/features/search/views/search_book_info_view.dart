@@ -127,6 +127,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   bool _switchingSource = false;
   bool _allowUpdate = true;
   bool _splitLongChapter = true;
+  bool _tocUiUseReplace = false;
+  bool _tocUiLoadWordCount = true;
   bool _deleteAlertEnabled = true;
   bool _introExpanded = false;
   String? _error;
@@ -211,9 +213,22 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
             index: chapter.index,
             name: chapter.title,
             url: (chapter.url ?? '').trim(),
+            wordCount: _resolveStoredChapterWordCount(chapter.content),
           ),
         )
         .toList(growable: false);
+  }
+
+  String? _resolveStoredChapterWordCount(String? content) {
+    final words = (content ?? '').length;
+    if (words <= 0) return null;
+    if (words > 10000) {
+      final value = (words / 10000.0)
+          .toStringAsFixed(1)
+          .replaceFirst(RegExp(r'\.0$'), '');
+      return '$value万字';
+    }
+    return '$words字';
   }
 
   List<Chapter> _buildStoredChapters({
@@ -315,6 +330,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   Future<bool> _loadContext({bool silent = false}) async {
     _refreshBookshelfState();
     _restoreBookMenuSwitches();
+    _tocUiUseReplace = _settingsService.getTocUiUseReplace();
+    _tocUiLoadWordCount = _settingsService.getTocUiLoadWordCount();
 
     if (!silent && mounted) {
       setState(() {
@@ -491,7 +508,14 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       bookName: _displayName,
       sourceUrl: sourceUrl.isEmpty ? null : sourceUrl,
       chineseConverterType: _resolveChineseConverterType(),
+      useReplaceRule: _tocUiUseReplace && _resolveBookUseReplaceRule(),
     );
+  }
+
+  bool _resolveBookUseReplaceRule() {
+    final id = _bookId?.trim() ?? '';
+    if (!_inBookshelf || id.isEmpty) return true;
+    return _settingsService.getBookUseReplaceRule(id, fallback: true);
   }
 
   String? _pickFirstNonEmpty(List<String> candidates) {
@@ -600,6 +624,106 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     return _SearchBookTocRuleUpdateResult(
       toc: updatedToc,
       displayTitles: updatedDisplayTitles,
+      splitLongChapterEnabled: _splitLongChapter,
+      useReplaceEnabled: _tocUiUseReplace,
+      loadWordCountEnabled: _tocUiLoadWordCount,
+    );
+  }
+
+  Future<_SearchBookTocRuleUpdateResult?>
+      _handleToggleSplitLongChapterFromToc() async {
+    final id = _bookId?.trim() ?? '';
+    if (!_inBookshelf || id.isEmpty || !_isLocalTxtBook()) {
+      _showMessage('当前书籍未接入拆分超长章节配置');
+      return null;
+    }
+    final storedBook = _bookRepo.getBookById(id);
+    if (storedBook == null || !storedBook.isLocal) {
+      _showMessage('书籍信息不存在，无法调整拆分超长章节');
+      return null;
+    }
+
+    final next = !_splitLongChapter;
+    if (mounted) {
+      setState(() => _splitLongChapter = next);
+    }
+    await _settingsService.saveBookSplitLongChapter(id, next);
+    await _refreshLocalBookshelfBook(
+      force: true,
+      showSuccessToast: false,
+      splitLongChapter: next,
+    );
+
+    final updatedToc = _loadStoredToc(id);
+    List<String> updatedDisplayTitles;
+    try {
+      updatedDisplayTitles = await _buildTocDisplayTitles(updatedToc);
+    } catch (_) {
+      updatedDisplayTitles =
+          updatedToc.map((item) => item.name).toList(growable: false);
+    }
+    return _SearchBookTocRuleUpdateResult(
+      toc: updatedToc,
+      displayTitles: updatedDisplayTitles,
+      splitLongChapterEnabled: next,
+      useReplaceEnabled: _tocUiUseReplace,
+      loadWordCountEnabled: _tocUiLoadWordCount,
+    );
+  }
+
+  Future<_SearchBookTocRuleUpdateResult?>
+      _handleToggleUseReplaceFromToc() async {
+    final next = !_tocUiUseReplace;
+    if (mounted) {
+      setState(() => _tocUiUseReplace = next);
+    }
+    await _settingsService.saveTocUiUseReplace(next);
+
+    final id = _bookId?.trim() ?? '';
+    final updatedToc =
+        _inBookshelf && id.isNotEmpty ? _loadStoredToc(id) : _toc;
+    List<String> updatedDisplayTitles;
+    try {
+      updatedDisplayTitles = await _buildTocDisplayTitles(updatedToc);
+    } catch (_) {
+      updatedDisplayTitles =
+          updatedToc.map((item) => item.name).toList(growable: false);
+    }
+
+    return _SearchBookTocRuleUpdateResult(
+      toc: updatedToc,
+      displayTitles: updatedDisplayTitles,
+      splitLongChapterEnabled: _splitLongChapter,
+      useReplaceEnabled: next,
+      loadWordCountEnabled: _tocUiLoadWordCount,
+    );
+  }
+
+  Future<_SearchBookTocRuleUpdateResult?>
+      _handleToggleLoadWordCountFromToc() async {
+    final next = !_tocUiLoadWordCount;
+    if (mounted) {
+      setState(() => _tocUiLoadWordCount = next);
+    }
+    await _settingsService.saveTocUiLoadWordCount(next);
+
+    final id = _bookId?.trim() ?? '';
+    final updatedToc =
+        _inBookshelf && id.isNotEmpty ? _loadStoredToc(id) : _toc;
+    List<String> updatedDisplayTitles;
+    try {
+      updatedDisplayTitles = await _buildTocDisplayTitles(updatedToc);
+    } catch (_) {
+      updatedDisplayTitles =
+          updatedToc.map((item) => item.name).toList(growable: false);
+    }
+
+    return _SearchBookTocRuleUpdateResult(
+      toc: updatedToc,
+      displayTitles: updatedDisplayTitles,
+      splitLongChapterEnabled: _splitLongChapter,
+      useReplaceEnabled: _tocUiUseReplace,
+      loadWordCountEnabled: next,
     );
   }
 
@@ -1504,6 +1628,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     }
     if (!mounted) return;
     final showTxtTocRuleAction = _inBookshelf && _isLocalTxtBook();
+    final showSplitLongChapterAction = showTxtTocRuleAction;
+    const showUseReplaceAction = true;
+    const showLoadWordCountAction = true;
     final showExportBookmarkAction =
         _inBookshelf && (_bookId?.trim().isNotEmpty ?? false);
 
@@ -1515,9 +1642,23 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           displayTitles: displayTitles,
           sourceName: _displaySourceName,
           showTxtTocRuleAction: showTxtTocRuleAction,
+          showSplitLongChapterAction: showSplitLongChapterAction,
+          splitLongChapterEnabled: _splitLongChapter,
+          showUseReplaceAction: showUseReplaceAction,
+          useReplaceEnabled: _tocUiUseReplace,
+          showLoadWordCountAction: showLoadWordCountAction,
+          loadWordCountEnabled: _tocUiLoadWordCount,
           showExportBookmarkAction: showExportBookmarkAction,
           onEditTocRule:
               showTxtTocRuleAction ? _handleEditTxtTocRuleFromToc : null,
+          onToggleSplitLongChapter: showSplitLongChapterAction
+              ? _handleToggleSplitLongChapterFromToc
+              : null,
+          onToggleUseReplace:
+              showUseReplaceAction ? _handleToggleUseReplaceFromToc : null,
+          onToggleLoadWordCount: showLoadWordCountAction
+              ? _handleToggleLoadWordCountFromToc
+              : null,
           onExportBookmark:
               showExportBookmarkAction ? _handleExportBookmarkFromToc : null,
           onExportBookmarkMarkdown: showExportBookmarkAction
@@ -2525,16 +2666,25 @@ class _StatusChip extends StatelessWidget {
 class _SearchBookTocRuleUpdateResult {
   final List<TocItem> toc;
   final List<String> displayTitles;
+  final bool splitLongChapterEnabled;
+  final bool useReplaceEnabled;
+  final bool loadWordCountEnabled;
 
   const _SearchBookTocRuleUpdateResult({
     required this.toc,
     required this.displayTitles,
+    required this.splitLongChapterEnabled,
+    required this.useReplaceEnabled,
+    required this.loadWordCountEnabled,
   }) : assert(displayTitles.length == toc.length);
 }
 
 enum _SearchBookTocMenuAction {
   reverseToc,
+  useReplace,
+  loadWordCount,
   tocRule,
+  splitLongChapter,
   exportBookmark,
   exportBookmarkMarkdown,
 }
@@ -2545,8 +2695,19 @@ class _SearchBookTocView extends StatefulWidget {
   final List<TocItem> toc;
   final List<String> displayTitles;
   final bool showTxtTocRuleAction;
+  final bool showSplitLongChapterAction;
+  final bool splitLongChapterEnabled;
+  final bool showUseReplaceAction;
+  final bool useReplaceEnabled;
+  final bool showLoadWordCountAction;
+  final bool loadWordCountEnabled;
   final bool showExportBookmarkAction;
   final Future<_SearchBookTocRuleUpdateResult?> Function()? onEditTocRule;
+  final Future<_SearchBookTocRuleUpdateResult?> Function()?
+      onToggleSplitLongChapter;
+  final Future<_SearchBookTocRuleUpdateResult?> Function()? onToggleUseReplace;
+  final Future<_SearchBookTocRuleUpdateResult?> Function()?
+      onToggleLoadWordCount;
   final Future<void> Function()? onExportBookmark;
   final Future<void> Function()? onExportBookmarkMarkdown;
 
@@ -2556,8 +2717,17 @@ class _SearchBookTocView extends StatefulWidget {
     required this.toc,
     required this.displayTitles,
     this.showTxtTocRuleAction = false,
+    this.showSplitLongChapterAction = false,
+    this.splitLongChapterEnabled = false,
+    this.showUseReplaceAction = true,
+    this.useReplaceEnabled = false,
+    this.showLoadWordCountAction = true,
+    this.loadWordCountEnabled = true,
     this.showExportBookmarkAction = false,
     this.onEditTocRule,
+    this.onToggleSplitLongChapter,
+    this.onToggleUseReplace,
+    this.onToggleLoadWordCount,
     this.onExportBookmark,
     this.onExportBookmarkMarkdown,
   }) : assert(displayTitles.length == toc.length);
@@ -2576,8 +2746,14 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
   static const Key _menuMoreActionKey = Key('search_book_toc_menu_more_action');
   static const Key _menuReverseTocActionKey =
       Key('search_book_toc_menu_reverse_toc_action');
+  static const Key _menuUseReplaceActionKey =
+      Key('search_book_toc_menu_use_replace_action');
+  static const Key _menuLoadWordCountActionKey =
+      Key('search_book_toc_menu_load_word_count_action');
   static const Key _menuTocRuleActionKey =
       Key('search_book_toc_menu_toc_rule_action');
+  static const Key _menuSplitLongChapterActionKey =
+      Key('search_book_toc_menu_split_long_chapter_action');
   static const Key _menuExportBookmarkActionKey =
       Key('search_book_toc_menu_export_bookmark_action');
   static const Key _menuExportBookmarkMarkdownActionKey =
@@ -2588,9 +2764,15 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
   String _searchQuery = '';
   bool _searchExpanded = false;
   bool _reversed = false;
+  bool _runningUseReplaceAction = false;
+  bool _runningLoadWordCountAction = false;
   bool _runningTocRuleAction = false;
+  bool _runningSplitLongChapterAction = false;
   bool _runningExportBookmarkAction = false;
   bool _runningExportBookmarkMarkdownAction = false;
+  late bool _useReplaceEnabled;
+  late bool _loadWordCountEnabled;
+  late bool _splitLongChapterEnabled;
   late List<TocItem> _toc;
   late List<String> _displayTitles;
 
@@ -2599,6 +2781,9 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
     super.initState();
     _toc = widget.toc;
     _displayTitles = widget.displayTitles;
+    _useReplaceEnabled = widget.useReplaceEnabled;
+    _loadWordCountEnabled = widget.loadWordCountEnabled;
+    _splitLongChapterEnabled = widget.splitLongChapterEnabled;
     _searchFocusNode.addListener(_handleSearchFocusChange);
   }
 
@@ -2610,6 +2795,15 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
     }
     if (!listEquals(oldWidget.displayTitles, widget.displayTitles)) {
       _displayTitles = widget.displayTitles;
+    }
+    if (oldWidget.useReplaceEnabled != widget.useReplaceEnabled) {
+      _useReplaceEnabled = widget.useReplaceEnabled;
+    }
+    if (oldWidget.loadWordCountEnabled != widget.loadWordCountEnabled) {
+      _loadWordCountEnabled = widget.loadWordCountEnabled;
+    }
+    if (oldWidget.splitLongChapterEnabled != widget.splitLongChapterEnabled) {
+      _splitLongChapterEnabled = widget.splitLongChapterEnabled;
     }
   }
 
@@ -2659,8 +2853,28 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
     );
   }
 
+  Widget _buildCheckableActionLabel({
+    required String title,
+    required bool checked,
+  }) {
+    if (!checked) {
+      return Text(title);
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(CupertinoIcons.check_mark, size: 18),
+        const SizedBox(width: 6),
+        Text(title),
+      ],
+    );
+  }
+
   Future<void> _showTocMenu() async {
-    if (_runningTocRuleAction ||
+    if (_runningUseReplaceAction ||
+        _runningLoadWordCountAction ||
+        _runningTocRuleAction ||
+        _runningSplitLongChapterAction ||
         _runningExportBookmarkAction ||
         _runningExportBookmarkMarkdownAction) {
       return;
@@ -2677,6 +2891,18 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                   Navigator.pop(sheetContext, _SearchBookTocMenuAction.tocRule),
               child: const Text('TXT 目录规则'),
             ),
+          if (widget.showSplitLongChapterAction)
+            CupertinoActionSheetAction(
+              key: _menuSplitLongChapterActionKey,
+              onPressed: () => Navigator.pop(
+                sheetContext,
+                _SearchBookTocMenuAction.splitLongChapter,
+              ),
+              child: _buildCheckableActionLabel(
+                title: '拆分超长章节',
+                checked: _splitLongChapterEnabled,
+              ),
+            ),
           CupertinoActionSheetAction(
             key: _menuReverseTocActionKey,
             onPressed: () => Navigator.pop(
@@ -2685,6 +2911,30 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
             ),
             child: const Text('反转目录'),
           ),
+          if (widget.showUseReplaceAction)
+            CupertinoActionSheetAction(
+              key: _menuUseReplaceActionKey,
+              onPressed: () => Navigator.pop(
+                sheetContext,
+                _SearchBookTocMenuAction.useReplace,
+              ),
+              child: _buildCheckableActionLabel(
+                title: '使用替换',
+                checked: _useReplaceEnabled,
+              ),
+            ),
+          if (widget.showLoadWordCountAction)
+            CupertinoActionSheetAction(
+              key: _menuLoadWordCountActionKey,
+              onPressed: () => Navigator.pop(
+                sheetContext,
+                _SearchBookTocMenuAction.loadWordCount,
+              ),
+              child: _buildCheckableActionLabel(
+                title: '加载字数',
+                checked: _loadWordCountEnabled,
+              ),
+            ),
           if (widget.showExportBookmarkAction)
             CupertinoActionSheetAction(
               key: _menuExportBookmarkActionKey,
@@ -2715,8 +2965,17 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
       case _SearchBookTocMenuAction.reverseToc:
         _toggleReverseToc();
         return;
+      case _SearchBookTocMenuAction.useReplace:
+        await _runUseReplaceAction();
+        return;
+      case _SearchBookTocMenuAction.loadWordCount:
+        await _runLoadWordCountAction();
+        return;
       case _SearchBookTocMenuAction.tocRule:
         await _runTocRuleAction();
+        return;
+      case _SearchBookTocMenuAction.splitLongChapter:
+        await _runSplitLongChapterAction();
         return;
       case _SearchBookTocMenuAction.exportBookmark:
         await _runExportBookmarkAction();
@@ -2731,6 +2990,57 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
     setState(() => _reversed = !_reversed);
   }
 
+  String? _resolveChapterWordCountLabel(TocItem item) {
+    if (!_loadWordCountEnabled || item.isVolume) return null;
+    final value = (item.wordCount ?? '').trim();
+    if (value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> _runUseReplaceAction() async {
+    final handler = widget.onToggleUseReplace;
+    if (handler == null || _runningUseReplaceAction) return;
+    setState(() => _runningUseReplaceAction = true);
+    try {
+      final updated = await handler();
+      if (!mounted || updated == null) return;
+      if (updated.displayTitles.length != updated.toc.length) return;
+      setState(() {
+        _toc = updated.toc;
+        _displayTitles = updated.displayTitles;
+        _splitLongChapterEnabled = updated.splitLongChapterEnabled;
+        _useReplaceEnabled = updated.useReplaceEnabled;
+        _loadWordCountEnabled = updated.loadWordCountEnabled;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _runningUseReplaceAction = false);
+      }
+    }
+  }
+
+  Future<void> _runLoadWordCountAction() async {
+    final handler = widget.onToggleLoadWordCount;
+    if (handler == null || _runningLoadWordCountAction) return;
+    setState(() => _runningLoadWordCountAction = true);
+    try {
+      final updated = await handler();
+      if (!mounted || updated == null) return;
+      if (updated.displayTitles.length != updated.toc.length) return;
+      setState(() {
+        _toc = updated.toc;
+        _displayTitles = updated.displayTitles;
+        _splitLongChapterEnabled = updated.splitLongChapterEnabled;
+        _useReplaceEnabled = updated.useReplaceEnabled;
+        _loadWordCountEnabled = updated.loadWordCountEnabled;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _runningLoadWordCountAction = false);
+      }
+    }
+  }
+
   Future<void> _runTocRuleAction() async {
     final handler = widget.onEditTocRule;
     if (handler == null || _runningTocRuleAction) return;
@@ -2742,10 +3052,35 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
       setState(() {
         _toc = updated.toc;
         _displayTitles = updated.displayTitles;
+        _splitLongChapterEnabled = updated.splitLongChapterEnabled;
+        _useReplaceEnabled = updated.useReplaceEnabled;
+        _loadWordCountEnabled = updated.loadWordCountEnabled;
       });
     } finally {
       if (mounted) {
         setState(() => _runningTocRuleAction = false);
+      }
+    }
+  }
+
+  Future<void> _runSplitLongChapterAction() async {
+    final handler = widget.onToggleSplitLongChapter;
+    if (handler == null || _runningSplitLongChapterAction) return;
+    setState(() => _runningSplitLongChapterAction = true);
+    try {
+      final updated = await handler();
+      if (!mounted || updated == null) return;
+      if (updated.displayTitles.length != updated.toc.length) return;
+      setState(() {
+        _toc = updated.toc;
+        _displayTitles = updated.displayTitles;
+        _splitLongChapterEnabled = updated.splitLongChapterEnabled;
+        _useReplaceEnabled = updated.useReplaceEnabled;
+        _loadWordCountEnabled = updated.loadWordCountEnabled;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _runningSplitLongChapterAction = false);
       }
     }
   }
@@ -2800,7 +3135,10 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         searchAction,
-        if (_runningTocRuleAction ||
+        if (_runningUseReplaceAction ||
+            _runningLoadWordCountAction ||
+            _runningTocRuleAction ||
+            _runningSplitLongChapterAction ||
             _runningExportBookmarkAction ||
             _runningExportBookmarkMarkdownAction)
           const Padding(
@@ -2811,7 +3149,10 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
           key: _menuMoreActionKey,
           padding: EdgeInsets.zero,
           minimumSize: const Size(30, 30),
-          onPressed: (_runningTocRuleAction ||
+          onPressed: (_runningUseReplaceAction ||
+                  _runningLoadWordCountAction ||
+                  _runningTocRuleAction ||
+                  _runningSplitLongChapterAction ||
                   _runningExportBookmarkAction ||
                   _runningExportBookmarkMarkdownAction)
               ? null
@@ -2874,6 +3215,8 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
               itemBuilder: (context, index) {
                 final entry = filtered[index];
                 final displayTitle = _displayTitles[entry.key];
+                final wordCountLabel =
+                    _resolveChapterWordCountLabel(entry.value);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(
@@ -2906,6 +3249,16 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                               ),
                             ),
                           ),
+                          if (wordCountLabel != null)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Text(
+                                wordCountLabel,
+                                style: theme.textTheme.small.copyWith(
+                                  color: scheme.mutedForeground,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),

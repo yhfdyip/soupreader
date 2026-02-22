@@ -9783,6 +9783,7 @@ class TocItem {
   final bool isVip;
   final bool isPay;
   final String? tag;
+  final String? wordCount;
 
   const TocItem({
     required this.index,
@@ -9792,5 +9793,6 @@ class TocItem {
     this.isVip = false,
     this.isPay = false,
     this.tag,
+    this.wordCount,
   });
 }
