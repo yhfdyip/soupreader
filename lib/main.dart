@@ -3,32 +3,27 @@ import 'package:flutter/foundation.dart';
 
 import 'app/bootstrap/app_bootstrap.dart';
 import 'app/soup_reader_app.dart';
-import 'app/widgets/app_error_widget.dart';
 
-/// 调试版：加入 ErrorWidget.builder 以让 tab 页面异常可见。
+/// 调试版：内联 ErrorWidget，不 import app_error_widget.dart。
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 让 Release 模式下的渲染异常可见（不再显示为灰色/空白区域）。
+  // 使用内联的简单 ErrorWidget（不引入任何项目文件）。
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    return AppErrorWidget(
-      message: details.exceptionAsString(),
-      stackTrace: details.stack?.toString(),
+    return Container(
+      color: const Color(0xFFFFEBEE),
+      padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
+        child: Text(
+          'BUILD ERROR:\n${details.exceptionAsString()}\n\n${details.stack}',
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFFB71C1C),
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ),
     );
-  };
-
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('[flutter-error] ${details.exceptionAsString()}');
-    if (details.stack != null) {
-      debugPrintStack(stackTrace: details.stack);
-    }
-  };
-
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    debugPrint('[platform-error] $error');
-    debugPrintStack(stackTrace: stack);
-    return true;
   };
 
   // 先显示探测 UI
