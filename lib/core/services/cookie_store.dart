@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -33,16 +31,11 @@ class CookieStore {
     BootLog.add(
       'CookieStore.setup: getApplicationDocumentsDirectory ok path=${docs.path}',
     );
-    final dir = Directory('${docs.path}/.cookies');
-    BootLog.add('CookieStore.setup: ensure cookie dir start path=${dir.path}');
-    if (!await dir.exists()) {
-      BootLog.add('CookieStore.setup: cookie dir missing, creating');
-      await dir.create(recursive: true);
-    }
-    BootLog.add('CookieStore.setup: ensure cookie dir ok');
+    final storagePath = '${docs.path}/.cookies';
+    BootLog.add('CookieStore.setup: use FileStorage path=$storagePath');
 
     BootLog.add('CookieStore.setup: init PersistCookieJar start');
-    final storage = FileStorage(dir.path);
+    final storage = FileStorage(storagePath);
     _jar = PersistCookieJar(
       storage: storage,
       ignoreExpires: false,
