@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../bootstrap/boot_log.dart';
 import 'drift/source_drift_database.dart';
 import 'drift/source_drift_service.dart';
 
@@ -18,9 +19,14 @@ class DatabaseService {
 
   Future<void> init() async {
     if (_isInitialized) return;
+    BootLog.add('DatabaseService.init: driftService.init start');
     await _driftService.init();
+    BootLog.add('DatabaseService.init: driftService.init ok');
+    BootLog.add('DatabaseService.init: reloadSettingsCache start');
     await _reloadSettingsCache();
+    BootLog.add('DatabaseService.init: reloadSettingsCache ok');
     _isInitialized = true;
+    BootLog.add('DatabaseService.init: done');
   }
 
   SourceDriftDatabase get driftDb {
@@ -79,7 +85,11 @@ class DatabaseService {
   Future<void> _reloadSettingsCache() async {
     _settingsCache.clear();
     final db = _driftService.db;
+    BootLog.add('DatabaseService.reloadSettingsCache: select appKeyValueRecords');
     final rows = await db.select(db.appKeyValueRecords).get();
+    BootLog.add(
+      'DatabaseService.reloadSettingsCache: select ok (rows=${rows.length})',
+    );
     for (final row in rows) {
       final raw = row.value?.trim();
       if (raw == null || raw.isEmpty) {
