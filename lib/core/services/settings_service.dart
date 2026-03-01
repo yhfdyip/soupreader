@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../bootstrap/boot_log.dart';
 import '../config/migration_exclusions.dart';
 import '../models/app_settings.dart';
 import '../../features/reader/models/reading_settings.dart';
@@ -195,7 +196,9 @@ class SettingsService {
   }
 
   Future<void> init() async {
+    BootLog.add('SettingsService.init: SharedPreferences.getInstance start');
     _prefs = await SharedPreferences.getInstance();
+    BootLog.add('SettingsService.init: SharedPreferences.getInstance ok');
     _isInitialized = true;
 
     var needsReadingSettingsRewrite = false;

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 
+import '../../bootstrap/boot_log.dart';
 import '../../utils/legado_json.dart';
 import '../../../features/replace/models/replace_rule.dart';
 import '../database_service.dart';
@@ -21,9 +22,13 @@ class ReplaceRuleRepository {
   }
 
   static Future<void> bootstrap(DatabaseService db) async {
+    BootLog.add('ReplaceRuleRepository.bootstrap: begin');
     final repo = ReplaceRuleRepository(db);
+    BootLog.add('ReplaceRuleRepository.bootstrap: reloadCache start');
     await repo._reloadCacheFromDb();
+    BootLog.add('ReplaceRuleRepository.bootstrap: reloadCache ok');
     repo._ensureWatchStarted();
+    BootLog.add('ReplaceRuleRepository.bootstrap: done');
   }
 
   void _ensureWatchStarted() {
@@ -35,7 +40,11 @@ class ReplaceRuleRepository {
   }
 
   Future<void> _reloadCacheFromDb() async {
+    BootLog.add('ReplaceRuleRepository.reloadCache: select replaceRuleRecords');
     final rows = await _driftDb.select(_driftDb.replaceRuleRecords).get();
+    BootLog.add(
+      'ReplaceRuleRepository.reloadCache: select ok (rows=${rows.length})',
+    );
     _updateCacheFromRows(rows);
   }
 

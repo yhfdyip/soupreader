@@ -22,7 +22,7 @@ class BootHostApp extends StatefulWidget {
 class _BootHostAppState extends State<BootHostApp> {
   static const Duration _kTickerInterval = Duration(seconds: 1);
   static const int _kMaxLogLines = 160;
-  static const int _kVisibleLogLines = 36;
+  static const int _kVisibleLogLines = 18;
 
   final List<String> _logLines = <String>[];
   Timer? _ticker;
@@ -116,10 +116,17 @@ class _BootHostAppState extends State<BootHostApp> {
 
   String _bootLogPayload() => _logLines.join('\n').trim();
 
+  String _latestLogLine() {
+    if (_logLines.isEmpty) return '';
+    return _logLines.last.trim();
+  }
+
   String _bootLogTailPayload() {
     if (_logLines.isEmpty) return '';
-    final start = (_logLines.length - _kVisibleLogLines).clamp(0, _logLines.length);
-    return _logLines.sublist(start).join('\n').trim();
+    final start =
+        (_logLines.length - _kVisibleLogLines).clamp(0, _logLines.length);
+    // Show newest first so the "current stuck line" is visible without scrolling.
+    return _logLines.sublist(start).reversed.join('\n').trim();
   }
 
   CupertinoApp _buildBootingApp() {
@@ -182,6 +189,16 @@ class _BootHostAppState extends State<BootHostApp> {
                     ),
                   ),
                   const SizedBox(height: 6),
+                  if (_logLines.isNotEmpty)
+                    Text(
+                      '最新：${_latestLogLine()}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: CupertinoColors.tertiaryLabel,
+                      ),
+                    ),
+                  const SizedBox(height: 6),
                   Text(
                     '已用时：${elapsedSeconds.toStringAsFixed(0)}s',
                     textAlign: TextAlign.center,
@@ -216,7 +233,7 @@ class _BootHostAppState extends State<BootHostApp> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      '启动日志（最后几行）',
+                      '启动日志（最新在上）',
                       style: TextStyle(
                         fontSize: 13,
                         color: CupertinoColors.secondaryLabel,
