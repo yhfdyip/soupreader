@@ -22,6 +22,7 @@ class BootHostApp extends StatefulWidget {
 class _BootHostAppState extends State<BootHostApp> {
   static const Duration _kTickerInterval = Duration(seconds: 1);
   static const int _kMaxLogLines = 160;
+  static const int _kVisibleLogLines = 36;
 
   final List<String> _logLines = <String>[];
   Timer? _ticker;
@@ -115,6 +116,12 @@ class _BootHostAppState extends State<BootHostApp> {
 
   String _bootLogPayload() => _logLines.join('\n').trim();
 
+  String _bootLogTailPayload() {
+    if (_logLines.isEmpty) return '';
+    final start = (_logLines.length - _kVisibleLogLines).clamp(0, _logLines.length);
+    return _logLines.sublist(start).join('\n').trim();
+  }
+
   CupertinoApp _buildBootingApp() {
     final brightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
@@ -185,38 +192,7 @@ class _BootHostAppState extends State<BootHostApp> {
                   ),
                   const SizedBox(height: 18),
                   if (_logLines.isNotEmpty) ...[
-                    const Text(
-                      '启动日志',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: CupertinoColors.secondaryLabel,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.secondarySystemGroupedBackground,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color:
-                              CupertinoColors.separator.withValues(alpha: 0.7),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(
-                          _bootLogPayload(),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            height: 1.35,
-                            color: CupertinoColors.label,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    CupertinoButton(
+                    CupertinoButton.filled(
                       onPressed: () async {
                         await Clipboard.setData(
                           ClipboardData(text: _bootLogPayload()),
@@ -237,6 +213,37 @@ class _BootHostAppState extends State<BootHostApp> {
                         );
                       },
                       child: const Text('复制启动日志'),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '启动日志（最后几行）',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.secondaryLabel,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.secondarySystemGroupedBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color:
+                              CupertinoColors.separator.withValues(alpha: 0.7),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          _bootLogTailPayload(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            height: 1.35,
+                            color: CupertinoColors.label,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ],
