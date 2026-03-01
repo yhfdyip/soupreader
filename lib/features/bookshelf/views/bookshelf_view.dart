@@ -165,6 +165,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     super.initState();
     try {
       debugPrint('[bookshelf] init start');
+      _settingsService = SettingsService();
       final db = DatabaseService();
       _database = db;
       _bookRepo = BookRepository(db);
@@ -173,7 +174,6 @@ class _BookshelfViewState extends State<BookshelfView> {
       _importService = ImportService();
       _bookImportFileNameRuleService = BookImportFileNameRuleService();
       _bookGroupStore = BookshelfBookGroupStore(database: db);
-      _settingsService = SettingsService();
       _bookshelfIo = BookshelfImportExportService();
       _booklistImporter = BookshelfBooklistImportService();
       _catalogUpdater = BookshelfCatalogUpdateService(
@@ -2125,6 +2125,8 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initError != null) return _buildInitErrorPage();
+
     final page = AppCupertinoPageScaffold(
       title: _currentBookshelfTitle(),
       useSliverNavigationBar: true,
@@ -2163,8 +2165,24 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
+  Widget _buildInitErrorPage() {
+    return AppCupertinoPageScaffold(
+      title: '书架',
+      useSliverNavigationBar: true,
+      sliverScrollController: _scrollController,
+      child: const SizedBox.shrink(),
+      sliverBodyBuilder: (_) => SliverSafeArea(
+        top: false,
+        bottom: true,
+        sliver: SliverFillRemaining(
+          hasScrollBody: false,
+          child: _buildInitError(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBodySliver() {
-    final displayItems = _displayItems();
     if (_initError != null) {
       return SliverSafeArea(
         top: false,
@@ -2175,6 +2193,7 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
       );
     }
+    final displayItems = _displayItems();
     final contentSliver = displayItems.isEmpty
         ? SliverFillRemaining(
             hasScrollBody: false,

@@ -206,6 +206,26 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tabCount = _tabs.length;
+    if (tabCount > 0) {
+      final currentIndex = _tabController.index;
+      if (currentIndex < 0 || currentIndex >= tabCount) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final latestTabCount = _tabs.length;
+          if (latestTabCount <= 0) return;
+          final current = _tabController.index;
+          final safeIndex = current.clamp(0, latestTabCount - 1);
+          if (current == safeIndex) return;
+          debugPrint(
+            '[main-tab] clamp controller index $current -> $safeIndex '
+            '(tabCount=$latestTabCount)',
+          );
+          _tabController.index = safeIndex;
+        });
+      }
+    }
+
     return CupertinoTabScaffold(
       controller: _tabController,
       tabBar: CupertinoTabBar(
@@ -219,6 +239,7 @@ class _MainScreenState extends State<MainScreen> {
       tabBuilder: (context, index) {
         final tabId = _tabs[index].id;
         return CupertinoTabView(
+          key: ValueKey(tabId),
           builder: (context) {
             switch (tabId) {
               case _MainTabId.bookshelf:
@@ -257,4 +278,3 @@ class _MainTabSpec {
   final _MainTabId id;
   final BottomNavigationBarItem item;
 }
-

@@ -102,7 +102,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   String get _themeModeSummary {
-    final app = _settingsService.appSettings;
+    final app = _settingsService.appSettingsListenable.value;
     switch (app.appearanceMode) {
       case AppAppearanceMode.followSystem:
         return '跟随系统';
@@ -116,7 +116,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _pickThemeMode() async {
-    final current = _settingsService.appSettings.appearanceMode;
+    final current = _settingsService.appSettingsListenable.value.appearanceMode;
     final selected = await showOptionPickerSheet<AppAppearanceMode>(
       context: context,
       title: '主题模式',
@@ -142,8 +142,9 @@ class _SettingsViewState extends State<SettingsView> {
       ],
     );
     if (selected == null || selected == current) return;
+    final currentSettings = _settingsService.appSettingsListenable.value;
     await _settingsService.saveAppSettings(
-      _settingsService.appSettings.copyWith(appearanceMode: selected),
+      currentSettings.copyWith(appearanceMode: selected),
     );
     if (!mounted) return;
     setState(() {});

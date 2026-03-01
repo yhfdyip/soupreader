@@ -47,6 +47,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   late final SourceExploreKindsService _exploreKindsService;
   final SettingsService _settingsService = SettingsService();
   StreamSubscription<List<BookSource>>? _sourceSub;
+  String? _initError;
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -62,24 +63,36 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   @override
   void initState() {
     super.initState();
-    final db = DatabaseService();
-    _sourceRepo = SourceRepository(db);
-    _exploreKindsService = SourceExploreKindsService(databaseService: db);
+    try {
+      final db = DatabaseService();
+      _sourceRepo = SourceRepository(db);
+      _exploreKindsService = SourceExploreKindsService(databaseService: db);
 
-    _allSources = _sourceRepo.getAllSources();
-    _searchController.addListener(_onQueryChanged);
-    _lastExternalCompressVersion = widget.compressSignal?.value;
-    widget.compressSignal?.addListener(_onExternalCompressSignal);
-    _sourceSub = _sourceRepo.watchAllSources().listen((sources) {
-      if (!mounted) return;
-      setState(() {
-        _allSources = sources;
-        if (_expandedSourceUrl != null &&
-            !_allSources.any((s) => s.bookSourceUrl == _expandedSourceUrl)) {
-          _expandedSourceUrl = null;
-        }
+      _allSources = _sourceRepo.getAllSources();
+      _searchController.addListener(_onQueryChanged);
+      _lastExternalCompressVersion = widget.compressSignal?.value;
+      widget.compressSignal?.addListener(_onExternalCompressSignal);
+      _sourceSub = _sourceRepo.watchAllSources().listen((sources) {
+        if (!mounted) return;
+        setState(() {
+          _allSources = sources;
+          if (_expandedSourceUrl != null &&
+              !_allSources.any((s) => s.bookSourceUrl == _expandedSourceUrl)) {
+            _expandedSourceUrl = null;
+          }
+        });
       });
-    });
+    } catch (error, stackTrace) {
+      _initError = '发现页初始化异常: $error';
+      debugPrint('[discovery] init failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      ExceptionLogService().record(
+        node: 'discovery.init',
+        message: '发现页初始化失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override
@@ -530,6 +543,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initError != null) return _buildInitErrorPage();
+
     final eligible = _eligibleSources(_allSources);
     final visible = DiscoveryFilterHelper.applyQueryFilter(
         eligible, _searchController.text);
@@ -555,6 +570,31 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         visible: visible,
         query: query,
         showEmptyMessage: showEmptyMessage,
+      ),
+    );
+  }
+
+  Widget _buildInitErrorPage() {
+    return AppCupertinoPageScaffold(
+      title: '发现',
+      useSliverNavigationBar: true,
+      sliverScrollController: _scrollController,
+      child: const SizedBox.shrink(),
+      sliverBodyBuilder: (_) => SliverSafeArea(
+        top: false,
+        bottom: true,
+        sliver: SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                _initError ?? '初始化失败',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
