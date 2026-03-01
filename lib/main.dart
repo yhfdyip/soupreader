@@ -11,8 +11,18 @@ import 'core/services/exception_log_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Release 模式下默认 ErrorWidget 常退化为灰色方块，
-  // 在无 Xcode 日志时难以诊断构建期故障。
+  // ── 第一步：立即 runApp，渲染极简 UI 证明 Flutter engine 正常 ──
+  // 如果这个都白屏，说明是 iOS native 层/打包/签名问题。
+  runApp(const _BootProbeApp());
+
+  // ── 第二步：异步执行 bootstrap，完成后替换 UI ──
+  _asyncBoot();
+}
+
+Future<void> _asyncBoot() async {
+  debugPrint('[boot] _asyncBoot start');
+
+  // Release 模式下默认 ErrorWidget 常退化为灰色方块。
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return AppErrorWidget(
       message: details.exceptionAsString(),
@@ -32,9 +42,6 @@ void main() {
         if (details.library != null) 'library': details.library!,
       },
     );
-    if (details.stack != null) {
-      debugPrintStack(stackTrace: details.stack);
-    }
   };
 
   PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
@@ -45,48 +52,56 @@ void main() {
       error: error,
       stackTrace: stack,
     );
-    debugPrintStack(stackTrace: stack);
     return true;
   };
 
-  runZonedGuarded(() async {
-    debugPrint('[boot] bootstrap start');
-
-    BootFailure? bootFailure;
-    try {
-      // 超时保护：如果 bootstrap 某步 hang 住（如 platform channel 死锁），
-      // 30 秒后强制跳过并展示启动失败页面，避免永远卡在白色闪屏上。
-      bootFailure = await bootstrapApp().timeout(const Duration(seconds: 30),
-          onTimeout: () {
-        debugPrint('[boot] bootstrapApp TIMEOUT after 30s');
-        return BootFailure(
-          stepName: 'timeout',
-          error: 'Bootstrap 超时（30 秒），可能某步初始化 hang 住了。',
-          stack: StackTrace.current,
-        );
-      });
-    } catch (e, st) {
-      debugPrint('[boot] bootstrapApp threw: $e');
-      debugPrintStack(stackTrace: st);
-      bootFailure = BootFailure(
-        stepName: 'bootstrapApp',
-        error: e,
-        stack: st,
+  BootFailure? bootFailure;
+  try {
+    debugPrint('[boot] bootstrapApp start');
+    bootFailure = await bootstrapApp().timeout(const Duration(seconds: 30),
+        onTimeout: () {
+      debugPrint('[boot] bootstrapApp TIMEOUT after 30s');
+      return BootFailure(
+        stepName: 'timeout',
+        error: 'Bootstrap 超时（30 秒），可能某步初始化 hang 住了。',
+        stack: StackTrace.current,
       );
-    }
+    });
+    debugPrint('[boot] bootstrapApp done, failure=$bootFailure');
+  } catch (e, st) {
+    debugPrint('[boot] bootstrapApp threw: $e');
+    bootFailure = BootFailure(stepName: 'bootstrapApp', error: e, stack: st);
+  }
 
-    debugPrint('[boot] bootstrap done, failure=$bootFailure');
-    debugPrint('[boot] runApp start');
-    runApp(SoupReaderApp(initialBootFailure: bootFailure));
-    debugPrint('[boot] runApp done');
-  }, (Object error, StackTrace stack) {
-    debugPrint('[zone-error] $error');
-    ExceptionLogService().record(
-      node: 'global.zone_error',
-      message: 'runZonedGuarded 捕获未处理异常',
-      error: error,
-      stackTrace: stack,
+  debugPrint('[boot] switching to SoupReaderApp');
+  runApp(SoupReaderApp(initialBootFailure: bootFailure));
+  debugPrint('[boot] SoupReaderApp mounted');
+}
+
+/// 极简探测 App：如果这个能渲染，说明 Flutter engine 正常。
+class _BootProbeApp extends StatelessWidget {
+  const _BootProbeApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoApp(
+      debugShowCheckedModeBanner: false,
+      home: CupertinoPageScaffold(
+        backgroundColor: const Color(0xFFFFF8E1),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              CupertinoActivityIndicator(radius: 14),
+              SizedBox(height: 16),
+              Text(
+                'SoupReader 正在启动…',
+                style: TextStyle(fontSize: 16, color: CupertinoColors.label),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-    debugPrintStack(stackTrace: stack);
-  });
+  }
 }
