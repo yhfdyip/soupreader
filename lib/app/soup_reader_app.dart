@@ -31,6 +31,7 @@ class _SoupReaderAppState extends State<SoupReaderApp>
 
   BootFailure? _bootFailure;
   bool _retrying = false;
+  bool _settingsReady = false;
 
   @override
   void initState() {
@@ -39,8 +40,8 @@ class _SoupReaderAppState extends State<SoupReaderApp>
     WidgetsBinding.instance.addObserver(this);
     _platformBrightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    // 仅在 bootstrap 成功时监听设置变化
-    if (_bootFailure == null) {
+    _settingsReady = _bootFailure == null;
+    if (_settingsReady) {
       _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
     }
     _applySystemUiOverlayStyle();
@@ -49,8 +50,10 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _settingsService.appSettingsListenable
-        .removeListener(_onAppSettingsChanged);
+    if (_settingsReady) {
+      _settingsService.appSettingsListenable
+          .removeListener(_onAppSettingsChanged);
+    }
     super.dispose();
   }
 
@@ -70,7 +73,7 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   }
 
   Brightness get _effectiveBrightness {
-    if (_bootFailure != null) return _platformBrightness;
+    if (!_settingsReady) return _platformBrightness;
     final settings = _settingsService.appSettings;
     switch (settings.appearanceMode) {
       case AppAppearanceMode.followSystem:
@@ -101,8 +104,8 @@ class _SoupReaderAppState extends State<SoupReaderApp>
     final failure = await bootstrapApp();
     if (!mounted) return;
 
-    if (failure == null) {
-      // 重试成功，开始监听设置变化并进入主界面
+    if (failure == null && !_settingsReady) {
+      _settingsReady = true;
       _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
     }
     setState(() {
@@ -128,7 +131,8 @@ class _SoupReaderAppState extends State<SoupReaderApp>
     } else {
       home = MainScreen(
         brightness: brightness,
-        appSettings: _settingsService.appSettings,
+        appSettings:
+            _settingsReady ? _settingsService.appSettings : const AppSettings(),
       );
     }
 
