@@ -177,7 +177,6 @@ class AppCupertinoPageScaffold extends StatelessWidget {
                 alignment: Alignment.centerRight,
               ),
               backgroundColor: navBarBackground,
-              automaticBackgroundVisibility: false,
               border: border,
             ),
             bodySliver,

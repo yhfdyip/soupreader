@@ -23,27 +23,11 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ── 全局错误处理 ──
-  // 使用只依赖基础 Widget 的安全 ErrorWidget.builder，避免 Release 模式灰屏。
-  // 注意：不能使用 CupertinoPageScaffold / CupertinoNavigationBar 等依赖
-  // CupertinoTheme 的组件，否则在缺少 theme 祖先时自身也会 crash 导致无限递归白屏。
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    debugPrint('[ErrorWidget] ${details.exceptionAsString()}');
-    return ColoredBox(
-      color: const Color(0xFFFFF4D6),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          'ERROR:\n${details.exceptionAsString()}',
-          textDirection: TextDirection.ltr,
-          style: const TextStyle(
-            color: Color(0xFF333333),
-            fontSize: 12,
-            decoration: TextDecoration.none,
-          ),
-        ),
-      ),
-    );
-  };
+  // 不设置 ErrorWidget.builder。
+  // 1. CupertinoPageScaffold 等依赖 CupertinoTheme 的组件在缺少 theme 时自身 crash → 递归白屏。
+  // 2. 任何 box widget 类型的 ErrorWidget 在 Sliver 上下文中会导致
+  //    'RenderBox is not a subtype of RenderSliver' 二次崩溃。
+  // 默认 ErrorWidget 在 Release 模式下为灰色方块，虽不美观但不会引发级联崩溃。
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
