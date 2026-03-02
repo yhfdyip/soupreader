@@ -123,24 +123,26 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     );
     final border = Border(bottom: BorderSide(color: borderColor, width: 0.5));
 
+    final navBar = CupertinoNavigationBar(
+      middle: middle ?? Text(title),
+      previousPageTitle: '',
+      leading: _buildNavBarItem(
+        context,
+        leading,
+        alignment: Alignment.centerLeft,
+      ),
+      trailing: _buildNavBarItem(
+        context,
+        trailing,
+        alignment: Alignment.centerRight,
+      ),
+      backgroundColor: navBarBackground,
+      border: border,
+    );
+
     if (!useSliverNavigationBar) {
       return CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(
-          middle: middle ?? Text(title),
-          previousPageTitle: '',
-          leading: _buildNavBarItem(
-            context,
-            leading,
-            alignment: Alignment.centerLeft,
-          ),
-          trailing: _buildNavBarItem(
-            context,
-            trailing,
-            alignment: Alignment.centerRight,
-          ),
-          backgroundColor: navBarBackground,
-          border: border,
-        ),
+        navigationBar: navBar,
         child: _buildBackground(
           backgroundColor: baseBackground,
           child: SafeArea(
@@ -152,6 +154,9 @@ class AppCupertinoPageScaffold extends StatelessWidget {
       );
     }
 
+    // Sliver 模式：使用普通 CupertinoNavigationBar + CustomScrollView 承载 bodySliver。
+    // 不使用 CupertinoSliverNavigationBar，因为它在 Release 模式下 layout 阶段崩溃。
+    // primary 强制为 false，避免多个 tab 的 CustomScrollView 竞争同一 PrimaryScrollController。
     Widget bodySliver;
     try {
       bodySliver =
@@ -173,39 +178,15 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         ),
       );
     }
-    final resolvedMiddle = middle ?? Text(title);
-    final resolvedLargeTitle =
-        showLargeTitle ? (largeTitle ?? Text(title)) : null;
 
-    // 注意：CupertinoSliverNavigationBar 必须在
-    // CupertinoPageScaffold(child: CustomScrollView(slivers: [...])) 中使用。
-    // CustomScrollView 必须是 CupertinoPageScaffold.child 的直接子组件，
-    // 中间不能插入 DecoratedBox 或其他包裹 Widget，否则会导致 layout 崩溃。
     return CupertinoPageScaffold(
       backgroundColor: baseBackground,
+      navigationBar: navBar,
       child: CustomScrollView(
-        primary: sliverScrollController == null,
+        primary: false,
         controller: sliverScrollController,
         physics: sliverScrollPhysics,
         slivers: [
-          CupertinoSliverNavigationBar(
-            largeTitle: resolvedLargeTitle,
-            middle: resolvedMiddle,
-            alwaysShowMiddle: !showLargeTitle,
-            previousPageTitle: '',
-            leading: _buildNavBarItem(
-              context,
-              leading,
-              alignment: Alignment.centerLeft,
-            ),
-            trailing: _buildNavBarItem(
-              context,
-              trailing,
-              alignment: Alignment.centerRight,
-            ),
-            backgroundColor: navBarBackground,
-            border: border,
-          ),
           bodySliver,
         ],
       ),
