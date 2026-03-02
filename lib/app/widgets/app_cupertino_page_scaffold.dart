@@ -154,9 +154,10 @@ class AppCupertinoPageScaffold extends StatelessWidget {
       );
     }
 
-    // Sliver 模式：使用普通 CupertinoNavigationBar + CustomScrollView 承载 bodySliver。
-    // 不使用 CupertinoSliverNavigationBar，因为它在 Release 模式下 layout 阶段崩溃。
-    // primary 强制为 false，避免多个 tab 的 CustomScrollView 竞争同一 PrimaryScrollController。
+    // Sliver 模式：CupertinoSliverNavigationBar 实现大标题折叠效果。
+    // ⚠️ primary 必须为 false：在 CupertinoTabScaffold 中多个 tab 同时存活，
+    // primary: true 会导致多个 CustomScrollView 竞争同一个 PrimaryScrollController，
+    // 在 Release 模式下 layout 阶段崩溃导致灰屏。
     Widget bodySliver;
     try {
       bodySliver =
@@ -178,15 +179,35 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         ),
       );
     }
+    final resolvedMiddle = middle ?? Text(title);
+    final resolvedLargeTitle =
+        showLargeTitle ? (largeTitle ?? Text(title)) : null;
 
     return CupertinoPageScaffold(
       backgroundColor: baseBackground,
-      navigationBar: navBar,
       child: CustomScrollView(
         primary: false,
         controller: sliverScrollController,
         physics: sliverScrollPhysics,
         slivers: [
+          CupertinoSliverNavigationBar(
+            largeTitle: resolvedLargeTitle,
+            middle: resolvedMiddle,
+            alwaysShowMiddle: !showLargeTitle,
+            previousPageTitle: '',
+            leading: _buildNavBarItem(
+              context,
+              leading,
+              alignment: Alignment.centerLeft,
+            ),
+            trailing: _buildNavBarItem(
+              context,
+              trailing,
+              alignment: Alignment.centerRight,
+            ),
+            backgroundColor: navBarBackground,
+            border: border,
+          ),
           bodySliver,
         ],
       ),
