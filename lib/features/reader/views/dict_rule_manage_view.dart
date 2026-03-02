@@ -637,10 +637,11 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                               setDialogState(() {});
                                             }
                                           },
-                                          child: const Icon(
+                                          child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed,
+                                            color: CupertinoColors.systemRed
+                                                .resolveFrom(context),
                                           ),
                                         ),
                                       ],

@@ -228,7 +228,8 @@ class ReplaceRuleRecords extends Table {
   IntColumn get timeoutMillisecond =>
       integer().withDefault(const Constant(3000))();
 
-  IntColumn get orderValue => integer().withDefault(const Constant(-2147483648))();
+  IntColumn get orderValue =>
+      integer().withDefault(const Constant(-2147483648))();
 
   IntColumn get updatedAt => integer().withDefault(const Constant(0))();
 
@@ -271,4 +272,3 @@ class BookmarkRecords extends Table {
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
-

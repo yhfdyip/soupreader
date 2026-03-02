@@ -466,14 +466,16 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
             onPressed: _menuBusy ? null : _saveRule,
             child: _saving
                 ? const CupertinoActivityIndicator(radius: 9)
-                : const Text('保存'), minimumSize: Size(30, 30),
+                : const Text('保存'),
+            minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _menuBusy ? null : _showMoreMenu,
             child: _logining
                 ? const CupertinoActivityIndicator(radius: 9)
-                : const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
+                : const Icon(CupertinoIcons.ellipsis),
+            minimumSize: Size(30, 30),
           ),
         ],
       ),

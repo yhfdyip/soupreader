@@ -930,6 +930,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                                               fontSize: 14,
                                               color: isSelected
                                                   ? CupertinoColors.activeBlue
+                                                      .resolveFrom(context)
                                                   : CupertinoColors.label
                                                       .resolveFrom(context),
                                             ),
@@ -957,7 +958,9 @@ class _BookshelfViewState extends State<BookshelfView> {
                                       size: 18,
                                       color: isSelected
                                           ? CupertinoColors.activeBlue
-                                          : CupertinoColors.systemGrey,
+                                              .resolveFrom(context)
+                                          : CupertinoColors.systemGrey
+                                              .resolveFrom(context),
                                     ),
                                   ],
                                 ),
@@ -1637,16 +1640,16 @@ class _BookshelfViewState extends State<BookshelfView> {
               style: TextStyle(
                 fontSize: 14,
                 color: selected
-                    ? CupertinoColors.activeBlue
+                    ? CupertinoColors.activeBlue.resolveFrom(context)
                     : CupertinoColors.label.resolveFrom(context),
               ),
             ),
           ),
           if (selected)
-            const Icon(
+            Icon(
               CupertinoIcons.check_mark,
               size: 16,
-              color: CupertinoColors.activeBlue,
+              color: CupertinoColors.activeBlue.resolveFrom(context),
             ),
         ],
       ),

@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
@@ -103,39 +106,27 @@ class _DirectLinkUploadConfigViewState
 
   Future<void> _showMoreMenu() async {
     final selected =
-        await showCupertinoBottomDialog<_DirectLinkUploadConfigMenuAction>(
+        await showAppActionListSheet<_DirectLinkUploadConfigMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('直链上传配置'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DirectLinkUploadConfigMenuAction.copyRule,
-            ),
-            child: const Text('拷贝规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DirectLinkUploadConfigMenuAction.pasteRule,
-            ),
-            child: const Text('粘贴规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DirectLinkUploadConfigMenuAction.importDefault,
-            ),
-            child: const Text('导入默认规则'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      title: '直链上传配置',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_DirectLinkUploadConfigMenuAction>(
+          value: _DirectLinkUploadConfigMenuAction.copyRule,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '拷贝规则',
         ),
-      ),
+        AppActionListItem<_DirectLinkUploadConfigMenuAction>(
+          value: _DirectLinkUploadConfigMenuAction.pasteRule,
+          icon: CupertinoIcons.doc_on_clipboard,
+          label: '粘贴规则',
+        ),
+        AppActionListItem<_DirectLinkUploadConfigMenuAction>(
+          value: _DirectLinkUploadConfigMenuAction.importDefault,
+          icon: CupertinoIcons.arrow_down_doc,
+          label: '导入默认规则',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
@@ -162,24 +153,19 @@ class _DirectLinkUploadConfigViewState
   Future<void> _importDefaultRule() async {
     final defaultRules = await _service.loadDefaultRules();
     if (!mounted || defaultRules.isEmpty) return;
-    final selected = await showCupertinoBottomDialog<DirectLinkUploadRule>(
+    final selected = await showOptionPickerSheet<DirectLinkUploadRule>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('导入默认规则'),
-        actions: defaultRules
-            .map(
-              (rule) => CupertinoActionSheetAction(
-                onPressed: () => Navigator.pop(sheetContext, rule),
-                child: Text(rule.summary),
-              ),
-            )
-            .toList(growable: false),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '导入默认规则',
+      currentValue: null,
+      showCancel: true,
+      items: defaultRules
+          .map(
+            (rule) => OptionPickerItem<DirectLinkUploadRule>(
+              value: rule,
+              label: rule.summary,
+            ),
+          )
+          .toList(growable: false),
     );
     if (selected == null || !mounted) return;
     setState(() {
@@ -253,11 +239,9 @@ class _DirectLinkUploadConfigViewState
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '直链上传配置',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: _showMoreMenu,
-        child: const Icon(CupertinoIcons.ellipsis),
-        minimumSize: Size(30, 30),
+        child: const Icon(CupertinoIcons.ellipsis, size: 22),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())

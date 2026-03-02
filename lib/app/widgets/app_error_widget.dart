@@ -29,7 +29,7 @@ class AppErrorWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final payload = _payload();
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemBackground,
+      backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
       navigationBar: CupertinoNavigationBar(
         middle: Text(title),
       ),
@@ -66,10 +66,13 @@ class AppErrorWidget extends StatelessWidget {
             const SizedBox(height: 12),
             DecoratedBox(
               decoration: BoxDecoration(
-                color: CupertinoColors.systemGroupedBackground,
+                color: CupertinoColors.systemGroupedBackground
+                    .resolveFrom(context),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: CupertinoColors.separator.withValues(alpha: 0.6),
+                  color: CupertinoColors.separator
+                      .resolveFrom(context)
+                      .withValues(alpha: 0.6),
                   width: 0.5,
                 ),
               ),
@@ -77,10 +80,10 @@ class AppErrorWidget extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   payload,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1.35,
-                    color: CupertinoColors.label,
+                    color: CupertinoColors.label.resolveFrom(context),
                   ),
                 ),
               ),

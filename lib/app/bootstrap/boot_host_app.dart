@@ -21,8 +21,7 @@ class BootHostApp extends StatefulWidget {
   State<BootHostApp> createState() => _BootHostAppState();
 }
 
-class _BootHostAppState extends State<BootHostApp>
-    with WidgetsBindingObserver {
+class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
   static const Duration _kTickerInterval = Duration(seconds: 1);
   static const int _kMaxLogLines = 160;
   static const int _kVisibleLogLines = 18;
@@ -244,9 +243,10 @@ class _BootHostAppState extends State<BootHostApp>
                   Text(
                     '步骤：$_step',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: CupertinoColors.secondaryLabel,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(innerContext),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -254,18 +254,20 @@ class _BootHostAppState extends State<BootHostApp>
                     Text(
                       '最新：${_latestLogLine()}',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: CupertinoColors.tertiaryLabel,
+                        color: CupertinoColors.tertiaryLabel
+                            .resolveFrom(innerContext),
                       ),
                     ),
                   const SizedBox(height: 6),
                   Text(
                     '已用时：${elapsedSeconds.toStringAsFixed(0)}s',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: CupertinoColors.tertiaryLabel,
+                      color: CupertinoColors.tertiaryLabel
+                          .resolveFrom(innerContext),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -293,21 +295,24 @@ class _BootHostAppState extends State<BootHostApp>
                       child: const Text('复制启动日志'),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       '启动日志（最新在上）',
                       style: TextStyle(
                         fontSize: 13,
-                        color: CupertinoColors.secondaryLabel,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(innerContext),
                       ),
                     ),
                     const SizedBox(height: 8),
                     DecoratedBox(
                       decoration: BoxDecoration(
-                        color: CupertinoColors.secondarySystemGroupedBackground,
+                        color: CupertinoColors.secondarySystemGroupedBackground
+                            .resolveFrom(innerContext),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color:
-                              CupertinoColors.separator.withValues(alpha: 0.7),
+                          color: CupertinoColors.separator
+                              .resolveFrom(innerContext)
+                              .withValues(alpha: 0.7),
                           width: 0.5,
                         ),
                       ),
@@ -315,10 +320,11 @@ class _BootHostAppState extends State<BootHostApp>
                         padding: const EdgeInsets.all(12),
                         child: Text(
                           _bootLogTailPayload(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             height: 1.35,
-                            color: CupertinoColors.label,
+                            color:
+                                CupertinoColors.label.resolveFrom(innerContext),
                           ),
                         ),
                       ),

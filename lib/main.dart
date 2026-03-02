@@ -7,7 +7,8 @@ import 'package:flutter/services.dart';
 import 'app/bootstrap/boot_host_app.dart';
 import 'core/services/exception_log_service.dart';
 
-const MethodChannel _bootOverlayChannel = MethodChannel('soupreader/boot_overlay');
+const MethodChannel _bootOverlayChannel =
+    MethodChannel('soupreader/boot_overlay');
 
 void _hideNativeBootOverlayAfterFirstFrame() {
   WidgetsBinding.instance.addPostFrameCallback((_) async {

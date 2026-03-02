@@ -420,6 +420,7 @@ class ReaderBottomMenu extends StatelessWidget {
             Row(
               children: [
                 _buildIconBtn(
+                    context,
                     CupertinoIcons.arrow_left,
                     currentChapterIndex > 0
                         ? () => onChapterChanged(currentChapterIndex - 1)
@@ -447,13 +448,17 @@ class ReaderBottomMenu extends StatelessWidget {
                       ),
                       Text(
                         '${currentChapterIndex + 1} / $totalChapters',
-                        style: const TextStyle(
-                            color: CupertinoColors.systemGrey, fontSize: 10),
+                        style: TextStyle(
+                          color:
+                              CupertinoColors.systemGrey.resolveFrom(context),
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 _buildIconBtn(
+                    context,
                     CupertinoIcons.arrow_right,
                     currentChapterIndex < totalChapters - 1
                         ? () => onChapterChanged(currentChapterIndex + 1)
@@ -465,8 +470,11 @@ class ReaderBottomMenu extends StatelessWidget {
             // 第二行：亮度调节
             Row(
               children: [
-                const Icon(CupertinoIcons.sun_min,
-                    color: CupertinoColors.systemGrey, size: 20),
+                Icon(
+                  CupertinoIcons.sun_min,
+                  color: CupertinoColors.systemGrey.resolveFrom(context),
+                  size: 20,
+                ),
                 Expanded(
                   child: CupertinoSlider(
                     value: safeBrightness.clamp(0.0, 1.0).toDouble(),
@@ -479,8 +487,11 @@ class ReaderBottomMenu extends StatelessWidget {
                     },
                   ),
                 ),
-                const Icon(CupertinoIcons.sun_max,
-                    color: CupertinoColors.systemGrey, size: 20),
+                Icon(
+                  CupertinoIcons.sun_max,
+                  color: CupertinoColors.systemGrey.resolveFrom(context),
+                  size: 20,
+                ),
                 const SizedBox(width: 16),
                 GestureDetector(
                   onTap: () {
@@ -493,7 +504,9 @@ class ReaderBottomMenu extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: settings.useSystemBrightness
                           ? AppDesignTokens.brandSecondary
-                          : CupertinoColors.systemGrey.withValues(alpha: 0.2),
+                          : CupertinoColors.systemGrey
+                              .resolveFrom(context)
+                              .withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -501,7 +514,7 @@ class ReaderBottomMenu extends StatelessWidget {
                       style: TextStyle(
                         color: settings.useSystemBrightness
                             ? CupertinoColors.white
-                            : CupertinoColors.systemGrey,
+                            : CupertinoColors.systemGrey.resolveFrom(context),
                         fontSize: 12,
                       ),
                     ),
@@ -551,15 +564,21 @@ class ReaderBottomMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildIconBtn(IconData icon, VoidCallback? onTap) {
+  Widget _buildIconBtn(
+    BuildContext context,
+    IconData icon,
+    VoidCallback? onTap,
+  ) {
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: onTap,
-      child: Icon(icon,
-          color: onTap != null
-              ? AppDesignTokens.brandSecondary
-              : CupertinoColors.systemGrey,
-          size: 24),
+      child: Icon(
+        icon,
+        color: onTap != null
+            ? AppDesignTokens.brandSecondary
+            : CupertinoColors.systemGrey.resolveFrom(context),
+        size: 24,
+      ),
     );
   }
 
@@ -636,7 +655,8 @@ class ReaderBottomMenu extends StatelessWidget {
                       ? AppDesignTokens.brandSecondary
                       : PageTurnModeUi.isHidden(mode)
                           ? CupertinoColors.inactiveGray
-                          : CupertinoColors.label,
+                              .resolveFrom(sheetContext)
+                          : CupertinoColors.label.resolveFrom(sheetContext),
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -648,8 +668,10 @@ class ReaderBottomMenu extends StatelessWidget {
                     color: isSelected
                         ? AppDesignTokens.brandSecondary
                         : PageTurnModeUi.isHidden(mode)
-                            ? CupertinoColors.inactiveGray
-                            : CupertinoColors.label,
+                            ? CupertinoColors.inactiveGray.resolveFrom(
+                                sheetContext,
+                              )
+                            : CupertinoColors.label.resolveFrom(sheetContext),
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
                   ),

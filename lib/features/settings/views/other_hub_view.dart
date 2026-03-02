@@ -21,9 +21,11 @@ class OtherHubView extends StatelessWidget {
             children: [
               AppListTile(
                 title: const Text('分享'),
-                additionalInfo: const Text(
+                additionalInfo: Text(
                   SettingsUiTokens.plannedLabel,
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                  style: TextStyle(
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
@@ -32,9 +34,11 @@ class OtherHubView extends StatelessWidget {
               ),
               AppListTile(
                 title: const Text('好评支持'),
-                additionalInfo: const Text(
+                additionalInfo: Text(
                   SettingsUiTokens.plannedLabel,
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                  style: TextStyle(
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,

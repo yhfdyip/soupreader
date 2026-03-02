@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
@@ -559,11 +560,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       title: '发现',
       useSliverNavigationBar: true,
       sliverScrollController: _scrollController,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(28, 28),
+      trailing: AppNavBarButton(
         onPressed: _showGroupFilterMenu,
-        child: const Icon(CupertinoIcons.slider_horizontal_3),
+        child: const Icon(CupertinoIcons.slider_horizontal_3, size: 22),
       ),
       child: const SizedBox.shrink(),
       sliverBodyBuilder: (_) => _buildBodySliver(

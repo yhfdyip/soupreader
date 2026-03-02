@@ -635,10 +635,13 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                                       const EdgeInsets.symmetric(horizontal: 6),
                                   minimumSize: const Size(36, 30),
                                   onPressed: () => _removeGroup(group),
-                                  child: const Text(
+                                  child: Text(
                                     '删除',
                                     style: TextStyle(
-                                      color: CupertinoColors.systemRed,
+                                      color:
+                                          CupertinoColors.systemRed.resolveFrom(
+                                        context,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1703,10 +1706,11 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                                               setDialogState(() {});
                                             }
                                           },
-                                          child: const Icon(
+                                          child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed,
+                                            color: CupertinoColors.systemRed
+                                                .resolveFrom(context),
                                           ),
                                         ),
                                       ],

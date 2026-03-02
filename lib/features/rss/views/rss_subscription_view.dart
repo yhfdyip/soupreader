@@ -161,16 +161,16 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
               _query.isEmpty ? '启用订阅源' : '筛选：$_query',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: CupertinoColors.secondaryLabel,
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 fontSize: 12,
               ),
             ),
           ),
           Text(
             '${visible.length} / $enabledCount',
-            style: const TextStyle(
-              color: CupertinoColors.secondaryLabel,
+            style: TextStyle(
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
               fontSize: 12,
             ),
           ),
@@ -240,7 +240,9 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
         children: [
           Text(
             title,
-            style: const TextStyle(color: CupertinoColors.secondaryLabel),
+            style: TextStyle(
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 10),
           CupertinoButton(
@@ -263,11 +265,11 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
       child: CupertinoListTile.notched(
         leading: const Icon(CupertinoIcons.square_list),
         title: const Text('规则订阅'),
-        additionalInfo: const Text(
+        additionalInfo: Text(
           '导入地址',
           style: TextStyle(
             fontSize: 12,
-            color: CupertinoColors.secondaryLabel,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
           ),
         ),
         trailing: const CupertinoListTileChevron(),
@@ -292,9 +294,9 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
           subtitle: source.sourceGroup?.trim().isNotEmpty == true
               ? Text(
                   source.sourceGroup!.trim(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: CupertinoColors.secondaryLabel,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
                   ),
                 )
               : null,

@@ -154,12 +154,14 @@ class _DictRuleEditViewState extends State<DictRuleEditView> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _saveRule,
-            child: const Text('保存'), minimumSize: Size(30, 30),
+            child: const Text('保存'),
+            minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
+            child: const Icon(CupertinoIcons.ellipsis),
+            minimumSize: Size(30, 30),
           ),
         ],
       ),

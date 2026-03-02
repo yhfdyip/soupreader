@@ -237,8 +237,8 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
                   const SizedBox(height: 6),
                   Text(
                     _errorText!,
-                    style: const TextStyle(
-                      color: CupertinoColors.systemRed,
+                    style: TextStyle(
+                      color: CupertinoColors.systemRed.resolveFrom(context),
                       fontSize: 12,
                     ),
                   ),
@@ -282,7 +282,7 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -321,7 +321,7 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
             color: color,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: CupertinoColors.separator,
+              color: CupertinoColors.separator.resolveFrom(context),
               width: 0.8,
             ),
           ),
@@ -329,9 +329,9 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
-            color: CupertinoColors.systemGrey,
+            color: CupertinoColors.systemGrey.resolveFrom(context),
           ),
         ),
       ],
@@ -373,7 +373,7 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: CupertinoColors.separator,
+                  color: CupertinoColors.separator.resolveFrom(context),
                   width: 0.8,
                 ),
                 color: HSVColor.fromAHSV(1, _hsvColor.hue, 1, 1).toColor(),
@@ -457,7 +457,7 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: CupertinoColors.separator,
+                  color: CupertinoColors.separator.resolveFrom(context),
                   width: 0.8,
                 ),
                 gradient: const LinearGradient(
@@ -510,9 +510,12 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey6,
+          color: CupertinoColors.systemGrey6.resolveFrom(context),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: CupertinoColors.separator, width: 0.6),
+          border: Border.all(
+            color: CupertinoColors.separator.resolveFrom(context),
+            width: 0.6,
+          ),
         ),
         child: Text(
           '$label $value',
@@ -543,9 +546,9 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
-            color: CupertinoColors.systemGrey,
+            color: CupertinoColors.systemGrey.resolveFrom(context),
           ),
         ),
         const SizedBox(height: 6),
@@ -568,8 +571,8 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: selected
-                        ? CupertinoColors.activeBlue
-                        : CupertinoColors.separator,
+                        ? CupertinoColors.activeBlue.resolveFrom(context)
+                        : CupertinoColors.separator.resolveFrom(context),
                     width: selected ? 2 : 1,
                   ),
                 ),

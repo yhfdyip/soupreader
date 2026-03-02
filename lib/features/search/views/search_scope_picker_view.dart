@@ -190,8 +190,9 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
         decoration: BoxDecoration(
-          color:
-              selected ? uiTokens.colors.accent.withValues(alpha: 0.08) : uiTokens.colors.card,
+          color: selected
+              ? uiTokens.colors.accent.withValues(alpha: 0.08)
+              : uiTokens.colors.card,
           borderRadius: BorderRadius.circular(uiTokens.radii.control),
           border: Border.all(
             color: selected
@@ -247,7 +248,9 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                     ? CupertinoIcons.check_mark_circled_solid
                     : CupertinoIcons.circle,
                 size: 20,
-                color: selected ? uiTokens.colors.accent : uiTokens.colors.mutedForeground,
+                color: selected
+                    ? uiTokens.colors.accent
+                    : uiTokens.colors.mutedForeground,
               ),
             ],
           ),
@@ -299,7 +302,9 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                     ? CupertinoIcons.check_mark_circled_solid
                     : CupertinoIcons.circle,
                 size: 20,
-                color: selected ? uiTokens.colors.accent : uiTokens.colors.mutedForeground,
+                color: selected
+                    ? uiTokens.colors.accent
+                    : uiTokens.colors.mutedForeground,
               ),
             ],
           ),

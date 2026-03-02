@@ -24,4 +24,3 @@ class BuildInfo {
     return sha.substring(0, 8);
   }
 }
-

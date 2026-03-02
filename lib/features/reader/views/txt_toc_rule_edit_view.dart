@@ -48,8 +48,7 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
   }
 
   Future<void> _showMoreMenu() async {
-    final selected =
-        await showCupertinoBottomDialog<_TxtTocRuleEditMenuAction>(
+    final selected = await showCupertinoBottomDialog<_TxtTocRuleEditMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -175,12 +174,14 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _saveRule,
-            child: const Text('保存'), minimumSize: Size(30, 30),
+            child: const Text('保存'),
+            minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
+            child: const Icon(CupertinoIcons.ellipsis),
+            minimumSize: Size(30, 30),
           ),
         ],
       ),

@@ -10,7 +10,8 @@ Future<T?> showCupertinoBottomDialog<T>({
   RouteSettings? routeSettings,
 }) {
   final themeData = CupertinoTheme.of(context);
-  final probeContext = Navigator.of(context, rootNavigator: useRootNavigator).context;
+  final probeContext =
+      Navigator.of(context, rootNavigator: useRootNavigator).context;
   final probeWidget = builder(probeContext);
 
   Widget themedBuilder(BuildContext popupContext) {

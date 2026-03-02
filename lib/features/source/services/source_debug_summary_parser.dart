@@ -201,8 +201,7 @@ class SourceDebugSummaryParser {
       ).firstMatch(line);
       if (pageSummaryMatch != null) {
         contentPages = int.tryParse(pageSummaryMatch.group(1) ?? '');
-        contentExtractedLength =
-            int.tryParse(pageSummaryMatch.group(2) ?? '');
+        contentExtractedLength = int.tryParse(pageSummaryMatch.group(2) ?? '');
         contentCleanedLength = int.tryParse(pageSummaryMatch.group(3) ?? '');
         continue;
       }
@@ -287,9 +286,9 @@ class SourceDebugSummaryParser {
     final lowerErrors = stageErrors.map((e) => e.toLowerCase()).join('\n');
     final lowerDebug = (debugError ?? '').toLowerCase();
 
-    final hasRequestFailure =
-        failedRequests > 0 || _containsAny(lowerErrors, _requestKeywords) ||
-            _containsAny(lowerDebug, _requestKeywords);
+    final hasRequestFailure = failedRequests > 0 ||
+        _containsAny(lowerErrors, _requestKeywords) ||
+        _containsAny(lowerDebug, _requestKeywords);
     if (hasRequestFailure) {
       labels.add('request_failure');
       hints.add('请求阶段存在失败，优先检查网络可达性、Header/Cookie 与反爬限制。');
@@ -303,7 +302,8 @@ class SourceDebugSummaryParser {
             (contentCleanedLength != null && contentCleanedLength <= 0));
     if (hasParseFailure) {
       labels.add('parse_failure');
-      hints.add('请求成功但解析结果异常，建议先核对 ruleSearch/ruleBookInfo/ruleToc/ruleContent。');
+      hints.add(
+          '请求成功但解析结果异常，建议先核对 ruleSearch/ruleBookInfo/ruleToc/ruleContent。');
     }
 
     final hasPagingInterrupted = stoppedByNextChapter ||

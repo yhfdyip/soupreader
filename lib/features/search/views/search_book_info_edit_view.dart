@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../services/search_book_info_edit_helper.dart';
 import 'search_book_cover_change_view.dart';
 
@@ -122,13 +123,11 @@ class _SearchBookInfoEditViewState extends State<SearchBookInfoEditView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '编辑书籍信息',
-      leading: CupertinoButton(
-        padding: EdgeInsets.zero,
+      leading: AppNavBarButton(
         onPressed: () => Navigator.of(context).pop(),
         child: const Text('取消'),
       ),
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: _submit,
         child: const Text('保存'),
       ),

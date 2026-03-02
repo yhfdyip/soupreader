@@ -253,8 +253,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _showRuleItemMenu(TxtTocRule rule) async {
     if (_menuBusy || _selectionMode) return;
-    final selected =
-        await showCupertinoBottomDialog<_TxtTocRuleItemMenuAction>(
+    final selected = await showCupertinoBottomDialog<_TxtTocRuleItemMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -958,10 +957,11 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                               setDialogState(() {});
                                             }
                                           },
-                                          child: const Icon(
+                                          child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed,
+                                            color: CupertinoColors.systemRed
+                                                .resolveFrom(context),
                                           ),
                                         ),
                                       ],

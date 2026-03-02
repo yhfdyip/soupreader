@@ -22,4 +22,3 @@ class BootLog {
     _sink?.call(message);
   }
 }
-

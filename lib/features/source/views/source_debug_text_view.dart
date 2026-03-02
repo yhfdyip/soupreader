@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 
 class SourceDebugTextView extends StatefulWidget {
   final String title;
@@ -35,11 +36,9 @@ class _SourceDebugTextViewState extends State<SourceDebugTextView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: widget.title,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: () => Navigator.of(context).pop(),
         child: const Text('关闭'),
-        minimumSize: Size(30, 30),
       ),
       child: CupertinoScrollbar(
         child: SingleChildScrollView(

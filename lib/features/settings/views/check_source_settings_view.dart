@@ -4,6 +4,7 @@ import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../models/check_source_settings.dart';
 import '../services/check_source_settings_service.dart';
 
@@ -160,17 +161,13 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '校验设置',
-      leading: CupertinoButton(
-        padding: EdgeInsets.zero,
+      leading: AppNavBarButton(
         onPressed: () => Navigator.of(context).pop(false),
         child: const Text('取消'),
-        minimumSize: Size(30, 30),
       ),
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: _saveAndClose,
         child: const Text('确定'),
-        minimumSize: Size(30, 30),
       ),
       child: AppListView(
         children: [

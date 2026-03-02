@@ -253,59 +253,28 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   }
 
   Future<void> _pickUpdateToVariant() async {
-    final selected = await showCupertinoBottomDialog<String>(
+    final current = _appSettings.updateToVariant;
+    final variants = <String>[
+      AppSettings.defaultUpdateToVariant,
+      AppSettings.officialUpdateToVariant,
+      AppSettings.betaReleaseUpdateToVariant,
+      AppSettings.betaReleaseAUpdateToVariant,
+    ];
+    final selected = await showOptionPickerSheet<String>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(sheetContext).pop(
-              AppSettings.defaultUpdateToVariant,
+      title: '检查更新查找版本',
+      currentValue: current,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: variants
+          .map(
+            (variant) => OptionPickerItem<String>(
+              value: variant,
+              label: AppSettings.updateToVariantLabel(variant),
             ),
-            child: Text(
-              AppSettings.updateToVariantLabel(
-                AppSettings.defaultUpdateToVariant,
-              ),
-            ),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(sheetContext).pop(
-              AppSettings.officialUpdateToVariant,
-            ),
-            child: Text(
-              AppSettings.updateToVariantLabel(
-                AppSettings.officialUpdateToVariant,
-              ),
-            ),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(sheetContext).pop(
-              AppSettings.betaReleaseUpdateToVariant,
-            ),
-            child: Text(
-              AppSettings.updateToVariantLabel(
-                AppSettings.betaReleaseUpdateToVariant,
-              ),
-            ),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(sheetContext).pop(
-              AppSettings.betaReleaseAUpdateToVariant,
-            ),
-            child: Text(
-              AppSettings.updateToVariantLabel(
-                AppSettings.betaReleaseAUpdateToVariant,
-              ),
-            ),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
-        ),
-      ),
+          )
+          .toList(growable: false),
     );
-    if (selected == null) return;
+    if (selected == null || selected == current) return;
     await _settingsService.saveUpdateToVariant(selected);
   }
 

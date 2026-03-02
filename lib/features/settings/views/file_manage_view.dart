@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -167,24 +169,18 @@ class _FileManageViewState extends State<FileManageView> {
   }
 
   Future<void> _showEntityMenu(FileSystemEntity entity) async {
-    final selected = await showCupertinoBottomDialog<_FileEntityAction>(
+    final selected = await showAppActionListSheet<_FileEntityAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text(_displayName(entity)),
-        actions: [
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () =>
-                Navigator.pop(sheetContext, _FileEntityAction.delete),
-            child: const Text('删除'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      title: _displayName(entity),
+      showCancel: true,
+      items: const [
+        AppActionListItem<_FileEntityAction>(
+          value: _FileEntityAction.delete,
+          icon: CupertinoIcons.delete,
+          label: '删除',
+          isDestructiveAction: true,
         ),
-      ),
+      ],
     );
     if (selected == _FileEntityAction.delete) {
       await _deleteEntity(entity);
@@ -532,7 +528,11 @@ class _FileManageViewState extends State<FileManageView> {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Row(
               children: [
-                Icon(icon, size: 20, color: CupertinoColors.activeBlue),
+                Icon(
+                  icon,
+                  size: 20,
+                  color: CupertinoColors.activeBlue.resolveFrom(context),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -581,15 +581,13 @@ class _FileManageViewState extends State<FileManageView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '文件管理',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: (_currentDir != null && !_creatingFolder)
             ? _showCreateFolderDialog
             : null,
         child: _creatingFolder
             ? const CupertinoActivityIndicator()
             : const Text('新建文件夹'),
-        minimumSize: Size(30, 30),
       ),
       child: PopScope<void>(
         canPop: _atRoot,

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../services/remote_books_archive_service.dart';
 
 /// 远程压缩包内容选择页（Cupertino 风格）。
@@ -117,18 +118,19 @@ class _RemoteBooksArchiveEntriesViewState
                   const SizedBox(height: 2),
                   Text(
                     '${item.extension.toUpperCase()} · ${_formatBytes(item.sizeInBytes)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: CupertinoColors.secondaryLabel,
+                      color:
+                          CupertinoColors.secondaryLabel.resolveFrom(context),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               CupertinoIcons.chevron_forward,
               size: 16,
-              color: CupertinoColors.tertiaryLabel,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
             ),
           ],
         ),
@@ -145,8 +147,7 @@ class _RemoteBooksArchiveEntriesViewState
     return AppCupertinoPageScaffold(
       title: '压缩包内容',
       middle: Text(archiveTitle.isEmpty ? '压缩包内容' : archiveTitle),
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: () => Navigator.of(context).pop(),
         child: const Text('取消'),
       ),
@@ -162,12 +163,13 @@ class _RemoteBooksArchiveEntriesViewState
           if (message.isNotEmpty) _buildMessageCard(context, message),
           Expanded(
             child: candidates.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       '未找到可阅读文件',
                       style: TextStyle(
                         fontSize: 14,
-                        color: CupertinoColors.secondaryLabel,
+                        color:
+                            CupertinoColors.secondaryLabel.resolveFrom(context),
                       ),
                     ),
                   )

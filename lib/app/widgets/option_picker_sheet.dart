@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
-import '../theme/design_tokens.dart';
+import '../theme/ui_tokens.dart';
 
 /// 通用单选底部面板（用于替换纯“选项选择器”类 ActionSheet）。
 class OptionPickerItem<T> {
@@ -67,17 +67,12 @@ class _OptionPickerSheet<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final accent = accentColor ??
-        (isDark
-            ? AppDesignTokens.brandSecondary
-            : AppDesignTokens.brandPrimary);
-    final sheetBg =
-        CupertinoColors.systemGroupedBackground.resolveFrom(context);
-    final titleColor = CupertinoColors.label.resolveFrom(context);
-    final subtitleColor = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final handleColor =
-        CupertinoColors.systemGrey3.resolveFrom(context).withValues(alpha: 0.72);
+    final ui = AppUiTokens.resolve(context);
+    final accent = accentColor ?? ui.colors.accent;
+    final sheetBg = ui.colors.groupedBackground;
+    final titleColor = ui.colors.label;
+    final subtitleColor = ui.colors.secondaryLabel;
+    final handleColor = ui.colors.separator.withValues(alpha: 0.72);
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = math.max(mediaQuery.padding.bottom, 8.0);
     final maxHeight = mediaQuery.size.height * 0.58;
@@ -88,10 +83,12 @@ class _OptionPickerSheet<T> extends StatelessWidget {
         width: double.infinity,
         decoration: BoxDecoration(
           color: sheetBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(ui.radii.sheet),
+          ),
         ),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
+          padding: EdgeInsets.fromLTRB(10, 10, 10, bottomInset),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -200,6 +197,12 @@ class _OptionPickerContent<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ui = AppUiTokens.resolve(context);
+    final sectionDecoration = BoxDecoration(
+      color: ui.colors.surfaceBackground,
+      borderRadius: BorderRadius.circular(ui.radii.card),
+    );
+
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: ListView(
@@ -207,6 +210,11 @@ class _OptionPickerContent<T> extends StatelessWidget {
         physics: const BouncingScrollPhysics(),
         children: [
           CupertinoListSection.insetGrouped(
+            margin: EdgeInsets.zero,
+            hasLeading: false,
+            backgroundColor: ui.colors.groupedBackground,
+            decoration: sectionDecoration,
+            separatorColor: ui.colors.separator,
             children: [
               for (final item in items)
                 _OptionPickerRow<T>(
@@ -219,8 +227,14 @@ class _OptionPickerContent<T> extends StatelessWidget {
                 ),
             ],
           ),
-          if (showCancel)
+          if (showCancel) ...[
+            const SizedBox(height: 10),
             CupertinoListSection.insetGrouped(
+              margin: EdgeInsets.zero,
+              hasLeading: false,
+              backgroundColor: ui.colors.groupedBackground,
+              decoration: sectionDecoration,
+              separatorColor: ui.colors.separator,
               children: [
                 CupertinoListTile.notched(
                   title: Text(
@@ -234,6 +248,7 @@ class _OptionPickerContent<T> extends StatelessWidget {
                 ),
               ],
             ),
+          ],
         ],
       ),
     );
@@ -255,10 +270,10 @@ class _OptionPickerRow<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelColor = item.enabled
-        ? CupertinoColors.label.resolveFrom(context)
-        : CupertinoColors.secondaryLabel.resolveFrom(context);
-    final subtitleColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final ui = AppUiTokens.resolve(context);
+    final labelColor =
+        item.enabled ? ui.colors.label : ui.colors.secondaryLabel;
+    final subtitleColor = ui.colors.secondaryLabel;
     final titleStyle = TextStyle(
       color: labelColor,
       fontWeight: FontWeight.w600,
@@ -306,7 +321,11 @@ class _OptionPickerRow<T> extends StatelessWidget {
               style: TextStyle(color: subtitleColor, fontSize: 12),
             ),
       trailing: selected
-          ? Icon(CupertinoIcons.check_mark, size: 18, color: accent)
+          ? Icon(
+              CupertinoIcons.check_mark,
+              size: ui.iconSizes.listTrailing,
+              color: accent,
+            )
           : null,
       onTap: onTap,
     );

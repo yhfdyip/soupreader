@@ -72,7 +72,9 @@ class SourceAvailabilityDiagnosisService {
   DiagnosisSummary diagnoseMissingRule() {
     return const DiagnosisSummary(
       labels: <String>['parse_failure'],
-      hints: <String>['缺少 search/explore 规则配置，请先补齐 searchUrl/ruleSearch 或 exploreUrl/ruleExplore。'],
+      hints: <String>[
+        '缺少 search/explore 规则配置，请先补齐 searchUrl/ruleSearch 或 exploreUrl/ruleExplore。'
+      ],
     );
   }
 

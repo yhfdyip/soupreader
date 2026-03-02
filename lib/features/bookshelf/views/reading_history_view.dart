@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../core/database/database_service.dart';
@@ -63,11 +64,9 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '阅读记录',
-      trailing: CupertinoButton(
+      trailing: AppNavBarButton(
         key: _moreMenuKey,
-        padding: EdgeInsets.zero,
         onPressed: _showTopActions,
-        minimumSize: const Size(28, 28),
         child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
       ),
       child: StreamBuilder<List<Book>>(

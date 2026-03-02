@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
@@ -84,11 +85,10 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: widget.title,
-      trailing: CupertinoButton(
+      trailing: AppNavBarButton(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         onPressed: _clearLogs,
         child: const Text('清除'),
-        minimumSize: Size(30, 30),
       ),
       child: ValueListenableBuilder<List<ExceptionLogEntry>>(
         valueListenable: _service.listenable,
@@ -126,12 +126,12 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(top: 2),
                         child: Icon(
                           CupertinoIcons.exclamationmark_circle,
                           size: 18,
-                          color: CupertinoColors.systemRed,
+                          color: CupertinoColors.systemRed.resolveFrom(context),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -179,10 +179,11 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         CupertinoIcons.chevron_right,
                         size: 14,
-                        color: CupertinoColors.tertiaryLabel,
+                        color:
+                            CupertinoColors.tertiaryLabel.resolveFrom(context),
                       ),
                     ],
                   ),
@@ -244,9 +245,7 @@ class ExceptionLogDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '异常详情',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(30, 30),
+      trailing: AppNavBarButton(
         onPressed: () => _copy(context),
         child: const Icon(CupertinoIcons.doc_on_doc),
       ),

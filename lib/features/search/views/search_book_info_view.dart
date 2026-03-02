@@ -2055,10 +2055,12 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     ];
   }
 
-  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildVariableMenuItems({
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>>
+      _buildVariableMenuItems({
     required bool showSetVariable,
   }) {
-    if (!showSetVariable) return const <AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>>[];
+    if (!showSetVariable)
+      return const <AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>>[];
     return const [
       AppPopoverMenuItem(
         value: _SearchBookInfoMoreMenuAction.setSourceVariable,
@@ -2073,7 +2075,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     ];
   }
 
-  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildCopyMenuItems() {
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>>
+      _buildCopyMenuItems() {
     return const [
       AppPopoverMenuItem(
         value: _SearchBookInfoMoreMenuAction.copyBookUrl,
@@ -2088,7 +2091,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     ];
   }
 
-  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildOptionMenuItems({
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>>
+      _buildOptionMenuItems({
     required bool showAllowUpdate,
     required bool showSplitLongChapter,
   }) {
@@ -2113,7 +2117,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     ];
   }
 
-  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildUtilityMenuItems() {
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>>
+      _buildUtilityMenuItems() {
     return const [
       AppPopoverMenuItem(
         value: _SearchBookInfoMoreMenuAction.clearCache,
@@ -2736,8 +2741,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                               trailing: _canFetchOnlineDetail
                                   ? _MetaActionChip(
                                       label: '换源',
-                                      onPressed:
-                                          _switchingSource ? null : _switchSource,
+                                      onPressed: _switchingSource
+                                          ? null
+                                          : _switchSource,
                                       color: primaryActionColor,
                                     )
                                   : null,

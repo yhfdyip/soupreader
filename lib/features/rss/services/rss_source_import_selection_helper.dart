@@ -101,7 +101,8 @@ class RssSourceImportSelectionHelper {
       dedup[url] = RssSourceImportCandidate(
         incoming: source,
         existing: existing,
-        rawJson: result.rawJsonForSourceUrl(url) ?? LegadoJson.encode(source.toJson()),
+        rawJson: result.rawJsonForSourceUrl(url) ??
+            LegadoJson.encode(source.toJson()),
         state: state,
       );
     }

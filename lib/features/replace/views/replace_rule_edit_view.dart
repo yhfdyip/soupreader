@@ -289,12 +289,14 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _saving ? null : _save,
-            child: const Text('保存'), minimumSize: Size(30, 30),
+            child: const Text('保存'),
+            minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _saving ? null : _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
+            child: const Icon(CupertinoIcons.ellipsis),
+            minimumSize: Size(30, 30),
           ),
         ],
       ),

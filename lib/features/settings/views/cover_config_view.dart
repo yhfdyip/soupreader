@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
@@ -157,28 +158,23 @@ class _CoverConfigViewState extends State<CoverConfigView> {
       return;
     }
 
-    final selected = await showCupertinoBottomDialog<_CoverImageAction>(
+    final selected = await showAppActionListSheet<_CoverImageAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () =>
-                Navigator.of(sheetContext).pop(_CoverImageAction.delete),
-            child: const Text('删除'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.of(sheetContext).pop(_CoverImageAction.select),
-            child: const Text('选择图片'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+      title: night ? '夜间默认封面' : '白天默认封面',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_CoverImageAction>(
+          value: _CoverImageAction.delete,
+          icon: CupertinoIcons.delete,
+          label: '删除',
+          isDestructiveAction: true,
         ),
-      ),
+        AppActionListItem<_CoverImageAction>(
+          value: _CoverImageAction.select,
+          icon: CupertinoIcons.photo,
+          label: '选择图片',
+        ),
+      ],
     );
 
     if (selected == _CoverImageAction.delete) {

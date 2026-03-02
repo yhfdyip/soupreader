@@ -521,9 +521,8 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
 
   Widget _buildProgressBar(BuildContext context, {required bool showProgress}) {
     if (!showProgress) return const SizedBox.shrink();
-    final factor = _progress <= 0 && _isLoading
-        ? _progressMinFactor
-        : (_progress / 100.0);
+    final factor =
+        _progress <= 0 && _isLoading ? _progressMinFactor : (_progress / 100.0);
     return SizedBox(
       height: _progressBarHeight,
       child: DecoratedBox(
@@ -590,7 +589,8 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
     }) {
       return CupertinoButton(
         padding: EdgeInsets.zero,
-        minimumSize: const Size(_fullScreenOverlayButtonSize, _fullScreenOverlayButtonSize),
+        minimumSize: const Size(
+            _fullScreenOverlayButtonSize, _fullScreenOverlayButtonSize),
         onPressed: onTap,
         child: Container(
           width: _fullScreenOverlayButtonSize,
@@ -676,7 +676,8 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
                     child: SafeArea(
                       top: false,
                       bottom: false,
-                      child: _buildPageBody(context, showProgress: showProgress),
+                      child:
+                          _buildPageBody(context, showProgress: showProgress),
                     ),
                   ),
                   Positioned(

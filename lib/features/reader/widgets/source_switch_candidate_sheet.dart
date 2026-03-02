@@ -1340,10 +1340,11 @@ class _SourceSwitchCandidateSheetState
                                 children: [
                                   Text(
                                     sourceName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
-                                      color: CupertinoColors.label,
+                                      color: CupertinoColors.label
+                                          .resolveFrom(itemContext),
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,

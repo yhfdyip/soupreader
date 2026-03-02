@@ -91,9 +91,11 @@ class SourceManagementView extends StatelessWidget {
               ),
               AppListTile(
                 title: const Text('广告屏蔽'),
-                additionalInfo: const Text(
+                additionalInfo: Text(
                   SettingsUiTokens.plannedLabel,
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                  style: TextStyle(
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,

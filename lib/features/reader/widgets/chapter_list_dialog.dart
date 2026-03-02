@@ -66,19 +66,20 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
   Color get _textStrong =>
       _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
 
-  Color get _textNormal =>
-      _isDark ? CupertinoColors.systemGrey : AppDesignTokens.textNormal;
+  Color get _textNormal => _isDark
+      ? CupertinoColors.systemGrey.resolveFrom(context)
+      : AppDesignTokens.textNormal;
 
   Color get _textSubtle => _isDark
-      ? CupertinoColors.systemGrey.withValues(alpha: 0.75)
+      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
       : AppDesignTokens.textMuted;
 
   Color get _chipBg => _isDark
-      ? CupertinoColors.systemGrey.withValues(alpha: 0.2)
+      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.2)
       : AppDesignTokens.pageBgLight;
 
   Color get _cardBg => _isDark
-      ? CupertinoColors.systemGrey.withValues(alpha: 0.1)
+      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1)
       : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
 
   @override

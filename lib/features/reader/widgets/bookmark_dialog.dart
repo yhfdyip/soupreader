@@ -46,18 +46,19 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   Color get _textStrong =>
       _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
 
-  Color get _textNormal =>
-      _isDark ? CupertinoColors.systemGrey : AppDesignTokens.textNormal;
+  Color get _textNormal => _isDark
+      ? CupertinoColors.systemGrey.resolveFrom(context)
+      : AppDesignTokens.textNormal;
 
   Color get _textSubtle => _isDark
-      ? CupertinoColors.systemGrey.withValues(alpha: 0.75)
+      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
       : AppDesignTokens.textMuted;
 
   Color get _lineColor =>
       _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
 
   Color get _cardBg => _isDark
-      ? CupertinoColors.systemGrey.withValues(alpha: 0.1)
+      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1)
       : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
 
   Color get _dangerBg => _isDark
@@ -421,17 +422,16 @@ class BookmarkIndicator extends StatelessWidget {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final activeColor =
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
-    final inactiveColor =
-        isDark ? CupertinoColors.systemGrey : AppDesignTokens.textMuted;
+    final inactiveColor = isDark
+        ? CupertinoColors.systemGrey.resolveFrom(context)
+        : AppDesignTokens.textMuted;
 
     return GestureDetector(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Icon(
-          hasBookmark
-              ? CupertinoIcons.bookmark_fill
-              : CupertinoIcons.bookmark,
+          hasBookmark ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
           color: hasBookmark ? activeColor : inactiveColor,
           size: 24,
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../services/rss_source_manage_helper.dart';
@@ -35,10 +36,9 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
     }
     return AppCupertinoPageScaffold(
       title: '分组管理',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: _addGroup,
-        child: const Icon(CupertinoIcons.add),
+        child: const Icon(CupertinoIcons.add, size: 22),
       ),
       child: _buildGroupList(),
     );
@@ -90,10 +90,12 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
       builder: (context, snapshot) {
         final groups = snapshot.data ?? _repo.allGroups();
         if (groups.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
               '暂无分组',
-              style: TextStyle(color: CupertinoColors.secondaryLabel),
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
             ),
           );
         }
@@ -128,9 +130,9 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(28, 28),
                       onPressed: () => _removeGroup(group),
-                      child: const Icon(
+                      child: Icon(
                         CupertinoIcons.delete,
-                        color: CupertinoColors.systemRed,
+                        color: CupertinoColors.systemRed.resolveFrom(context),
                         size: 18,
                       ),
                     ),

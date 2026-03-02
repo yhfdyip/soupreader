@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
@@ -219,29 +220,24 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     final currentPath =
         night ? _settings.backgroundImageNight : _settings.backgroundImage;
     final hasImage = currentPath.trim().isNotEmpty;
-    final selected = await showCupertinoBottomDialog<_BackgroundImageAction>(
+    final selected = await showAppActionListSheet<_BackgroundImageAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.of(sheetContext).pop(_BackgroundImageAction.select),
-            child: const Text('选择图片'),
-          ),
-          if (hasImage)
-            CupertinoActionSheetAction(
-              isDestructiveAction: true,
-              onPressed: () =>
-                  Navigator.of(sheetContext).pop(_BackgroundImageAction.clear),
-              child: const Text('清空'),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+      title: night ? '夜间背景图' : '白天背景图',
+      showCancel: true,
+      items: [
+        const AppActionListItem<_BackgroundImageAction>(
+          value: _BackgroundImageAction.select,
+          icon: CupertinoIcons.photo,
+          label: '选择图片',
         ),
-      ),
+        if (hasImage)
+          const AppActionListItem<_BackgroundImageAction>(
+            value: _BackgroundImageAction.clear,
+            icon: CupertinoIcons.delete,
+            label: '清空',
+            isDestructiveAction: true,
+          ),
+      ],
     );
     if (selected == _BackgroundImageAction.select) {
       await _pickAndSaveBackgroundImage(night: night);

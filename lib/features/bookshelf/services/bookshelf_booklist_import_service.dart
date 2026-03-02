@@ -59,7 +59,8 @@ class BookshelfBooklistImportService {
     this._engine,
     BookAddService? addService,
   )   : _sourceRepo = SourceRepository(db),
-        _addService = addService ?? BookAddService(database: db, engine: _engine);
+        _addService =
+            addService ?? BookAddService(database: db, engine: _engine);
 
   String _compactReason(String text, {int maxLength = 96}) {
     final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -127,7 +128,8 @@ class BookshelfBooklistImportService {
 
       if (best == null) {
         failed++;
-        final base = '未找到：${item.name}${item.author.isNotEmpty ? ' - ${item.author}' : ''}';
+        final base =
+            '未找到：${item.name}${item.author.isNotEmpty ? ' - ${item.author}' : ''}';
         if (sourceRunErrors.isEmpty) {
           errors.add(base);
         } else {
@@ -196,7 +198,8 @@ class BookshelfBooklistImportService {
       if (targetAuthor.isNotEmpty) {
         if (author == targetAuthor) {
           s += 4;
-        } else if (author.contains(targetAuthor) || targetAuthor.contains(author)) {
+        } else if (author.contains(targetAuthor) ||
+            targetAuthor.contains(author)) {
           s += 2;
         }
       }

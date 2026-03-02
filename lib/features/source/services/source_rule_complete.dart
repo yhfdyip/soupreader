@@ -54,8 +54,8 @@ class SourceRuleComplete {
                 .firstMatch(full)
                 ?.group(1) ??
             '';
-        final seq = RegExp(r'(\&{2}|%%|\|{2}|$)$').firstMatch(full)?.group(1) ??
-            '';
+        final seq =
+            RegExp(r'(\&{2}|%%|\|{2}|$)$').firstMatch(full)?.group(1) ?? '';
         return imgText.replaceAll(r'${seq}', seq).replaceAll(r'${at}', at);
       });
     }

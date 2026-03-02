@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/remote_server.dart';
 import '../services/remote_server_store.dart';
@@ -154,9 +155,7 @@ class _RemoteBooksServerConfigViewState
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '服务器配置',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(28, 28),
+      trailing: AppNavBarButton(
         onPressed: _saving ? null : _saveServerConfig,
         child: _saving ? const CupertinoActivityIndicator() : const Text('保存'),
       ),

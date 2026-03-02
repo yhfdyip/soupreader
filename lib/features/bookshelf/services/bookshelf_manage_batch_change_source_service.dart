@@ -142,9 +142,7 @@ class BookshelfManageBatchChangeSourceService {
           break;
       }
 
-      if (index < books.length - 1 &&
-          delaySeconds > 0 &&
-          result.applyDelay) {
+      if (index < books.length - 1 && delaySeconds > 0 && result.applyDelay) {
         final keepRunning = await _waitDelayWithCancel(
           seconds: delaySeconds,
           cancelToken: cancelToken,
@@ -304,8 +302,9 @@ class BookshelfManageBatchChangeSourceService {
       storedBook: storedBook,
       chapters: previousChapters,
     );
-    final previousChapterCount =
-        previousChapters.isEmpty ? storedBook.totalChapters : previousChapters.length;
+    final previousChapterCount = previousChapters.isEmpty
+        ? storedBook.totalChapters
+        : previousChapters.length;
 
     final targetIndex = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
       newChapters: nextChapters,
@@ -532,8 +531,7 @@ class _BatchChangeSourceItemResult {
 
   const _BatchChangeSourceItemResult.success({
     bool applyDelay = true,
-  })
-      : this._(
+  }) : this._(
           status: BookshelfManageBatchChangeSourceItemStatus.success,
           message: '',
           cancelled: false,
@@ -543,8 +541,7 @@ class _BatchChangeSourceItemResult {
   const _BatchChangeSourceItemResult.skipped(
     String message, {
     bool applyDelay = false,
-  })
-      : this._(
+  }) : this._(
           status: BookshelfManageBatchChangeSourceItemStatus.skipped,
           message: message,
           cancelled: false,
@@ -554,8 +551,7 @@ class _BatchChangeSourceItemResult {
   const _BatchChangeSourceItemResult.failed(
     String message, {
     bool applyDelay = false,
-  })
-      : this._(
+  }) : this._(
           status: BookshelfManageBatchChangeSourceItemStatus.failed,
           message: message,
           cancelled: false,

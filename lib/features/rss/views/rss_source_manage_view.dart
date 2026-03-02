@@ -144,16 +144,18 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                         _query.isEmpty ? '全部源' : '筛选：${intent.rawQuery}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: CupertinoColors.secondaryLabel,
+                        style: TextStyle(
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
                           fontSize: 12,
                         ),
                       ),
                     ),
                     Text(
                       '${visible.length} 条',
-                      style: const TextStyle(
-                        color: CupertinoColors.secondaryLabel,
+                      style: TextStyle(
+                        color:
+                            CupertinoColors.secondaryLabel.resolveFrom(context),
                         fontSize: 12,
                       ),
                     ),
@@ -182,7 +184,9 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
         children: [
           Text(
             title,
-            style: const TextStyle(color: CupertinoColors.secondaryLabel),
+            style: TextStyle(
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 10),
           CupertinoButton(
@@ -1206,10 +1210,11 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                                               setDialogState(() {});
                                             }
                                           },
-                                          child: const Icon(
+                                          child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed,
+                                            color: CupertinoColors.systemRed
+                                                .resolveFrom(context),
                                           ),
                                         ),
                                       ],

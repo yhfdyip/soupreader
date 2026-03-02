@@ -924,11 +924,13 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 18),
             color: _isDark
-                ? CupertinoColors.destructiveRed.withValues(alpha: 0.18)
+                ? CupertinoColors.destructiveRed
+                    .resolveFrom(context)
+                    .withValues(alpha: 0.18)
                 : const Color(0xFFFFEAEA),
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.delete,
-              color: CupertinoColors.destructiveRed,
+              color: CupertinoColors.destructiveRed.resolveFrom(context),
               size: 20,
             ),
           ),

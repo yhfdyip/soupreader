@@ -10,9 +10,7 @@ class ReplaceRuleEngine {
     required String? sourceName,
     required String? sourceUrl,
   }) {
-    final sorted = allRules
-      .where((r) => r.isEnabled)
-      .toList(growable: false)
+    final sorted = allRules.where((r) => r.isEnabled).toList(growable: false)
       ..sort((a, b) => a.order.compareTo(b.order));
     return sorted.where((r) {
       if (!_isScopeMatched(
@@ -90,12 +88,8 @@ class ReplaceRuleEngine {
   }
 
   bool _isScopeMatched(
-    String? scope,
-    String bookName,
-    String? sourceName,
-    String? sourceUrl,
-    {required bool emptyMatchesAll}
-  ) {
+      String? scope, String bookName, String? sourceName, String? sourceUrl,
+      {required bool emptyMatchesAll}) {
     final text = scope?.trim();
     if (text == null || text.isEmpty) return emptyMatchesAll;
 
@@ -109,7 +103,9 @@ class ReplaceRuleEngine {
 
     bool matchToken(String token, String target) {
       if (target.isEmpty) return false;
-      return target == token || target.contains(token) || token.contains(target);
+      return target == token ||
+          target.contains(token) ||
+          token.contains(target);
     }
 
     for (final token in tokens) {

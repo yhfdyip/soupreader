@@ -9,6 +9,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 
 class SourceQrShareView extends StatelessWidget {
   const SourceQrShareView({
@@ -27,9 +28,7 @@ class SourceQrShareView extends StatelessWidget {
     final title = subject.trim().isEmpty ? '书源二维码' : subject.trim();
     return AppCupertinoPageScaffold(
       title: title,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(30, 30),
+      trailing: AppNavBarButton(
         onPressed: () async {
           final qrFile = await _buildQrPngFile(text);
           if (qrFile != null) {

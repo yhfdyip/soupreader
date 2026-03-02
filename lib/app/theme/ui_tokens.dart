@@ -87,7 +87,8 @@ class AppUiColors {
     final theme = CupertinoTheme.of(context);
     return AppUiColors(
       pageBackground: theme.scaffoldBackgroundColor,
-      groupedBackground: CupertinoColors.systemGroupedBackground.resolveFrom(context),
+      groupedBackground:
+          CupertinoColors.systemGroupedBackground.resolveFrom(context),
       sectionBackground:
           CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
       surfaceBackground: CupertinoColors.systemBackground.resolveFrom(context),
@@ -157,4 +158,3 @@ class AppUiSizes {
     this.dividerThickness = 0.5,
   });
 }
-

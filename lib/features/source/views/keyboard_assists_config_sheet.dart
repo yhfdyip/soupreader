@@ -168,11 +168,12 @@ class _KeyboardAssistsConfigDialogState
                 child: _loading
                     ? const Center(child: CupertinoActivityIndicator())
                     : _items.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
                               '暂无辅助按键',
                               style: TextStyle(
-                                color: CupertinoColors.secondaryLabel,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
                               ),
                             ),
                           )
@@ -210,10 +211,11 @@ class _KeyboardAssistsConfigDialogState
                                                   : item.value,
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 12,
                                                 color: CupertinoColors
-                                                    .secondaryLabel,
+                                                    .secondaryLabel
+                                                    .resolveFrom(context),
                                               ),
                                             ),
                                           ],
@@ -223,10 +225,11 @@ class _KeyboardAssistsConfigDialogState
                                         padding: const EdgeInsets.all(4),
                                         minimumSize: const Size(28, 28),
                                         onPressed: () => _deleteAssist(item),
-                                        child: const Icon(
+                                        child: Icon(
                                           CupertinoIcons.delete,
                                           size: 18,
-                                          color: CupertinoColors.destructiveRed,
+                                          color: CupertinoColors.destructiveRed
+                                              .resolveFrom(context),
                                         ),
                                       ),
                                     ],

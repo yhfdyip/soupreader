@@ -14,6 +14,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import 'app_help_dialog.dart';
@@ -144,17 +145,13 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          minimumSize: const Size(30, 30),
+        AppNavBarButton(
           onPressed: _handleShare,
-          child: const Icon(CupertinoIcons.share, size: 20),
+          child: const Icon(CupertinoIcons.share, size: 22),
         ),
-        CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          minimumSize: const Size(30, 30),
+        AppNavBarButton(
           onPressed: _openScoring,
-          child: const Icon(CupertinoIcons.hand_thumbsup, size: 20),
+          child: const Icon(CupertinoIcons.hand_thumbsup, size: 22),
         ),
       ],
     );

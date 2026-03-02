@@ -151,7 +151,8 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = AppUiTokens.resolve(context);
-    final resolvedBackground = backgroundColor ?? tokens.colors.sectionBackground;
+    final resolvedBackground =
+        backgroundColor ?? tokens.colors.sectionBackground;
     final resolvedBorder = borderColor ?? tokens.colors.separator;
     final radius = borderRadius ?? tokens.radii.card;
 

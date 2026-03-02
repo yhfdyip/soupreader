@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -225,10 +226,8 @@ class _SourceListViewState extends State<SourceListView> {
       },
       child: AppCupertinoPageScaffold(
         title: '书源管理',
-        trailing: CupertinoButton(
+        trailing: AppNavBarButton(
           key: _moreMenuKey,
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(30, 30),
           onPressed: _showMainOptions,
           child: const Icon(CupertinoIcons.line_horizontal_3),
         ),
@@ -654,7 +653,8 @@ class _SourceListViewState extends State<SourceListView> {
                                 : CupertinoIcons.circle,
                             color: selected
                                 ? CupertinoTheme.of(context).primaryColor
-                                : CupertinoColors.systemGrey,
+                                : CupertinoColors.systemGrey
+                                    .resolveFrom(context),
                           ),
                         ),
                       ),
@@ -685,7 +685,9 @@ class _SourceListViewState extends State<SourceListView> {
                                         shape: BoxShape.circle,
                                         color: source.enabledExplore
                                             ? CupertinoColors.systemGreen
-                                            : CupertinoColors.systemRed,
+                                                .resolveFrom(context)
+                                            : CupertinoColors.systemRed
+                                                .resolveFrom(context),
                                       ),
                                     ),
                                   ),
@@ -1384,10 +1386,13 @@ class _SourceListViewState extends State<SourceListView> {
                                   onPressed: () async {
                                     await _removeGroupEverywhere(group);
                                   },
-                                  child: const Text(
+                                  child: Text(
                                     '删除',
                                     style: TextStyle(
-                                      color: CupertinoColors.systemRed,
+                                      color:
+                                          CupertinoColors.systemRed.resolveFrom(
+                                        context,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1428,7 +1433,8 @@ class _SourceListViewState extends State<SourceListView> {
     items.add(
       AppActionListItem(
         value: _SourceItemAction.toggleEnabled,
-        icon: source.enabled ? CupertinoIcons.nosign : CupertinoIcons.check_mark,
+        icon:
+            source.enabled ? CupertinoIcons.nosign : CupertinoIcons.check_mark,
         label: source.enabled ? '禁用' : '启用',
       ),
     );
@@ -2755,10 +2761,11 @@ class _SourceListViewState extends State<SourceListView> {
                                             setDialogState(() {});
                                           }
                                         },
-                                        child: const Icon(
+                                        child: Icon(
                                           CupertinoIcons.delete,
                                           size: 18,
-                                          color: CupertinoColors.systemRed,
+                                          color: CupertinoColors.systemRed
+                                              .resolveFrom(context),
                                         ),
                                       ),
                                     ],
@@ -3171,7 +3178,8 @@ class _SourceListViewState extends State<SourceListView> {
                                       color: selected
                                           ? CupertinoTheme.of(context)
                                               .primaryColor
-                                          : CupertinoColors.systemGrey,
+                                          : CupertinoColors.systemGrey
+                                              .resolveFrom(context),
                                       size: 20,
                                     ),
                                   ),
@@ -3795,7 +3803,8 @@ class _SourceListViewState extends State<SourceListView> {
 }
 
 typedef _SourceSortModeLabelBuilder = String Function(_SourceSortMode mode);
-typedef _SourceSortChanged = void Function(_SourceSortMode mode, bool ascending);
+typedef _SourceSortChanged = void Function(
+    _SourceSortMode mode, bool ascending);
 
 class _SourceSortSheet extends StatefulWidget {
   static const double _radius = 18;
@@ -3851,7 +3860,8 @@ class _SourceSortSheetState extends State<_SourceSortSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final sheetBg = CupertinoColors.systemGroupedBackground.resolveFrom(context);
+    final sheetBg =
+        CupertinoColors.systemGroupedBackground.resolveFrom(context);
     final titleColor = CupertinoColors.label.resolveFrom(context);
     final handleColor = CupertinoColors.systemGrey3
         .resolveFrom(context)
@@ -3993,7 +4003,8 @@ class _SourceGroupFilterSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sheetBg = CupertinoColors.systemGroupedBackground.resolveFrom(context);
+    final sheetBg =
+        CupertinoColors.systemGroupedBackground.resolveFrom(context);
     final titleColor = CupertinoColors.label.resolveFrom(context);
     final handleColor = CupertinoColors.systemGrey3
         .resolveFrom(context)
@@ -4028,7 +4039,8 @@ class _SourceGroupFilterSheet extends StatelessWidget {
         width: double.infinity,
         decoration: BoxDecoration(
           color: sheetBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(_radius)),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(_radius)),
         ),
         child: Padding(
           padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
@@ -4064,12 +4076,18 @@ class _SourceGroupFilterSheet extends StatelessWidget {
     return AppListSection(
       hasLeading: false,
       children: [
-        _buildActionRow(title: '已启用', onTap: () => onApplyQuery('已启用', context)),
-        _buildActionRow(title: '已禁用', onTap: () => onApplyQuery('已禁用', context)),
-        _buildActionRow(title: '需要登录', onTap: () => onApplyQuery('需要登录', context)),
-        _buildActionRow(title: '未分组', onTap: () => onApplyQuery('未分组', context)),
-        _buildActionRow(title: '已启用发现', onTap: () => onApplyQuery('已启用发现', context)),
-        _buildActionRow(title: '已禁用发现', onTap: () => onApplyQuery('已禁用发现', context)),
+        _buildActionRow(
+            title: '已启用', onTap: () => onApplyQuery('已启用', context)),
+        _buildActionRow(
+            title: '已禁用', onTap: () => onApplyQuery('已禁用', context)),
+        _buildActionRow(
+            title: '需要登录', onTap: () => onApplyQuery('需要登录', context)),
+        _buildActionRow(
+            title: '未分组', onTap: () => onApplyQuery('未分组', context)),
+        _buildActionRow(
+            title: '已启用发现', onTap: () => onApplyQuery('已启用发现', context)),
+        _buildActionRow(
+            title: '已禁用发现', onTap: () => onApplyQuery('已禁用发现', context)),
       ],
     );
   }

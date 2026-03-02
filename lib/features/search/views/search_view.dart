@@ -1598,7 +1598,8 @@ class _SearchViewState extends State<SearchView> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: uiTokens.colors.accent.withValues(alpha: 0.14),
+                              color: uiTokens.colors.accent
+                                  .withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
@@ -1664,8 +1665,9 @@ class _SearchViewState extends State<SearchView> {
                     ? CupertinoIcons.book_fill
                     : CupertinoIcons.chevron_forward,
                 size: item.inBookshelf ? 17 : 16,
-                color:
-                    item.inBookshelf ? uiTokens.colors.accent : uiTokens.colors.mutedForeground,
+                color: item.inBookshelf
+                    ? uiTokens.colors.accent
+                    : uiTokens.colors.mutedForeground,
               ),
             ],
           ),
@@ -1846,8 +1848,7 @@ class _LegadoSearchAggregator {
   static String _sourceBookKey(SearchResult item) =>
       '${item.sourceUrl}|${item.bookUrl}';
 
-  static String _groupKey(SearchResult item) =>
-      '${item.name}|${item.author}';
+  static String _groupKey(SearchResult item) => '${item.name}|${item.author}';
 
   static int _matchRank(SearchResult result, String searchKeyword) {
     if (searchKeyword.isEmpty) return 2;

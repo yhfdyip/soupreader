@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/models/app_settings.dart';
@@ -165,11 +166,9 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '主题列表',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: _importFromClipboard,
         child: const Text('剪贴板导入'),
-        minimumSize: const Size(30, 30),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())

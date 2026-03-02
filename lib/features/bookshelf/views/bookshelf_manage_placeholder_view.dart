@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -1574,10 +1575,11 @@ class _SelectionSummaryBar extends StatelessWidget {
                 onPressed: onDeleteSelection,
                 child: deletingSelection
                     ? const CupertinoActivityIndicator()
-                    : const Text(
+                    : Text(
                         '删除',
                         style: TextStyle(
-                          color: CupertinoColors.destructiveRed,
+                          color: CupertinoColors.destructiveRed
+                              .resolveFrom(context),
                         ),
                       ),
                 minimumSize: Size(28, 28),
@@ -1764,9 +1766,7 @@ class _BookshelfManageSourcePickerViewState
 
     return AppCupertinoPageScaffold(
       title: '选择书源',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(28, 28),
+      trailing: AppNavBarButton(
         onPressed: _updatingDelay ? null : _showMoreMenu,
         child: _updatingDelay
             ? const CupertinoActivityIndicator(radius: 8)

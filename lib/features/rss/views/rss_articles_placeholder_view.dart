@@ -1774,11 +1774,11 @@ class _RssFavoritesPlaceholderViewState
       builder: (context, snapshot) {
         final stars = snapshot.data ?? const <RssStar>[];
         if (stars.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
               '当前分组暂无收藏',
               style: TextStyle(
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 fontSize: 13,
               ),
             ),
@@ -1826,8 +1826,9 @@ class _RssFavoritesPlaceholderViewState
                           '当前分组：$currentGroup',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: CupertinoColors.secondaryLabel,
+                          style: TextStyle(
+                            color: CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
                             fontSize: 12,
                           ),
                         ),
@@ -1837,11 +1838,13 @@ class _RssFavoritesPlaceholderViewState
                 ),
               Expanded(
                 child: currentGroup.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           '暂无收藏',
                           style: TextStyle(
-                            color: CupertinoColors.secondaryLabel,
+                            color: CupertinoColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
                             fontSize: 13,
                           ),
                         ),
@@ -1886,11 +1889,11 @@ class _RssFavoriteItemCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildFallbackImage(),
+                errorBuilder: (_, __, ___) => _buildFallbackImage(context),
               ),
             )
           else
-            _buildFallbackImage(),
+            _buildFallbackImage(context),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1910,8 +1913,8 @@ class _RssFavoriteItemCard extends StatelessWidget {
                   pubDate.isEmpty ? '无发布时间' : pubDate,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: CupertinoColors.secondaryLabel,
+                  style: TextStyle(
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
                     fontSize: 12,
                   ),
                 ),
@@ -1923,12 +1926,12 @@ class _RssFavoriteItemCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFallbackImage() {
+  Widget _buildFallbackImage(BuildContext context) {
     return Container(
       width: 52,
       height: 52,
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey5,
+        color: CupertinoColors.systemGrey5.resolveFrom(context),
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
@@ -1969,9 +1972,9 @@ class _PlaceholderCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             message,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -2005,9 +2008,9 @@ class _InfoCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
           const SizedBox(height: 4),
@@ -2050,11 +2053,11 @@ class _SortPreviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '分类预览',
             style: TextStyle(
               fontSize: 12,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
           const SizedBox(height: 4),
@@ -2065,9 +2068,9 @@ class _SortPreviewCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],

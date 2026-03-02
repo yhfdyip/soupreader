@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
@@ -328,11 +329,9 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '所有书签',
-      trailing: CupertinoButton(
+      trailing: AppNavBarButton(
         key: _moreMenuKey,
-        padding: EdgeInsets.zero,
         onPressed: _showTopActions,
-        minimumSize: const Size(28, 28),
         child: _exporting
             ? const CupertinoActivityIndicator(radius: 10)
             : const Icon(CupertinoIcons.ellipsis_circle, size: 22),

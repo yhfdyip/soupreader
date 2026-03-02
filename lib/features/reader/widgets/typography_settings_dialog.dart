@@ -35,14 +35,14 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
       _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
 
   Color get _textSubtle => _isDark
-      ? CupertinoColors.systemGrey.withValues(alpha: 0.75)
+      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
       : AppDesignTokens.textMuted;
 
   Color get _lineColor =>
       _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
 
   Color get _chipBg => _isDark
-      ? CupertinoColors.systemGrey.withValues(alpha: 0.16)
+      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.16)
       : AppDesignTokens.pageBgLight;
 
   @override
@@ -296,9 +296,8 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
   }) {
     final safeMin = min.isFinite ? min : 0.0;
     final safeMax = max.isFinite && max > safeMin ? max : safeMin + 1.0;
-    final safeValue = (value.isFinite ? value : safeMin)
-        .clamp(safeMin, safeMax)
-        .toDouble();
+    final safeValue =
+        (value.isFinite ? value : safeMin).clamp(safeMin, safeMax).toDouble();
     final canSlide = min.isFinite && max.isFinite && max > min;
 
     return Padding(

@@ -78,7 +78,8 @@ Future<T?> showAppPopoverMenu<T>({
     width: width,
     estimatedHeight: estimatedHeight,
   );
-  final barrierLabel = CupertinoLocalizations.of(context).modalBarrierDismissLabel;
+  final barrierLabel =
+      CupertinoLocalizations.of(context).modalBarrierDismissLabel;
   return showGeneralDialog<T>(
     context: context,
     useRootNavigator: true,
@@ -89,7 +90,8 @@ Future<T?> showAppPopoverMenu<T>({
     pageBuilder: (popupContext, __, ___) {
       final uiTokens = AppUiTokens.resolve(popupContext);
       final resolvedRadius = radius ?? uiTokens.radii.popover;
-      final isDark = CupertinoTheme.of(popupContext).brightness == Brightness.dark;
+      final isDark =
+          CupertinoTheme.of(popupContext).brightness == Brightness.dark;
       final backdropMask = isDark
           ? CupertinoColors.black.withValues(alpha: 0.18)
           : CupertinoColors.black.withValues(alpha: 0.06);
@@ -174,8 +176,9 @@ _PopoverAnchor _resolveAnchor({
   if (renderBox is! RenderBox || !renderBox.hasSize) {
     throw FlutterError('showAppPopoverMenu: anchorKey renderBox not ready');
   }
-  final overlayBox =
-      Overlay.of(context, rootOverlay: true).context.findRenderObject() as RenderBox;
+  final overlayBox = Overlay.of(context, rootOverlay: true)
+      .context
+      .findRenderObject() as RenderBox;
   final anchorOffset = renderBox.localToGlobal(Offset.zero);
   return _PopoverAnchor(
     rect: anchorOffset & renderBox.size,
@@ -209,7 +212,8 @@ _PopoverLayout _resolveLayout({
   final availableAbove = anchor.rect.top - safeTop - _popoverVerticalGap;
   final canFitBelow = estimatedHeight <= availableBelow;
   final canFitAbove = estimatedHeight <= availableAbove;
-  final showBelow = canFitBelow || (!canFitAbove && availableBelow >= availableAbove);
+  final showBelow =
+      canFitBelow || (!canFitAbove && availableBelow >= availableAbove);
 
   final maxHeight =
       math.max(0, showBelow ? availableBelow : availableAbove).toDouble();

@@ -5,6 +5,7 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/theme/cupertino_theme.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../services/theme_config_service.dart';
@@ -312,11 +313,9 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '主题设置',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: _showThemeModeManagedHint,
         child: const Text('主题模式'),
-        minimumSize: const Size(30, 30),
       ),
       child: AppListView(
         children: [

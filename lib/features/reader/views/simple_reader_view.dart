@@ -33,6 +33,7 @@ import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
@@ -6335,7 +6336,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final source = _resolveCurrentSource();
     final hasLogin =
         source != null && ReaderSourceActionHelper.hasLoginUrl(source.loginUrl);
-    final selected = await showCupertinoBottomDialog<_ReaderAudioPlayMenuAction>(
+    final selected =
+        await showCupertinoBottomDialog<_ReaderAudioPlayMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -7874,7 +7876,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             icon: CupertinoIcons.clear_circled_solid,
                             label: '退出',
                             onTap: _exitSearchMenu,
-                            activeColor: CupertinoColors.destructiveRed,
+                            activeColor: CupertinoColors.destructiveRed
+                                .resolveFrom(context),
                           ),
                         ),
                       ],
@@ -12754,14 +12757,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       width: double.infinity,
                       child: CupertinoButton(
                         color: canDelete
-                            ? CupertinoColors.systemRed.withValues(alpha: 0.16)
+                            ? CupertinoColors.systemRed
+                                .resolveFrom(context)
+                                .withValues(alpha: 0.16)
                             : _uiCardBg,
                         onPressed: onDelete,
                         child: Text(
                           '删除样式',
                           style: TextStyle(
                             color: canDelete
-                                ? CupertinoColors.systemRed
+                                ? CupertinoColors.systemRed.resolveFrom(context)
                                 : _uiTextSubtle,
                             fontWeight: FontWeight.w600,
                           ),
@@ -16750,13 +16755,11 @@ class _ReaderContentEditorPageState extends State<_ReaderContentEditorPage> {
         navigationBar: CupertinoNavigationBar(
           middle: const Text('编辑正文'),
           automaticallyImplyLeading: false,
-          leading: CupertinoButton(
-            padding: EdgeInsets.zero,
+          leading: AppNavBarButton(
             onPressed: _resetting ? null : _popWithPayload,
             child: const Text('关闭'),
           ),
-          trailing: CupertinoButton(
-            padding: EdgeInsets.zero,
+          trailing: AppNavBarButton(
             onPressed: _resetting ? null : _popWithPayload,
             child: const Text('保存'),
           ),

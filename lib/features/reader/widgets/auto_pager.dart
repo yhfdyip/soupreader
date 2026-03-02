@@ -238,8 +238,9 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
   Color get _textStrong =>
       _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
 
-  Color get _textNormal =>
-      _isDark ? CupertinoColors.systemGrey : AppDesignTokens.textNormal;
+  Color get _textNormal => _isDark
+      ? CupertinoColors.systemGrey.resolveFrom(context)
+      : AppDesignTokens.textNormal;
 
   Color get _divider =>
       _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;

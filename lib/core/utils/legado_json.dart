@@ -31,4 +31,3 @@ class LegadoJson {
     return json.decode(text);
   }
 }
-

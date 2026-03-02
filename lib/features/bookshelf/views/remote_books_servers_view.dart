@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/remote_server.dart';
 import '../services/remote_server_store.dart';
@@ -150,8 +151,9 @@ class _RemoteBooksServersViewState extends State<RemoteBooksServersView> {
           ? CupertinoIcons.check_mark_circled_solid
           : CupertinoIcons.circle,
       size: 22,
-      color:
-          selected ? CupertinoColors.activeBlue : CupertinoColors.tertiaryLabel,
+      color: selected
+          ? CupertinoColors.activeBlue.resolveFrom(context)
+          : CupertinoColors.tertiaryLabel.resolveFrom(context),
     );
   }
 
@@ -189,10 +191,10 @@ class _RemoteBooksServersViewState extends State<RemoteBooksServersView> {
             padding: EdgeInsets.zero,
             minimumSize: const Size(28, 28),
             onPressed: _loading ? null : () => _confirmDeleteServer(server),
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.delete,
               size: 18,
-              color: CupertinoColors.destructiveRed,
+              color: CupertinoColors.destructiveRed.resolveFrom(context),
             ),
           ),
           const SizedBox(width: 8),
@@ -277,9 +279,7 @@ class _RemoteBooksServersViewState extends State<RemoteBooksServersView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '服务器配置',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(28, 28),
+      trailing: AppNavBarButton(
         onPressed: _loading ? null : _openServerConfig,
         child: const Text('新建'),
       ),

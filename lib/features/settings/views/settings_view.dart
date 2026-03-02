@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
@@ -189,10 +190,8 @@ class _SettingsViewState extends State<SettingsView> {
         child: CupertinoActivityIndicator(radius: 9),
       );
     }
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
+    return AppNavBarButton(
       onPressed: _openMyHelp,
-      minimumSize: const Size(30, 30),
       child: const Icon(CupertinoIcons.question_circle, size: 22),
     );
   }

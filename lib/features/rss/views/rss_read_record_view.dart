@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -89,11 +90,13 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
     }
   }
 
-  Widget _buildEmptyState() {
-    return const Center(
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
       child: Text(
         '暂无阅读记录',
-        style: TextStyle(color: CupertinoColors.secondaryLabel),
+        style: TextStyle(
+          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+        ),
       ),
     );
   }
@@ -125,9 +128,9 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
               const SizedBox(height: 6),
               Text(
                 record.record,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
             ],
@@ -141,15 +144,14 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '阅读记录',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
+      trailing: AppNavBarButton(
         onPressed: _clearAllRecords,
         child: const Text('清空'),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
           : _records.isEmpty
-              ? _buildEmptyState()
+              ? _buildEmptyState(context)
               : _buildRecordList(),
     );
   }

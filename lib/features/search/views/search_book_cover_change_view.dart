@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -290,8 +291,7 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
     final actionLabel = _searching ? '停止' : '刷新';
     final actionIcon =
         _searching ? CupertinoIcons.stop_fill : CupertinoIcons.refresh;
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
+    return AppNavBarButton(
       onPressed: _bookName.isEmpty ? null : _toggleStartStopSearch,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -316,8 +316,7 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
 
     return AppCupertinoPageScaffold(
       title: '封面换源',
-      leading: CupertinoButton(
-        padding: EdgeInsets.zero,
+      leading: AppNavBarButton(
         onPressed: () => Navigator.of(context).pop(),
         child: const Text('关闭'),
       ),

@@ -25,9 +25,8 @@ class ReaderImageRequestParser {
     }
 
     final split = _splitLegacyUrlOption(trimmed);
-    final option = split.optionRaw == null
-        ? null
-        : _tryParseOptionMap(split.optionRaw!);
+    final option =
+        split.optionRaw == null ? null : _tryParseOptionMap(split.optionRaw!);
     final headers = <String, String>{}
       ..addAll(_coerceHeaderMap(option?['header']))
       ..addAll(_coerceHeaderMap(option?['headers']));

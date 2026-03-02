@@ -97,7 +97,8 @@ class _ReaderTxtTocRuleDialogState extends State<ReaderTxtTocRuleDialog> {
                             color: accent,
                           ),
                       ],
-                    ), minimumSize: Size(0, 0),
+                    ),
+                    minimumSize: Size(0, 0),
                   ),
                   if (index != choices.length - 1)
                     Container(

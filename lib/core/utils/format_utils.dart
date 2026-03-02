@@ -8,8 +8,8 @@ class FormatUtils {
       value /= 1024;
       unitIndex++;
     }
-    final digits = unitIndex == 0 ? 0 : (value >= 100 ? 0 : (value >= 10 ? 1 : 2));
+    final digits =
+        unitIndex == 0 ? 0 : (value >= 100 ? 0 : (value >= 10 ? 1 : 2));
     return '${value.toStringAsFixed(digits)} ${units[unitIndex]}';
   }
 }
-

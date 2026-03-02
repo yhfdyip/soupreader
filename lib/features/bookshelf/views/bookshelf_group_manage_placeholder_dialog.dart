@@ -164,7 +164,8 @@ class _BookshelfGroupManagePlaceholderDialogState
                           onPressed: _adding ? null : _handleAddGroup,
                           child: _adding
                               ? const CupertinoActivityIndicator(radius: 8)
-                              : const Icon(CupertinoIcons.add), minimumSize: Size(30, 30),
+                              : const Icon(CupertinoIcons.add),
+                          minimumSize: Size(30, 30),
                         ),
                       ],
                     ),
@@ -215,7 +216,8 @@ class _BookshelfGroupManagePlaceholderDialogState
                       child: CupertinoButton(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('完成'), minimumSize: Size(30, 30),
+                        child: const Text('完成'),
+                        minimumSize: Size(30, 30),
                       ),
                     ),
                   ),
@@ -364,7 +366,8 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
                   onPressed: _pickingCover ? null : _pickCover,
                   child: _pickingCover
                       ? const CupertinoActivityIndicator(radius: 7)
-                      : const Text('选择封面'), minimumSize: Size(26, 26),
+                      : const Text('选择封面'),
+                  minimumSize: Size(26, 26),
                 ),
                 if ((_coverPath ?? '').trim().isNotEmpty)
                   CupertinoButton(
@@ -379,7 +382,8 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
                     child: Text(
                       '清除',
                       style: TextStyle(color: destructiveColor),
-                    ), minimumSize: Size(26, 26),
+                    ),
+                    minimumSize: Size(26, 26),
                   ),
               ],
             ),
@@ -407,7 +411,8 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   onPressed: _pickSort,
-                  child: Text(_groupSortLabel(_bookSort)), minimumSize: Size(26, 26),
+                  child: Text(_groupSortLabel(_bookSort)),
+                  minimumSize: Size(26, 26),
                 ),
               ],
             ),

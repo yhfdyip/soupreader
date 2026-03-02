@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
@@ -58,28 +59,23 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
       return;
     }
 
-    final selected = await showCupertinoBottomDialog<_WelcomeImageAction>(
+    final selected = await showAppActionListSheet<_WelcomeImageAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () =>
-                Navigator.of(sheetContext).pop(_WelcomeImageAction.delete),
-            child: const Text('删除'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.of(sheetContext).pop(_WelcomeImageAction.select),
-            child: const Text('选择图片'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+      title: night ? '夜间背景图片' : '白天背景图片',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_WelcomeImageAction>(
+          value: _WelcomeImageAction.delete,
+          icon: CupertinoIcons.delete,
+          label: '删除',
+          isDestructiveAction: true,
         ),
-      ),
+        AppActionListItem<_WelcomeImageAction>(
+          value: _WelcomeImageAction.select,
+          icon: CupertinoIcons.photo,
+          label: '选择图片',
+        ),
+      ],
     );
 
     if (selected == _WelcomeImageAction.delete) {

@@ -202,7 +202,8 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
   }
 
   Future<void> _openInBrowser() async {
-    final raw = _currentUrl.trim().isNotEmpty ? _currentUrl.trim() : _initialUrl;
+    final raw =
+        _currentUrl.trim().isNotEmpty ? _currentUrl.trim() : _initialUrl;
     final uri = Uri.tryParse(raw);
     final scheme = uri?.scheme.toLowerCase();
     if (uri == null || (scheme != 'http' && scheme != 'https')) {
@@ -254,7 +255,8 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
   }
 
   Future<void> _copyUrl() async {
-    final url = _currentUrl.trim().isNotEmpty ? _currentUrl.trim() : _initialUrl;
+    final url =
+        _currentUrl.trim().isNotEmpty ? _currentUrl.trim() : _initialUrl;
     if (url.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
     await _showMessage('已复制 URL');

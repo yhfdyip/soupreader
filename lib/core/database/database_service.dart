@@ -85,7 +85,8 @@ class DatabaseService {
   Future<void> _reloadSettingsCache() async {
     _settingsCache.clear();
     final db = _driftService.db;
-    BootLog.add('DatabaseService.reloadSettingsCache: select appKeyValueRecords');
+    BootLog.add(
+        'DatabaseService.reloadSettingsCache: select appKeyValueRecords');
     final rows = await db.select(db.appKeyValueRecords).get();
     BootLog.add(
       'DatabaseService.reloadSettingsCache: select ok (rows=${rows.length})',

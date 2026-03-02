@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../models/rule_subscription.dart';
@@ -52,11 +53,9 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '规则订阅',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(28, 28),
+      trailing: AppNavBarButton(
         onPressed: _addSubscription,
-        child: const Icon(CupertinoIcons.add),
+        child: const Icon(CupertinoIcons.add, size: 22),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
@@ -64,15 +63,17 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
               valueListenable: _store.listenable,
               builder: (context, subscriptions, _) {
                 if (subscriptions.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Text(
                         '新增大佬们提供的规则导入地址\n新增后点击可导入规则',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
-                          color: CupertinoColors.secondaryLabel,
+                          color: CupertinoColors.secondaryLabel.resolveFrom(
+                            context,
+                          ),
                         ),
                       ),
                     ),
@@ -137,9 +138,11 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
                         ),
                         child: Text(
                           typeText,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: CupertinoColors.secondaryLabel,
+                            color: CupertinoColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
                           ),
                         ),
                       ),
@@ -149,9 +152,11 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
                           subscription.url,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: CupertinoColors.secondaryLabel,
+                            color: CupertinoColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
                           ),
                         ),
                       ),

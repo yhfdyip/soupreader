@@ -832,9 +832,10 @@ class _CacheExportViewState extends State<CacheExportView> {
                     CacheExportTaskService.legacyExportCharsetOptions
                         .join(' / '),
                     textAlign: TextAlign.left,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: CupertinoColors.secondaryLabel,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(dialogContext),
                     ),
                   ),
                 ],
@@ -1036,9 +1037,9 @@ class _CacheExportViewState extends State<CacheExportView> {
           Text(
             '整体进度 新增${progress.overallDownloadedChapters}，'
             '已缓存${progress.overallSkippedChapters}，失败${progress.overallFailedChapters}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -1055,11 +1056,11 @@ class _CacheExportViewState extends State<CacheExportView> {
             .resolveFrom(context),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Text(
+      child: Text(
         '缓存/导出（迁移中）',
         style: TextStyle(
           fontSize: 13,
-          color: CupertinoColors.secondaryLabel,
+          color: CupertinoColors.secondaryLabel.resolveFrom(context),
         ),
       ),
     );
@@ -1090,9 +1091,9 @@ class _CacheExportViewState extends State<CacheExportView> {
           const SizedBox(height: 4),
           Text(
             '作者：${book.author.isEmpty ? '未知' : book.author}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
           const SizedBox(height: 6),
@@ -1136,7 +1137,9 @@ class _CacheExportViewState extends State<CacheExportView> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   initError,
-                  style: const TextStyle(color: CupertinoColors.systemRed),
+                  style: TextStyle(
+                    color: CupertinoColors.systemRed.resolveFrom(context),
+                  ),
                 ),
               ),
             ),

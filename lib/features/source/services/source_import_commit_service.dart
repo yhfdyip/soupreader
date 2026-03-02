@@ -176,7 +176,8 @@ class SourceImportCommitService {
   }
 
   String _extractSecondLevelDomain(String url) {
-    final groupedHost = SourceHostGroupHelper.groupHost(url).trim().toLowerCase();
+    final groupedHost =
+        SourceHostGroupHelper.groupHost(url).trim().toLowerCase();
     if (groupedHost.isEmpty || groupedHost == '#') return '';
     return groupedHost;
   }
