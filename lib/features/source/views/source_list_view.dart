@@ -165,6 +165,8 @@ class _SourceListViewState extends State<SourceListView> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _listScrollController = ScrollController();
   final GlobalKey _moreMenuKey = GlobalKey();
+  OverlayEntry? _toastEntry;
+  Timer? _toastTimer;
 
   final Set<String> _selectedUrls = <String>{};
   final Map<String, String> _hostMap = <String, String>{};
@@ -210,6 +212,7 @@ class _SourceListViewState extends State<SourceListView> {
   void dispose() {
     _checkTaskService.listenable.removeListener(_onCheckTaskChanged);
     _syncCheckKeepScreenOn(null, forceDisable: true);
+    _dismissToast();
     _urlController.dispose();
     _searchController.dispose();
     _listScrollController.dispose();
@@ -3764,36 +3767,36 @@ class _SourceListViewState extends State<SourceListView> {
 
   void _showToastMessage(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
-      context: context,
-      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
-      builder: (toastContext) {
-        final navigator = Navigator.of(toastContext);
-        unawaited(Future<void>.delayed(const Duration(milliseconds: 1100), () {
-          if (navigator.mounted && navigator.canPop()) {
-            navigator.pop();
-          }
-        }));
-        return SafeArea(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 28),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemBackground
-                    .resolveFrom(context)
-                    .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: CupertinoColors.separator.resolveFrom(context),
+    _dismissToast();
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) {
+      throw FlutterError('source.toast: root overlay not found');
+    }
+
+    final entry = OverlayEntry(
+      builder: (overlayContext) {
+        final background = CupertinoColors.systemBackground
+            .resolveFrom(overlayContext)
+            .withValues(alpha: 0.96);
+        final border = CupertinoColors.separator.resolveFrom(overlayContext);
+        final label = CupertinoColors.label.resolveFrom(overlayContext);
+        return IgnorePointer(
+          ignoring: true,
+          child: SafeArea(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 28),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: border),
                 ),
-              ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
-                  fontSize: 13,
+                child: Text(
+                  message,
+                  style: TextStyle(color: label, fontSize: 13),
                 ),
               ),
             ),
@@ -3801,6 +3804,17 @@ class _SourceListViewState extends State<SourceListView> {
         );
       },
     );
+
+    _toastEntry = entry;
+    overlay.insert(entry);
+    _toastTimer = Timer(const Duration(milliseconds: 1100), _dismissToast);
+  }
+
+  void _dismissToast() {
+    _toastTimer?.cancel();
+    _toastTimer = null;
+    _toastEntry?.remove();
+    _toastEntry = null;
   }
 }
 
