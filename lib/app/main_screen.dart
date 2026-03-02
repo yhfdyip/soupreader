@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import 'widgets/app_cupertino_page_scaffold.dart';
 import 'theme/cupertino_theme.dart';
 import '../core/config/migration_exclusions.dart';
 import '../core/models/app_settings.dart';
@@ -241,15 +242,18 @@ class _MainScreenState extends State<MainScreen> {
         return CupertinoTabView(
           key: ValueKey(tabId),
           builder: (context) {
-            // ── 诊断模式：用最简单的 Widget 确认 tab 框架是否正常 ──
-            return CupertinoPageScaffold(
-              navigationBar: CupertinoNavigationBar(
-                middle: Text(tabId.name),
-              ),
-              child: Center(
-                child: Text(
-                  'Tab: ${tabId.name}\nindex=$index',
-                  textAlign: TextAlign.center,
+            // ── 诊断模式 2：测试 AppCupertinoPageScaffold Sliver 模式 ──
+            return AppCupertinoPageScaffold(
+              title: tabId.name,
+              useSliverNavigationBar: true,
+              child: const SizedBox.shrink(),
+              sliverBodyBuilder: (_) => SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Text(
+                    'Sliver Tab: ${tabId.name}\nindex=$index',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             );
