@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import 'widgets/app_cupertino_page_scaffold.dart';
 import 'theme/cupertino_theme.dart';
 import '../core/config/migration_exclusions.dart';
 import '../core/models/app_settings.dart';

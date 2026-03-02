@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -364,12 +365,8 @@ class _SearchViewState extends State<SearchView> {
     return _runningSearchSessionId;
   }
 
-  bool _isCanceledError(Object error) {
-    if (error is DioException) {
-      return error.type == DioExceptionType.cancel;
-    }
-    return false;
-  }
+  bool _isCanceledError(Object error) =>
+      error is DioException && error.type == DioExceptionType.cancel;
 
   void _cancelOngoingSearch({bool updateState = true}) {
     _isSearching = false;
@@ -431,18 +428,7 @@ class _SearchViewState extends State<SearchView> {
       page: nextPage,
     );
 
-    if (!_isSearchSessionActive(sessionId)) return;
-    _currentPage = nextPage;
-    if (_results.isNotEmpty && _currentCacheKey.isNotEmpty) {
-      unawaited(
-          _cacheService.writeCache(key: _currentCacheKey, results: _results));
-    }
-
-    setState(() {
-      _isSearching = false;
-      _searchingSource = '';
-      _hasMore = hasMore;
-    });
+    _finishSearchPage(sessionId, hasMore, newPage: nextPage);
   }
 
   Future<void> _search() async {
@@ -513,18 +499,22 @@ class _SearchViewState extends State<SearchView> {
       page: _currentPage,
     );
 
-    if (!_isSearchSessionActive(searchSessionId)) return;
+    _finishSearchPage(searchSessionId, hasMore);
+    unawaited(_maybePromptEmptyResultLikeLegado());
+  }
+
+  void _finishSearchPage(int sessionId, bool hasMore, {int? newPage}) {
+    if (!_isSearchSessionActive(sessionId)) return;
+    if (newPage != null) _currentPage = newPage;
     if (_results.isNotEmpty && _currentCacheKey.isNotEmpty) {
       unawaited(
           _cacheService.writeCache(key: _currentCacheKey, results: _results));
     }
-
     setState(() {
       _isSearching = false;
       _searchingSource = '';
       _hasMore = hasMore;
     });
-    unawaited(_maybePromptEmptyResultLikeLegado());
   }
 
   Future<void> _maybePromptEmptyResultLikeLegado() async {
@@ -1003,7 +993,7 @@ class _SearchViewState extends State<SearchView> {
   Widget build(BuildContext context) {
     final scopeState = _resolveSearchScope();
     final totalSources = scopeState.sources.length;
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
 
     return PopScope<void>(
       canPop: !SearchInputHintHelper.shouldConsumeBackToClearFocus(
@@ -1073,7 +1063,7 @@ class _SearchViewState extends State<SearchView> {
             ),
             if (_isSearching)
               _buildStatusPanel(
-                borderColor: tokens.border,
+                borderColor: uiTokens.colors.separator,
                 child: Row(
                   children: [
                     const CupertinoActivityIndicator(),
@@ -1083,7 +1073,7 @@ class _SearchViewState extends State<SearchView> {
                         '正在搜索：$_searchingSource ($_completedSources/$totalSources)',
                         style: TextStyle(
                           fontSize: 13,
-                          color: tokens.mutedForeground,
+                          color: uiTokens.colors.mutedForeground,
                         ),
                       ),
                     ),
@@ -1096,7 +1086,7 @@ class _SearchViewState extends State<SearchView> {
                       onPressed: _cancelOngoingSearch,
                       child: Text(
                         '停止',
-                        style: TextStyle(color: tokens.primary),
+                        style: TextStyle(color: uiTokens.colors.accent),
                       ),
                     ),
                   ],
@@ -1104,13 +1094,13 @@ class _SearchViewState extends State<SearchView> {
               ),
             if (!_isSearching && _sourceIssues.isNotEmpty)
               _buildStatusPanel(
-                borderColor: tokens.destructive,
+                borderColor: uiTokens.colors.destructive,
                 child: Row(
                   children: [
                     Icon(
                       CupertinoIcons.exclamationmark_triangle,
                       size: 16,
-                      color: tokens.destructive,
+                      color: uiTokens.colors.destructive,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1118,7 +1108,7 @@ class _SearchViewState extends State<SearchView> {
                         '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
                         style: TextStyle(
                           fontSize: 12,
-                          color: tokens.destructive,
+                          color: uiTokens.colors.destructive,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1133,7 +1123,7 @@ class _SearchViewState extends State<SearchView> {
                       onPressed: _showIssueDetails,
                       child: Text(
                         '查看',
-                        style: TextStyle(color: tokens.primary),
+                        style: TextStyle(color: uiTokens.colors.accent),
                       ),
                     ),
                   ],
@@ -1141,13 +1131,13 @@ class _SearchViewState extends State<SearchView> {
               ),
             if (_showManualLoadMorePanel)
               _buildStatusPanel(
-                borderColor: tokens.primary.withValues(alpha: 0.35),
+                borderColor: uiTokens.colors.accent.withValues(alpha: 0.35),
                 child: Row(
                   children: [
                     Icon(
                       CupertinoIcons.arrow_down_circle,
                       size: 16,
-                      color: tokens.primary,
+                      color: uiTokens.colors.accent,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1155,7 +1145,7 @@ class _SearchViewState extends State<SearchView> {
                         '还有更多结果，可继续加载下一页',
                         style: TextStyle(
                           fontSize: 12,
-                          color: tokens.mutedForeground,
+                          color: uiTokens.colors.mutedForeground,
                         ),
                       ),
                     ),
@@ -1168,7 +1158,7 @@ class _SearchViewState extends State<SearchView> {
                       onPressed: _continueLoadMoreLikeLegado,
                       child: Text(
                         '继续',
-                        style: TextStyle(color: tokens.primary),
+                        style: TextStyle(color: uiTokens.colors.accent),
                       ),
                     ),
                   ],
@@ -1218,7 +1208,7 @@ class _SearchViewState extends State<SearchView> {
     const shadowBlur = 14.0;
     const shadowOffset = Offset(0, 8);
 
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     final shadow = CupertinoColors.black.withValues(alpha: shadowAlpha);
 
@@ -1233,7 +1223,7 @@ class _SearchViewState extends State<SearchView> {
           color: bg,
           shape: BoxShape.circle,
           border: Border.all(
-            color: tokens.primary.withValues(alpha: borderAlpha),
+            color: uiTokens.colors.accent.withValues(alpha: borderAlpha),
             width: borderWidth,
           ),
           boxShadow: [
@@ -1247,7 +1237,7 @@ class _SearchViewState extends State<SearchView> {
         child: Icon(
           CupertinoIcons.line_horizontal_3,
           size: iconSize,
-          color: tokens.primary,
+          color: uiTokens.colors.accent,
         ),
       ),
     );
@@ -1257,14 +1247,14 @@ class _SearchViewState extends State<SearchView> {
     required Color borderColor,
     required Widget child,
   }) {
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: tokens.card,
-          borderRadius: tokens.controlRadius,
+          color: uiTokens.colors.card,
+          borderRadius: BorderRadius.circular(uiTokens.radii.control),
           border: Border.all(color: borderColor, width: 1),
         ),
         child: child,
@@ -1341,7 +1331,7 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Widget _buildEmptyBody({required int totalSources}) {
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
     final historyHints = _historyHintsForInput();
     if (_isSearching) {
       return const SizedBox.shrink();
@@ -1363,7 +1353,7 @@ class _SearchViewState extends State<SearchView> {
               hint,
               style: TextStyle(
                 fontSize: 12,
-                color: tokens.mutedForeground,
+                color: uiTokens.colors.mutedForeground,
               ),
             ),
           ),
@@ -1374,14 +1364,14 @@ class _SearchViewState extends State<SearchView> {
 
   Widget _buildBookshelfHintPanel(List<Book> books) {
     final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
-        color: tokens.card,
-        borderRadius: tokens.controlRadius,
+        color: uiTokens.colors.card,
+        borderRadius: BorderRadius.circular(uiTokens.radii.control),
         border: Border.all(
-          color: tokens.border.withValues(alpha: 0.72),
+          color: uiTokens.colors.separator.withValues(alpha: 0.72),
           width: 0.8,
         ),
       ),
@@ -1391,7 +1381,7 @@ class _SearchViewState extends State<SearchView> {
           Text(
             '书架匹配',
             style: theme.textTheme.textStyle.copyWith(
-              color: tokens.foreground,
+              color: uiTokens.colors.foreground,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1408,7 +1398,7 @@ class _SearchViewState extends State<SearchView> {
             '点击可直接进入该书详情',
             style: theme.textTheme.textStyle.copyWith(
               fontSize: 12,
-              color: tokens.mutedForeground,
+              color: uiTokens.colors.mutedForeground,
             ),
           ),
         ],
@@ -1418,18 +1408,18 @@ class _SearchViewState extends State<SearchView> {
 
   Widget _buildBookshelfHintChip(Book book) {
     final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       minimumSize: Size.zero,
-      color: tokens.primary.withValues(alpha: 0.12),
+      color: uiTokens.colors.accent.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(999),
       onPressed: () => unawaited(_openBookshelfBookInfo(book)),
       child: Text(
         book.title,
         style: theme.textTheme.textStyle.copyWith(
           fontSize: 12,
-          color: tokens.foreground,
+          color: uiTokens.colors.foreground,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -1438,7 +1428,7 @@ class _SearchViewState extends State<SearchView> {
 
   Widget _buildHistoryPanel(List<String> historyHints) {
     final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
     final hasQuery =
         SearchInputHintHelper.normalizeKeyword(_searchController.text)
             .isNotEmpty;
@@ -1466,7 +1456,7 @@ class _SearchViewState extends State<SearchView> {
                 child: Text(
                   '清除',
                   style: TextStyle(
-                    color: tokens.primary,
+                    color: uiTokens.colors.accent,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1480,7 +1470,7 @@ class _SearchViewState extends State<SearchView> {
             hasQuery ? '无匹配历史词' : '暂无历史记录',
             style: theme.textTheme.textStyle.copyWith(
               fontSize: 12,
-              color: tokens.mutedForeground,
+              color: uiTokens.colors.mutedForeground,
             ),
           )
         else
@@ -1521,14 +1511,18 @@ class _SearchViewState extends State<SearchView> {
 
   Widget _buildResultItem(_SearchDisplayItem item) {
     final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
     final result = item.primary;
-    final coverUrl = item.displayCoverUrl.trim();
+    final coverUrl = item.displayCoverUrl;
     final sourceCount = item.origins.length;
+    final mutedStyle = theme.textTheme.textStyle.copyWith(
+      fontSize: 12,
+      color: uiTokens.colors.mutedForeground,
+    );
     final meta = <String>[
-      if (result.kind.trim().isNotEmpty) result.kind.trim(),
-      if (result.wordCount.trim().isNotEmpty) '字数:${result.wordCount.trim()}',
-      if (result.updateTime.trim().isNotEmpty) '更新:${result.updateTime.trim()}',
+      if (result.kind.isNotEmpty) result.kind,
+      if (result.wordCount.isNotEmpty) '字数:${result.wordCount}',
+      if (result.updateTime.isNotEmpty) '更新:${result.updateTime}',
     ];
     final coverSource = _settings.searchShowCover
         ? _sourceRepo.getSourceByUrl(item.displayCoverSourceUrl)
@@ -1542,10 +1536,10 @@ class _SearchViewState extends State<SearchView> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
           decoration: BoxDecoration(
-            color: tokens.card,
-            borderRadius: tokens.controlRadius,
+            color: uiTokens.colors.card,
+            borderRadius: BorderRadius.circular(uiTokens.radii.control),
             border: Border.all(
-              color: tokens.border.withValues(alpha: 0.72),
+              color: uiTokens.colors.separator.withValues(alpha: 0.72),
               width: 0.8,
             ),
           ),
@@ -1592,7 +1586,7 @@ class _SearchViewState extends State<SearchView> {
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.textStyle.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: tokens.foreground,
+                              color: uiTokens.colors.foreground,
                             ),
                           ),
                         ),
@@ -1604,14 +1598,14 @@ class _SearchViewState extends State<SearchView> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: tokens.primary.withValues(alpha: 0.14),
+                              color: uiTokens.colors.accent.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               '$sourceCount 源',
                               style: theme.textTheme.textStyle.copyWith(
                                 fontSize: 12,
-                                color: tokens.primary,
+                                color: uiTokens.colors.accent,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1623,10 +1617,7 @@ class _SearchViewState extends State<SearchView> {
                       result.author.isNotEmpty ? result.author : '未知作者',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.textStyle.copyWith(
-                        fontSize: 12,
-                        color: tokens.mutedForeground,
-                      ),
+                      style: mutedStyle,
                     ),
                     if (meta.isNotEmpty) ...[
                       const SizedBox(height: 2),
@@ -1634,34 +1625,25 @@ class _SearchViewState extends State<SearchView> {
                         meta.join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.textStyle.copyWith(
-                          fontSize: 12,
-                          color: tokens.mutedForeground,
-                        ),
+                        style: mutedStyle,
                       ),
                     ],
-                    if (result.lastChapter.trim().isNotEmpty) ...[
+                    if (result.lastChapter.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '最新: ${result.lastChapter.trim()}',
+                        '最新: ${result.lastChapter}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.textStyle.copyWith(
-                          fontSize: 12,
-                          color: tokens.mutedForeground,
-                        ),
+                        style: mutedStyle,
                       ),
                     ],
-                    if (result.intro.trim().isNotEmpty) ...[
+                    if (result.intro.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        result.intro.trim(),
+                        result.intro,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.textStyle.copyWith(
-                          fontSize: 12,
-                          color: tokens.mutedForeground,
-                        ),
+                        style: mutedStyle,
                       ),
                     ],
                     const SizedBox(height: 2),
@@ -1671,10 +1653,7 @@ class _SearchViewState extends State<SearchView> {
                           : '来源: ${result.sourceName}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.textStyle.copyWith(
-                        fontSize: 12,
-                        color: tokens.mutedForeground,
-                      ),
+                      style: mutedStyle,
                     ),
                   ],
                 ),
@@ -1686,7 +1665,7 @@ class _SearchViewState extends State<SearchView> {
                     : CupertinoIcons.chevron_forward,
                 size: item.inBookshelf ? 17 : 16,
                 color:
-                    item.inBookshelf ? tokens.primary : tokens.mutedForeground,
+                    item.inBookshelf ? uiTokens.colors.accent : uiTokens.colors.mutedForeground,
               ),
             ],
           ),
@@ -1857,19 +1836,18 @@ class _LegadoSearchAggregator {
       wordCount: item.wordCount.trim(),
       bookUrl: bookUrl,
       sourceUrl: sourceUrl,
-      sourceName: item.sourceName.trim().isNotEmpty
-          ? item.sourceName.trim()
-          : sourceUrl,
+      sourceName: () {
+        final trimmed = item.sourceName.trim();
+        return trimmed.isNotEmpty ? trimmed : sourceUrl;
+      }(),
     );
   }
 
-  static String _sourceBookKey(SearchResult item) {
-    return '${item.sourceUrl.trim()}|${item.bookUrl.trim()}';
-  }
+  static String _sourceBookKey(SearchResult item) =>
+      '${item.sourceUrl}|${item.bookUrl}';
 
-  static String _groupKey(SearchResult item) {
-    return '${item.name}|${item.author}';
-  }
+  static String _groupKey(SearchResult item) =>
+      '${item.name}|${item.author}';
 
   static int _matchRank(SearchResult result, String searchKeyword) {
     if (searchKeyword.isEmpty) return 2;
@@ -1913,7 +1891,7 @@ class _LegadoSearchGroup {
       changed = true;
     }
 
-    final originKey = result.sourceUrl.trim();
+    final originKey = result.sourceUrl;
     final oldRepresentative = _representativeByOrigin[originKey];
     if (oldRepresentative == null) {
       _representativeByOrigin[originKey] = result;
