@@ -9,9 +9,9 @@ import WebKit
 
   private func installBootOverlayIfNeeded(controller: FlutterViewController) {
     if bootOverlay != nil { return }
-    let view = controller.view
+    guard let view = controller.view else { return }
     let overlay = UIView(frame: view.bounds)
-    overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    overlay.autoresizingMask = [UIView.AutoresizingMask.flexibleWidth, UIView.AutoresizingMask.flexibleHeight]
     overlay.backgroundColor = UIColor.systemBackground
 
     let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
