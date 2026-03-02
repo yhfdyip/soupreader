@@ -23,10 +23,27 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ── 全局错误处理 ──
-  // 注意：不设置 ErrorWidget.builder。
-  // 在 Release 模式下，默认 ErrorWidget 显示为灰色方块，虽然不好看但不会引发
-  // 递归 Stack Overflow。自定义 ErrorWidget（如 CupertinoPageScaffold 等）在缺少
-  // CupertinoTheme 上下文时自身也会 crash，导致无限递归白屏。
+  // 使用只依赖基础 Widget 的安全 ErrorWidget.builder，避免 Release 模式灰屏。
+  // 注意：不能使用 CupertinoPageScaffold / CupertinoNavigationBar 等依赖
+  // CupertinoTheme 的组件，否则在缺少 theme 祖先时自身也会 crash 导致无限递归白屏。
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    debugPrint('[ErrorWidget] ${details.exceptionAsString()}');
+    return ColoredBox(
+      color: const Color(0xFFFFF4D6),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'ERROR:\n${details.exceptionAsString()}',
+          textDirection: TextDirection.ltr,
+          style: const TextStyle(
+            color: Color(0xFF333333),
+            fontSize: 12,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ),
+    );
+  };
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
