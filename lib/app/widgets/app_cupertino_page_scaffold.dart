@@ -177,35 +177,37 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     final resolvedLargeTitle =
         showLargeTitle ? (largeTitle ?? Text(title)) : null;
 
+    // 注意：CupertinoSliverNavigationBar 必须在
+    // CupertinoPageScaffold(child: CustomScrollView(slivers: [...])) 中使用。
+    // CustomScrollView 必须是 CupertinoPageScaffold.child 的直接子组件，
+    // 中间不能插入 DecoratedBox 或其他包裹 Widget，否则会导致 layout 崩溃。
     return CupertinoPageScaffold(
-      child: _buildBackground(
-        backgroundColor: baseBackground,
-        child: CustomScrollView(
-          primary: sliverScrollController == null,
-          controller: sliverScrollController,
-          physics: sliverScrollPhysics,
-          slivers: [
-            CupertinoSliverNavigationBar(
-              largeTitle: resolvedLargeTitle,
-              middle: resolvedMiddle,
-              alwaysShowMiddle: !showLargeTitle,
-              previousPageTitle: '',
-              leading: _buildNavBarItem(
-                context,
-                leading,
-                alignment: Alignment.centerLeft,
-              ),
-              trailing: _buildNavBarItem(
-                context,
-                trailing,
-                alignment: Alignment.centerRight,
-              ),
-              backgroundColor: navBarBackground,
-              border: border,
+      backgroundColor: baseBackground,
+      child: CustomScrollView(
+        primary: sliverScrollController == null,
+        controller: sliverScrollController,
+        physics: sliverScrollPhysics,
+        slivers: [
+          CupertinoSliverNavigationBar(
+            largeTitle: resolvedLargeTitle,
+            middle: resolvedMiddle,
+            alwaysShowMiddle: !showLargeTitle,
+            previousPageTitle: '',
+            leading: _buildNavBarItem(
+              context,
+              leading,
+              alignment: Alignment.centerLeft,
             ),
-            bodySliver,
-          ],
-        ),
+            trailing: _buildNavBarItem(
+              context,
+              trailing,
+              alignment: Alignment.centerRight,
+            ),
+            backgroundColor: navBarBackground,
+            border: border,
+          ),
+          bodySliver,
+        ],
       ),
     );
   }

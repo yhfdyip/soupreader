@@ -242,21 +242,41 @@ class _MainScreenState extends State<MainScreen> {
         return CupertinoTabView(
           key: ValueKey(tabId),
           builder: (context) {
-            // ── 诊断模式 2：测试 AppCupertinoPageScaffold Sliver 模式 ──
-            return AppCupertinoPageScaffold(
-              title: tabId.name,
-              useSliverNavigationBar: true,
-              child: const SizedBox.shrink(),
-              sliverBodyBuilder: (_) => SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Text(
-                    'Sliver Tab: ${tabId.name}\nindex=$index',
-                    textAlign: TextAlign.center,
+            try {
+              switch (tabId) {
+                case _MainTabId.bookshelf:
+                  return BookshelfView(
+                    reselectSignal: _bookshelfReselectSignal,
+                  );
+                case _MainTabId.discovery:
+                  return DiscoveryView(
+                    compressSignal: _discoveryCompressSignal,
+                  );
+                case _MainTabId.rss:
+                  return const RssSubscriptionView();
+                case _MainTabId.my:
+                  return const SettingsView();
+              }
+            } catch (e, st) {
+              debugPrint('[main-tab] tab $tabId build error: $e');
+              debugPrintStack(stackTrace: st);
+              return CupertinoPageScaffold(
+                navigationBar: CupertinoNavigationBar(
+                  middle: Text('${tabId.name} 异常'),
+                ),
+                child: SafeArea(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        '页面构建异常:\n$e',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            );
+              );
+            }
           },
         );
       },
