@@ -814,7 +814,7 @@ class _SourceListViewState extends State<SourceListView> {
       extentRatio: 0.62,
       children: [
         _buildSourceItemSlidableAction(
-          icon: CupertinoIcons.ellipsis,
+          icon: CupertinoIcons.line_horizontal_3,
           backgroundColor: CupertinoColors.systemBlue.resolveFrom(context),
           onTap: () => unawaited(_showSourceActions(source)),
         ),
@@ -1007,7 +1007,7 @@ class _SourceListViewState extends State<SourceListView> {
                   ? () => _showBatchMoreActions(visibleSources)
                   : null,
               child: Icon(
-                CupertinoIcons.ellipsis_circle,
+                CupertinoIcons.line_horizontal_3,
                 size: 19,
                 color: hasSelection ? enabledColor : disabledColor,
               ),

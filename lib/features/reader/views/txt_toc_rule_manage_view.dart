@@ -1154,12 +1154,13 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                 ? (_selectionActionBusy
                     ? const CupertinoActivityIndicator(radius: 9)
                     : Icon(
-                        CupertinoIcons.ellipsis_circle,
+                        CupertinoIcons.line_horizontal_3,
+                        size: 20,
                         color: hasSelection ? enabledColor : disabledColor,
                       ))
                 : (_menuBusy
                     ? const CupertinoActivityIndicator(radius: 9)
-                    : const Icon(CupertinoIcons.ellipsis)),
+                    : const Icon(CupertinoIcons.line_horizontal_3, size: 20)),
           ),
         ],
       ),
@@ -1284,7 +1285,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                             child: _selectionActionBusy
                                 ? const CupertinoActivityIndicator(radius: 9)
                                 : Icon(
-                                    CupertinoIcons.ellipsis_circle,
+                                    CupertinoIcons.line_horizontal_3,
                                     size: 19,
                                     color: hasSelection
                                         ? enabledColor
@@ -1387,7 +1388,7 @@ class _TxtTocRuleListTile extends StatelessWidget {
                     minimumSize: const Size(28, 28),
                     onPressed: onShowItemMenu,
                     child: const Icon(
-                      CupertinoIcons.ellipsis,
+                      CupertinoIcons.line_horizontal_3,
                       size: 18,
                     ),
                   ),
