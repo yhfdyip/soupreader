@@ -5,6 +5,75 @@ import WebKit
 @main
 @objc class AppDelegate: FlutterAppDelegate {
   private var originalBrightness: CGFloat?
+  private var bootOverlay: UIView?
+
+  private func installBootOverlayIfNeeded(controller: FlutterViewController) {
+    if bootOverlay != nil { return }
+    let view = controller.view
+    let overlay = UIView(frame: view.bounds)
+    overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    overlay.backgroundColor = UIColor.systemBackground
+
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+
+    let titleLabel = UILabel()
+    titleLabel.text = "SoupReader"
+    titleLabel.textAlignment = .center
+    titleLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+    titleLabel.textColor = UIColor.label
+
+    let metaLabel = UILabel()
+    metaLabel.text = "native boot overlay\\nversion \(version) (\(build))\\n\\n如果此屏持续不消失，说明 Flutter 未完成首帧渲染。"
+    metaLabel.textAlignment = .center
+    metaLabel.numberOfLines = 0
+    metaLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .medium)
+    metaLabel.textColor = UIColor.secondaryLabel
+
+    let stack = UIStackView(arrangedSubviews: [titleLabel, metaLabel])
+    stack.axis = .vertical
+    stack.alignment = .center
+    stack.spacing = 14
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    overlay.addSubview(stack)
+
+    NSLayoutConstraint.activate([
+      stack.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+      stack.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+      stack.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 20),
+      stack.trailingAnchor.constraint(lessThanOrEqualTo: overlay.trailingAnchor, constant: -20),
+    ])
+
+    view.addSubview(overlay)
+    bootOverlay = overlay
+  }
+
+  private func removeBootOverlay() {
+    bootOverlay?.removeFromSuperview()
+    bootOverlay = nil
+  }
+
+  private func bindBootOverlayChannel(controller: FlutterViewController) {
+    let channel = FlutterMethodChannel(
+      name: "soupreader/boot_overlay",
+      binaryMessenger: controller.binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else {
+        result(FlutterError(code: "UNAVAILABLE", message: "AppDelegate deallocated", details: nil))
+        return
+      }
+      switch call.method {
+      case "hide":
+        DispatchQueue.main.async {
+          self.removeBootOverlay()
+          result(true)
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
 
   override func application(
     _ application: UIApplication,
@@ -13,6 +82,9 @@ import WebKit
     GeneratedPluginRegistrant.register(with: self)
 
     if let controller = window?.rootViewController as? FlutterViewController {
+      installBootOverlayIfNeeded(controller: controller)
+      bindBootOverlayChannel(controller: controller)
+
       let channel = FlutterMethodChannel(
         name: "soupreader/screen_brightness",
         binaryMessenger: controller.binaryMessenger
