@@ -172,19 +172,46 @@ _PopoverAnchor _resolveAnchor({
   if (anchorContext == null) {
     throw FlutterError('showAppPopoverMenu: anchorKey has no currentContext');
   }
-  final renderBox = anchorContext.findRenderObject();
-  if (renderBox is! RenderBox || !renderBox.hasSize) {
+  final renderBox = _findAnchorRenderBox(anchorContext);
+  if (renderBox == null) {
     throw FlutterError('showAppPopoverMenu: anchorKey renderBox not ready');
   }
-  final overlayBox = Overlay.of(context, rootOverlay: true)
-      .context
-      .findRenderObject() as RenderBox;
+  final overlayObject =
+      Overlay.of(context, rootOverlay: true).context.findRenderObject();
+  if (overlayObject is! RenderBox || !overlayObject.hasSize) {
+    throw FlutterError('showAppPopoverMenu: root overlay renderBox not ready');
+  }
   final anchorOffset = renderBox.localToGlobal(Offset.zero);
   return _PopoverAnchor(
     rect: anchorOffset & renderBox.size,
-    overlaySize: overlayBox.size,
+    overlaySize: overlayObject.size,
     safePadding: MediaQuery.of(context).padding,
   );
+}
+
+RenderBox? _findAnchorRenderBox(BuildContext anchorContext) {
+  final directObject = anchorContext.findRenderObject();
+  if (directObject is RenderBox && directObject.hasSize) {
+    return directObject;
+  }
+  if (anchorContext is! Element) return null;
+  return _findRenderBoxInSubtree(anchorContext);
+}
+
+RenderBox? _findRenderBoxInSubtree(Element root) {
+  RenderBox? resolved;
+  void visit(Element element) {
+    if (resolved != null) return;
+    final renderObject = element.renderObject;
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      resolved = renderObject;
+      return;
+    }
+    element.visitChildElements(visit);
+  }
+
+  root.visitChildElements(visit);
+  return resolved;
 }
 
 double _estimateHeight({
