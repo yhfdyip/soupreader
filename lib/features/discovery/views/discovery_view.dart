@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -168,13 +169,19 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   Future<void> _showGroupFilterMenu() async {
     final groups = _buildGroups(_eligibleSources(_allSources));
-    if (groups.isEmpty) return;
     await showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('分组'),
         actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _setQuery('');
+            },
+            child: const Text('全部'),
+          ),
           for (final group in groups)
             CupertinoActionSheetAction(
               onPressed: () {
@@ -609,10 +616,10 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final uiTokens = AppUiTokens.resolve(context);
 
     final header = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      padding: AppManageSearchField.outerPadding,
       child: Column(
         children: [
-          CupertinoSearchTextField(
+          AppManageSearchField(
             controller: _searchController,
             placeholder: '请输入关键字搜索书源...',
           ),

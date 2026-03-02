@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -228,6 +229,8 @@ class _SourceListViewState extends State<SourceListView> {
         title: '书源管理',
         trailing: AppNavBarButton(
           key: _moreMenuKey,
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(30, 30),
           onPressed: _showMainOptions,
           child: const Icon(CupertinoIcons.line_horizontal_3),
         ),
@@ -431,9 +434,9 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Widget _buildNavigationSearchField() {
-    return CupertinoSearchTextField(
+    return AppManageSearchField(
       controller: _searchController,
-      placeholder: '请输入搜索关键字搜索书源...',
+      placeholder: '请输入关键字搜索书源...',
       onChanged: (_) => setState(() {}),
     );
   }
