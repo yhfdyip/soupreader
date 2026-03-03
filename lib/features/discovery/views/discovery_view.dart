@@ -721,7 +721,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                   controller: _searchController,
                   focusNode: _searchFocusNode,
                   placeholder: '请输入关键字搜索书源...',
-                  onSubmitted: (_) => _searchFocusNode.unfocus(),
                 ),
               ),
               AnimatedSwitcher(

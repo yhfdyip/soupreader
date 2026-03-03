@@ -54,6 +54,8 @@ import '../services/search_book_toc_filter_helper.dart';
 import 'search_book_info_edit_view.dart';
 
 enum _SearchBookInfoMoreMenuAction {
+  edit,
+  share,
   uploadWebDav,
   refresh,
   login,
@@ -146,6 +148,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   static const _uuid = Uuid();
   static const int _maxSessionCacheEntries = 48;
   static const Duration _sessionCacheTtl = Duration(hours: 12);
+  static const double _minWidthForInlineShareAction = 390;
+  static const double _minWidthForInlineEditAction = 460;
   static final LinkedHashMap<String, _BookInfoSessionCacheEntry> _sessionCache =
       LinkedHashMap<String, _BookInfoSessionCacheEntry>();
 
@@ -190,11 +194,32 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         _activeResult.bookUrl.trim().isNotEmpty;
   }
 
-  String _buildSessionCacheKey() {
-    final sourceUrl = _activeResult.sourceUrl.trim().toLowerCase();
-    final bookUrl = _activeResult.bookUrl.trim();
+  String _buildSessionCacheKeyForResult(SearchResult value) {
+    final sourceUrl = value.sourceUrl.trim().toLowerCase();
+    final bookUrl = value.bookUrl.trim();
     if (sourceUrl.isEmpty || bookUrl.isEmpty) return '';
     return '$sourceUrl|$bookUrl';
+  }
+
+  String _buildSessionCacheKey() {
+    return _buildSessionCacheKeyForResult(_activeResult);
+  }
+
+  bool _matchesActiveResult(Book shelfBook) {
+    final activeSource = _normalize(_activeResult.sourceUrl);
+    final activeBookUrl = _normalize(_activeResult.bookUrl);
+    final shelfSource = _normalize(
+      (shelfBook.sourceUrl ?? shelfBook.sourceId ?? ''),
+    );
+    final shelfBookUrl = _normalize(shelfBook.bookUrl ?? '');
+
+    final sourceMatched = activeSource.isEmpty ||
+        shelfSource.isEmpty ||
+        activeSource == shelfSource;
+    final bookMatched = activeBookUrl.isEmpty ||
+        shelfBookUrl.isEmpty ||
+        activeBookUrl == shelfBookUrl;
+    return sourceMatched && bookMatched;
   }
 
   bool _hasUsableDetail(BookDetail? detail) {
@@ -307,7 +332,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     );
   }
 
-  List<Chapter> _buildEphemeralChapters(String sessionId) {
+  List<Chapter> _buildChaptersFromCurrentToc(String bookId) {
     final seen = <String>{};
     final chapters = <Chapter>[];
     for (final item in _toc) {
@@ -316,11 +341,11 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       if (title.isEmpty || url.isEmpty) continue;
       if (!seen.add(url)) continue;
       final id =
-          _uuid.v5(Namespace.url.value, '$sessionId|${chapters.length}|$url');
+          _uuid.v5(Namespace.url.value, '$bookId|${chapters.length}|$url');
       chapters.add(
         Chapter(
           id: id,
-          bookId: sessionId,
+          bookId: bookId,
           title: title,
           url: url,
           index: chapters.length,
@@ -328,6 +353,81 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       );
     }
     return chapters;
+  }
+
+  List<Chapter> _buildEphemeralChapters(String sessionId) {
+    return _buildChaptersFromCurrentToc(sessionId);
+  }
+
+  Book _buildShelfBook({
+    required String bookId,
+    required BookSource source,
+    required int chapterCount,
+  }) {
+    final resolvedBookUrl = _pickFirstNonEmpty([
+      _detail?.bookUrl ?? '',
+      _activeResult.bookUrl,
+    ]);
+    return Book(
+      id: bookId,
+      title: _displayName,
+      author: _displayAuthor,
+      coverUrl: _displayCoverUrl,
+      intro: _displayIntro,
+      sourceId: source.bookSourceUrl,
+      sourceUrl: source.bookSourceUrl,
+      bookUrl: resolvedBookUrl,
+      latestChapter: _pickFirstNonEmpty([
+        _detail?.lastChapter ?? '',
+        _activeResult.lastChapter,
+      ]),
+      totalChapters: chapterCount,
+      currentChapter: 0,
+      readProgress: 0,
+      lastReadTime: null,
+      addedTime: DateTime.now(),
+      isLocal: false,
+      localPath: null,
+    );
+  }
+
+  Future<BookAddResult> _addToShelfLikeLegado() async {
+    try {
+      final source =
+          _source ?? _sourceRepo.getSourceByUrl(_activeResult.sourceUrl);
+      if (source == null) {
+        return BookAddResult.error('书源不存在或已被删除');
+      }
+      final bookId = _addService.buildBookId(_activeResult);
+      if (bookId == null) {
+        return BookAddResult.error('书源不存在或已被删除');
+      }
+      if (_bookRepo.hasBook(bookId)) {
+        return BookAddResult.alreadyExists(bookId);
+      }
+
+      final chapters = _buildChaptersFromCurrentToc(bookId);
+      final book = _buildShelfBook(
+        bookId: bookId,
+        source: source,
+        chapterCount: chapters.length,
+      );
+      await _bookRepo.addBook(book);
+      if (chapters.isNotEmpty) {
+        await _chapterRepo.addChapters(chapters);
+      }
+
+      final storedChapterCount =
+          await _chapterRepo.countChaptersForBook(bookId);
+      if (storedChapterCount != book.totalChapters) {
+        await _bookRepo.updateBook(
+          book.copyWith(totalChapters: storedChapterCount),
+        );
+      }
+      return BookAddResult.success(bookId);
+    } catch (error) {
+      return BookAddResult.error('导入失败: ${_compactReason(error.toString())}');
+    }
   }
 
   List<TocItem> _loadStoredToc(String bookId) {
@@ -347,7 +447,14 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   Book? _resolveCachedBookshelfBook() {
     final explicit = widget.bookshelfBook;
-    if (explicit != null) return explicit;
+    if (explicit != null) {
+      final preferredId = (_bookId ?? '').trim();
+      if (preferredId.isNotEmpty) {
+        final byPreferredId = _bookRepo.getBookById(preferredId);
+        if (byPreferredId != null) return byPreferredId;
+      }
+      return _bookRepo.getBookById(explicit.id) ?? explicit;
+    }
 
     final id = (_bookId ?? '').trim();
     if (id.isNotEmpty) {
@@ -544,7 +651,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   void _refreshBookshelfState() {
     if (_isBookshelfEntry) {
-      final id = widget.bookshelfBook!.id;
+      final preferredId = _bookId?.trim() ?? '';
+      final fallbackId = widget.bookshelfBook!.id.trim();
+      final id = preferredId.isNotEmpty ? preferredId : fallbackId;
       _bookId = id;
       _inBookshelf = _bookRepo.hasBook(id);
       return;
@@ -601,14 +710,18 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     }
 
     final shelfBook = _resolveCachedBookshelfBook();
-    final cachedShelfToc =
-        shelfBook == null ? const <TocItem>[] : _loadStoredToc(shelfBook.id);
+    final canReuseShelfCache =
+        shelfBook != null && _matchesActiveResult(shelfBook);
+    final cachedShelfToc = (shelfBook == null || !canReuseShelfCache)
+        ? const <TocItem>[]
+        : _loadStoredToc(shelfBook.id);
 
     // 对齐 legado：进入详情优先复用书架已缓存目录，避免每次进页都发网络请求。
-    if (_applyCachedBookshelfContext(
-      shelfBook: shelfBook,
-      cachedToc: cachedShelfToc,
-    )) {
+    if (canReuseShelfCache &&
+        _applyCachedBookshelfContext(
+          shelfBook: shelfBook,
+          cachedToc: cachedShelfToc,
+        )) {
       if (mounted) {
         _writeSessionCacheEntry(
           key: cacheKey,
@@ -619,7 +732,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       return true;
     }
 
-    if (shelfBook != null && !_canFetchOnlineDetail) {
+    if (shelfBook != null && canReuseShelfCache && !_canFetchOnlineDetail) {
       final sourceUrl =
           (shelfBook.sourceUrl ?? shelfBook.sourceId ?? '').trim();
       final source =
@@ -714,7 +827,11 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _refreshBookshelfState();
     var resolvedToc = toc;
     var resolvedTocError = tocError;
-    if (_inBookshelf && _bookId != null && _bookId!.trim().isNotEmpty) {
+    final shouldUseStoredBookshelfToc = _inBookshelf &&
+        _bookId != null &&
+        _bookId!.trim().isNotEmpty &&
+        (shelfBook == null || canReuseShelfCache || !_isBookshelfEntry);
+    if (shouldUseStoredBookshelfToc) {
       final id = _bookId!.trim();
       final localToc = _loadStoredToc(id);
       if (localToc.isNotEmpty) {
@@ -1825,28 +1942,136 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     return refreshError == null;
   }
 
-  Future<bool> _confirmRemoveFromShelf() async {
-    if (!_deleteAlertEnabled) return true;
+  String? _normalizeLocalFilePath(String? rawValue) {
+    final raw = (rawValue ?? '').trim();
+    if (raw.isEmpty) return null;
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !uri.hasScheme) return raw;
+    if (uri.scheme.toLowerCase() != 'file') return null;
+    try {
+      final filePath = uri.toFilePath().trim();
+      if (filePath.isEmpty) return null;
+      return filePath;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _deleteFileIfExists(String? filePath) async {
+    final normalized = (filePath ?? '').trim();
+    if (normalized.isEmpty) return;
+    try {
+      final file = File(normalized);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'search_book_info.remove_shelf.delete_file',
+        message: '移出书架时删除本地文件失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{'filePath': normalized},
+      );
+    }
+  }
+
+  Future<void> _deleteLocalBookArtifacts({
+    required Book book,
+    required bool deleteOriginal,
+  }) async {
+    final coverPath = _normalizeLocalFilePath(book.coverUrl);
+    await _deleteFileIfExists(coverPath);
+    if (!deleteOriginal) return;
+    final localPath = _normalizeLocalFilePath(book.localPath);
+    final originalPath = localPath ?? _normalizeLocalFilePath(book.bookUrl);
+    await _deleteFileIfExists(originalPath);
+  }
+
+  Future<bool?> _confirmRemoveFromShelf() async {
+    final isLocal = _isLocalBook();
+    if (!_deleteAlertEnabled) {
+      return isLocal ? _settingsService.getDeleteBookOriginal() : false;
+    }
+
+    var deleteOriginal = _settingsService.getDeleteBookOriginal();
     final confirmed = await showCupertinoDialog<bool>(
-          context: context,
-          builder: (dialogContext) => CupertinoAlertDialog(
-            title: const Text('移出书架'),
-            content: Text('\n确定将《$_displayName》移出书架吗？'),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('取消'),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('移出'),
-              ),
-            ],
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (innerContext, setDialogState) => CupertinoAlertDialog(
+          title: const Text('移出书架'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('确定将《$_displayName》移出书架吗？'),
+                if (isLocal) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '删除源文件',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      CupertinoSwitch(
+                        value: deleteOriginal,
+                        onChanged: (value) {
+                          setDialogState(() => deleteOriginal = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
-        ) ??
-        false;
-    return confirmed;
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('移出'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return null;
+    return isLocal ? deleteOriginal : false;
+  }
+
+  Future<void> _removeFromShelf({
+    required String bookId,
+    required bool deleteOriginal,
+  }) async {
+    final stored = _bookRepo.getBookById(bookId);
+    await _bookRepo.deleteBook(bookId);
+    if (stored != null && stored.isLocal) {
+      await _deleteLocalBookArtifacts(
+        book: stored,
+        deleteOriginal: deleteOriginal,
+      );
+    }
+  }
+
+  int _resolveReadStartChapter() {
+    if (!_inBookshelf) return 0;
+    final id = _bookId?.trim() ?? '';
+    if (id.isEmpty) return 0;
+    final stored = _bookRepo.getBookById(id);
+    if (stored == null) return 0;
+    final chapterCount = _chapterRepo.getChaptersForBook(id).length;
+    final maxIndex = chapterCount > 0
+        ? chapterCount - 1
+        : math.max(stored.totalChapters - 1, 0);
+    return stored.currentChapter.clamp(0, maxIndex).toInt();
   }
 
   Future<void> _toggleShelf() async {
@@ -1859,9 +2084,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           _showMessage('当前书籍 ID 无效，无法移出书架');
           return;
         }
-        final confirmed = await _confirmRemoveFromShelf();
-        if (!confirmed) return;
-        await _bookRepo.deleteBook(id);
+        final deleteOriginal = await _confirmRemoveFromShelf();
+        if (deleteOriginal == null) return;
+        await _settingsService.saveDeleteBookOriginal(deleteOriginal);
+        await _removeFromShelf(
+          bookId: id.trim(),
+          deleteOriginal: deleteOriginal,
+        );
         if (!mounted) return;
         setState(() {
           _inBookshelf = false;
@@ -1875,7 +2104,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         return;
       }
 
-      final addResult = await _addService.addFromSearchResult(_activeResult);
+      final addResult = await _addToShelfLikeLegado();
       if (!mounted) return;
       setState(() {
         _inBookshelf = addResult.success || addResult.alreadyExists;
@@ -2295,10 +2524,24 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }
 
   List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildSyncMenuItems({
+    required bool showEdit,
+    required bool showShare,
     required bool showUpload,
     required bool hasLogin,
   }) {
     return [
+      if (showEdit)
+        const AppPopoverMenuItem(
+          value: _SearchBookInfoMoreMenuAction.edit,
+          icon: CupertinoIcons.pencil,
+          label: '编辑',
+        ),
+      if (showShare)
+        const AppPopoverMenuItem(
+          value: _SearchBookInfoMoreMenuAction.share,
+          icon: CupertinoIcons.share,
+          label: '分享',
+        ),
       if (showUpload)
         const AppPopoverMenuItem(
           value: _SearchBookInfoMoreMenuAction.uploadWebDav,
@@ -2398,6 +2641,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }
 
   List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildMoreMenuItems({
+    required bool showEdit,
+    required bool showShare,
     required bool hasLogin,
     required bool showSetVariable,
     required bool showAllowUpdate,
@@ -2405,7 +2650,12 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     required bool showSplitLongChapter,
   }) {
     return [
-      ..._buildSyncMenuItems(showUpload: showUpload, hasLogin: hasLogin),
+      ..._buildSyncMenuItems(
+        showEdit: showEdit,
+        showShare: showShare,
+        showUpload: showUpload,
+        hasLogin: hasLogin,
+      ),
       const AppPopoverMenuItem(
         value: _SearchBookInfoMoreMenuAction.pinTop,
         icon: CupertinoIcons.arrow_up_to_line,
@@ -2425,6 +2675,18 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _SearchBookInfoMoreMenuAction action,
   ) {
     switch (action) {
+      case _SearchBookInfoMoreMenuAction.edit:
+        return (
+          actionKey: 'edit',
+          actionLabel: '编辑',
+          action: _openBookEdit,
+        );
+      case _SearchBookInfoMoreMenuAction.share:
+        return (
+          actionKey: 'share',
+          actionLabel: '分享',
+          action: _shareBook,
+        );
       case _SearchBookInfoMoreMenuAction.uploadWebDav:
         return (
           actionKey: 'upload',
@@ -2548,6 +2810,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }
 
   Future<void> _showMoreActions() async {
+    final showInlineEditAction = _shouldShowInlineEditAction(context);
+    final showInlineShareAction = _shouldShowInlineShareAction(context);
     final source = _source;
     final hasLogin = SearchBookInfoMenuHelper.shouldShowLogin(
       loginUrl: source?.loginUrl,
@@ -2566,6 +2830,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       isLocalTxtBook: _isLocalTxtBook(),
     );
     final items = _buildMoreMenuItems(
+      showEdit: _inBookshelf && !showInlineEditAction,
+      showShare: !showInlineShareAction,
       hasLogin: hasLogin,
       showSetVariable: showSetVariable,
       showAllowUpdate: showAllowUpdate,
@@ -2598,6 +2864,22 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     );
   }
 
+  int _resolveInlineActionCapacity(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= _minWidthForInlineEditAction) return 2;
+    if (width >= _minWidthForInlineShareAction) return 1;
+    return 0;
+  }
+
+  bool _shouldShowInlineShareAction(BuildContext context) {
+    return _resolveInlineActionCapacity(context) >= 1;
+  }
+
+  bool _shouldShowInlineEditAction(BuildContext context) {
+    if (!_inBookshelf) return false;
+    return _resolveInlineActionCapacity(context) >= 2;
+  }
+
   int _normalizeChangeSourceDelaySeconds(int seconds) {
     return seconds.clamp(0, 9999).toInt();
   }
@@ -2606,6 +2888,107 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final normalized = _normalizeChangeSourceDelaySeconds(seconds);
     _changeSourceDelaySeconds = normalized;
     await _settingsService.saveBatchChangeSourceDelay(normalized);
+  }
+
+  List<Chapter> _loadStoredChapters(String bookId) {
+    final chapters = _chapterRepo
+        .getChaptersForBook(bookId)
+        .toList(growable: false)
+      ..sort((a, b) => a.index.compareTo(b.index));
+    return chapters;
+  }
+
+  String _resolveSwitchSourceChapterTitle({
+    required Book previousBook,
+    required List<Chapter> previousChapters,
+  }) {
+    if (previousChapters.isEmpty) {
+      return _pickFirstNonEmpty(
+            <String>[
+              previousBook.latestChapter ?? '',
+              _activeResult.lastChapter,
+            ],
+          ) ??
+          '';
+    }
+    final safeIndex = previousBook.currentChapter
+        .clamp(0, previousChapters.length - 1)
+        .toInt();
+    return previousChapters[safeIndex].title;
+  }
+
+  Future<bool> _migrateBookshelfBookAfterSourceSwitch({
+    required Book previousBook,
+    required List<Chapter> previousChapters,
+  }) async {
+    final source =
+        _source ?? _sourceRepo.getSourceByUrl(_activeResult.sourceUrl);
+    if (source == null) return false;
+
+    final targetBookId = _addService.buildBookId(_activeResult)?.trim() ?? '';
+    if (targetBookId.isEmpty) return false;
+
+    final targetChapters =
+        _buildStoredChapters(bookId: targetBookId, toc: _toc);
+    if (targetChapters.isEmpty) return false;
+
+    final currentChapterTitle = _resolveSwitchSourceChapterTitle(
+      previousBook: previousBook,
+      previousChapters: previousChapters,
+    );
+    final targetChapterIndex =
+        ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+      newChapters: targetChapters,
+      currentChapterTitle: currentChapterTitle,
+      currentChapterIndex: previousBook.currentChapter,
+      oldChapterCount: previousChapters.length,
+    ).clamp(0, targetChapters.length - 1).toInt();
+
+    final resolvedBookUrl = _resolveBookUrl().trim();
+    final migratedBook = previousBook.copyWith(
+      id: targetBookId,
+      title: _displayName,
+      author: _displayAuthor,
+      coverUrl: _displayCoverUrl,
+      intro: _displayIntro,
+      sourceId: source.bookSourceUrl,
+      sourceUrl: source.bookSourceUrl,
+      bookUrl: resolvedBookUrl.isEmpty ? previousBook.bookUrl : resolvedBookUrl,
+      latestChapter: _pickFirstNonEmpty(<String>[
+        _detail?.lastChapter ?? '',
+        targetChapters.last.title,
+        previousBook.latestChapter ?? '',
+      ]),
+      totalChapters: targetChapters.length,
+      currentChapter: targetChapterIndex,
+    );
+
+    final previousBookId = previousBook.id.trim();
+    final sameBookId = previousBookId == targetBookId;
+    if (!sameBookId && _bookRepo.hasBook(targetBookId)) {
+      await _bookRepo.deleteBook(targetBookId);
+    }
+    if (sameBookId) {
+      await _bookRepo.updateBook(migratedBook);
+    } else {
+      await _bookRepo.addBook(migratedBook);
+    }
+    await _chapterRepo.clearChaptersForBook(targetBookId);
+    await _chapterRepo.addChapters(targetChapters);
+    if (!sameBookId && previousBookId.isNotEmpty) {
+      await _bookRepo.deleteBook(previousBookId);
+    }
+
+    if (!mounted) return true;
+    final refreshedToc = _loadStoredToc(targetBookId);
+    setState(() {
+      _bookId = targetBookId;
+      _inBookshelf = true;
+      _syncDisplayFromStoredBook(migratedBook);
+      _toc = refreshedToc;
+      _tocError = refreshedToc.isEmpty ? '目录为空（书架缓存中无章节，请先刷新目录）' : null;
+    });
+    return true;
   }
 
   Future<void> _switchSource() async {
@@ -2718,6 +3101,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     ReaderSourceSwitchCandidate candidate,
   ) async {
     final previousResult = _activeResult;
+    final previousBookId = (_bookId ?? '').trim();
+    final previousBook = (_inBookshelf && previousBookId.isNotEmpty)
+        ? _bookRepo.getBookById(previousBookId)
+        : null;
+    final previousChapters = previousBook == null
+        ? const <Chapter>[]
+        : _loadStoredChapters(previousBook.id);
     final nextResult = _copyResultWithSource(candidate.book, candidate.source);
 
     if (_normalize(nextResult.sourceUrl) ==
@@ -2737,17 +3127,40 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       _loadingToc = true;
     });
 
-    final loaded = await _loadContext(silent: true);
+    final loaded = await _loadContext(silent: true, forceRemote: true);
     if (!loaded) {
       if (!mounted) return;
       setState(() {
         _activeResult = previousResult;
+        if (previousBookId.isNotEmpty) {
+          _bookId = previousBookId;
+          _inBookshelf = _bookRepo.hasBook(previousBookId);
+        }
       });
-      await _loadContext();
+      await _loadContext(forceRemote: true);
       _showMessage('换源失败，已回退到原书源');
       return;
     }
 
+    if (previousBook != null) {
+      final migrated = await _migrateBookshelfBookAfterSourceSwitch(
+        previousBook: previousBook,
+        previousChapters: previousChapters,
+      );
+      if (!migrated) {
+        if (!mounted) return;
+        setState(() {
+          _activeResult = previousResult;
+          _bookId = previousBookId;
+          _inBookshelf = _bookRepo.hasBook(previousBookId);
+        });
+        await _loadContext(forceRemote: true);
+        _showMessage('换源失败，已回退到原书源');
+        return;
+      }
+    }
+
+    _removeSessionCacheEntry(_buildSessionCacheKeyForResult(previousResult));
     if (!mounted) return;
     _showMessage('已切换到：${candidate.source.bookSourceName}');
   }
@@ -2774,6 +3187,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   @override
   Widget build(BuildContext context) {
+    final showInlineEditAction = _shouldShowInlineEditAction(context);
+    final showInlineShareAction = _shouldShowInlineShareAction(context);
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
     final backgroundColor =
         CupertinoColors.systemBackground.resolveFrom(context);
@@ -2815,6 +3230,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       title: '书籍详情',
       includeTopSafeArea: false,
       includeBottomSafeArea: false,
+      transitionBetweenRoutes: false,
       navigationBarBackgroundColor: CupertinoColors.transparent,
       navigationBarBorder: const Border(),
       navigationBarEnableBackgroundFilterBlur: false,
@@ -2822,17 +3238,18 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_inBookshelf)
+          if (showInlineEditAction)
             CupertinoButton(
               padding: EdgeInsets.zero,
               onPressed: _openBookEdit,
               child: const Icon(CupertinoIcons.pencil),
             ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: _shareBook,
-            child: const Icon(CupertinoIcons.share),
-          ),
+          if (showInlineShareAction)
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: _shareBook,
+              child: const Icon(CupertinoIcons.share),
+            ),
           CupertinoButton(
             key: _moreMenuKey,
             padding: EdgeInsets.zero,
@@ -3201,7 +3618,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                     padding: EdgeInsets.zero,
                     onPressed: (_loading || _loadingToc)
                         ? null
-                        : () => _openReader(initialChapter: 0),
+                        : () => _openReader(
+                              initialChapter: _resolveReadStartChapter(),
+                            ),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         color: primaryActionColor,
