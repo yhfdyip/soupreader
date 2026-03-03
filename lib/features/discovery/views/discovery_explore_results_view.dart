@@ -35,6 +35,7 @@ class _DiscoveryExploreResultsViewState
     extends State<DiscoveryExploreResultsView> {
   static const double _scrollLoadThreshold = 220;
   static const double _minTapSize = SourceUiTokens.minTapSize;
+  static const double _footerTapMinHeight = SourceUiTokens.minTapSize;
 
   late final RuleParserEngine _engine;
   late final BookAddService _addService;
@@ -280,9 +281,9 @@ class _DiscoveryExploreResultsViewState
           Padding(
             padding: const EdgeInsets.fromLTRB(
               SourceUiTokens.pagePaddingHorizontal,
-              10,
+              12,
               SourceUiTokens.pagePaddingHorizontal,
-              8,
+              10,
             ),
             child: Row(
               children: [
@@ -294,13 +295,14 @@ class _DiscoveryExploreResultsViewState
                     style: textStyle.copyWith(
                       fontSize: SourceUiTokens.itemMetaSize,
                       color: secondaryTextColor,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 Text(
                   '已加载 ${_results.length} 本',
                   style: textStyle.copyWith(
-                    fontSize: SourceUiTokens.itemMetaSize,
+                    fontSize: SourceUiTokens.itemSubMetaSize,
                     color: secondaryTextColor,
                   ),
                 ),
@@ -368,8 +370,8 @@ class _DiscoveryExploreResultsViewState
                   urlOrPath: result.coverUrl,
                   title: result.name,
                   author: result.author,
-                  width: 42,
-                  height: 60,
+                  width: SourceUiTokens.discoveryResultCoverWidth,
+                  height: SourceUiTokens.discoveryResultCoverHeight,
                   borderRadius: 7,
                   fit: BoxFit.cover,
                   showTextOnPlaceholder: false,
@@ -400,26 +402,28 @@ class _DiscoveryExploreResultsViewState
                         ),
                       ),
                       if (lastChapter.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           '最新：$lastChapter',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
-                            fontSize: SourceUiTokens.itemMetaSize,
-                            color: secondaryTextColor,
+                            fontSize: SourceUiTokens.itemSubMetaSize,
+                            color: CupertinoColors.tertiaryLabel
+                                .resolveFrom(context),
                           ),
                         ),
                       ],
                       if (intro.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           intro,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
-                            fontSize: SourceUiTokens.itemMetaSize,
-                            color: secondaryTextColor,
+                            fontSize: SourceUiTokens.itemSubMetaSize,
+                            color: CupertinoColors.tertiaryLabel
+                                .resolveFrom(context),
                           ),
                         ),
                       ],
@@ -458,91 +462,108 @@ class _DiscoveryExploreResultsViewState
     final hasError = (_errorMessage ?? '').trim().isNotEmpty;
 
     if (_results.isEmpty && !_loading && !hasError && !_hasMore) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Center(
-          child: Text(
-            '暂无发现内容',
-            style: textStyle.copyWith(
-              fontSize: SourceUiTokens.itemMetaSize,
-              color: secondaryTextColor,
-            ),
+      return _buildFooterBox(
+        child: Text(
+          '暂无发现内容',
+          style: textStyle.copyWith(
+            fontSize: SourceUiTokens.itemMetaSize,
+            color: secondaryTextColor,
           ),
         ),
       );
     }
 
     if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 14),
-        child: Center(child: CupertinoActivityIndicator()),
-      );
+      return const _FooterLoadingBox();
     }
 
     if (hasError) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 8, bottom: 12),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => unawaited(_onFooterTap()),
-          child: Column(
-            children: [
-              Text(
-                '加载失败：点击查看详情并重试',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: textStyle.copyWith(
-                  fontSize: SourceUiTokens.itemMetaSize,
-                  color: destructiveColor,
-                ),
+      return _buildFooterBox(
+        onTap: () => unawaited(_onFooterTap()),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '加载失败，点按查看详情并重试',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: textStyle.copyWith(
+                fontSize: SourceUiTokens.itemMetaSize,
+                color: destructiveColor,
               ),
-              const SizedBox(height: 4),
-              Text(
-                _errorMessage!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: textStyle.copyWith(
-                  fontSize: SourceUiTokens.itemMetaSize,
-                  color: secondaryTextColor,
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _errorMessage!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: textStyle.copyWith(
+                fontSize: SourceUiTokens.itemSubMetaSize,
+                color: secondaryTextColor,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
     if (!_hasMore) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Center(
-          child: Text(
-            '没有更多了',
-            style: textStyle.copyWith(
-              fontSize: SourceUiTokens.itemMetaSize,
-              color: secondaryTextColor,
-            ),
+      return _buildFooterBox(
+        child: Text(
+          '没有更多了',
+          style: textStyle.copyWith(
+            fontSize: SourceUiTokens.itemMetaSize,
+            color: secondaryTextColor,
           ),
         ),
       );
     }
 
+    return _buildFooterBox(
+      onTap: () => unawaited(_onFooterTap()),
+      child: Text(
+        '点击继续加载',
+        style: textStyle.copyWith(
+          fontSize: SourceUiTokens.itemMetaSize,
+          color: primaryActionColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooterBox({
+    required Widget child,
+    VoidCallback? onTap,
+  }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => unawaited(_onFooterTap()),
-        child: Center(
-          child: Text(
-            '点击继续加载',
-            style: textStyle.copyWith(
-              fontSize: SourceUiTokens.itemMetaSize,
-              color: primaryActionColor,
-            ),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: _footerTapMinHeight),
+          child: Center(
+            child: child,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FooterLoadingBox extends StatelessWidget {
+  const _FooterLoadingBox();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: SourceUiTokens.minTapSize),
+        child: const Center(child: CupertinoActivityIndicator()),
       ),
     );
   }

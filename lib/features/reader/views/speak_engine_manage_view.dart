@@ -318,7 +318,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
     final history = await _loadOnlineImportHistory();
     final inputController = TextEditingController();
     try {
-      return showCupertinoModalPopup<String>(
+      return showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(
@@ -547,7 +547,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
       for (var index = 0; index < candidates.length; index++)
         if (candidates[index].selectedByDefault) index,
     };
-    return showCupertinoModalPopup<Set<int>>(
+    return showCupertinoBottomSheetDialog<Set<int>>(
       context: context,
       builder: (popupContext) {
         return CupertinoPopupSurface(
@@ -743,7 +743,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
 
   void _showToastMessage(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {

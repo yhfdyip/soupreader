@@ -32,7 +32,8 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     this.middle,
     this.leading,
     this.trailing,
-    this.transitionBetweenRoutes = true,
+    // 默认关闭路由间导航栏联动过渡，避免二级页进场时右上角动作按钮瞬时叠加。
+    this.transitionBetweenRoutes = false,
     this.includeTopSafeArea = true,
     this.includeBottomSafeArea = true,
     this.useSliverNavigationBar = false,

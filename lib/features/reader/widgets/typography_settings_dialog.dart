@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 
 /// 排版设置对话框 - Cupertino 风格
@@ -442,7 +443,7 @@ void showTypographySettingsDialog(
   required ReadingSettings settings,
   required ValueChanged<ReadingSettings> onSettingsChanged,
 }) {
-  showCupertinoModalPopup(
+  showCupertinoBottomSheetDialog(
     context: context,
     builder: (context) => TypographySettingsDialog(
       settings: settings,

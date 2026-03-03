@@ -10,6 +10,8 @@ class AppTypography {
   // 按 AGENTS 规范：UI 默认统一使用 SF 字体族。
   static const String fontFamilySans = fontFamilySystem;
   static const String fontFamilySerif = fontFamilySystem;
+  // 仅用于规则编辑/调试日志等代码文本场景。
+  static const String fontFamilyMonospace = 'monospace';
 
   // ===== 标题样式 =====
   static const TextStyle displayLarge = TextStyle(

@@ -188,6 +188,14 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     _searchFocusNode.unfocus();
   }
 
+  String? _activeGroupFilter(String query) {
+    final raw = query.trim();
+    if (!raw.startsWith('group:')) return null;
+    final group = raw.substring(6).trim();
+    if (group.isEmpty) return null;
+    return group;
+  }
+
   Future<void> _showGroupFilterMenu() async {
     final groups = _buildGroups(_eligibleSources(_allSources));
     await showCupertinoBottomDialog<void>(
@@ -600,14 +608,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     return AppCupertinoPageScaffold(
       title: '发现',
-      useSliverNavigationBar: true,
-      sliverScrollController: _scrollController,
       trailing: AppNavBarButton(
         onPressed: _showGroupFilterMenu,
         child: const Icon(CupertinoIcons.slider_horizontal_3, size: 22),
       ),
-      child: const SizedBox.shrink(),
-      sliverBodyBuilder: (_) => _buildBodySliver(
+      child: _buildBody(
         eligible: eligible,
         visible: visible,
         query: query,
@@ -619,29 +624,19 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Widget _buildInitErrorPage() {
     return AppCupertinoPageScaffold(
       title: '发现',
-      useSliverNavigationBar: true,
-      sliverScrollController: _scrollController,
-      child: const SizedBox.shrink(),
-      sliverBodyBuilder: (_) => SliverSafeArea(
-        top: true,
-        bottom: true,
-        sliver: SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                _initError ?? '初始化失败',
-                textAlign: TextAlign.center,
-              ),
-            ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            _initError ?? '初始化失败',
+            textAlign: TextAlign.center,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBodySliver({
+  Widget _buildBody({
     required List<BookSource> eligible,
     required List<BookSource> visible,
     required String query,
@@ -657,48 +652,35 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       uiTokens: uiTokens,
     );
 
-    if (visible.isEmpty) {
-      return SliverSafeArea(
-        top: true,
-        bottom: true,
-        sliver: SliverFillRemaining(
-          hasScrollBody: false,
-          child: Column(
+    return Column(
+      children: [
+        header,
+        Expanded(
+          child: Stack(
             children: [
-              header,
-              Expanded(
-                child: showEmptyMessage
-                    ? _buildEmptyState(
-                        eligibleCount: eligible.length,
-                        query: query,
-                      )
-                    : const SizedBox.shrink(),
+              ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 12),
+                itemCount: visible.length,
+                itemBuilder: (context, index) {
+                  final source = visible[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: _buildSourceItem(source),
+                  );
+                },
               ),
+              if (showEmptyMessage)
+                Positioned.fill(
+                  child: _buildEmptyState(
+                    eligibleCount: eligible.length,
+                    query: query,
+                  ),
+                ),
             ],
           ),
         ),
-      );
-    }
-
-    return SliverSafeArea(
-      top: true,
-      bottom: true,
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            if (index == 0) return header;
-            if (index == visible.length + 1) {
-              return const SizedBox(height: 12);
-            }
-            final source = visible[index - 1];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: _buildSourceItem(source),
-            );
-          },
-          childCount: visible.length + 2,
-        ),
-      ),
+      ],
     );
   }
 
@@ -709,6 +691,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required AppUiTokens uiTokens,
   }) {
     final showCancel = _searchFocusNode.hasFocus || query.isNotEmpty;
+    final activeGroup = _activeGroupFilter(query);
 
     return Padding(
       padding: AppManageSearchField.outerPadding,
@@ -751,28 +734,35 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: SourceUiTokens.discoveryHeaderGap),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 '书源（$visibleCount）',
                 style: theme.textTheme.textStyle.copyWith(
-                  fontSize: SourceUiTokens.itemMetaSize,
+                  fontSize: SourceUiTokens.discoveryMetaTextSize,
                   color: uiTokens.colors.mutedForeground,
                 ),
               ),
-              if (query.startsWith('group:')) ...[
+              if (activeGroup != null) ...[
                 const SizedBox(width: 8),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: uiTokens.colors.accent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(uiTokens.radii.control),
+                    border: Border.all(
+                      color: uiTokens.colors.accent.withValues(alpha: 0.28),
+                      width: SourceUiTokens.borderWidth,
+                    ),
                   ),
                   child: Padding(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                     child: Text(
-                      '分组筛选',
+                      '分组：$activeGroup',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.textStyle.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -823,10 +813,15 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         : kinds.take(_collapsedKindsLimit).toList(growable: false);
     final hasHiddenKinds = visibleKinds.length < kinds.length;
     final groupText = (source.bookSourceGroup ?? '').trim();
+    final cardBorderColor = expanded
+        ? uiTokens.colors.accent
+            .withValues(alpha: SourceUiTokens.discoveryExpandedCardBorderAlpha)
+        : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: SourceConsistentCard(
+        borderColor: cardBorderColor,
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,14 +874,21 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                           ? CupertinoIcons.chevron_down
                           : CupertinoIcons.chevron_forward,
                       size: 16,
-                      color: uiTokens.colors.mutedForeground,
+                      color: expanded
+                          ? uiTokens.colors.accent
+                          : uiTokens.colors.mutedForeground,
                     ),
                   ],
                 ),
               ),
             ),
             if (expanded) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
+              Container(
+                height: SourceUiTokens.borderWidth,
+                color: uiTokens.colors.separator.withValues(alpha: 0.55),
+              ),
+              const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
               if (loadingKinds)
                 Row(
                   children: [
@@ -895,7 +897,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                     Text(
                       '正在加载发现入口…',
                       style: theme.textTheme.textStyle.copyWith(
-                        fontSize: SourceUiTokens.itemMetaSize,
+                        fontSize: SourceUiTokens.discoveryMetaTextSize,
                         color: secondaryLabel,
                       ),
                     ),
@@ -905,7 +907,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 Text(
                   '暂无发现入口',
                   style: theme.textTheme.textStyle.copyWith(
-                    fontSize: SourceUiTokens.itemMetaSize,
+                    fontSize: SourceUiTokens.discoveryMetaTextSize,
                     color: secondaryLabel,
                   ),
                 )
@@ -951,8 +953,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                     }
 
                     return Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: SourceUiTokens.discoveryHeaderGap,
+                      runSpacing: SourceUiTokens.discoveryHeaderGap,
                       children: chips,
                     );
                   },
@@ -975,7 +977,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final textColor = uiTokens.colors.secondaryLabel;
     final backgroundColor =
         CupertinoColors.tertiarySystemFill.resolveFrom(context);
-    final borderColor = uiTokens.colors.separator.withValues(alpha: 0.55);
+    final borderColor = uiTokens.colors.separator.withValues(alpha: 0.62);
     return _buildKindPill(
       onTap: onTap,
       uiTokens: uiTokens,
@@ -1016,7 +1018,10 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: _minTapSize),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
+            vertical: SourceUiTokens.discoveryChipVerticalPadding,
+          ),
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(uiTokens.radii.control),
@@ -1073,13 +1078,20 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         ? uiTokens.colors.destructive
         : isEnabled
             ? uiTokens.colors.foreground
-            : uiTokens.colors.secondaryLabel;
+            : uiTokens.colors.tertiaryLabel;
+    final clickableBorderColor =
+        uiTokens.colors.accent.withValues(alpha: isEnabled ? 0.34 : 0.0);
+    final resolvedBorderColor = isError
+        ? borderColor
+        : isEnabled
+            ? clickableBorderColor
+            : borderColor;
 
     return _buildKindPill(
       onTap: isEnabled ? () => _openExploreKind(source, kind) : null,
       uiTokens: uiTokens,
       backgroundColor: backgroundColor,
-      borderColor: borderColor,
+      borderColor: resolvedBorderColor,
       child: Text(
         title,
         maxLines: 1,

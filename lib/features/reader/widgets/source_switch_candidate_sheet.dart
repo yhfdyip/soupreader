@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../services/reader_source_switch_helper.dart';
 
@@ -51,7 +52,7 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
   )? onDeleteSourceCandidate,
   bool confirmDeleteSourceCandidate = false,
 }) {
-  return showCupertinoModalPopup<ReaderSourceSwitchCandidate>(
+  return showCupertinoBottomSheetDialog<ReaderSourceSwitchCandidate>(
     context: context,
     builder: (_) => SourceSwitchCandidateSheet(
       keyword: keyword,
@@ -1034,7 +1035,7 @@ class _SourceSwitchCandidateSheetState
       initialItem: initialValue,
     );
     var selectedValue = initialValue;
-    final result = await showCupertinoModalPopup<int>(
+    final result = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (sheetContext) {
         final theme = CupertinoTheme.of(sheetContext);
@@ -1104,6 +1105,8 @@ class _SourceSwitchCandidateSheetState
   @override
   Widget build(BuildContext context) {
     final colors = CupertinoTheme.of(context);
+    final compactTapSquare =
+        AppUiTokens.resolve(context).sizes.compactTapSquare;
     final size = MediaQuery.of(context).size;
     final filtered = _filteredCandidates;
     final showCheckAuthorAction = widget.onCheckAuthorChanged != null;
@@ -1174,7 +1177,7 @@ class _SourceSwitchCandidateSheetState
                     children: [
                       CupertinoButton(
                         padding: EdgeInsets.zero,
-                        minimumSize: const Size(32, 32),
+                        minimumSize: compactTapSquare,
                         onPressed:
                             _filterExpanded ? _collapseFilter : _openFilter,
                         child: Text(_filterExpanded ? '收起' : '筛选'),
@@ -1183,7 +1186,7 @@ class _SourceSwitchCandidateSheetState
                       if (widget.onStartCandidatesSearch != null)
                         CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(32, 32),
+                          minimumSize: compactTapSquare,
                           onPressed: (_openingSourceManage ||
                                   _refreshingCandidates ||
                                   (_searchingCandidates &&
@@ -1204,7 +1207,7 @@ class _SourceSwitchCandidateSheetState
                       if (widget.onRefreshCandidates != null)
                         CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(32, 32),
+                          minimumSize: compactTapSquare,
                           onPressed: (_refreshingCandidates ||
                                   _searchingCandidates ||
                                   _openingSourceManage)
@@ -1219,7 +1222,7 @@ class _SourceSwitchCandidateSheetState
                       if (widget.onOpenSourceManage != null)
                         CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(32, 32),
+                          minimumSize: compactTapSquare,
                           onPressed:
                               (_openingSourceManage || _refreshingCandidates)
                                   ? null
@@ -1230,7 +1233,7 @@ class _SourceSwitchCandidateSheetState
                       if (showGroupAction)
                         CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(32, 32),
+                          minimumSize: compactTapSquare,
                           onPressed: (_openingSourceManage ||
                                   _refreshingCandidates ||
                                   _updatingSourceGroup ||
@@ -1247,7 +1250,7 @@ class _SourceSwitchCandidateSheetState
                       if (showMoreButton)
                         CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(32, 32),
+                          minimumSize: compactTapSquare,
                           onPressed: (_openingSourceManage ||
                                   _refreshingCandidates ||
                                   _updatingSourceGroup ||
@@ -1263,7 +1266,7 @@ class _SourceSwitchCandidateSheetState
                       if (showMoreButton) const SizedBox(width: 12),
                       CupertinoButton(
                         padding: EdgeInsets.zero,
-                        minimumSize: const Size(32, 32),
+                        minimumSize: compactTapSquare,
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text('关闭'),
                       ),
@@ -1330,7 +1333,7 @@ class _SourceSwitchCandidateSheetState
                               horizontal: 16,
                               vertical: 10,
                             ),
-                            minimumSize: Size.zero,
+                            minimumSize: compactTapSquare,
                             onPressed: () =>
                                 Navigator.of(itemContext).pop(candidate),
                             child: Align(

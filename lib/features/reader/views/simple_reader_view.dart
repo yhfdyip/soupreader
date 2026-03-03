@@ -32,6 +32,7 @@ import '../../../core/utils/chinese_script_converter.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
@@ -5497,7 +5498,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (normalizedText.isEmpty || !mounted) {
       return;
     }
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (_) => ReaderDictLookupSheet(selectedText: normalizedText),
     );
@@ -8148,7 +8149,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _showCopyToast(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {
@@ -9330,7 +9331,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<DateTime?> _pickSimulatedReadingStartDate(DateTime initialDate) async {
     var selected = _normalizeDateOnly(initialDate);
-    return await showCupertinoModalPopup<DateTime>(
+    return await showCupertinoBottomSheetDialog<DateTime>(
       context: context,
       builder: (sheetContext) {
         return Container(
@@ -12063,7 +12064,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showReadStyleDialog() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: const Color(0x00000000),
       builder: (popupContext) => StatefulBuilder(
@@ -12458,7 +12459,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required int styleIndex,
   }) async {
     if (styleIndex < 0) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setEditorState) {
@@ -13246,7 +13247,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         : allowedTabs.toSet().toList()
       ..sort();
     int selectedTab = tabs.contains(initialTab) ? initialTab : tabs.first;
-    showCupertinoModalPopup(
+    showCupertinoBottomSheetDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setPopupState) => Container(
@@ -13328,7 +13329,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showLegacyMoreConfigDialog() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: const Color(0x00000000),
       builder: (popupContext) => StatefulBuilder(
@@ -13353,7 +13354,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showLegacyTipConfigDialog() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: const Color(0x00000000),
       builder: (popupContext) => StatefulBuilder(
@@ -14157,7 +14158,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       opacity: isHiddenMode ? 0.5 : 1,
                       child: CupertinoButton(
                         padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
+                        minimumSize:
+                            AppUiTokens.resolve(context).sizes.compactTapSquare,
                         onPressed: isHiddenMode
                             ? null
                             : () {
@@ -15590,7 +15592,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Future<void> _openFontSelectDialog(StateSetter parentSetState) async {
     await _refreshReaderCustomFontOptions();
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (dialogContext, setDialogState) =>
@@ -16543,7 +16545,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (_showMenu) {
       _setReaderMenuVisible(false);
     }
-    showCupertinoModalPopup(
+    showCupertinoBottomSheetDialog(
       context: context,
       builder: (popupContext) => ReaderCatalogSheet(
         bookId: widget.bookId,
@@ -16686,7 +16688,7 @@ class _ReaderContentEditorPageState extends State<_ReaderContentEditorPage> {
 
   void _showCopyToast(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {

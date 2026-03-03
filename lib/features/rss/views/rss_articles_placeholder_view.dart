@@ -498,7 +498,7 @@ class _RssArticlesPlaceholderViewState
     if (!mounted) return;
 
     final controller = TextEditingController(text: initial);
-    final result = await showCupertinoModalPopup<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (popupContext) => CupertinoPopupSurface(
         isSurfacePainted: true,
@@ -863,7 +863,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
 
   void _showToast(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {

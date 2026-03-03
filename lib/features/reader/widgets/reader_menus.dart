@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 import 'reader_menu_surface_style.dart';
@@ -528,11 +529,12 @@ class ReaderBottomMenu extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildMenuBtn(
-                    CupertinoIcons.list_bullet, '目录', onShowChapterList),
-                _buildMenuBtn(CupertinoIcons.slider_horizontal_3, '界面',
+                _buildMenuBtn(context, CupertinoIcons.list_bullet, '目录',
+                    onShowChapterList),
+                _buildMenuBtn(context, CupertinoIcons.slider_horizontal_3, '界面',
                     onShowInterfaceSettings),
                 _buildMenuBtn(
+                    context,
                     currentTheme.isDark
                         ? CupertinoIcons.moon_fill
                         : CupertinoIcons.sun_max,
@@ -548,14 +550,15 @@ class ReaderBottomMenu extends StatelessWidget {
                 // 翻页模式切换（点击弹窗选择）
                 Builder(
                   builder: (context) => _buildMenuBtn(
+                      context,
                       _getPageTurnModeIcon(settings.pageTurnMode),
                       settings.pageTurnMode.name, () {
                     _showPageTurnModeSheet(
                         context, settings, onSettingsChanged);
                   }),
                 ),
-                _buildMenuBtn(
-                    CupertinoIcons.ellipsis_circle, '更多', onShowMoreMenu),
+                _buildMenuBtn(context, CupertinoIcons.ellipsis_circle, '更多',
+                    onShowMoreMenu),
               ],
             ),
           ],
@@ -582,10 +585,17 @@ class ReaderBottomMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuBtn(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildMenuBtn(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
+    final compactTapSquare =
+        AppUiTokens.resolve(context).sizes.compactTapSquare;
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
+      minimumSize: compactTapSquare,
       onPressed: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

@@ -11,6 +11,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -511,7 +512,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
     final history = await _loadOnlineImportHistory();
     final inputController = TextEditingController();
     try {
-      return showCupertinoModalPopup<String>(
+      return showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(
@@ -757,7 +758,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
       for (var index = 0; index < candidates.length; index++)
         if (candidates[index].selectedByDefault) index,
     };
-    return showCupertinoModalPopup<Set<int>>(
+    return showCupertinoBottomSheetDialog<Set<int>>(
       context: context,
       builder: (popupContext) {
         return CupertinoPopupSurface(

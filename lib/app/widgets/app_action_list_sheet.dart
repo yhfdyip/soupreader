@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
+import '../theme/typography.dart';
 import '../theme/ui_tokens.dart';
+import 'cupertino_bottom_dialog.dart';
 
 class AppActionListItem<T> {
   final T value;
@@ -31,7 +33,7 @@ Future<T?> showAppActionListSheet<T>({
   bool barrierDismissible = true,
   Color? accentColor,
 }) {
-  return showCupertinoModalPopup<T>(
+  return showCupertinoBottomSheetDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
     builder: (_) => _AppActionListSheet<T>(
@@ -232,6 +234,7 @@ class _SheetHeader extends StatelessWidget {
             textAlign: titleAlign,
             style: TextStyle(
               color: titleColor,
+              fontFamily: AppTypography.fontFamilySans,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -243,7 +246,12 @@ class _SheetHeader extends StatelessWidget {
             child: Text(
               message,
               textAlign: titleAlign,
-              style: TextStyle(color: messageColor, fontSize: 13, height: 1.3),
+              style: TextStyle(
+                color: messageColor,
+                fontFamily: AppTypography.fontFamilySans,
+                fontSize: 13,
+                height: 1.3,
+              ),
             ),
           )
         else
@@ -270,6 +278,7 @@ class _ActionRow<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ui = AppUiTokens.resolve(context);
     final enabled = item.enabled;
     final textColor = item.isDestructiveAction ? destructiveColor : labelColor;
     final iconColor = item.isDestructiveAction ? destructiveColor : accent;
@@ -278,7 +287,7 @@ class _ActionRow<T> extends StatelessWidget {
       opacity: enabled ? 1 : 0.45,
       child: CupertinoButton(
         padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
+        minimumSize: ui.sizes.compactTapSquare,
         onPressed: enabled ? () => Navigator.of(context).pop(item.value) : null,
         child: SizedBox(
           height: height,
@@ -296,6 +305,7 @@ class _ActionRow<T> extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: textColor,
+                      fontFamily: AppTypography.fontFamilySans,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -324,9 +334,10 @@ class _CancelRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ui = AppUiTokens.resolve(context);
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
+      minimumSize: ui.sizes.compactTapSquare,
       onPressed: onTap,
       child: SizedBox(
         height: height,
@@ -336,6 +347,7 @@ class _CancelRow extends StatelessWidget {
             label,
             style: TextStyle(
               color: labelColor,
+              fontFamily: AppTypography.fontFamilySans,
               fontWeight: FontWeight.w600,
             ),
           ),

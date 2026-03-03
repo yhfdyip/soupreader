@@ -1988,65 +1988,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     await _deleteFileIfExists(originalPath);
   }
 
-  Future<bool?> _confirmRemoveFromShelf() async {
-    final isLocal = _isLocalBook();
-    if (!_deleteAlertEnabled) {
-      return isLocal ? _settingsService.getDeleteBookOriginal() : false;
-    }
-
-    var deleteOriginal = _settingsService.getDeleteBookOriginal();
-    final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (innerContext, setDialogState) => CupertinoAlertDialog(
-          title: const Text('移出书架'),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('确定将《$_displayName》移出书架吗？'),
-                if (isLocal) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          '删除源文件',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      CupertinoSwitch(
-                        value: deleteOriginal,
-                        onChanged: (value) {
-                          setDialogState(() => deleteOriginal = value);
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('取消'),
-            ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('移出'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return null;
-    return isLocal ? deleteOriginal : false;
-  }
-
   Future<void> _removeFromShelf({
     required String bookId,
     required bool deleteOriginal,
@@ -2080,13 +2021,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     try {
       if (_inBookshelf) {
         final id = _bookId;
-        if (id == null || id.trim().isEmpty) {
-          _showMessage('当前书籍 ID 无效，无法移出书架');
-          return;
-        }
-        final deleteOriginal = await _confirmRemoveFromShelf();
-        if (deleteOriginal == null) return;
-        await _settingsService.saveDeleteBookOriginal(deleteOriginal);
+        if (id == null || id.trim().isEmpty) return;
+        final deleteOriginal = _settingsService.getDeleteBookOriginal();
         await _removeFromShelf(
           bookId: id.trim(),
           deleteOriginal: deleteOriginal,
@@ -2095,14 +2031,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         setState(() {
           _inBookshelf = false;
         });
-        _showMessage('已移出书架');
         return;
       }
 
-      if (!_canFetchOnlineDetail) {
-        _showMessage('当前书籍缺少详情链接，无法加入书架');
-        return;
-      }
+      if (!_canFetchOnlineDetail) return;
 
       final addResult = await _addToShelfLikeLegado();
       if (!mounted) return;
@@ -2119,7 +2051,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           }
         }
       });
-      _showMessage(addResult.message);
     } finally {
       if (mounted) {
         setState(() => _shelfBusy = false);
@@ -3192,7 +3123,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
     final backgroundColor =
         CupertinoColors.systemBackground.resolveFrom(context);
-    final cardColor = SourceUiTokens.resolveCardBackgroundColor(context);
     final borderColor = SourceUiTokens.resolveSeparatorColor(context);
     final primaryTextColor = CupertinoColors.label.resolveFrom(context);
     final secondaryTextColor =
@@ -3353,35 +3283,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           ),
                         ),
                       ),
-                      if (_loading)
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: _CupertinoCardContainer(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            backgroundColor: cardColor.withValues(alpha: 0.95),
-                            borderColor: borderColor.withValues(alpha: 0.7),
-                            borderWidth: SourceUiTokens.borderWidth,
-                            borderRadius: SourceUiTokens.radiusControl,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const CupertinoActivityIndicator(radius: 7),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '加载中',
-                                  style: textStyle.copyWith(
-                                    fontSize: SourceUiTokens.itemMetaSize,
-                                    color: primaryTextColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),

@@ -150,11 +150,17 @@ class AppUiSizes {
   /// 交互最小热区（iOS 人体工学）。
   final double minTapSize;
 
+  /// 紧凑控件的最小热区（用于 chip/popover row 等高密度场景）。
+  final double compactTapSize;
+
   /// 分隔线高度（iOS 细分隔线）。
   final double dividerThickness;
 
   const AppUiSizes({
     this.minTapSize = kMinInteractiveDimensionCupertino,
+    this.compactTapSize = 32,
     this.dividerThickness = 0.5,
   });
+
+  Size get compactTapSquare => Size.square(compactTapSize);
 }

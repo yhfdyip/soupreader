@@ -1,13 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
-
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/theme/typography.dart';
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/cookie_store.dart';
@@ -947,7 +948,10 @@ class _SourceEditViewState extends State<SourceEditView> {
               maxLines: null,
               minLines: 20,
               keyboardType: TextInputType.multiline,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+              style: const TextStyle(
+                fontFamily: AppTypography.fontFamilyMonospace,
+                fontSize: 13,
+              ),
               onChanged: (_) => _validateJson(silent: true),
             ),
           ),
@@ -1043,6 +1047,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     EdgeInsetsGeometry padding =
         const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
   }) {
+    final uiTokens = AppUiTokens.resolve(context);
     final enabled = onPressed != null;
     final fillColor =
         CupertinoColors.systemGrey5.resolveFrom(context).withValues(
@@ -1063,7 +1068,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       ),
       child: CupertinoButton(
         padding: padding,
-        minimumSize: Size.zero,
+        minimumSize: uiTokens.sizes.compactTapSquare,
         onPressed: onPressed,
         child: DefaultTextStyle.merge(
           style: TextStyle(
@@ -2292,7 +2297,7 @@ class _SourceEditViewState extends State<SourceEditView> {
           title: Text(
             line.text,
             style: TextStyle(
-              fontFamily: 'monospace',
+              fontFamily: AppTypography.fontFamilyMonospace,
               fontSize: 12.5,
               color: color,
             ),

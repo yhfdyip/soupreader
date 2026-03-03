@@ -120,7 +120,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     );
     var pendingIndex = currentIndex >= 0 ? currentIndex : 0;
     final controller = FixedExtentScrollController(initialItem: pendingIndex);
-    final selected = await showCupertinoModalPopup<int>(
+    final selected = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (dialogContext) => Container(
         height: 300,

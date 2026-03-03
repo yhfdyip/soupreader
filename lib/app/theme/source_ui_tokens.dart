@@ -11,6 +11,14 @@ class SourceUiTokens {
   static const double radiusControl = 10;
   static const double borderWidth = 0.6;
   static const double pagePaddingHorizontal = 12;
+  static const double discoveryHeaderGap = 8;
+  static const double discoveryCardInnerGap = 8;
+  static const double discoveryChipHorizontalPadding = 11;
+  static const double discoveryChipVerticalPadding = 7;
+  static const double discoveryExpandedCardBorderAlpha = 0.78;
+  static const double discoveryMetaTextSize = 12;
+  static const double discoveryResultCoverWidth = 42;
+  static const double discoveryResultCoverHeight = 60;
   static const double itemTitleSize = 15;
   static const double itemMetaSize = 12;
   static const double itemSubMetaSize = 11;

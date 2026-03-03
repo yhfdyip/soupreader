@@ -182,7 +182,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   }
 
   void _openAdvancedTypography() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (ctx) => TypographySettingsDialog(
         settings: _settings,

@@ -983,7 +983,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     final jsCtrl = TextEditingController();
     var useWebView = false;
 
-    final text = await showCupertinoModalPopup<String>(
+    final text = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (popupContext) {
         return StatefulBuilder(
@@ -1490,7 +1490,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     if (!mounted) return;
 
     final controller = TextEditingController(text: current);
-    final result = await showCupertinoModalPopup<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (popupContext) => CupertinoPopupSurface(
         isSurfacePainted: true,

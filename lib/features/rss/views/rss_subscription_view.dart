@@ -602,7 +602,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
 
   void _showToast(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
+import '../../../app/theme/typography.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_popover_menu.dart';
@@ -1292,7 +1293,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   void _showSortOptions() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _SourceSortSheet(
@@ -1332,7 +1333,7 @@ class _SourceListViewState extends State<SourceListView> {
 
   void _showGroupFilterOptions() {
     final groups = _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _SourceGroupFilterSheet(
@@ -1359,7 +1360,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _showGroupManageSheet() async {
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (sheetContext) {
         return CupertinoPopupSurface(
@@ -2702,7 +2703,7 @@ class _SourceListViewState extends State<SourceListView> {
   Future<void> _importFromUrl() async {
     _urlController.clear();
     final history = _loadOnlineImportHistory();
-    final url = await showCupertinoModalPopup<String>(
+    final url = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (context) {
         return CupertinoPopupSurface(
@@ -2935,7 +2936,7 @@ class _SourceListViewState extends State<SourceListView> {
     var appendCustomGroup = false;
     var customGroupName = '';
 
-    return showCupertinoModalPopup<_ImportSelectionDecision>(
+    return showCupertinoBottomSheetDialog<_ImportSelectionDecision>(
       context: context,
       builder: (popupContext) {
         return CupertinoPopupSurface(
@@ -3477,7 +3478,7 @@ class _SourceListViewState extends State<SourceListView> {
   }) async {
     final controller = TextEditingController(text: initialText);
     try {
-      return await showCupertinoModalPopup<String>(
+      return await showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(
@@ -3540,7 +3541,7 @@ class _SourceListViewState extends State<SourceListView> {
                           textAlignVertical: TextAlignVertical.top,
                           placeholder: '输入书源 JSON',
                           style: const TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: AppTypography.fontFamilyMonospace,
                           ),
                         ),
                       ),

@@ -529,7 +529,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _showGroupManageSheet() async {
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (sheetContext) {
         return CupertinoPopupSurface(
@@ -1590,7 +1590,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     final history = await _loadOnlineImportHistory();
     final inputController = TextEditingController();
     try {
-      return showCupertinoModalPopup<String>(
+      return showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(
@@ -1897,7 +1897,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     };
     var customGroupName = '';
     var appendCustomGroup = false;
-    return showCupertinoModalPopup<_ReplaceRuleImportSelectionDecision>(
+    return showCupertinoBottomSheetDialog<_ReplaceRuleImportSelectionDecision>(
       context: context,
       builder: (popupContext) {
         return CupertinoPopupSurface(

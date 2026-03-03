@@ -1,5 +1,23 @@
 import 'package:flutter/cupertino.dart';
 
+Future<T?> showCupertinoBottomSheetDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+  Color? barrierColor,
+}) {
+  final themeData = CupertinoTheme.of(context);
+  return showCupertinoModalPopup<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    barrierColor: barrierColor ?? kCupertinoModalBarrierColor,
+    builder: (popupContext) => CupertinoTheme(
+      data: themeData,
+      child: builder(popupContext),
+    ),
+  );
+}
+
 Future<T?> showCupertinoBottomDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,

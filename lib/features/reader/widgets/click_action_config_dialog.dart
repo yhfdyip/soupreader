@@ -426,7 +426,7 @@ void showClickActionConfigDialog(
     throw ArgumentError('initialConfig 或 currentConfig 至少需要提供一个');
   }
 
-  showCupertinoModalPopup(
+  showCupertinoBottomSheetDialog(
     context: context,
     builder: (context) => ClickActionConfigDialog(
       initialConfig: resolvedConfig,

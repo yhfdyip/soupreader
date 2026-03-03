@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/typography.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 
@@ -49,7 +50,7 @@ class _SourceDebugTextViewState extends State<SourceDebugTextView> {
             child: Text(
               widget.text,
               style: const TextStyle(
-                fontFamily: 'monospace',
+                fontFamily: AppTypography.fontFamilyMonospace,
                 fontSize: 12.5,
                 height: 1.25,
               ),

@@ -1214,7 +1214,7 @@ class _SearchViewState extends State<SearchView> {
 
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
+      minimumSize: uiTokens.sizes.compactTapSquare,
       onPressed: _showSearchSettingsSheet,
       child: Container(
         width: buttonSize,
@@ -1411,7 +1411,7 @@ class _SearchViewState extends State<SearchView> {
     final uiTokens = AppUiTokens.resolve(context);
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      minimumSize: Size.zero,
+      minimumSize: uiTokens.sizes.compactTapSquare,
       color: uiTokens.colors.accent.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(999),
       onPressed: () => unawaited(_openBookshelfBookInfo(book)),
@@ -1487,13 +1487,14 @@ class _SearchViewState extends State<SearchView> {
 
   Widget _buildHistoryChip(String keyword) {
     final theme = CupertinoTheme.of(context);
+    final uiTokens = AppUiTokens.resolve(context);
     final chipBg = CupertinoColors.systemGrey5.resolveFrom(context);
     final textColor = CupertinoColors.label.resolveFrom(context);
     return GestureDetector(
       onLongPress: () => _removeHistoryKeyword(keyword),
       child: CupertinoButton(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        minimumSize: Size.zero,
+        minimumSize: uiTokens.sizes.compactTapSquare,
         color: chipBg,
         borderRadius: BorderRadius.circular(999),
         onPressed: () => unawaited(_handleHistoryKeywordTap(keyword)),

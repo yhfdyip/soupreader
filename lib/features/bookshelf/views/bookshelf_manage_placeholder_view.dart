@@ -1944,7 +1944,7 @@ class _BookshelfManageSourcePickerViewState
       initialItem: initialValue,
     );
     var selectedValue = initialValue;
-    final result = await showCupertinoModalPopup<int>(
+    final result = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (sheetContext) {
         final theme = CupertinoTheme.of(sheetContext);

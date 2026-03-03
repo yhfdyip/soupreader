@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 
@@ -100,7 +101,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   void _showToast(String message) {
     if (!mounted) return;
 
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {

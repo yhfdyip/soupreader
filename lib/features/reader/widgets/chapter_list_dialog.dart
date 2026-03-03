@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../bookshelf/models/book.dart';
 
 /// 目录/书签弹窗 - Cupertino 风格
@@ -32,7 +33,7 @@ class ChapterListDialog extends StatefulWidget {
     required ValueChanged<Bookmark> onBookmarkSelected,
     required ReadingThemeColors currentTheme,
   }) {
-    showCupertinoModalPopup(
+    showCupertinoBottomSheetDialog(
       context: context,
       builder: (context) => ChapterListDialog(
         chapters: chapters,

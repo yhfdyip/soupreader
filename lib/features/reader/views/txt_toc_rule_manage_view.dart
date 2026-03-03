@@ -706,7 +706,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
       for (var index = 0; index < candidates.length; index++)
         if (candidates[index].selectedByDefault) index,
     };
-    return showCupertinoModalPopup<Set<int>>(
+    return showCupertinoBottomSheetDialog<Set<int>>(
       context: context,
       builder: (popupContext) {
         return CupertinoPopupSurface(
@@ -829,7 +829,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     final history = _buildHistoryWithDefaultUrl(persistedHistory);
     final inputController = TextEditingController();
     try {
-      return showCupertinoModalPopup<String>(
+      return showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(

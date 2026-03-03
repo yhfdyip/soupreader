@@ -143,7 +143,7 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
 
   void _showToastMessage(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {

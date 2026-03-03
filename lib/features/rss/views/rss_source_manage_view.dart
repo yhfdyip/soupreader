@@ -955,7 +955,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _openGroupManageSheet() async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (sheetContext) => CupertinoPopupSurface(
         isSurfacePainted: true,
@@ -1085,7 +1085,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     final inputController = TextEditingController();
     try {
       if (!mounted) return null;
-      return showCupertinoModalPopup<String>(
+      return showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(
@@ -1336,7 +1336,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     var keepEnabled = true;
     var appendCustomGroup = false;
     try {
-      return await showCupertinoModalPopup<_RssImportSelectionDecision>(
+      return await showCupertinoBottomSheetDialog<_RssImportSelectionDecision>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(

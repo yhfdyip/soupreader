@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 
+import '../theme/typography.dart';
 import '../theme/ui_tokens.dart';
 
 const double _screenEdgePadding = 10.0;
@@ -309,11 +310,12 @@ class _PopoverMenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final uiTokens = AppUiTokens.resolve(context);
     return Opacity(
       opacity: enabled ? 1 : 0.45,
       child: CupertinoButton(
         padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
+        minimumSize: uiTokens.sizes.compactTapSquare,
         onPressed: onTap,
         child: SizedBox(
           height: height,
@@ -330,6 +332,7 @@ class _PopoverMenuRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: textColor,
+                      fontFamily: AppTypography.fontFamilySans,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),

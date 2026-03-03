@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 
 import '../theme/ui_tokens.dart';
+import 'cupertino_bottom_dialog.dart';
 
 /// 通用单选底部面板（用于替换纯“选项选择器”类 ActionSheet）。
 class OptionPickerItem<T> {
@@ -31,7 +32,7 @@ Future<T?> showOptionPickerSheet<T>({
   bool showCancel = false,
   Color? accentColor,
 }) {
-  return showCupertinoModalPopup<T>(
+  return showCupertinoBottomSheetDialog<T>(
     context: context,
     barrierDismissible: true,
     builder: (sheetContext) => _OptionPickerSheet<T>(

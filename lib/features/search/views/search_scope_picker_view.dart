@@ -183,7 +183,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
     return CupertinoButton(
       key: key,
       padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
+      minimumSize: uiTokens.sizes.compactTapSquare,
       pressedOpacity: 0.72,
       onPressed: onPressed,
       child: Container(

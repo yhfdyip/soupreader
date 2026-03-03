@@ -845,6 +845,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             final rootPath = scanResult.rootDirectoryPath;
             final isAllSelected = candidates.isNotEmpty &&
                 selectedPaths.length == candidates.length;
+            final uiTokens = AppUiTokens.resolve(context);
             return CupertinoAlertDialog(
               title: const Text('智能扫描'),
               content: SizedBox(
@@ -901,7 +902,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                                   },
                             child: CupertinoButton(
                               padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
+                              minimumSize: uiTokens.sizes.compactTapSquare,
                               onPressed: () {
                                 setDialogState(() {
                                   if (isSelected) {
@@ -2044,7 +2045,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   void _showBottomHint(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {

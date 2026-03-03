@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
@@ -287,7 +288,7 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
 
   void _showToast(String message) {
     if (!mounted) return;
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
       builder: (toastContext) {
