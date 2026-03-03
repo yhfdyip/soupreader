@@ -20,6 +20,8 @@ class AppCupertinoPageScaffold extends StatelessWidget {
   final AppSliverBodyBuilder? sliverBodyBuilder;
   final ScrollController? sliverScrollController;
   final ScrollPhysics? sliverScrollPhysics;
+  final Color? navigationBarBackgroundColor;
+  final Border? navigationBarBorder;
 
   const AppCupertinoPageScaffold({
     super.key,
@@ -37,6 +39,8 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     this.sliverBodyBuilder,
     this.sliverScrollController,
     this.sliverScrollPhysics,
+    this.navigationBarBackgroundColor,
+    this.navigationBarBorder,
   });
 
   Widget? _buildNavBarItem(
@@ -122,11 +126,14 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     final navSurface = isDark
         ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
-    final navBarBackground = Color.alphaBlend(
+    final defaultNavBarBackground = Color.alphaBlend(
       navSurface,
       theme.barBackgroundColor,
     );
     final border = Border(bottom: BorderSide(color: borderColor, width: 0.5));
+    final resolvedNavBarBackground =
+        navigationBarBackgroundColor ?? defaultNavBarBackground;
+    final resolvedNavBarBorder = navigationBarBorder ?? border;
 
     final navBar = CupertinoNavigationBar(
       middle: middle ?? Text(title),
@@ -142,8 +149,8 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         alignment: Alignment.centerRight,
       ),
       transitionBetweenRoutes: transitionBetweenRoutes,
-      backgroundColor: navBarBackground,
-      border: border,
+      backgroundColor: resolvedNavBarBackground,
+      border: resolvedNavBarBorder,
     );
 
     if (!useSliverNavigationBar) {

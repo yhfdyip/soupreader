@@ -15,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/cookie_store.dart';
@@ -122,6 +123,32 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     'imageStyle': '图片样式',
     'imageDecode': '图片解码',
     'payAction': '购买动作',
+  };
+  static const Map<int, Widget> _tabSwitcherItems = <int, Widget>{
+    0: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: Text('基础'),
+    ),
+    1: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: Text('搜索'),
+    ),
+    2: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: Text('发现'),
+    ),
+    3: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: Text('详情'),
+    ),
+    4: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: Text('目录'),
+    ),
+    5: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: Text('正文'),
+    ),
   };
 
   late final DatabaseService _db;
@@ -347,72 +374,27 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(30, 30),
+            AppNavBarButton(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               onPressed: _save,
               child: const Text('保存'),
             ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(30, 30),
+            AppNavBarButton(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               onPressed: _saveAndOpenDebug,
-              child: const Text('调试源'),
+              child: const Text('调试'),
             ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(30, 30),
+            AppNavBarButton(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               onPressed: _showMore,
-              child: const Icon(CupertinoIcons.ellipsis),
+              child: const Icon(CupertinoIcons.ellipsis_circle),
             ),
           ],
         ),
         child: Column(
           children: [
             _buildTopSettings(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: CupertinoSlidingSegmentedControl<int>(
-                  groupValue: _tab,
-                  children: const {
-                    0: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('基础'),
-                    ),
-                    1: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('搜索'),
-                    ),
-                    2: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('发现'),
-                    ),
-                    3: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('详情'),
-                    ),
-                    4: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('目录'),
-                    ),
-                    5: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('正文'),
-                    ),
-                  },
-                  onValueChanged: (value) {
-                    if (value == null) return;
-                    setState(() {
-                      _tab = value;
-                      _activeFieldKey = null;
-                      _activeFieldController = null;
-                    });
-                  },
-                ),
-              ),
-            ),
+            _buildTabSwitcher(),
             Expanded(
               child: IndexedStack(
                 index: _tab,
@@ -433,69 +415,101 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Widget _buildTopSettings() {
-    return Container(
-      color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const Text('书源类型'),
-            const SizedBox(width: 8),
-            CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              color: CupertinoColors.systemGrey5.resolveFrom(context),
-              borderRadius: BorderRadius.circular(14),
-              onPressed: _pickBookSourceType,
-              child: Text(_typeLabel(_bookSourceType)),
+    final accentColor = CupertinoTheme.of(context).primaryColor;
+    return CupertinoListSection.insetGrouped(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      children: [
+        CupertinoListTile.notched(
+          title: const Text('书源类型'),
+          additionalInfo: Text(
+            _typeLabel(_bookSourceType),
+            style: TextStyle(
+              color: accentColor,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(width: 8),
-            _buildTopSwitchItem(
-              text: '启用书源',
-              value: _enabled,
-              onChanged: (value) => setState(() => _enabled = value),
-            ),
-            const SizedBox(width: 8),
-            _buildTopSwitchItem(
-              text: '启用发现',
-              value: _enabledExplore,
-              onChanged: (value) => setState(() => _enabledExplore = value),
-            ),
-            const SizedBox(width: 8),
-            _buildTopSwitchItem(
-              text: '自动保存Cookie',
-              value: _enabledCookieJar,
-              onChanged: (value) => setState(() => _enabledCookieJar = value),
-            ),
-          ],
+          ),
+          trailing: const CupertinoListTileChevron(),
+          onTap: _pickBookSourceType,
         ),
-      ),
+        _buildTopSwitchTile(
+          text: '启用书源',
+          helper: '控制该书源是否参与搜索与阅读流程',
+          value: _enabled,
+          onChanged: (value) => setState(() => _enabled = value),
+        ),
+        _buildTopSwitchTile(
+          text: '启用发现',
+          helper: '关闭后该书源不会在发现页显示',
+          value: _enabledExplore,
+          onChanged: (value) => setState(() => _enabledExplore = value),
+        ),
+        _buildTopSwitchTile(
+          text: '自动保存 Cookie',
+          helper: '请求命中登录态时自动更新 Cookie',
+          value: _enabledCookieJar,
+          onChanged: (value) => setState(() => _enabledCookieJar = value),
+        ),
+      ],
     );
   }
 
-  Widget _buildTopSwitchItem({
+  Widget _buildTopSwitchTile({
     required String text,
+    required String helper,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6.resolveFrom(context),
-        borderRadius: BorderRadius.circular(14),
+    final helperColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
+    return CupertinoListTile.notched(
+      title: Text(text),
+      subtitle: Text(
+        helper,
+        style: TextStyle(
+          fontSize: 12,
+          color: helperColor,
+        ),
       ),
-      child: Row(
-        children: [
-          Text(text),
-          const SizedBox(width: 6),
-          Transform.scale(
-            scale: 0.82,
-            child: CupertinoSwitch(
-              value: value,
-              onChanged: onChanged,
+      trailing: CupertinoSwitch(
+        value: value,
+        onChanged: onChanged,
+      ),
+      onTap: () => onChanged(!value),
+    );
+  }
+
+  Widget _buildTabSwitcher() {
+    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final sectionColor =
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: sectionColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: borderColor.withValues(alpha: 0.7),
+            width: 0.6,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: CupertinoSlidingSegmentedControl<int>(
+              groupValue: _tab,
+              children: _tabSwitcherItems,
+              onValueChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _tab = value;
+                  _activeFieldKey = null;
+                  _activeFieldController = null;
+                });
+              },
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -651,25 +665,73 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     int maxLines = 1,
   }) {
     final isActiveField = identical(_activeFieldController, controller);
+    final titleStyle = CupertinoTheme.of(
+      context,
+    ).textTheme.textStyle.copyWith(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        );
+    final trailing =
+        isActiveField ? _buildInsertActionButton(key, controller) : null;
     return CupertinoListTile.notched(
-      title: Text(_labelForField(key)),
-      subtitle: CupertinoTextField(
+      title: Text(_labelForField(key), style: titleStyle),
+      subtitle: _buildFieldInput(
+        key: key,
         controller: controller,
         maxLines: maxLines,
+      ),
+      trailing: trailing,
+    );
+  }
+
+  Widget _buildInsertActionButton(
+    String key,
+    TextEditingController controller,
+  ) {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(36, 36),
+      onPressed: () {
+        _markActiveField(key, controller);
+        _showInsertActions();
+      },
+      child: const Icon(CupertinoIcons.wand_stars, size: 18),
+    );
+  }
+
+  Widget _buildFieldInput({
+    required String key,
+    required TextEditingController controller,
+    required int maxLines,
+  }) {
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final fieldColor = CupertinoColors.systemGrey6.resolveFrom(context);
+    final placeholderColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: CupertinoTextField(
+        controller: controller,
+        maxLines: maxLines,
+        minLines: maxLines > 1 ? 2 : 1,
+        placeholder: key,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: fieldColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: borderColor.withValues(alpha: 0.65),
+            width: 0.6,
+          ),
+        ),
+        style: textStyle.copyWith(fontSize: 14),
+        placeholderStyle: textStyle.copyWith(
+          fontSize: 13,
+          color: placeholderColor,
+        ),
         onTap: () => _markActiveField(key, controller),
         onChanged: (_) => _markActiveField(key, controller),
       ),
-      trailing: isActiveField
-          ? CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(28, 28),
-              onPressed: () {
-                _markActiveField(key, controller);
-                _showInsertActions();
-              },
-              child: const Icon(CupertinoIcons.wand_stars, size: 18),
-            )
-          : null,
     );
   }
 

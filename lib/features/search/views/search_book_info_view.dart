@@ -2524,6 +2524,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final coverUrl = _displayCoverUrl;
     final heroTopExtend =
         MediaQuery.of(context).padding.top + kMinInteractiveDimensionCupertino;
+    final translucentNavBar = backgroundColor.withValues(alpha: 0.22);
 
     final kind = _pickFirstNonEmpty([
       _detail?.kind ?? '',
@@ -2550,6 +2551,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       title: '书籍详情',
       includeTopSafeArea: false,
       includeBottomSafeArea: false,
+      navigationBarBackgroundColor: translucentNavBar,
+      navigationBarBorder: const Border(),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
