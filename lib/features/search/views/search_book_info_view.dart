@@ -107,7 +107,7 @@ class SearchBookInfoView extends StatefulWidget {
         name: book.title,
         author: book.author,
         coverUrl: (book.coverUrl ?? '').trim(),
-        intro: (book.intro ?? '').trim(),
+        intro: book.intro ?? '',
         kind: '',
         lastChapter: (book.latestChapter ?? '').trim(),
         updateTime: '',
@@ -156,7 +156,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   bool _tocUiUseReplace = false;
   bool _tocUiLoadWordCount = true;
   bool _deleteAlertEnabled = true;
-  bool _introExpanded = false;
   int _changeSourceDelaySeconds = 0;
   String? _error;
   String? _tocError;
@@ -269,6 +268,64 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         .toList(growable: false);
   }
 
+  Book? _resolveCachedBookshelfBook() {
+    final explicit = widget.bookshelfBook;
+    if (explicit != null) return explicit;
+
+    final id = (_bookId ?? '').trim();
+    if (id.isNotEmpty) {
+      final byId = _bookRepo.getBookById(id);
+      if (byId != null) return byId;
+    }
+
+    final targetName = _activeResult.name.trim();
+    final targetAuthor = _activeResult.author.trim();
+    if (targetName.isNotEmpty && targetAuthor.isNotEmpty) {
+      for (final item in _bookRepo.getAllBooks()) {
+        if (item.title.trim() == targetName &&
+            item.author.trim() == targetAuthor) {
+          return item;
+        }
+      }
+    }
+
+    final targetBookUrl = _activeResult.bookUrl.trim();
+    if (targetBookUrl.isEmpty) return null;
+    for (final item in _bookRepo.getAllBooks()) {
+      if ((item.bookUrl ?? '').trim() == targetBookUrl) return item;
+    }
+    return null;
+  }
+
+  BookSource? _resolveCachedBookSource(Book shelfBook) {
+    final sourceUrl = (shelfBook.sourceUrl ?? shelfBook.sourceId ?? '').trim();
+    if (sourceUrl.isNotEmpty) {
+      final source = _sourceRepo.getSourceByUrl(sourceUrl);
+      if (source != null) return source;
+    }
+    return _sourceRepo.getSourceByUrl(_activeResult.sourceUrl);
+  }
+
+  bool _applyCachedBookshelfContext({
+    required Book? shelfBook,
+    required List<TocItem> cachedToc,
+  }) {
+    if (shelfBook == null || cachedToc.isEmpty) return false;
+    if (!mounted) return true;
+
+    _refreshBookshelfState();
+    setState(() {
+      _source = _resolveCachedBookSource(shelfBook);
+      _detail = _buildFallbackDetail(shelfBook);
+      _toc = cachedToc;
+      _loading = false;
+      _loadingToc = false;
+      _error = null;
+      _tocError = null;
+    });
+    return true;
+  }
+
   String? _resolveStoredChapterWordCount(String? content) {
     final words = (content ?? '').length;
     if (words <= 0) return null;
@@ -322,7 +379,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       name: book.title,
       author: book.author,
       coverUrl: (book.coverUrl ?? '').trim(),
-      intro: (book.intro ?? '').trim(),
+      intro: book.intro ?? '',
       kind: '',
       lastChapter: (book.latestChapter ?? '').trim(),
       updateTime: '',
@@ -389,18 +446,27 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         _loadingToc = true;
         _error = null;
         _tocError = null;
-        _introExpanded = false;
       });
     }
 
-    final shelfBook = widget.bookshelfBook;
+    final shelfBook = _resolveCachedBookshelfBook();
+    final cachedShelfToc =
+        shelfBook == null ? const <TocItem>[] : _loadStoredToc(shelfBook.id);
+
+    // 对齐 legado：进入详情优先复用书架已缓存目录，避免每次进页都发网络请求。
+    if (_applyCachedBookshelfContext(
+      shelfBook: shelfBook,
+      cachedToc: cachedShelfToc,
+    )) {
+      return true;
+    }
 
     if (shelfBook != null && !_canFetchOnlineDetail) {
       final sourceUrl =
           (shelfBook.sourceUrl ?? shelfBook.sourceId ?? '').trim();
       final source =
           sourceUrl.isEmpty ? null : _sourceRepo.getSourceByUrl(sourceUrl);
-      final toc = _loadStoredToc(shelfBook.id);
+      final toc = cachedShelfToc;
 
       if (!mounted) return false;
       _refreshBookshelfState();
@@ -425,7 +491,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       final fallbackDetail =
           shelfBook != null ? _buildFallbackDetail(shelfBook) : null;
       final fallbackToc = shelfBook != null
-          ? _loadStoredToc(shelfBook.id)
+          ? cachedShelfToc
           : (_inBookshelf && fallbackBookId.isNotEmpty)
               ? _loadStoredToc(fallbackBookId)
               : const <TocItem>[];
@@ -518,10 +584,11 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }
 
   String get _displayIntro {
-    final fromDetail = _detail?.intro.trim() ?? '';
-    if (fromDetail.isNotEmpty) return fromDetail;
-    final fromResult = _activeResult.intro.trim();
-    return fromResult.isNotEmpty ? fromResult : '暂无简介';
+    final fromDetail = _detail?.intro ?? '';
+    if (fromDetail.trim().isNotEmpty) return fromDetail;
+    final fromResult = _activeResult.intro;
+    if (fromResult.trim().isNotEmpty) return fromResult;
+    return '';
   }
 
   String get _displaySourceName {
@@ -589,6 +656,14 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     for (final raw in candidates) {
       final value = raw.trim();
       if (value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  String? _pickFirstNonBlankPreserve(List<String?> candidates) {
+    for (final raw in candidates) {
+      final value = raw ?? '';
+      if (value.trim().isNotEmpty) return value;
     }
     return null;
   }
@@ -884,7 +959,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       name: book.title,
       author: book.author,
       coverUrl: (book.coverUrl ?? '').trim(),
-      intro: (book.intro ?? '').trim(),
+      intro: book.intro ?? '',
       kind: _activeResult.kind,
       lastChapter: resolvedLastChapter,
       updateTime: _activeResult.updateTime,
@@ -897,7 +972,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       name: book.title,
       author: book.author,
       coverUrl: (book.coverUrl ?? '').trim(),
-      intro: (book.intro ?? '').trim(),
+      intro: book.intro ?? '',
       kind: previousDetail?.kind ?? _activeResult.kind,
       lastChapter: resolvedLastChapter,
       updateTime: previousDetail?.updateTime ?? _activeResult.updateTime,
@@ -927,10 +1002,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           stored?.coverUrl ?? '',
         ]) ??
         '';
-    final resolvedIntro = _pickFirstNonEmpty(<String>[
-          _detail?.intro ?? '',
+    final resolvedIntro = _pickFirstNonBlankPreserve(<String?>[
+          _detail?.intro,
           _activeResult.intro,
-          stored?.intro ?? '',
+          stored?.intro,
         ]) ??
         '';
     final resolvedSourceUrl = _pickFirstNonEmpty(<String>[
@@ -1127,7 +1202,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
     setState(() {
       _syncDisplayFromStoredBook(updated);
-      _introExpanded = false;
     });
   }
 
@@ -1941,8 +2015,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                       [detail?.coverUrl ?? '', storedBook.coverUrl ?? ''],
                     ) ??
                     storedBook.coverUrl,
-                intro: _pickFirstNonEmpty(
-                      [detail?.intro ?? '', storedBook.intro ?? ''],
+                intro: _pickFirstNonBlankPreserve(
+                      [detail?.intro, storedBook.intro],
                     ) ??
                     storedBook.intro,
                 sourceId: source.bookSourceUrl,
@@ -2524,7 +2598,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final coverUrl = _displayCoverUrl;
     final heroTopExtend =
         MediaQuery.of(context).padding.top + kMinInteractiveDimensionCupertino;
-    final translucentNavBar = backgroundColor.withValues(alpha: 0.22);
 
     final kind = _pickFirstNonEmpty([
       _detail?.kind ?? '',
@@ -2551,8 +2624,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       title: '书籍详情',
       includeTopSafeArea: false,
       includeBottomSafeArea: false,
-      navigationBarBackgroundColor: translucentNavBar,
+      navigationBarBackgroundColor: CupertinoColors.transparent,
       navigationBarBorder: const Border(),
+      navigationBarEnableBackgroundFilterBlur: false,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2795,41 +2869,17 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              _displayIntro,
-                              maxLines: _introExpanded ? null : 4,
-                              overflow: _introExpanded
-                                  ? TextOverflow.visible
-                                  : TextOverflow.ellipsis,
-                              style: textStyle.copyWith(
-                                fontSize: 13,
-                                color: CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                              ),
-                            ),
-                            if (_displayIntro.trim().length > 90) ...[
-                              const SizedBox(height: 6),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () {
-                                    setState(() {
-                                      _introExpanded = !_introExpanded;
-                                    });
-                                  },
-                                  child: Text(
-                                    _introExpanded ? '收起简介' : '展开简介',
-                                    style: textStyle.copyWith(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: primaryActionColor,
-                                    ),
-                                  ),
-                                  minimumSize: Size(0, 0),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 48),
+                              child: Text(
+                                _displayIntro,
+                                style: textStyle.copyWith(
+                                  fontSize: 13,
+                                  color: CupertinoColors.secondaryLabel
+                                      .resolveFrom(context),
                                 ),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),

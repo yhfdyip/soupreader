@@ -46,7 +46,7 @@ class DiscoveryView extends StatefulWidget {
 }
 
 class _DiscoveryViewState extends State<DiscoveryView> {
-  static const int _collapsedKindsLimit = 10;
+  static const int _collapsedKindsLimit = 12;
   static const double _minTapSize = kMinInteractiveDimensionCupertino;
 
   late final SourceRepository _sourceRepo;
@@ -825,7 +825,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-        borderWidth: 0.8,
+        borderWidth: 0.6,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -868,7 +868,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.textStyle.copyWith(
                                 fontSize: 12,
-                                color: uiTokens.colors.mutedForeground,
+                                color: uiTokens.colors.tertiaryLabel,
                               ),
                             ),
                           ],
@@ -888,9 +888,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               ),
             ),
             if (expanded) ...[
-              const SizedBox(height: 10),
-              Container(height: 1, color: uiTokens.colors.separator),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               if (loadingKinds)
                 Row(
                   children: [
@@ -955,8 +953,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                     }
 
                     return Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: chips,
                     );
                   },
@@ -975,7 +973,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required AppUiTokens uiTokens,
     required VoidCallback onTap,
   }) {
-    final title = expanded ? '收起' : '更多 $hiddenCount';
+    final title = expanded ? '收起' : '更多$hiddenCount';
+    final borderColor = uiTokens.colors.separator.withValues(alpha: 0.85);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -984,15 +983,15 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: uiTokens.colors.accent.withValues(alpha: 0.12),
+            color: uiTokens.colors.surfaceBackground,
             borderRadius: BorderRadius.circular(uiTokens.radii.control),
-            border: Border.all(color: uiTokens.colors.accent, width: 1),
+            border: Border.all(color: borderColor, width: 1),
           ),
           child: Text(
             title,
             style: theme.textTheme.textStyle.copyWith(
               fontSize: 12,
-              color: uiTokens.colors.accent,
+              color: uiTokens.colors.mutedForeground,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1027,13 +1026,21 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final isEnabled = url.isNotEmpty;
     final isError = title.startsWith('ERROR:');
 
-    final borderColor =
-        isError ? uiTokens.colors.destructive : uiTokens.colors.separator;
-    final textColor =
-        isError ? uiTokens.colors.destructive : uiTokens.colors.foreground;
+    final borderColor = isError
+        ? uiTokens.colors.destructive
+        : isEnabled
+            ? uiTokens.colors.accent.withValues(alpha: 0.45)
+            : uiTokens.colors.separator.withValues(alpha: 0.9);
+    final textColor = isError
+        ? uiTokens.colors.destructive
+        : isEnabled
+            ? uiTokens.colors.accent
+            : uiTokens.colors.foreground;
     final backgroundColor = isError
         ? uiTokens.colors.destructive.withValues(alpha: 0.12)
-        : uiTokens.colors.surfaceBackground;
+        : isEnabled
+            ? uiTokens.colors.accent.withValues(alpha: 0.12)
+            : uiTokens.colors.surfaceBackground;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

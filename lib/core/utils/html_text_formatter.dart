@@ -43,6 +43,13 @@ class HtmlTextFormatter {
     caseSensitive: false,
     multiLine: true,
   );
+  static final RegExp _legacyIntroWrapHtmlRegex = RegExp(
+    r'</?(?:div|p|br|hr|h\d|article|dd|dl)[^>]*>',
+    caseSensitive: false,
+    multiLine: true,
+  );
+  static final RegExp _legacyIntroCommentRegex =
+      RegExp(r'<!--[^>]*-->', caseSensitive: false, multiLine: true);
   static final RegExp _formatImageRegex = RegExp(
     r"""<img[^>]*\ssrc\s*=\s*['"]([^'"{>]*\{(?:[^{}]|\{[^}>]+\})+\})['"][^>]*>|<img[^>]*\s(?:data-src|src)\s*=\s*['"]([^'">]+)['"][^>]*>|<img[^>]*\sdata-[^=>]*=\s*['"]([^'">]*)['"][^>]*>""",
     caseSensitive: false,
@@ -101,6 +108,28 @@ class HtmlTextFormatter {
     text = text.replaceAll(_trailingNewlineRegex, '');
 
     return text.trim();
+  }
+
+  /// 对齐 legado `HtmlFormatter.format`：用于详情简介文本。
+  ///
+  /// 语义：
+  /// - 不做 HTML 实体解码（仅处理 legacy 中定义的空白相关实体）
+  /// - 段落统一为 `\n　　`，并保留开头全角缩进 `　　`
+  static String formatIntroLikeLegado(String input) {
+    if (input.isEmpty) return '';
+
+    var text = input.replaceAll('\r\n', '\n').replaceAll('\u00A0', ' ');
+    text = text
+        .replaceAll(_nbspRegex, ' ')
+        .replaceAll(_espRegex, ' ')
+        .replaceAll(_noPrintRegex, '')
+        .replaceAll(_legacyIntroWrapHtmlRegex, '\n')
+        .replaceAll(_legacyIntroCommentRegex, '')
+        .replaceAll(_otherHtmlRegex, '')
+        .replaceAll(_indent1Regex, '\n　　')
+        .replaceAll(_leadingNewlineRegex, '　　')
+        .replaceAll(_trailingNewlineRegex, '');
+    return text;
   }
 
   /// 对齐 legado `HtmlFormatter.formatKeepImg`：

@@ -3409,7 +3409,7 @@ class RuleParserEngine {
 
   String _formatIntroLikeLegado(String raw) {
     if (raw.trim().isEmpty) return '';
-    return HtmlTextFormatter.formatToPlainText(raw);
+    return HtmlTextFormatter.formatIntroLikeLegado(raw);
   }
 
   String _joinKindLikeLegado(List<String> values) {
@@ -3606,7 +3606,7 @@ class RuleParserEngine {
       name: name,
       author: author,
       coverUrl: detail.coverUrl.trim(),
-      intro: detail.intro.trim(),
+      intro: detail.intro,
       kind: detail.kind.trim(),
       lastChapter: detail.lastChapter.trim(),
       updateTime: detail.updateTime.trim(),

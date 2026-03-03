@@ -163,10 +163,12 @@ class _SourceListViewState extends State<SourceListView> {
 
   final TextEditingController _urlController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _listScrollController = ScrollController();
   final GlobalKey _moreMenuKey = GlobalKey();
   OverlayEntry? _toastEntry;
   Timer? _toastTimer;
+  late final Stream<List<BookSource>> _sourceStream;
 
   final Set<String> _selectedUrls = <String>{};
   final Map<String, String> _hostMap = <String, String>{};
@@ -200,6 +202,8 @@ class _SourceListViewState extends State<SourceListView> {
       loadAllSources: _sourceRepo.getAllSources,
       loadRawJsonByUrl: _sourceRepo.getRawJsonByUrl,
     );
+    _sourceStream = _sourceRepo.watchAllSources();
+    _searchController.addListener(_onSearchQueryChanged);
     _lastCheckSnapshot = _checkTaskService.snapshot;
     _checkTaskService.listenable.addListener(_onCheckTaskChanged);
     _syncCheckKeepScreenOn(_lastCheckSnapshot);
@@ -214,7 +218,10 @@ class _SourceListViewState extends State<SourceListView> {
     _syncCheckKeepScreenOn(null, forceDisable: true);
     _dismissToast();
     _urlController.dispose();
-    _searchController.dispose();
+    _searchController
+      ..removeListener(_onSearchQueryChanged)
+      ..dispose();
+    _searchFocusNode.dispose();
     _listScrollController.dispose();
     super.dispose();
   }
@@ -238,7 +245,7 @@ class _SourceListViewState extends State<SourceListView> {
           child: const Icon(CupertinoIcons.line_horizontal_3),
         ),
         child: StreamBuilder<List<BookSource>>(
-          stream: _sourceRepo.watchAllSources(),
+          stream: _sourceStream,
           builder: (context, snapshot) {
             final allSources = snapshot.data ?? _sourceRepo.getAllSources();
             final cleanedAll = _normalizeSources(allSources);
@@ -439,9 +446,14 @@ class _SourceListViewState extends State<SourceListView> {
   Widget _buildNavigationSearchField() {
     return AppManageSearchField(
       controller: _searchController,
+      focusNode: _searchFocusNode,
       placeholder: '请输入关键字搜索书源...',
-      onChanged: (_) => setState(() {}),
     );
+  }
+
+  void _onSearchQueryChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   List<BookSource> _buildVisibleList(List<BookSource> allSources) {

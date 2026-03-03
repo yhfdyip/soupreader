@@ -22,6 +22,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
   final ScrollPhysics? sliverScrollPhysics;
   final Color? navigationBarBackgroundColor;
   final Border? navigationBarBorder;
+  final bool navigationBarEnableBackgroundFilterBlur;
 
   const AppCupertinoPageScaffold({
     super.key,
@@ -41,6 +42,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     this.sliverScrollPhysics,
     this.navigationBarBackgroundColor,
     this.navigationBarBorder,
+    this.navigationBarEnableBackgroundFilterBlur = true,
   });
 
   Widget? _buildNavBarItem(
@@ -151,6 +153,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
       transitionBetweenRoutes: transitionBetweenRoutes,
       backgroundColor: resolvedNavBarBackground,
       border: resolvedNavBarBorder,
+      enableBackgroundFilterBlur: navigationBarEnableBackgroundFilterBlur,
     );
 
     if (!useSliverNavigationBar) {
