@@ -5,10 +5,13 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
+import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/source_group_badge.dart';
+import '../../../app/widgets/source_state_dot.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -241,7 +244,10 @@ class _SourceListViewState extends State<SourceListView> {
           key: _moreMenuKey,
           onPressed: _showMainOptions,
           padding: EdgeInsets.zero,
-          minimumSize: const Size(30, 30),
+          minimumSize: const Size(
+            SourceUiTokens.minTapSize,
+            SourceUiTokens.minTapSize,
+          ),
           child: const Icon(CupertinoIcons.line_horizontal_3),
         ),
         child: StreamBuilder<List<BookSource>>(
@@ -255,7 +261,12 @@ class _SourceListViewState extends State<SourceListView> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  padding: const EdgeInsets.fromLTRB(
+                    SourceUiTokens.pagePaddingHorizontal,
+                    8,
+                    SourceUiTokens.pagePaddingHorizontal,
+                    10,
+                  ),
                   child: _buildNavigationSearchField(),
                 ),
                 _buildCheckTaskBanner(),
@@ -397,7 +408,12 @@ class _SourceListViewState extends State<SourceListView> {
       color: CupertinoColors.systemYellow.resolveFrom(context).withValues(
             alpha: 0.14,
           ),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(
+        SourceUiTokens.pagePaddingHorizontal,
+        8,
+        SourceUiTokens.pagePaddingHorizontal,
+        8,
+      ),
       child: Row(
         children: [
           const CupertinoActivityIndicator(radius: 8),
@@ -406,7 +422,7 @@ class _SourceListViewState extends State<SourceListView> {
             child: Text(
               text,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: SourceUiTokens.itemMetaSize,
                 color: CupertinoColors.label.resolveFrom(context),
               ),
             ),
@@ -592,8 +608,13 @@ class _SourceListViewState extends State<SourceListView> {
       List<BookSource> allSources, List<BookSource> visible) {
     final reorderEnabled = _canManualReorder;
     final titleColor = CupertinoColors.label.resolveFrom(context);
+    final secondaryTextColor =
+        SourceUiTokens.resolveSecondaryTextColor(context);
+    final primaryActionColor =
+        SourceUiTokens.resolvePrimaryActionColor(context);
     final titleStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
           fontWeight: FontWeight.w600,
+          fontSize: SourceUiTokens.itemTitleSize,
           color: titleColor,
         );
 
@@ -608,9 +629,6 @@ class _SourceListViewState extends State<SourceListView> {
                   _hostOf(source.bookSourceUrl));
 
       final groupText = (source.bookSourceGroup ?? '').trim();
-      final displayName = groupText.isEmpty
-          ? source.bookSourceName
-          : '${source.bookSourceName} ($groupText)';
       final hasExplore = (source.exploreUrl ?? '').trim().isNotEmpty;
 
       return Column(
@@ -622,9 +640,9 @@ class _SourceListViewState extends State<SourceListView> {
               child: Text(
                 _hostOf(source.bookSourceUrl),
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: SourceUiTokens.itemMetaSize,
                   fontWeight: FontWeight.w600,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  color: secondaryTextColor,
                 ),
               ),
             ),
@@ -670,7 +688,7 @@ class _SourceListViewState extends State<SourceListView> {
                                 ? CupertinoIcons.check_mark_circled_solid
                                 : CupertinoIcons.circle,
                             color: selected
-                                ? CupertinoTheme.of(context).primaryColor
+                                ? primaryActionColor
                                 : CupertinoColors.systemGrey
                                     .resolveFrom(context),
                           ),
@@ -683,11 +701,24 @@ class _SourceListViewState extends State<SourceListView> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: Text(
-                                    displayName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: titleStyle,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        source.bookSourceName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: titleStyle,
+                                      ),
+                                      if (groupText.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        SourceGroupBadge(
+                                          text: groupText,
+                                          textColor: secondaryTextColor,
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                                 if (hasExplore)
@@ -696,17 +727,11 @@ class _SourceListViewState extends State<SourceListView> {
                                       left: 6,
                                       top: 6,
                                     ),
-                                    child: Container(
-                                      width: 7,
-                                      height: 7,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: source.enabledExplore
-                                            ? CupertinoColors.systemGreen
-                                                .resolveFrom(context)
-                                            : CupertinoColors.systemRed
-                                                .resolveFrom(context),
-                                      ),
+                                    child: SourceStateDot(
+                                      enabled: source.enabledExplore,
+                                      disabledColor:
+                                          SourceUiTokens.resolveDangerColor(
+                                              context),
                                     ),
                                   ),
                               ],
@@ -734,7 +759,8 @@ class _SourceListViewState extends State<SourceListView> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize:
+                                              SourceUiTokens.itemSubMetaSize,
                                           color: _inlineCheckColor(
                                             checkStatus ??
                                                 SourceCheckStatus.pending,
@@ -756,9 +782,7 @@ class _SourceListViewState extends State<SourceListView> {
                             index: index,
                             child: Icon(
                               CupertinoIcons.line_horizontal_3,
-                              color: CupertinoColors.secondaryLabel.resolveFrom(
-                                context,
-                              ),
+                              color: secondaryTextColor,
                             ),
                           ),
                         ),
@@ -811,8 +835,8 @@ class _SourceListViewState extends State<SourceListView> {
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
       itemCount: visible.length,
       separatorBuilder: (_, __) => Container(
-        height: 0.5,
-        color: CupertinoColors.separator.resolveFrom(context),
+        height: SourceUiTokens.borderWidth,
+        color: SourceUiTokens.resolveSeparatorColor(context),
       ),
       itemBuilder: (context, index) {
         final source = visible[index];
@@ -822,28 +846,35 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   ActionPane _buildSourceItemEndActionPane(BookSource source) {
+    const highEmphasisAlpha = 0.9;
+    const mediumEmphasisAlpha = 0.82;
+    final primaryActionColor =
+        SourceUiTokens.resolvePrimaryActionColor(context);
+    final successColor = SourceUiTokens.resolveSuccessColor(context);
+    final dangerColor = SourceUiTokens.resolveDangerColor(context);
     return ActionPane(
       motion: const ScrollMotion(),
       extentRatio: 0.62,
       children: [
         _buildSourceItemSlidableAction(
           icon: CupertinoIcons.line_horizontal_3,
-          backgroundColor: CupertinoColors.systemBlue.resolveFrom(context),
+          backgroundColor: primaryActionColor,
           onTap: () => unawaited(_showSourceActions(source)),
         ),
         _buildSourceItemSlidableAction(
           icon: CupertinoIcons.share,
-          backgroundColor: CupertinoColors.systemGreen.resolveFrom(context),
+          backgroundColor: successColor.withValues(alpha: highEmphasisAlpha),
           onTap: () => unawaited(_batchShareSelected([source])),
         ),
         _buildSourceItemSlidableAction(
           icon: CupertinoIcons.pencil,
-          backgroundColor: CupertinoColors.systemOrange.resolveFrom(context),
+          backgroundColor:
+              primaryActionColor.withValues(alpha: mediumEmphasisAlpha),
           onTap: () => _openEditor(source.bookSourceUrl),
         ),
         _buildSourceItemSlidableAction(
           icon: CupertinoIcons.delete,
-          backgroundColor: CupertinoColors.systemRed.resolveFrom(context),
+          backgroundColor: dangerColor,
           onTap: () => unawaited(_confirmDeleteSource(source)),
         ),
       ],
@@ -929,8 +960,9 @@ class _SourceListViewState extends State<SourceListView> {
     final totalCount = visibleSources.length;
     final allSelected = totalCount > 0 && selectedCount >= totalCount;
     final hasSelection = selectedCount > 0;
-    final enabledColor = CupertinoTheme.of(context).primaryColor;
-    final disabledColor = CupertinoColors.systemGrey.resolveFrom(context);
+    final enabledColor = SourceUiTokens.resolvePrimaryActionColor(context);
+    final disabledColor = SourceUiTokens.resolveMutedTextColor(context);
+    final dangerColor = SourceUiTokens.resolveDangerColor(context);
 
     void selectAllOrClearVisible() {
       setState(() {
@@ -956,13 +988,18 @@ class _SourceListViewState extends State<SourceListView> {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
+        padding: const EdgeInsets.fromLTRB(
+          SourceUiTokens.pagePaddingHorizontal,
+          8,
+          8,
+          8,
+        ),
         decoration: BoxDecoration(
           color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
           border: Border(
             top: BorderSide(
               color: CupertinoColors.systemGrey4.resolveFrom(context),
-              width: 0.5,
+              width: SourceUiTokens.borderWidth,
             ),
           ),
         ),
@@ -971,7 +1008,10 @@ class _SourceListViewState extends State<SourceListView> {
             Expanded(
               child: CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                minimumSize: const Size(30, 30),
+                minimumSize: const Size(
+                  SourceUiTokens.minTapSize,
+                  SourceUiTokens.minTapSize,
+                ),
                 alignment: Alignment.centerLeft,
                 onPressed: totalCount == 0 ? null : selectAllOrClearVisible,
                 child: Text(
@@ -979,7 +1019,7 @@ class _SourceListViewState extends State<SourceListView> {
                       ? '取消全选（$selectedCount/$totalCount）'
                       : '全选（$selectedCount/$totalCount）',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: SourceUiTokens.actionTextSize,
                     color: totalCount == 0 ? disabledColor : enabledColor,
                   ),
                 ),
@@ -987,41 +1027,48 @@ class _SourceListViewState extends State<SourceListView> {
             ),
             CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              minimumSize: const Size(30, 30),
+              minimumSize: const Size(
+                SourceUiTokens.minTapSize,
+                SourceUiTokens.minTapSize,
+              ),
               onPressed: hasSelection ? invertVisibleSelection : null,
               child: Text(
                 '反选',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: SourceUiTokens.actionTextSize,
                   color: hasSelection ? enabledColor : disabledColor,
                 ),
               ),
             ),
             CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              minimumSize: const Size(30, 30),
+              minimumSize: const Size(
+                SourceUiTokens.minTapSize,
+                SourceUiTokens.minTapSize,
+              ),
               onPressed: hasSelection
                   ? () => _batchDeleteSelected(visibleSources)
                   : null,
               child: Text(
                 '删除',
                 style: TextStyle(
-                  fontSize: 13,
-                  color: hasSelection
-                      ? CupertinoColors.systemRed.resolveFrom(context)
-                      : disabledColor,
+                  fontSize: SourceUiTokens.actionTextSize,
+                  color: hasSelection ? dangerColor : disabledColor,
                 ),
               ),
             ),
             CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              minimumSize: const Size(30, 30),
+              minimumSize: const Size(
+                SourceUiTokens.minTapSize,
+                SourceUiTokens.minTapSize,
+              ),
               onPressed: hasSelection
                   ? () => _showBatchMoreActions(visibleSources)
                   : null,
               child: Icon(
                 CupertinoIcons.line_horizontal_3,
-                size: 19,
+                size: SourceUiTokens.actionIconSize,
                 color: hasSelection ? enabledColor : disabledColor,
               ),
             ),
@@ -1143,8 +1190,8 @@ class _SourceListViewState extends State<SourceListView> {
   Widget _buildEmptyState() {
     final textTheme = CupertinoTheme.of(context).textTheme;
     final labelColor = CupertinoColors.label.resolveFrom(context);
-    final secondaryColor = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final tertiaryColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
+    final secondaryColor = SourceUiTokens.resolveSecondaryTextColor(context);
+    final tertiaryColor = SourceUiTokens.resolveMutedTextColor(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1158,7 +1205,7 @@ class _SourceListViewState extends State<SourceListView> {
           Text(
             '暂无书源',
             style: textTheme.textStyle.copyWith(
-              fontSize: 20,
+              fontSize: SourceUiTokens.emptyTitleSize,
               fontWeight: FontWeight.w600,
               color: labelColor,
             ),
@@ -1167,7 +1214,7 @@ class _SourceListViewState extends State<SourceListView> {
           Text(
             '点击右上角更多导入书源',
             style: textTheme.textStyle.copyWith(
-              fontSize: 14,
+              fontSize: SourceUiTokens.emptyMessageSize,
               color: secondaryColor,
             ),
           ),

@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/source_consistent_card.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../bookshelf/services/book_add_service.dart';
@@ -32,7 +34,7 @@ class DiscoveryExploreResultsView extends StatefulWidget {
 class _DiscoveryExploreResultsViewState
     extends State<DiscoveryExploreResultsView> {
   static const double _scrollLoadThreshold = 220;
-  static const double _minTapSize = kMinInteractiveDimensionCupertino;
+  static const double _minTapSize = SourceUiTokens.minTapSize;
 
   late final RuleParserEngine _engine;
   late final BookAddService _addService;
@@ -269,14 +271,19 @@ class _DiscoveryExploreResultsViewState
     final theme = CupertinoTheme.of(context);
     final textStyle = theme.textTheme.textStyle;
     final secondaryTextColor =
-        CupertinoColors.secondaryLabel.resolveFrom(context);
+        SourceUiTokens.resolveSecondaryTextColor(context);
 
     return AppCupertinoPageScaffold(
       title: widget.exploreName,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+            padding: const EdgeInsets.fromLTRB(
+              SourceUiTokens.pagePaddingHorizontal,
+              10,
+              SourceUiTokens.pagePaddingHorizontal,
+              8,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -285,7 +292,7 @@ class _DiscoveryExploreResultsViewState
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textStyle.copyWith(
-                      fontSize: 12,
+                      fontSize: SourceUiTokens.itemMetaSize,
                       color: secondaryTextColor,
                     ),
                   ),
@@ -293,7 +300,7 @@ class _DiscoveryExploreResultsViewState
                 Text(
                   '已加载 ${_results.length} 本',
                   style: textStyle.copyWith(
-                    fontSize: 12,
+                    fontSize: SourceUiTokens.itemMetaSize,
                     color: secondaryTextColor,
                   ),
                 ),
@@ -315,7 +322,12 @@ class _DiscoveryExploreResultsViewState
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+      padding: const EdgeInsets.fromLTRB(
+        SourceUiTokens.pagePaddingHorizontal,
+        0,
+        SourceUiTokens.pagePaddingHorizontal,
+        12,
+      ),
       itemCount: _results.length + 1,
       itemBuilder: (context, index) {
         if (index == _results.length) {
@@ -328,13 +340,9 @@ class _DiscoveryExploreResultsViewState
 
   Widget _buildResultItem(SearchResult result) {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final cardColor =
-        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
     final primaryTextColor = CupertinoColors.label.resolveFrom(context);
-    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
-      context,
-    );
+    final secondaryTextColor =
+        SourceUiTokens.resolveSecondaryTextColor(context);
     final inShelfColor = CupertinoColors.activeBlue.resolveFrom(context);
     final inBookshelf = _addService.isInBookshelf(
       result,
@@ -349,97 +357,90 @@ class _DiscoveryExploreResultsViewState
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => _openBookInfo(result),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: _minTapSize),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppCoverImage(
-                    urlOrPath: result.coverUrl,
-                    title: result.name,
-                    author: result.author,
-                    width: 42,
-                    height: 60,
-                    borderRadius: 7,
-                    fit: BoxFit.cover,
-                    showTextOnPlaceholder: false,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          result.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textStyle.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: primaryTextColor,
-                          ),
+        child: SourceConsistentCard(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: _minTapSize),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppCoverImage(
+                  urlOrPath: result.coverUrl,
+                  title: result.name,
+                  author: result.author,
+                  width: 42,
+                  height: 60,
+                  borderRadius: 7,
+                  fit: BoxFit.cover,
+                  showTextOnPlaceholder: false,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        result.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textStyle.copyWith(
+                          fontSize: SourceUiTokens.itemTitleSize,
+                          fontWeight: FontWeight.w600,
+                          color: primaryTextColor,
                         ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textStyle.copyWith(
+                          fontSize: SourceUiTokens.itemMetaSize,
+                          color: secondaryTextColor,
+                        ),
+                      ),
+                      if (lastChapter.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          author,
+                          '最新：$lastChapter',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
-                            fontSize: 12,
+                            fontSize: SourceUiTokens.itemMetaSize,
                             color: secondaryTextColor,
                           ),
                         ),
-                        if (lastChapter.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            '最新：$lastChapter',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textStyle.copyWith(
-                              fontSize: 12,
-                              color: secondaryTextColor,
-                            ),
-                          ),
-                        ],
-                        if (intro.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            intro,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textStyle.copyWith(
-                              fontSize: 12,
-                              color: secondaryTextColor,
-                            ),
-                          ),
-                        ],
                       ],
+                      if (intro.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          intro,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textStyle.copyWith(
+                            fontSize: SourceUiTokens.itemMetaSize,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: _minTapSize,
+                  height: _minTapSize,
+                  child: Center(
+                    child: Icon(
+                      inBookshelf
+                          ? CupertinoIcons.book_fill
+                          : CupertinoIcons.chevron_right,
+                      size: inBookshelf ? 17 : 16,
+                      color: inBookshelf ? inShelfColor : secondaryTextColor,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: _minTapSize,
-                    height: _minTapSize,
-                    child: Center(
-                      child: Icon(
-                        inBookshelf
-                            ? CupertinoIcons.book_fill
-                            : CupertinoIcons.chevron_right,
-                        size: inBookshelf ? 17 : 16,
-                        color: inBookshelf ? inShelfColor : secondaryTextColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -449,10 +450,11 @@ class _DiscoveryExploreResultsViewState
 
   Widget _buildFooter(BuildContext context) {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
-      context,
-    );
-    final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
+    final secondaryTextColor =
+        SourceUiTokens.resolveSecondaryTextColor(context);
+    final destructiveColor = SourceUiTokens.resolveDangerColor(context);
+    final primaryActionColor =
+        SourceUiTokens.resolvePrimaryActionColor(context);
     final hasError = (_errorMessage ?? '').trim().isNotEmpty;
 
     if (_results.isEmpty && !_loading && !hasError && !_hasMore) {
@@ -462,7 +464,7 @@ class _DiscoveryExploreResultsViewState
           child: Text(
             '暂无发现内容',
             style: textStyle.copyWith(
-              fontSize: 13,
+              fontSize: SourceUiTokens.itemMetaSize,
               color: secondaryTextColor,
             ),
           ),
@@ -491,7 +493,7 @@ class _DiscoveryExploreResultsViewState
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: textStyle.copyWith(
-                  fontSize: 12,
+                  fontSize: SourceUiTokens.itemMetaSize,
                   color: destructiveColor,
                 ),
               ),
@@ -502,7 +504,7 @@ class _DiscoveryExploreResultsViewState
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: textStyle.copyWith(
-                  fontSize: 12,
+                  fontSize: SourceUiTokens.itemMetaSize,
                   color: secondaryTextColor,
                 ),
               ),
@@ -519,7 +521,7 @@ class _DiscoveryExploreResultsViewState
           child: Text(
             '没有更多了',
             style: textStyle.copyWith(
-              fontSize: 12,
+              fontSize: SourceUiTokens.itemMetaSize,
               color: secondaryTextColor,
             ),
           ),
@@ -536,8 +538,8 @@ class _DiscoveryExploreResultsViewState
           child: Text(
             '点击继续加载',
             style: textStyle.copyWith(
-              fontSize: 12,
-              color: CupertinoColors.activeBlue.resolveFrom(context),
+              fontSize: SourceUiTokens.itemMetaSize,
+              color: primaryActionColor,
             ),
           ),
         ),

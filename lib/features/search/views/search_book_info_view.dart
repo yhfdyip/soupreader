@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -11,6 +12,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_popover_menu.dart';
@@ -78,6 +80,18 @@ typedef _BookshelfTocCacheResult = ({
   String? error,
 });
 
+class _BookInfoSessionCacheEntry {
+  final BookDetail? detail;
+  final List<TocItem> toc;
+  final DateTime savedAt;
+
+  const _BookInfoSessionCacheEntry({
+    required this.detail,
+    required this.toc,
+    required this.savedAt,
+  });
+}
+
 /// 搜索/发现结果详情页（对标 legado：点击结果先进入详情，再决定阅读/加书架/目录）。
 /// 也可从书架进入：若历史数据缺少 bookUrl，则降级展示缓存信息。
 class SearchBookInfoView extends StatefulWidget {
@@ -130,6 +144,10 @@ class SearchBookInfoView extends StatefulWidget {
 
 class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   static const _uuid = Uuid();
+  static const int _maxSessionCacheEntries = 48;
+  static const Duration _sessionCacheTtl = Duration(hours: 12);
+  static final LinkedHashMap<String, _BookInfoSessionCacheEntry> _sessionCache =
+      LinkedHashMap<String, _BookInfoSessionCacheEntry>();
 
   late final RuleParserEngine _engine;
   late final SourceRepository _sourceRepo;
@@ -170,6 +188,60 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   bool get _canFetchOnlineDetail {
     return _activeResult.sourceUrl.trim().isNotEmpty &&
         _activeResult.bookUrl.trim().isNotEmpty;
+  }
+
+  String _buildSessionCacheKey() {
+    final sourceUrl = _activeResult.sourceUrl.trim().toLowerCase();
+    final bookUrl = _activeResult.bookUrl.trim();
+    if (sourceUrl.isEmpty || bookUrl.isEmpty) return '';
+    return '$sourceUrl|$bookUrl';
+  }
+
+  bool _hasUsableDetail(BookDetail? detail) {
+    if (detail == null) return false;
+    return detail.name.trim().isNotEmpty ||
+        detail.author.trim().isNotEmpty ||
+        detail.coverUrl.trim().isNotEmpty ||
+        detail.intro.trim().isNotEmpty ||
+        detail.lastChapter.trim().isNotEmpty;
+  }
+
+  _BookInfoSessionCacheEntry? _readSessionCacheEntry(String key) {
+    if (key.isEmpty) return null;
+    final entry = _sessionCache.remove(key);
+    if (entry == null) return null;
+    final age = DateTime.now().difference(entry.savedAt);
+    if (age > _sessionCacheTtl) return null;
+    if (entry.toc.isEmpty && !_hasUsableDetail(entry.detail)) return null;
+    _sessionCache[key] = entry;
+    return entry;
+  }
+
+  void _writeSessionCacheEntry({
+    required String key,
+    required BookDetail? detail,
+    required List<TocItem> toc,
+  }) {
+    if (key.isEmpty) return;
+    final safeToc = List<TocItem>.from(toc);
+    if (safeToc.isEmpty && !_hasUsableDetail(detail)) {
+      _sessionCache.remove(key);
+      return;
+    }
+    _sessionCache.remove(key);
+    _sessionCache[key] = _BookInfoSessionCacheEntry(
+      detail: detail,
+      toc: safeToc,
+      savedAt: DateTime.now(),
+    );
+    while (_sessionCache.length > _maxSessionCacheEntries) {
+      _sessionCache.remove(_sessionCache.keys.first);
+    }
+  }
+
+  void _removeSessionCacheEntry(String key) {
+    if (key.isEmpty) return;
+    _sessionCache.remove(key);
   }
 
   @override
@@ -489,19 +561,43 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _splitLongChapter = _settingsService.getBookSplitLongChapter(id);
   }
 
-  Future<bool> _loadContext({bool silent = false}) async {
+  Future<bool> _loadContext({
+    bool silent = false,
+    bool forceRemote = false,
+  }) async {
     _refreshBookshelfState();
     _restoreBookMenuSwitches();
     _tocUiUseReplace = _settingsService.getTocUiUseReplace();
     _tocUiLoadWordCount = _settingsService.getTocUiLoadWordCount();
+    final cacheKey = _buildSessionCacheKey();
+    final sessionCache = forceRemote ? null : _readSessionCacheEntry(cacheKey);
 
     if (!silent && mounted) {
-      setState(() {
-        _loading = true;
-        _loadingToc = true;
-        _error = null;
-        _tocError = null;
-      });
+      if (sessionCache != null) {
+        setState(() {
+          _source = _sourceRepo.getSourceByUrl(_activeResult.sourceUrl);
+          _detail = sessionCache.detail;
+          _toc = sessionCache.toc;
+          _loading = false;
+          _loadingToc = false;
+          _error = null;
+          _tocError = null;
+        });
+      } else {
+        setState(() {
+          _loading = true;
+          _loadingToc = true;
+          _error = null;
+          _tocError = null;
+        });
+      }
+    }
+
+    if (!forceRemote &&
+        !_inBookshelf &&
+        sessionCache != null &&
+        sessionCache.toc.isNotEmpty) {
+      return true;
     }
 
     final shelfBook = _resolveCachedBookshelfBook();
@@ -513,6 +609,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       shelfBook: shelfBook,
       cachedToc: cachedShelfToc,
     )) {
+      if (mounted) {
+        _writeSessionCacheEntry(
+          key: cacheKey,
+          detail: _detail,
+          toc: _toc,
+        );
+      }
       return true;
     }
 
@@ -534,6 +637,11 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         _error = '该书缺少详情链接，已降级为书架缓存信息模式';
         _tocError = toc.isEmpty ? '目录为空（书架缓存中无章节）' : null;
       });
+      _writeSessionCacheEntry(
+        key: cacheKey,
+        detail: _detail,
+        toc: _toc,
+      );
       return false;
     }
 
@@ -559,6 +667,11 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         _error = shelfBook != null ? '书源不存在或已被删除，已展示书架缓存信息' : '书源不存在或已被删除';
         _tocError = fallbackToc.isEmpty ? '无法获取目录' : null;
       });
+      _writeSessionCacheEntry(
+        key: cacheKey,
+        detail: _detail,
+        toc: _toc,
+      );
       return false;
     }
 
@@ -620,16 +733,22 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     } else if (resolvedToc.isNotEmpty) {
       resolvedTocError = null;
     }
+    final resolvedDetail =
+        detail ?? (shelfBook != null ? _buildFallbackDetail(shelfBook) : null);
     setState(() {
       _source = source;
-      _detail = detail ??
-          (shelfBook != null ? _buildFallbackDetail(shelfBook) : null);
+      _detail = resolvedDetail;
       _toc = resolvedToc;
       _loading = false;
       _loadingToc = false;
       _error = detailError;
       _tocError = resolvedToc.isEmpty ? resolvedTocError : null;
     });
+    _writeSessionCacheEntry(
+      key: cacheKey,
+      detail: resolvedDetail,
+      toc: resolvedToc,
+    );
 
     return detailError == null;
   }
@@ -1360,8 +1479,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
               Text(
                 note,
                 style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  fontSize: SourceUiTokens.itemMetaSize,
+                  color: SourceUiTokens.resolveSecondaryTextColor(context),
                 ),
               ),
               const SizedBox(height: 10),
@@ -1419,8 +1538,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
               Text(
                 note,
                 style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  fontSize: SourceUiTokens.itemMetaSize,
+                  color: SourceUiTokens.resolveSecondaryTextColor(context),
                 ),
               ),
               const SizedBox(height: 10),
@@ -1577,7 +1696,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         _loading = true;
         _loadingToc = true;
       });
-      await _loadContext(silent: true);
+      await _loadContext(silent: true, forceRemote: true);
     }
     if (!mounted || !refreshSuccess) return;
     if (!next) {
@@ -1606,6 +1725,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final id = (_bookId?.trim().isNotEmpty ?? false)
         ? _bookId!.trim()
         : _buildEphemeralSessionId();
+    _removeSessionCacheEntry(_buildSessionCacheKey());
     try {
       await _chapterRepo.clearDownloadedCacheForBook(id);
       if (!mounted) return;
@@ -1629,7 +1749,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       await _refreshBookshelfToc();
       return;
     }
-    await _loadContext();
+    await _loadContext(forceRemote: true);
   }
 
   Future<bool> _refreshLocalBookshelfBook({
@@ -2655,15 +2775,16 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   @override
   Widget build(BuildContext context) {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final backgroundColor = CupertinoColors.systemBackground.resolveFrom(
-      context,
-    );
-    final cardColor =
-        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final backgroundColor =
+        CupertinoColors.systemBackground.resolveFrom(context);
+    final cardColor = SourceUiTokens.resolveCardBackgroundColor(context);
+    final borderColor = SourceUiTokens.resolveSeparatorColor(context);
     final primaryTextColor = CupertinoColors.label.resolveFrom(context);
-    final primaryActionColor = CupertinoColors.activeBlue.resolveFrom(context);
-    final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
+    final secondaryTextColor =
+        SourceUiTokens.resolveSecondaryTextColor(context);
+    final primaryActionColor =
+        SourceUiTokens.resolvePrimaryActionColor(context);
+    final destructiveColor = SourceUiTokens.resolveDangerColor(context);
     final warningColor = CupertinoColors.systemOrange.resolveFrom(context);
     final coverUrl = _displayCoverUrl;
     final heroTopExtend =
@@ -2826,8 +2947,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                             ),
                             backgroundColor: cardColor.withValues(alpha: 0.95),
                             borderColor: borderColor.withValues(alpha: 0.7),
-                            borderWidth: 0.6,
-                            borderRadius: 10,
+                            borderWidth: SourceUiTokens.borderWidth,
+                            borderRadius: SourceUiTokens.radiusControl,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -2836,7 +2957,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                                 Text(
                                   '加载中',
                                   style: textStyle.copyWith(
-                                    fontSize: 12,
+                                    fontSize: SourceUiTokens.itemMetaSize,
                                     color: primaryTextColor,
                                   ),
                                 ),
@@ -2848,7 +2969,12 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(
+                    SourceUiTokens.pagePaddingHorizontal,
+                    4,
+                    SourceUiTokens.pagePaddingHorizontal,
+                    0,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -2858,7 +2984,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: textStyle.copyWith(
-                          fontSize: 23,
+                          fontSize: SourceUiTokens.detailTitleSize,
                           height: 1.25,
                           color: primaryTextColor,
                           fontWeight: FontWeight.w700,
@@ -2934,7 +3060,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                             Text(
                               '简介',
                               style: textStyle.copyWith(
-                                fontSize: 15,
+                                fontSize: SourceUiTokens.itemTitleSize,
                                 color: primaryTextColor,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -2945,9 +3071,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                               child: Text(
                                 _displayIntro,
                                 style: textStyle.copyWith(
-                                  fontSize: 13,
-                                  color: CupertinoColors.secondaryLabel
-                                      .resolveFrom(context),
+                                  fontSize: SourceUiTokens.actionTextSize,
+                                  color: secondaryTextColor,
                                 ),
                               ),
                             ),
@@ -2982,7 +3107,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           child: Text(
                             _error!,
                             style: textStyle.copyWith(
-                              fontSize: 13,
+                              fontSize: SourceUiTokens.actionTextSize,
                               color: destructiveColor,
                             ),
                           ),
@@ -2997,7 +3122,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           child: Text(
                             _tocError!,
                             style: textStyle.copyWith(
-                              fontSize: 13,
+                              fontSize: SourceUiTokens.actionTextSize,
                               color: warningColor,
                             ),
                           ),
@@ -3016,14 +3141,14 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
               border: Border(
                 top: BorderSide(
                   color: borderColor,
-                  width: 0.6,
+                  width: SourceUiTokens.borderWidth,
                 ),
               ),
             ),
             padding: EdgeInsets.fromLTRB(
-              12,
+              SourceUiTokens.pagePaddingHorizontal,
               8,
-              12,
+              SourceUiTokens.pagePaddingHorizontal,
               math.max(8, MediaQuery.paddingOf(context).bottom),
             ),
             child: Row(
@@ -3035,7 +3160,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         color: backgroundColor,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius:
+                            BorderRadius.circular(SourceUiTokens.radiusControl),
                         border: Border.all(color: borderColor),
                       ),
                       child: Padding(
@@ -3057,7 +3183,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                             Text(
                               _inBookshelf ? '移出书架' : '加入书架',
                               style: textStyle.copyWith(
-                                fontSize: 14,
+                                fontSize: SourceUiTokens.actionTextSize,
                                 fontWeight: FontWeight.w600,
                                 color: primaryActionColor,
                               ),
@@ -3079,7 +3205,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         color: primaryActionColor,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius:
+                            BorderRadius.circular(SourceUiTokens.radiusControl),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -3090,7 +3217,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           child: Text(
                             '开始阅读',
                             style: textStyle.copyWith(
-                              fontSize: 14,
+                              fontSize: SourceUiTokens.actionTextSize,
                               fontWeight: FontWeight.w600,
                               color: CupertinoColors.white,
                             ),
@@ -3123,16 +3250,16 @@ class _CupertinoCardContainer extends StatelessWidget {
     required this.child,
     this.backgroundColor,
     this.borderColor,
-    this.borderWidth = 0.6,
-    this.borderRadius = 12,
+    this.borderWidth = SourceUiTokens.borderWidth,
+    this.borderRadius = SourceUiTokens.radiusCard,
   });
 
   @override
   Widget build(BuildContext context) {
-    final resolvedBackground = backgroundColor ??
-        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    final resolvedBackground =
+        backgroundColor ?? SourceUiTokens.resolveCardBackgroundColor(context);
     final resolvedBorder =
-        borderColor ?? CupertinoColors.separator.resolveFrom(context);
+        borderColor ?? SourceUiTokens.resolveSeparatorColor(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: resolvedBackground,
@@ -3203,10 +3330,9 @@ class _MetaLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
-      context,
-    );
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final secondaryTextColor =
+        SourceUiTokens.resolveSecondaryTextColor(context);
+    final borderColor = SourceUiTokens.resolveSeparatorColor(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -3216,7 +3342,7 @@ class _MetaLine extends StatelessWidget {
               border: Border(
                 bottom: BorderSide(
                   color: borderColor.withValues(alpha: 0.6),
-                  width: 0.5,
+                  width: SourceUiTokens.borderWidth,
                 ),
               ),
             ),
@@ -3230,7 +3356,7 @@ class _MetaLine extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textStyle.copyWith(
-                fontSize: 13,
+                fontSize: SourceUiTokens.itemMetaSize,
                 color: secondaryTextColor,
               ),
             ),
@@ -3272,14 +3398,14 @@ class _MetaActionChip extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: resolvedBackground,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(SourceUiTokens.radiusControl),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           child: Text(
             label,
             style: textStyle.copyWith(
-              fontSize: 12,
+              fontSize: SourceUiTokens.itemMetaSize,
               fontWeight: FontWeight.w600,
               color: resolvedColor,
             ),
@@ -3311,7 +3437,7 @@ class _StatusChip extends StatelessWidget {
       child: Text(
         label,
         style: textStyle.copyWith(
-          fontSize: 12,
+          fontSize: SourceUiTokens.itemMetaSize,
           color: color,
           fontWeight: FontWeight.w600,
         ),
@@ -3783,26 +3909,30 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
   @override
   Widget build(BuildContext context) {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final cardColor =
-        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final cardColor = SourceUiTokens.resolveCardBackgroundColor(context);
+    final borderColor = SourceUiTokens.resolveSeparatorColor(context);
     final primaryTextColor = CupertinoColors.label.resolveFrom(context);
-    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
-      context,
-    );
+    final secondaryTextColor =
+        SourceUiTokens.resolveSecondaryTextColor(context);
     final filtered = _filtered;
     final searchAction = _searchExpanded
         ? CupertinoButton(
             key: _menuSearchCloseKey,
             padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+            minimumSize: const Size(
+              SourceUiTokens.minTapSize,
+              SourceUiTokens.minTapSize,
+            ),
             onPressed: () => _closeSearch(clearQuery: true),
             child: const Icon(CupertinoIcons.xmark, size: 18),
           )
         : CupertinoButton(
             key: _menuSearchActionKey,
             padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+            minimumSize: const Size(
+              SourceUiTokens.minTapSize,
+              SourceUiTokens.minTapSize,
+            ),
             onPressed: _openSearch,
             child: const Icon(CupertinoIcons.search, size: 18),
           );
@@ -3823,7 +3953,10 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
         CupertinoButton(
           key: _menuMoreActionKey,
           padding: EdgeInsets.zero,
-          minimumSize: const Size(30, 30),
+          minimumSize: const Size(
+            SourceUiTokens.minTapSize,
+            SourceUiTokens.minTapSize,
+          ),
           onPressed: (_runningUseReplaceAction ||
                   _runningLoadWordCountAction ||
                   _runningTocRuleAction ||
@@ -3856,7 +3989,12 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            padding: const EdgeInsets.fromLTRB(
+              SourceUiTokens.pagePaddingHorizontal,
+              10,
+              SourceUiTokens.pagePaddingHorizontal,
+              6,
+            ),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -3864,14 +4002,19 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: textStyle.copyWith(
-                  fontSize: 12,
+                  fontSize: SourceUiTokens.itemMetaSize,
                   color: secondaryTextColor,
                 ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+            padding: const EdgeInsets.fromLTRB(
+              SourceUiTokens.pagePaddingHorizontal,
+              0,
+              SourceUiTokens.pagePaddingHorizontal,
+              6,
+            ),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -3879,7 +4022,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                     ? '共 ${_toc.length} 章'
                     : '匹配 ${filtered.length} 章',
                 style: textStyle.copyWith(
-                  fontSize: 12,
+                  fontSize: SourceUiTokens.itemMetaSize,
                   color: secondaryTextColor,
                 ),
               ),
@@ -3887,7 +4030,12 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              padding: const EdgeInsets.fromLTRB(
+                SourceUiTokens.pagePaddingHorizontal,
+                4,
+                SourceUiTokens.pagePaddingHorizontal,
+                12,
+              ),
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final entry = filtered[index];
@@ -3902,8 +4050,8 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                       backgroundColor: cardColor,
                       borderColor: borderColor,
-                      borderWidth: 0.6,
-                      borderRadius: 12,
+                      borderWidth: SourceUiTokens.borderWidth,
+                      borderRadius: SourceUiTokens.radiusCard,
                       child: Row(
                         children: [
                           SizedBox(
@@ -3911,7 +4059,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                             child: Text(
                               '${entry.key + 1}',
                               style: textStyle.copyWith(
-                                fontSize: 12,
+                                fontSize: SourceUiTokens.itemMetaSize,
                                 color: secondaryTextColor,
                               ),
                             ),
@@ -3922,7 +4070,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: textStyle.copyWith(
-                                fontSize: 14,
+                                fontSize: SourceUiTokens.actionTextSize,
                                 color: primaryTextColor,
                               ),
                             ),
@@ -3933,7 +4081,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                               child: Text(
                                 wordCountLabel,
                                 style: textStyle.copyWith(
-                                  fontSize: 12,
+                                  fontSize: SourceUiTokens.itemMetaSize,
                                   color: secondaryTextColor,
                                 ),
                               ),

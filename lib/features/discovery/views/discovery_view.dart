@@ -4,13 +4,15 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/source_consistent_card.dart';
+import '../../../app/widgets/source_group_badge.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
@@ -47,7 +49,7 @@ class DiscoveryView extends StatefulWidget {
 
 class _DiscoveryViewState extends State<DiscoveryView> {
   static const int _collapsedKindsLimit = 12;
-  static const double _minTapSize = kMinInteractiveDimensionCupertino;
+  static const double _minTapSize = SourceUiTokens.minTapSize;
 
   late final SourceRepository _sourceRepo;
   late final SourceExploreKindsService _exploreKindsService;
@@ -735,7 +737,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                         child: Text(
                           '取消',
                           style: theme.textTheme.actionTextStyle.copyWith(
-                            color: uiTokens.colors.accent,
+                            color: SourceUiTokens.resolvePrimaryActionColor(
+                                context),
                           ),
                         ),
                       )
@@ -755,7 +758,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               Text(
                 '书源（$visibleCount）',
                 style: theme.textTheme.textStyle.copyWith(
-                  fontSize: 12,
+                  fontSize: SourceUiTokens.itemMetaSize,
                   color: uiTokens.colors.mutedForeground,
                 ),
               ),
@@ -824,9 +827,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: AppCard(
+      child: SourceConsistentCard(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        borderWidth: 0.6,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -847,6 +849,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.textStyle.copyWith(
+                              fontSize: SourceUiTokens.itemTitleSize,
                               fontWeight: FontWeight.w600,
                               color: uiTokens.colors.foreground,
                             ),
@@ -857,20 +860,15 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.textStyle.copyWith(
-                              fontSize: 13,
+                              fontSize: SourceUiTokens.itemMetaSize,
                               color: secondaryLabel,
                             ),
                           ),
                           if (groupText.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              '分组：$groupText',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.textStyle.copyWith(
-                                fontSize: 12,
-                                color: secondaryLabel.withValues(alpha: 0.9),
-                              ),
+                            const SizedBox(height: 4),
+                            SourceGroupBadge(
+                              text: groupText,
+                              textColor: secondaryLabel.withValues(alpha: 0.9),
                             ),
                           ],
                         ],
@@ -898,7 +896,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                     Text(
                       '正在加载发现入口…',
                       style: theme.textTheme.textStyle.copyWith(
-                        fontSize: 13,
+                        fontSize: SourceUiTokens.itemMetaSize,
                         color: secondaryLabel,
                       ),
                     ),
@@ -908,7 +906,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 Text(
                   '暂无发现入口',
                   style: theme.textTheme.textStyle.copyWith(
-                    fontSize: 13,
+                    fontSize: SourceUiTokens.itemMetaSize,
                     color: secondaryLabel,
                   ),
                 )
@@ -990,7 +988,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
           Text(
             title,
             style: theme.textTheme.textStyle.copyWith(
-              fontSize: 13,
+              fontSize: SourceUiTokens.actionTextSize,
               color: textColor,
               fontWeight: FontWeight.w600,
             ),
@@ -1023,7 +1021,10 @@ class _DiscoveryViewState extends State<DiscoveryView> {
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(uiTokens.radii.control),
-            border: Border.all(color: borderColor, width: 0.8),
+            border: Border.all(
+              color: borderColor,
+              width: SourceUiTokens.borderWidth,
+            ),
           ),
           child: child,
         ),
@@ -1085,7 +1086,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.textStyle.copyWith(
-          fontSize: 13,
+          fontSize: SourceUiTokens.actionTextSize,
           color: textColor,
           fontWeight: FontWeight.w600,
         ),
