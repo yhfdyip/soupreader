@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_action_list_sheet.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:path_provider/path_provider.dart';
@@ -29,6 +30,7 @@ class _FileManageViewState extends State<FileManageView> {
   Directory? _rootDir;
   List<Directory> _subDirs = <Directory>[];
   List<FileSystemEntity> _entities = <FileSystemEntity>[];
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _loading = true;
   bool _creatingFolder = false;
@@ -39,6 +41,12 @@ class _FileManageViewState extends State<FileManageView> {
   void initState() {
     super.initState();
     _initRootDirectory();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _initRootDirectory() async {
@@ -408,6 +416,7 @@ class _FileManageViewState extends State<FileManageView> {
       if (!mounted) return;
       setState(() {
         _searchQuery = '';
+        _searchController.clear();
       });
       await _reloadCurrentDirectory();
     } catch (error) {
@@ -600,7 +609,8 @@ class _FileManageViewState extends State<FileManageView> {
             _buildPathBar(),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: CupertinoSearchTextField(
+              child: AppManageSearchField(
+                controller: _searchController,
                 placeholder: '筛选 • 文件管理',
                 onChanged: (value) => setState(() => _searchQuery = value),
               ),
