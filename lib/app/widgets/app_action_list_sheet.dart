@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../theme/design_tokens.dart';
 import '../theme/typography.dart';
 import '../theme/ui_tokens.dart';
+import 'app_glass_sheet_panel.dart';
 import 'app_squircle_surface.dart';
 import 'cupertino_bottom_dialog.dart';
 
@@ -78,61 +79,39 @@ class _AppActionListSheet<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ui = AppUiTokens.resolve(context);
-    final resolvedAccent = accentColor ?? ui.colors.accent;
+    final accent = accentColor ?? ui.colors.accent;
     final bottomInset = math.max(MediaQuery.of(context).padding.bottom, 8.0);
     final trimmedMessage = (message ?? '').trim();
     final maxHeight = MediaQuery.sizeOf(context).height * _maxHeightFactor;
     final children = _buildChildren(
       context,
       ui: ui,
-      accent: resolvedAccent,
+      accent: accent,
       trimmedMessage: trimmedMessage,
     );
 
     return SafeArea(
       top: false,
-      child: DecoratedBox(
-        decoration: _buildPanelDecoration(ui),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _SheetHandle(
-                color: ui.colors.secondaryLabel.withValues(alpha: 0.38),
+      child: AppGlassSheetPanel(
+        contentPadding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
+        radius: ui.radii.sheet,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SheetHandle(
+              color: ui.colors.secondaryLabel.withValues(alpha: 0.38),
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: ListView(
+                shrinkWrap: true,
+                physics: const BouncingScrollPhysics(),
+                children: children,
               ),
-              const SizedBox(height: 8),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: maxHeight),
-                child: ListView(
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  children: children,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
-    );
-  }
-
-  BoxDecoration _buildPanelDecoration(AppUiTokens ui) {
-    final isDark = ui.isDark;
-    final panelTop = isDark
-        ? AppDesignTokens.pageBgDark.withValues(alpha: 0.96)
-        : AppDesignTokens.pageBgLight.withValues(alpha: 0.96);
-    final panelBottom = isDark
-        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.96)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
-    return BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: <Color>[panelTop, panelBottom],
-      ),
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(ui.radii.sheet),
       ),
     );
   }
@@ -171,7 +150,7 @@ class _AppActionListSheet<T> extends StatelessWidget {
 
     if (showCancel) {
       children.addAll(
-        [
+        <Widget>[
           const SizedBox(height: 10),
           _SheetCard(
             backgroundColor: cardBg,

@@ -11,6 +11,7 @@ import '../../core/build/build_info.dart';
 import '../../core/models/app_settings.dart';
 import '../../core/services/exception_log_service.dart';
 import '../../core/services/settings_service.dart';
+import '../widgets/app_global_ui_chrome.dart';
 import '../main_screen.dart';
 import 'app_bootstrap.dart';
 import 'boot_failure_view.dart';
@@ -201,6 +202,9 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
       theme: theme,
+      builder: (context, child) => AppGlobalUiChrome(
+        child: child ?? const SizedBox.shrink(),
+      ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -371,6 +375,9 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
       theme: theme,
+      builder: (context, child) => AppGlobalUiChrome(
+        child: child ?? const SizedBox.shrink(),
+      ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

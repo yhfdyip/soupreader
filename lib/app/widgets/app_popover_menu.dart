@@ -70,7 +70,7 @@ Future<T?> showAppPopoverMenu<T>({
   double itemHeight = kMinInteractiveDimensionCupertino,
   double? radius,
   double verticalPadding = 6,
-  double backdropBlurSigma = 14,
+  double backdropBlurSigma = AppDesignTokens.glassBlurSigma,
 }) {
   assert(items.isNotEmpty, 'items should not be empty');
   final anchor = _resolveAnchor(context: context, anchorKey: anchorKey);
@@ -104,6 +104,7 @@ Future<T?> showAppPopoverMenu<T>({
       final destructiveColor = uiTokens.colors.destructive;
       final bg = uiTokens.colors.surfaceBackground.withValues(alpha: 0.92);
       final borderColor = uiTokens.colors.separator.withValues(alpha: 0.78);
+      final separatorColor = uiTokens.colors.separator.withValues(alpha: 0.54);
 
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -147,6 +148,8 @@ Future<T?> showAppPopoverMenu<T>({
                           icon: item.icon,
                           label: item.label,
                           enabled: item.enabled,
+                          showDivider: index < items.length - 1,
+                          dividerColor: separatorColor,
                           iconColor: item.isDestructiveAction
                               ? destructiveColor
                               : iconColor,

@@ -3,12 +3,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
-import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/source_consistent_card.dart';
@@ -29,6 +30,7 @@ import '../../source/views/source_edit_legacy_view.dart';
 import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_login_webview_view.dart';
 import '../services/discovery_filter_helper.dart';
+import 'discovery_search_header.dart';
 import 'discovery_explore_results_view.dart';
 
 /// 发现页（对标 legado ExploreFragment）：
@@ -50,6 +52,7 @@ class DiscoveryView extends StatefulWidget {
 class _DiscoveryViewState extends State<DiscoveryView> {
   static const int _collapsedKindsLimit = 12;
   static const double _minTapSize = SourceUiTokens.minTapSize;
+  static const Duration _expandCollapseDuration = AppDesignTokens.motionNormal;
 
   late final SourceRepository _sourceRepo;
   late final SourceExploreKindsService _exploreKindsService;
@@ -247,6 +250,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _toggleSource(BookSource source) async {
+    HapticFeedback.selectionClick();
     final sourceUrl = source.bookSourceUrl;
     if (_expandedSourceUrl == sourceUrl) {
       setState(() {
@@ -264,6 +268,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   void _toggleKindsExpanded(String sourceUrl) {
+    HapticFeedback.selectionClick();
     if (_expandedKindsSources.contains(sourceUrl)) {
       setState(() => _expandedKindsSources.remove(sourceUrl));
       return;
@@ -642,13 +647,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required String query,
     required bool showEmptyMessage,
   }) {
-    final theme = CupertinoTheme.of(context);
     final uiTokens = AppUiTokens.resolve(context);
 
     final header = _buildSearchHeader(
       visibleCount: visible.length,
       query: query,
-      theme: theme,
       uiTokens: uiTokens,
     );
 
@@ -687,76 +690,23 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Widget _buildSearchHeader({
     required int visibleCount,
     required String query,
-    required CupertinoThemeData theme,
     required AppUiTokens uiTokens,
   }) {
-    final showCancel = _searchFocusNode.hasFocus || query.isNotEmpty;
     final activeGroup = _activeGroupFilter(query);
 
-    return Padding(
-      padding: AppManageSearchField.outerPadding,
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: AppManageSearchField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  placeholder: '请输入关键字搜索书源...',
-                ),
-              ),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                child: showCancel
-                    ? CupertinoButton(
-                        key: const ValueKey<String>('discovery_search_cancel'),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        minimumSize: const Size(_minTapSize, _minTapSize),
-                        onPressed: _clearQuery,
-                        child: Text(
-                          '取消',
-                          style: theme.textTheme.actionTextStyle.copyWith(
-                            color: SourceUiTokens.resolvePrimaryActionColor(
-                                context),
-                          ),
-                        ),
-                      )
-                    : const SizedBox(
-                        key: ValueKey<String>(
-                          'discovery_search_cancel_placeholder',
-                        ),
-                        width: 0,
-                        height: _minTapSize,
-                      ),
-              ),
-            ],
-          ),
-          const SizedBox(height: SourceUiTokens.discoveryHeaderGap),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '书源（$visibleCount）',
-                style: theme.textTheme.textStyle.copyWith(
-                  fontSize: SourceUiTokens.discoveryMetaTextSize,
-                  color: uiTokens.colors.mutedForeground,
-                ),
-              ),
-              if (activeGroup != null) ...[
-                const SizedBox(width: 8),
-                _buildGroupFilterChip(
-                  uiTokens: uiTokens,
-                  theme: theme,
-                  activeGroup: activeGroup,
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
+    return DiscoverySearchHeader(
+      controller: _searchController,
+      searchFocusNode: _searchFocusNode,
+      query: query,
+      visibleCount: visibleCount,
+      onClear: _clearQuery,
+      activeFilterChip: activeGroup == null
+          ? null
+          : _buildGroupFilterChip(
+              uiTokens: uiTokens,
+              theme: CupertinoTheme.of(context),
+              activeGroup: activeGroup,
+            ),
     );
   }
 
@@ -817,169 +767,326 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Widget _buildSourceItem(BookSource source) {
     final theme = CupertinoTheme.of(context);
     final uiTokens = AppUiTokens.resolve(context);
-    final secondaryLabel = uiTokens.colors.secondaryLabel;
+    final model = _buildSourceItemModel(source, uiTokens);
 
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SourceConsistentCard(
+        borderColor: model.cardBorderColor,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSourceItemHeader(
+              source: source,
+              expanded: model.expanded,
+              groupText: model.groupText,
+              theme: theme,
+              uiTokens: uiTokens,
+              secondaryLabel: model.secondaryLabel,
+            ),
+            AnimatedSize(
+              duration: _expandCollapseDuration,
+              curve: Curves.easeOutQuart,
+              alignment: Alignment.topCenter,
+              clipBehavior: Clip.hardEdge,
+              child: model.expanded
+                  ? _buildExpandedKindsSection(
+                      source: source,
+                      sourceUrl: model.sourceUrl,
+                      loadingKinds: model.loadingKinds,
+                      kinds: model.kinds,
+                      visibleKinds: model.visibleKinds,
+                      hasHiddenKinds: model.hasHiddenKinds,
+                      kindsExpanded: model.kindsExpanded,
+                      theme: theme,
+                      uiTokens: uiTokens,
+                      secondaryLabel: model.secondaryLabel,
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _DiscoverySourceItemModel _buildSourceItemModel(
+    BookSource source,
+    AppUiTokens uiTokens,
+  ) {
+    final secondaryLabel = uiTokens.colors.secondaryLabel;
     final sourceUrl = source.bookSourceUrl;
-    final expanded = _expandedSourceUrl == sourceUrl;
-    final loadingKinds = _loadingKindsSources.contains(sourceUrl);
     final kinds = _sourceKindsCache[sourceUrl] ?? const <SourceExploreKind>[];
+    final expanded = _expandedSourceUrl == sourceUrl;
     final kindsExpanded = _expandedKindsSources.contains(sourceUrl);
     final visibleKinds = kindsExpanded || kinds.length <= _collapsedKindsLimit
         ? kinds
         : kinds.take(_collapsedKindsLimit).toList(growable: false);
     final hasHiddenKinds = visibleKinds.length < kinds.length;
-    final groupText = (source.bookSourceGroup ?? '').trim();
     final cardBorderColor = expanded
         ? uiTokens.colors.accent
             .withValues(alpha: SourceUiTokens.discoveryExpandedCardBorderAlpha)
         : null;
+    return _DiscoverySourceItemModel(
+      sourceUrl: sourceUrl,
+      expanded: expanded,
+      loadingKinds: _loadingKindsSources.contains(sourceUrl),
+      kindsExpanded: kindsExpanded,
+      kinds: kinds,
+      visibleKinds: visibleKinds,
+      hasHiddenKinds: hasHiddenKinds,
+      groupText: (source.bookSourceGroup ?? '').trim(),
+      secondaryLabel: secondaryLabel,
+      cardBorderColor: cardBorderColor,
+    );
+  }
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SourceConsistentCard(
-        borderColor: cardBorderColor,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSourceItemHeader({
+    required BookSource source,
+    required bool expanded,
+    required String groupText,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+    required Color secondaryLabel,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _toggleSource(source),
+      onLongPress: () => _showSourceActions(source),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: _minTapSize),
+        child: Row(
           children: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _toggleSource(source),
-              onLongPress: () => _showSourceActions(source),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: _minTapSize),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            source.bookSourceName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.textStyle.copyWith(
-                              fontSize: SourceUiTokens.itemTitleSize,
-                              fontWeight: FontWeight.w600,
-                              color: uiTokens.colors.foreground,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            source.bookSourceUrl,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.textStyle.copyWith(
-                              fontSize: SourceUiTokens.itemMetaSize,
-                              color: secondaryLabel,
-                            ),
-                          ),
-                          if (groupText.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            SourceGroupBadge(
-                              text: groupText,
-                              textColor: secondaryLabel.withValues(alpha: 0.9),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      expanded
-                          ? CupertinoIcons.chevron_down
-                          : CupertinoIcons.chevron_forward,
-                      size: 16,
-                      color: expanded
-                          ? uiTokens.colors.accent
-                          : uiTokens.colors.mutedForeground,
-                    ),
-                  ],
-                ),
+            Expanded(
+              child: _buildSourceInfoBlock(
+                source: source,
+                groupText: groupText,
+                theme: theme,
+                uiTokens: uiTokens,
+                secondaryLabel: secondaryLabel,
               ),
             ),
-            if (expanded) ...[
-              const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
-              Container(
-                height: SourceUiTokens.borderWidth,
-                color: uiTokens.colors.separator.withValues(alpha: 0.55),
-              ),
-              const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
-              if (loadingKinds)
-                Row(
-                  children: [
-                    const CupertinoActivityIndicator(),
-                    const SizedBox(width: 8),
-                    Text(
-                      '正在加载发现入口…',
-                      style: theme.textTheme.textStyle.copyWith(
-                        fontSize: SourceUiTokens.discoveryMetaTextSize,
-                        color: secondaryLabel,
-                      ),
-                    ),
-                  ],
-                )
-              else if (kinds.isEmpty)
-                Text(
-                  '暂无发现入口',
-                  style: theme.textTheme.textStyle.copyWith(
-                    fontSize: SourceUiTokens.discoveryMetaTextSize,
-                    color: secondaryLabel,
-                  ),
-                )
-              else
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final maxWidth = constraints.maxWidth;
-                    final chips = <Widget>[];
-                    for (final kind in visibleKinds) {
-                      if (kind.style?.layoutWrapBefore == true) {
-                        chips.add(SizedBox(width: maxWidth, height: 0));
-                      }
-
-                      final width = _kindWidth(kind.style, maxWidth);
-                      final child = _buildKindChip(
-                        source,
-                        kind,
-                        theme: theme,
-                        uiTokens: uiTokens,
-                      );
-                      if (width == null) {
-                        chips.add(child);
-                      } else {
-                        chips.add(
-                          SizedBox(
-                            width: width,
-                            child: child,
-                          ),
-                        );
-                      }
-                    }
-                    if (hasHiddenKinds || kindsExpanded) {
-                      final hiddenCount = kinds.length - visibleKinds.length;
-                      chips.add(
-                        _buildKindsToggleChip(
-                          expanded: kindsExpanded,
-                          hiddenCount: hiddenCount,
-                          theme: theme,
-                          uiTokens: uiTokens,
-                          onTap: () => _toggleKindsExpanded(sourceUrl),
-                        ),
-                      );
-                    }
-
-                    return Wrap(
-                      spacing: SourceUiTokens.discoveryHeaderGap,
-                      runSpacing: SourceUiTokens.discoveryHeaderGap,
-                      children: chips,
-                    );
-                  },
-                ),
-            ],
+            const SizedBox(width: 8),
+            Icon(
+              expanded
+                  ? CupertinoIcons.chevron_down
+                  : CupertinoIcons.chevron_forward,
+              size: 16,
+              color: expanded
+                  ? uiTokens.colors.accent
+                  : uiTokens.colors.mutedForeground,
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildSourceInfoBlock({
+    required BookSource source,
+    required String groupText,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+    required Color secondaryLabel,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          source.bookSourceName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.textStyle.copyWith(
+            fontSize: SourceUiTokens.itemTitleSize,
+            fontWeight: FontWeight.w600,
+            color: uiTokens.colors.foreground,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          source.bookSourceUrl,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.textStyle.copyWith(
+            fontSize: SourceUiTokens.itemMetaSize,
+            color: secondaryLabel,
+          ),
+        ),
+        if (groupText.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          SourceGroupBadge(
+            text: groupText,
+            textColor: secondaryLabel.withValues(alpha: 0.9),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildExpandedKindsSection({
+    required BookSource source,
+    required String sourceUrl,
+    required bool loadingKinds,
+    required List<SourceExploreKind> kinds,
+    required List<SourceExploreKind> visibleKinds,
+    required bool hasHiddenKinds,
+    required bool kindsExpanded,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+    required Color secondaryLabel,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
+        Container(
+          height: SourceUiTokens.borderWidth,
+          color: uiTokens.colors.separator.withValues(alpha: 0.55),
+        ),
+        const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
+        _buildExpandedKindsBody(
+          source: source,
+          sourceUrl: sourceUrl,
+          loadingKinds: loadingKinds,
+          kinds: kinds,
+          visibleKinds: visibleKinds,
+          hasHiddenKinds: hasHiddenKinds,
+          kindsExpanded: kindsExpanded,
+          theme: theme,
+          uiTokens: uiTokens,
+          secondaryLabel: secondaryLabel,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpandedKindsBody({
+    required BookSource source,
+    required String sourceUrl,
+    required bool loadingKinds,
+    required List<SourceExploreKind> kinds,
+    required List<SourceExploreKind> visibleKinds,
+    required bool hasHiddenKinds,
+    required bool kindsExpanded,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+    required Color secondaryLabel,
+  }) {
+    if (loadingKinds) {
+      return _buildLoadingKindsRow(
+          theme: theme, secondaryLabel: secondaryLabel);
+    }
+    if (kinds.isEmpty) {
+      return Text(
+        '暂无发现入口',
+        style: theme.textTheme.textStyle.copyWith(
+          fontSize: SourceUiTokens.discoveryMetaTextSize,
+          color: secondaryLabel,
+        ),
+      );
+    }
+    return _buildKindsWrap(
+      source: source,
+      sourceUrl: sourceUrl,
+      kinds: kinds,
+      visibleKinds: visibleKinds,
+      hasHiddenKinds: hasHiddenKinds,
+      kindsExpanded: kindsExpanded,
+      theme: theme,
+      uiTokens: uiTokens,
+    );
+  }
+
+  Widget _buildLoadingKindsRow({
+    required CupertinoThemeData theme,
+    required Color secondaryLabel,
+  }) {
+    return Row(
+      children: [
+        const CupertinoActivityIndicator(),
+        const SizedBox(width: 8),
+        Text(
+          '正在加载发现入口…',
+          style: theme.textTheme.textStyle.copyWith(
+            fontSize: SourceUiTokens.discoveryMetaTextSize,
+            color: secondaryLabel,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKindsWrap({
+    required BookSource source,
+    required String sourceUrl,
+    required List<SourceExploreKind> kinds,
+    required List<SourceExploreKind> visibleKinds,
+    required bool hasHiddenKinds,
+    required bool kindsExpanded,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final chips = _buildKindWidgets(
+          source: source,
+          kinds: kinds,
+          visibleKinds: visibleKinds,
+          hasHiddenKinds: hasHiddenKinds,
+          kindsExpanded: kindsExpanded,
+          sourceUrl: sourceUrl,
+          maxWidth: maxWidth,
+          theme: theme,
+          uiTokens: uiTokens,
+        );
+        return Wrap(
+          spacing: SourceUiTokens.discoveryHeaderGap,
+          runSpacing: SourceUiTokens.discoveryHeaderGap,
+          children: chips,
+        );
+      },
+    );
+  }
+
+  List<Widget> _buildKindWidgets({
+    required BookSource source,
+    required List<SourceExploreKind> kinds,
+    required List<SourceExploreKind> visibleKinds,
+    required bool hasHiddenKinds,
+    required bool kindsExpanded,
+    required String sourceUrl,
+    required double maxWidth,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+  }) {
+    final chips = <Widget>[];
+    for (final kind in visibleKinds) {
+      if (kind.style?.layoutWrapBefore == true) {
+        chips.add(SizedBox(width: maxWidth, height: 0));
+      }
+      final width = _kindWidth(kind.style, maxWidth);
+      final chip = _buildKindChip(
+        source,
+        kind,
+        theme: theme,
+        uiTokens: uiTokens,
+      );
+      chips.add(width == null ? chip : SizedBox(width: width, child: chip));
+    }
+    if (hasHiddenKinds || kindsExpanded) {
+      chips.add(
+        _buildKindsToggleChip(
+          expanded: kindsExpanded,
+          hiddenCount: kinds.length - visibleKinds.length,
+          theme: theme,
+          uiTokens: uiTokens,
+          onTap: () => _toggleKindsExpanded(sourceUrl),
+        ),
+      );
+    }
+    return chips;
   }
 
   Widget _buildKindsToggleChip({
@@ -1028,25 +1135,37 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required AppUiTokens uiTokens,
     required VoidCallback? onTap,
   }) {
+    final tapHandler = onTap == null
+        ? null
+        : () {
+            HapticFeedback.lightImpact();
+            onTap();
+          };
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: tapHandler,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: _minTapSize),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
-            vertical: SourceUiTokens.discoveryChipVerticalPadding,
-          ),
-          decoration: BoxDecoration(
+        child: DecoratedBox(
+          decoration: ShapeDecoration(
             color: backgroundColor,
-            borderRadius: BorderRadius.circular(uiTokens.radii.control),
-            border: Border.all(
-              color: borderColor,
-              width: SourceUiTokens.borderWidth,
+            shape: ContinuousRectangleBorder(
+              borderRadius: BorderRadius.all(
+                Radius.circular(uiTokens.radii.control),
+              ),
+              side: BorderSide(
+                color: borderColor,
+                width: SourceUiTokens.borderWidth,
+              ),
             ),
           ),
-          child: child,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
+              vertical: SourceUiTokens.discoveryChipVerticalPadding,
+            ),
+            child: child,
+          ),
         ),
       ),
     );
@@ -1120,4 +1239,31 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       ),
     );
   }
+}
+
+@immutable
+class _DiscoverySourceItemModel {
+  const _DiscoverySourceItemModel({
+    required this.sourceUrl,
+    required this.expanded,
+    required this.loadingKinds,
+    required this.kindsExpanded,
+    required this.kinds,
+    required this.visibleKinds,
+    required this.hasHiddenKinds,
+    required this.groupText,
+    required this.secondaryLabel,
+    required this.cardBorderColor,
+  });
+
+  final String sourceUrl;
+  final bool expanded;
+  final bool loadingKinds;
+  final bool kindsExpanded;
+  final List<SourceExploreKind> kinds;
+  final List<SourceExploreKind> visibleKinds;
+  final bool hasHiddenKinds;
+  final String groupText;
+  final Color secondaryLabel;
+  final Color? cardBorderColor;
 }

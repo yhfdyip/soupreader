@@ -7,6 +7,9 @@ import 'typography.dart';
 class AppCupertinoTheme {
   AppCupertinoTheme._();
 
+  static const double _kNavBarGlassAlpha = 0.9;
+  static const double _kTabBarGlassAlpha = 0.92;
+
   static CupertinoThemeData build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
     final scaffoldBackground =
@@ -67,22 +70,23 @@ class AppCupertinoTheme {
 
   static Color navBarBackground(
     Brightness brightness,
-    Color scaffoldBackground,
+    Color _,
   ) {
-    final glass = brightness == Brightness.dark
+    // 保持半透明以触发 Cupertino 导航栏系统模糊，不做 alphaBlend 覆盖底层。
+    return brightness == Brightness.dark
         ? AppDesignTokens.glassDarkMaterial
-        : AppDesignTokens.glassLightMaterial;
-    return Color.alphaBlend(glass, scaffoldBackground);
+            .withValues(alpha: _kNavBarGlassAlpha)
+        : AppDesignTokens.glassLightMaterial
+            .withValues(alpha: _kNavBarGlassAlpha);
   }
 
   static Color tabBarBackground(Brightness brightness) {
-    final base = brightness == Brightness.dark
-        ? AppDesignTokens.surfaceDark
-        : AppDesignTokens.surfaceLight;
-    final glass = brightness == Brightness.dark
-        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.94)
-        : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.94);
-    return Color.alphaBlend(glass, base);
+    // 保持半透明以触发 Cupertino 底栏系统模糊，不做 alphaBlend 覆盖底层。
+    return brightness == Brightness.dark
+        ? AppDesignTokens.glassDarkMaterial
+            .withValues(alpha: _kTabBarGlassAlpha)
+        : AppDesignTokens.glassLightMaterial
+            .withValues(alpha: _kTabBarGlassAlpha);
   }
 
   static Color tabBarActive(Brightness brightness) {

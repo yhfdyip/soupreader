@@ -25,6 +25,7 @@ import 'backup_settings_view.dart';
 import 'file_manage_view.dart';
 import 'other_settings_view.dart';
 import 'settings_placeholders.dart';
+import 'settings_profile_card.dart';
 import 'theme_settings_view.dart';
 
 /// 我的页菜单（按 legado `pref_main.xml` 入口顺序迁移）
@@ -378,120 +379,10 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Widget _buildProfileCard(BuildContext context) {
-    final tokens = AppUiTokens.resolve(context);
     final appSettings = _settingsService.appSettingsListenable.value;
-    final modeLabel = _themeModeSummary;
-    final appearanceIcon = switch (appSettings.appearanceMode) {
-      AppAppearanceMode.followSystem => CupertinoIcons.circle_lefthalf_fill,
-      AppAppearanceMode.light => CupertinoIcons.sun_max,
-      AppAppearanceMode.dark => CupertinoIcons.moon_stars,
-      AppAppearanceMode.eInk => CupertinoIcons.rectangle_compress_vertical,
-    };
-
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-      borderWidth: AppDesignTokens.hairlineBorderWidth,
-      borderColor: tokens.colors.separator.withValues(alpha: 0.75),
-      child: Row(
-        children: [
-          _buildProfileAvatar(tokens),
-          const SizedBox(width: 12),
-          _buildProfileIntro(context, tokens),
-          _buildAppearanceChip(tokens, appearanceIcon, modeLabel),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileAvatar(AppUiTokens tokens) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [
-            tokens.colors.accent.withValues(alpha: 0.9),
-            tokens.colors.accent.withValues(alpha: 0.62),
-          ],
-        ),
-      ),
-      child: const SizedBox(
-        width: 42,
-        height: 42,
-        child: Icon(
-          CupertinoIcons.person_crop_circle_fill,
-          color: CupertinoColors.white,
-          size: 24,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileIntro(BuildContext context, AppUiTokens tokens) {
-    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'SoupReader',
-            style: textStyle.copyWith(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.24,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '你的阅读与规则管理中枢',
-            style: textStyle.copyWith(
-              fontSize: 12,
-              color: tokens.colors.secondaryLabel,
-              letterSpacing: -0.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppearanceChip(
-    AppUiTokens tokens,
-    IconData appearanceIcon,
-    String modeLabel,
-  ) {
-    return DecoratedBox(
-      decoration: ShapeDecoration(
-        color: tokens.colors.accent.withValues(alpha: 0.12),
-        shape: ContinuousRectangleBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(14)),
-          side: BorderSide(
-            color: tokens.colors.accent.withValues(alpha: 0.3),
-            width: AppDesignTokens.hairlineBorderWidth,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              appearanceIcon,
-              size: 12,
-              color: tokens.colors.accent,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              modeLabel,
-              style: TextStyle(
-                color: tokens.colors.accent,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return SettingsProfileCard(
+      appearanceMode: appSettings.appearanceMode,
+      modeLabel: _themeModeSummary,
     );
   }
 

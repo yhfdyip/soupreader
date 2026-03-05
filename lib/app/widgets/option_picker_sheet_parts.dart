@@ -154,6 +154,10 @@ class _OptionPickerBody<T> extends StatelessWidget {
 }
 
 class _OptionPickerCard extends StatelessWidget {
+  static const double _kAmbientTopAlpha = 0.2;
+  static const double _kAmbientBottomAlpha = 0.16;
+  static const double _kBezelAlpha = 0.5;
+
   final Widget child;
   final Color color;
   final Color borderColor;
@@ -168,6 +172,11 @@ class _OptionPickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppUiTokens.resolve(context).isDark;
+    final bezelColor = (isDark
+            ? AppDesignTokens.glassInnerHighlightDark
+            : AppDesignTokens.glassInnerHighlightLight)
+        .withValues(alpha: _kBezelAlpha);
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: color,
@@ -175,7 +184,42 @@ class _OptionPickerCard extends StatelessWidget {
       borderWidth: AppDesignTokens.hairlineBorderWidth,
       radius: radius,
       blurBackground: true,
-      child: child,
+      child: Stack(
+        children: [
+          Positioned.fill(child: _buildAmbientLayer(isDark)),
+          Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              height: AppDesignTokens.hairlineBorderWidth,
+              child: ColoredBox(color: bezelColor),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAmbientLayer(bool isDark) {
+    final topColor = (isDark
+            ? AppDesignTokens.ambientTopDark
+            : AppDesignTokens.ambientTopLight)
+        .withValues(alpha: _kAmbientTopAlpha);
+    final bottomColor = (isDark
+            ? AppDesignTokens.ambientBottomDark
+            : AppDesignTokens.ambientBottomLight)
+        .withValues(alpha: _kAmbientBottomAlpha);
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [topColor, bottomColor, const Color(0x00000000)],
+            stops: const [0.0, 0.64, 1.0],
+          ),
+        ),
+      ),
     );
   }
 }

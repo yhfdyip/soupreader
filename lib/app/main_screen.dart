@@ -89,8 +89,13 @@ class _MainScreenState extends State<MainScreen> {
       );
       return;
     }
-    HapticFeedback.selectionClick();
-    if (index != _tabController.index) return;
+    final isReselect = index == _tabController.index;
+    if (isReselect) {
+      HapticFeedback.selectionClick();
+    } else {
+      HapticFeedback.lightImpact();
+      return;
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
     switch (_tabs[index].id) {
       case _MainTabId.bookshelf:

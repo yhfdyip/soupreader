@@ -179,10 +179,8 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     final navSurface = isDark
         ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.9)
         : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
-    final defaultNavBarBackground = Color.alphaBlend(
-      navSurface,
-      baseBackground,
-    );
+    // 保留半透明玻璃层，避免 alphaBlend 后退化为不透明背景导致失去系统模糊。
+    final defaultNavBarBackground = navSurface;
     final border = Border(
       top: BorderSide(
         color: isDark

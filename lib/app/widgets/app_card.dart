@@ -1,58 +1,58 @@
 import 'package:flutter/cupertino.dart';
 
 import '../theme/design_tokens.dart';
-import '../theme/source_ui_tokens.dart';
+import '../theme/ui_tokens.dart';
 import 'app_squircle_surface.dart';
 
-/// 书源页统一卡片容器。
-class SourceConsistentCard extends StatelessWidget {
+class AppCard extends StatelessWidget {
   static const double _kDarkSurfaceAlpha = 0.86;
-  static const double _kLightSurfaceAlpha = 0.9;
-  static const double _kAmbientTopAlpha = 0.26;
-  static const double _kAmbientBottomAlpha = 0.2;
+  static const double _kLightSurfaceAlpha = 0.88;
+  static const double _kBorderAlpha = 0.74;
   static const double _kBezelAlpha = 0.52;
-  static const double _kShadowDarkAlpha = 0.22;
-  static const double _kShadowLightAlpha = 0.1;
+  static const double _kAmbientTopAlpha = 0.24;
+  static const double _kAmbientBottomAlpha = 0.2;
+  static const double _kShadowDarkAlpha = 0.28;
+  static const double _kShadowLightAlpha = 0.09;
 
   final EdgeInsetsGeometry padding;
   final Widget child;
   final Color? backgroundColor;
   final Color? borderColor;
+  final double borderWidth;
+  final double? borderRadius;
 
-  const SourceConsistentCard({
+  const AppCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(12),
     this.backgroundColor,
     this.borderColor,
+    this.borderWidth = 0,
+    this.borderRadius,
   });
 
   @override
   Widget build(BuildContext context) {
-    final style = _resolveStyle(context);
-    return _buildSurface(style);
+    final tokens = AppUiTokens.resolve(context);
+    final style = _resolveStyle(tokens);
+    return _buildCard(tokens, style);
   }
 
-  _SourceCardStyle _resolveStyle(BuildContext context) {
-    final theme = CupertinoTheme.of(context);
-    final brightness = theme.brightness ??
-        MediaQuery.maybeOf(context)?.platformBrightness ??
-        Brightness.light;
-    final isDark = brightness == Brightness.dark;
+  _AppCardStyle _resolveStyle(AppUiTokens tokens) {
+    final isDark = tokens.isDark;
     final background = backgroundColor ??
-        SourceUiTokens.resolveCardBackgroundColor(context).withValues(
-            alpha: isDark ? _kDarkSurfaceAlpha : _kLightSurfaceAlpha);
-    final border =
-        (borderColor ?? SourceUiTokens.resolveSeparatorColor(context))
-            .withValues(alpha: SourceUiTokens.discoveryExpandedCardBorderAlpha);
-    final shadow = (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E))
+        tokens.colors.sectionBackground.withValues(
+          alpha: isDark ? _kDarkSurfaceAlpha : _kLightSurfaceAlpha,
+        );
+    final border = (borderColor ?? tokens.colors.separator)
+        .withValues(alpha: _kBorderAlpha);
+    final shadow = (isDark ? CupertinoColors.black : const Color(0xFF042852))
         .withValues(alpha: isDark ? _kShadowDarkAlpha : _kShadowLightAlpha);
     final bezel = (isDark
             ? AppDesignTokens.glassInnerHighlightDark
             : AppDesignTokens.glassInnerHighlightLight)
         .withValues(alpha: _kBezelAlpha);
-    return _SourceCardStyle(
-      isDark: isDark,
+    return _AppCardStyle(
       background: background,
       border: border,
       shadow: shadow,
@@ -60,25 +60,28 @@ class SourceConsistentCard extends StatelessWidget {
     );
   }
 
-  Widget _buildSurface(_SourceCardStyle style) {
+  Widget _buildCard(AppUiTokens tokens, _AppCardStyle style) {
+    final radius = borderRadius ?? tokens.radii.card;
+    final resolvedBorderWidth =
+        borderWidth <= 0 ? AppDesignTokens.hairlineBorderWidth : borderWidth;
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: style.background,
       borderColor: style.border,
-      borderWidth: SourceUiTokens.borderWidth,
-      radius: SourceUiTokens.radiusCard,
+      borderWidth: resolvedBorderWidth,
+      radius: radius,
       blurBackground: true,
       shadows: <BoxShadow>[
         BoxShadow(
           color: style.shadow,
-          offset: const Offset(0, 7),
-          blurRadius: 20,
-          spreadRadius: -11,
+          offset: const Offset(0, 8),
+          blurRadius: 24,
+          spreadRadius: -12,
         ),
       ],
       child: Stack(
         children: [
-          Positioned.fill(child: _buildAmbientLayer(style.isDark)),
+          Positioned.fill(child: _buildAmbientLayer(tokens.isDark)),
           Align(
             alignment: Alignment.topCenter,
             child: SizedBox(
@@ -111,7 +114,7 @@ class SourceConsistentCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [topColor, bottomColor, const Color(0x00000000)],
-            stops: const [0.0, 0.65, 1.0],
+            stops: const [0.0, 0.66, 1.0],
           ),
         ),
       ),
@@ -120,16 +123,14 @@ class SourceConsistentCard extends StatelessWidget {
 }
 
 @immutable
-class _SourceCardStyle {
-  const _SourceCardStyle({
-    required this.isDark,
+class _AppCardStyle {
+  const _AppCardStyle({
     required this.background,
     required this.border,
     required this.shadow,
     required this.bezel,
   });
 
-  final bool isDark;
   final Color background;
   final Color border;
   final Color shadow;
