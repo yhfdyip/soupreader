@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
@@ -83,6 +84,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         builder: (context, logs, _) {
           return AppListView(
             children: [
+              _buildAboutHeroCard(),
               AppListSection(
                 hasLeading: false,
                 children: [
@@ -154,6 +156,92 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
           child: const Icon(CupertinoIcons.hand_thumbsup, size: 22),
         ),
       ],
+    );
+  }
+
+  Widget _buildAboutHeroCard() {
+    final tokens = AppUiTokens.resolve(context);
+    final theme = CupertinoTheme.of(context);
+    final packageName = _packageName.trim();
+    final packageText = packageName.isEmpty ? '包名未读取' : packageName;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+        borderColor: tokens.colors.separator.withValues(alpha: 0.72),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    tokens.colors.accent.withValues(alpha: 0.88),
+                    tokens.colors.accent.withValues(alpha: 0.6),
+                  ],
+                ),
+              ),
+              child: const SizedBox(
+                width: 42,
+                height: 42,
+                child: Icon(
+                  CupertinoIcons.info_circle_fill,
+                  color: CupertinoColors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _appName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.textStyle.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.24,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _versionSummary,
+                    style: theme.textTheme.textStyle.copyWith(
+                      fontSize: 12,
+                      color: tokens.colors.secondaryLabel,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    packageText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.textStyle.copyWith(
+                      fontSize: 11,
+                      color: tokens.colors.tertiaryLabel,
+                      letterSpacing: -0.16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              'v$_version',
+              style: theme.textTheme.textStyle.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: tokens.colors.accent,
+                letterSpacing: -0.16,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

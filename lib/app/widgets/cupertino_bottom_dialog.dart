@@ -1,5 +1,14 @@
 import 'package:flutter/cupertino.dart';
 
+const Color _kSheetBarrierDynamicColor = CupertinoDynamicColor.withBrightness(
+  color: Color(0x1A0B1630),
+  darkColor: Color(0x4D000000),
+);
+const Color _kDialogBarrierDynamicColor = CupertinoDynamicColor.withBrightness(
+  color: Color(0x3309142B),
+  darkColor: Color(0x73000000),
+);
+
 Future<T?> showCupertinoBottomSheetDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -7,10 +16,14 @@ Future<T?> showCupertinoBottomSheetDialog<T>({
   Color? barrierColor,
 }) {
   final themeData = CupertinoTheme.of(context);
+  final resolvedBarrierColor = CupertinoDynamicColor.resolve(
+    barrierColor ?? _kSheetBarrierDynamicColor,
+    context,
+  );
   return showCupertinoModalPopup<T>(
     context: context,
     barrierDismissible: barrierDismissible,
-    barrierColor: barrierColor ?? kCupertinoModalBarrierColor,
+    barrierColor: resolvedBarrierColor,
     builder: (popupContext) => CupertinoTheme(
       data: themeData,
       child: builder(popupContext),
@@ -40,7 +53,7 @@ Future<T?> showCupertinoBottomDialog<T>({
   }
 
   if (probeWidget is CupertinoActionSheet) {
-    final resolvedBarrierColor = barrierColor ?? kCupertinoModalBarrierColor;
+    final resolvedBarrierColor = barrierColor ?? _kSheetBarrierDynamicColor;
     final resolvedBarrierLabel = barrierLabel ??
         CupertinoLocalizations.of(context).modalBarrierDismissLabel;
 
@@ -62,7 +75,7 @@ Future<T?> showCupertinoBottomDialog<T>({
     builder: themedBuilder,
     barrierDismissible: barrierDismissible,
     barrierLabel: barrierLabel,
-    barrierColor: barrierColor,
+    barrierColor: barrierColor ?? _kDialogBarrierDynamicColor,
     useRootNavigator: useRootNavigator,
     routeSettings: routeSettings,
   );

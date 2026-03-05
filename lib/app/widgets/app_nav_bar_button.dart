@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/ui_tokens.dart';
 
@@ -26,11 +27,17 @@ class AppNavBarButton extends StatelessWidget {
     final ui = AppUiTokens.resolve(context);
     final resolvedMinimumSize =
         minimumSize ?? Size(ui.sizes.minTapSize, ui.sizes.minTapSize);
+    final onTap = onPressed == null
+        ? null
+        : () {
+            HapticFeedback.lightImpact();
+            onPressed?.call();
+          };
 
     return CupertinoButton(
       padding: padding,
       minimumSize: resolvedMinimumSize,
-      onPressed: onPressed,
+      onPressed: onTap,
       child: child,
     );
   }

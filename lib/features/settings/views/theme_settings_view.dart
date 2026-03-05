@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
@@ -319,6 +320,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
       ),
       child: AppListView(
         children: [
+          _buildThemeHeroCard(context),
           AppListSection(
             header: Text('主题模式：${_themeModeSummary(context)}'),
             children: [
@@ -380,6 +382,87 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
           ),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+
+  Widget _buildThemeHeroCard(BuildContext context) {
+    final tokens = AppUiTokens.resolve(context);
+    final theme = CupertinoTheme.of(context);
+    final mode = _settingsService.appSettings.appearanceMode;
+    final modeLabel = _themeModeSummary(context);
+    final iconData = switch (mode) {
+      AppAppearanceMode.followSystem => CupertinoIcons.circle_lefthalf_fill,
+      AppAppearanceMode.light => CupertinoIcons.sun_max_fill,
+      AppAppearanceMode.dark => CupertinoIcons.moon_stars_fill,
+      AppAppearanceMode.eInk => CupertinoIcons.rectangle_compress_vertical,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        borderColor: tokens.colors.separator.withValues(alpha: 0.72),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    tokens.colors.accent.withValues(alpha: 0.9),
+                    tokens.colors.accent.withValues(alpha: 0.62),
+                  ],
+                ),
+              ),
+              child: SizedBox(
+                width: 42,
+                height: 42,
+                child: Icon(
+                  iconData,
+                  color: CupertinoColors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '当前主题模式',
+                    style: theme.textTheme.textStyle.copyWith(
+                      fontSize: 12,
+                      color: tokens.colors.secondaryLabel,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    modeLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.textStyle.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              '主题',
+              style: theme.textTheme.textStyle.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: tokens.colors.accent,
+                letterSpacing: -0.16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

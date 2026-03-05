@@ -747,34 +747,50 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               ),
               if (activeGroup != null) ...[
                 const SizedBox(width: 8),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: uiTokens.colors.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(uiTokens.radii.control),
-                    border: Border.all(
-                      color: uiTokens.colors.accent.withValues(alpha: 0.28),
-                      width: SourceUiTokens.borderWidth,
-                    ),
-                  ),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                    child: Text(
-                      '分组：$activeGroup',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.textStyle.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: uiTokens.colors.accent,
-                      ),
-                    ),
-                  ),
+                _buildGroupFilterChip(
+                  uiTokens: uiTokens,
+                  theme: theme,
+                  activeGroup: activeGroup,
                 ),
               ],
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGroupFilterChip({
+    required AppUiTokens uiTokens,
+    required CupertinoThemeData theme,
+    required String activeGroup,
+  }) {
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        color: uiTokens.colors.accent.withValues(alpha: 0.12),
+        shape: ContinuousRectangleBorder(
+          borderRadius: BorderRadius.all(
+            Radius.circular(uiTokens.radii.control),
+          ),
+          side: BorderSide(
+            color: uiTokens.colors.accent.withValues(alpha: 0.28),
+            width: SourceUiTokens.borderWidth,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        child: Text(
+          '分组：$activeGroup',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.textStyle.copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2,
+            color: uiTokens.colors.accent,
+          ),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
@@ -145,8 +146,20 @@ class AppListTile extends StatelessWidget {
       additionalInfo: additionalInfo,
       leading: resolvedLeading,
       trailing: resolvedTrailing,
-      onTap: onTap,
+      onTap: _resolveOnTap(),
     );
+  }
+
+  VoidCallback? _resolveOnTap() {
+    final action = onTap;
+    if (action == null) return null;
+    return () {
+      HapticFeedback.lightImpact();
+      final result = action();
+      if (result is Future<void>) {
+        unawaited(result);
+      }
+    };
   }
 }
 

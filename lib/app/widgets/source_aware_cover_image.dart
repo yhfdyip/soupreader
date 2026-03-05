@@ -132,17 +132,15 @@ class _SourceAwareCoverImageState extends State<SourceAwareCoverImage> {
         final bytes = snapshot.data;
         if (bytes != null && bytes.isNotEmpty) {
           _emitLoadState(SourceAwareCoverLoadState.success);
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            child: SizedBox(
-              width: widget.width,
-              height: widget.height,
-              child: Image.memory(
-                bytes,
-                fit: widget.fit,
-                gaplessPlayback: true,
-                errorBuilder: (_, __, ___) => _buildFallback(),
-              ),
+          return AppCoverFrame(
+            width: widget.width,
+            height: widget.height,
+            borderRadius: widget.borderRadius,
+            child: Image.memory(
+              bytes,
+              fit: widget.fit,
+              gaplessPlayback: true,
+              errorBuilder: (_, __, ___) => _buildFallback(),
             ),
           );
         }

@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
+import '../theme/design_tokens.dart';
+import 'app_squircle_surface.dart';
+
 /// iOS 风格的空态组件：对齐 .happy-attachments 截图中的留白、字号与插画比例。
 ///
 /// 约定：
@@ -28,42 +31,76 @@ class AppEmptyState extends StatelessWidget {
     final labelColor = CupertinoColors.label.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final trimmedMessage = (message ?? '').trim();
+    final isDark = (theme.brightness ?? Brightness.light) == Brightness.dark;
+    final panelColor = isDark
+        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.86)
+        : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            illustration,
-            const SizedBox(height: 14),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.textStyle.copyWith(
-                color: labelColor,
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                height: 1.15,
-              ),
-            ),
-            if (trimmedMessage.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                trimmedMessage,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.textStyle.copyWith(
-                  color: secondary,
-                  fontSize: 13,
-                  height: 1.25,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              illustration,
+              const SizedBox(height: 14),
+              AppSquircleSurface(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                backgroundColor: panelColor,
+                borderColor: CupertinoColors.separator
+                    .resolveFrom(context)
+                    .withValues(alpha: 0.72),
+                radius: AppDesignTokens.radiusCard,
+                borderWidth: AppDesignTokens.hairlineBorderWidth,
+                blurBackground: true,
+                shadows: <BoxShadow>[
+                  BoxShadow(
+                    color: (isDark
+                            ? CupertinoColors.black
+                            : const Color(0xFF0B2F66))
+                        .withValues(alpha: isDark ? 0.26 : 0.12),
+                    offset: const Offset(0, 10),
+                    blurRadius: 24,
+                    spreadRadius: -12,
+                  ),
+                ],
+                child: Column(
+                  children: [
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.textStyle.copyWith(
+                        color: labelColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        height: 1.15,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    if (trimmedMessage.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        trimmedMessage,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.textStyle.copyWith(
+                          color: secondary,
+                          fontSize: 13,
+                          height: 1.25,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                    if (action != null) ...[
+                      const SizedBox(height: 16),
+                      action!,
+                    ],
+                  ],
                 ),
               ),
             ],
-            if (action != null) ...[
-              const SizedBox(height: 18),
-              action!,
-            ],
-          ],
+          ),
         ),
       ),
     );

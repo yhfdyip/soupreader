@@ -2,9 +2,14 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
+import '../theme/design_tokens.dart';
 import '../theme/typography.dart';
 import '../theme/ui_tokens.dart';
+import 'app_squircle_surface.dart';
+
+part 'app_popover_menu_parts.dart';
 
 const double _screenEdgePadding = 10.0;
 const double _popoverVerticalGap = 8.0;
@@ -65,7 +70,7 @@ Future<T?> showAppPopoverMenu<T>({
   double itemHeight = kMinInteractiveDimensionCupertino,
   double? radius,
   double verticalPadding = 6,
-  double backdropBlurSigma = 10,
+  double backdropBlurSigma = 14,
 }) {
   assert(items.isNotEmpty, 'items should not be empty');
   final anchor = _resolveAnchor(context: context, anchorKey: anchorKey);
@@ -93,13 +98,12 @@ Future<T?> showAppPopoverMenu<T>({
       final resolvedRadius = radius ?? uiTokens.radii.popover;
       final isDark =
           CupertinoTheme.of(popupContext).brightness == Brightness.dark;
-      final backdropMask = isDark
-          ? CupertinoColors.black.withValues(alpha: 0.18)
-          : CupertinoColors.black.withValues(alpha: 0.06);
+      final backdropMask = _resolveBackdropMask(isDark);
       final labelColor = uiTokens.colors.label;
       final iconColor = uiTokens.colors.secondaryLabel;
       final destructiveColor = uiTokens.colors.destructive;
-      final bg = uiTokens.colors.surfaceBackground;
+      final bg = uiTokens.colors.surfaceBackground.withValues(alpha: 0.92);
+      final borderColor = uiTokens.colors.separator.withValues(alpha: 0.78);
 
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -125,6 +129,7 @@ Future<T?> showAppPopoverMenu<T>({
               width: width,
               child: _PopoverSurface(
                 backgroundColor: bg,
+                borderColor: borderColor,
                 radius: resolvedRadius,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxHeight: layout.maxHeight),
@@ -149,7 +154,10 @@ Future<T?> showAppPopoverMenu<T>({
                               ? destructiveColor
                               : labelColor,
                           onTap: item.enabled
-                              ? () => Navigator.of(popupContext).pop(item.value)
+                              ? () => _dismissWithFeedback(
+                                    popupContext,
+                                    value: item.value,
+                                  )
                               : null,
                         );
                       },
@@ -163,6 +171,17 @@ Future<T?> showAppPopoverMenu<T>({
       );
     },
   );
+}
+
+Color _resolveBackdropMask(bool isDark) {
+  return isDark
+      ? CupertinoColors.black.withValues(alpha: 0.2)
+      : CupertinoColors.black.withValues(alpha: 0.06);
+}
+
+void _dismissWithFeedback<T>(BuildContext context, {required T value}) {
+  HapticFeedback.selectionClick();
+  Navigator.of(context).pop(value);
 }
 
 _PopoverAnchor _resolveAnchor({
@@ -256,93 +275,4 @@ _PopoverLayout _resolveLayout({
     position: _PopoverPosition(left: left, top: top),
     maxHeight: maxHeight,
   );
-}
-
-class _PopoverSurface extends StatelessWidget {
-  final Widget child;
-  final Color backgroundColor;
-  final double radius;
-
-  const _PopoverSurface({
-    required this.child,
-    required this.backgroundColor,
-    required this.radius,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F000000),
-            blurRadius: 18,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: child,
-    );
-  }
-}
-
-class _PopoverMenuRow extends StatelessWidget {
-  final double height;
-  final IconData icon;
-  final String label;
-  final bool enabled;
-  final Color iconColor;
-  final Color textColor;
-  final VoidCallback? onTap;
-
-  const _PopoverMenuRow({
-    required this.height,
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    required this.iconColor,
-    required this.textColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final uiTokens = AppUiTokens.resolve(context);
-    return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: uiTokens.sizes.compactTapSquare,
-        onPressed: onTap,
-        child: SizedBox(
-          height: height,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Icon(icon, size: 18, color: iconColor),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: textColor,
-                      fontFamily: AppTypography.fontFamilySans,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

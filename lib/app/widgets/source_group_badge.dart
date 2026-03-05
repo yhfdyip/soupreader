@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/design_tokens.dart';
 import '../theme/source_ui_tokens.dart';
 
 /// 书源分组标签（统一外观）。
@@ -18,17 +19,29 @@ class SourceGroupBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedBackground = backgroundColor ??
-        CupertinoColors.tertiarySystemFill.resolveFrom(context);
+        CupertinoColors.tertiarySystemFill
+            .resolveFrom(context)
+            .withValues(alpha: 0.72);
     final resolvedTextColor =
         textColor ?? SourceUiTokens.resolveSecondaryTextColor(context);
+    final borderColor =
+        CupertinoColors.separator.resolveFrom(context).withValues(alpha: 0.78);
 
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: ShapeDecoration(
         color: resolvedBackground,
-        borderRadius: BorderRadius.circular(SourceUiTokens.radiusControl),
+        shape: ContinuousRectangleBorder(
+          borderRadius: BorderRadius.all(
+            Radius.circular(SourceUiTokens.radiusControl),
+          ),
+          side: BorderSide(
+            color: borderColor,
+            width: AppDesignTokens.hairlineBorderWidth,
+          ),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
         child: Text(
           text,
           maxLines: 1,
@@ -37,6 +50,7 @@ class SourceGroupBadge extends StatelessWidget {
                 fontSize: SourceUiTokens.itemSubMetaSize,
                 color: resolvedTextColor,
                 fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
               ),
         ),
       ),

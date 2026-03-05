@@ -1,5 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+
+import '../theme/design_tokens.dart';
+import 'app_squircle_surface.dart';
 import 'cupertino_bottom_dialog.dart';
 
 /// 在 Release 模式下，Flutter 默认的 ErrorWidget 往往只是一块灰色区域，
@@ -29,6 +32,12 @@ class AppErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final payload = _payload();
+    final isDark =
+        (CupertinoTheme.of(context).brightness ?? Brightness.light) ==
+            Brightness.dark;
+    final panelColor = isDark
+        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.88)
+        : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
       navigationBar: CupertinoNavigationBar(
@@ -46,6 +55,7 @@ class AppErrorWidget extends StatelessWidget {
             const SizedBox(height: 12),
             CupertinoButton.filled(
               onPressed: () async {
+                HapticFeedback.lightImpact();
                 await Clipboard.setData(ClipboardData(text: payload));
                 if (!context.mounted) return;
                 await showCupertinoBottomDialog<void>(
@@ -65,27 +75,21 @@ class AppErrorWidget extends StatelessWidget {
               child: const Text('复制异常信息'),
             ),
             const SizedBox(height: 12),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGroupedBackground
-                    .resolveFrom(context),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: CupertinoColors.separator
-                      .resolveFrom(context)
-                      .withValues(alpha: 0.6),
-                  width: 0.5,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  payload,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: CupertinoColors.label.resolveFrom(context),
-                  ),
+            AppSquircleSurface(
+              padding: const EdgeInsets.all(12),
+              backgroundColor: panelColor,
+              borderColor: CupertinoColors.separator
+                  .resolveFrom(context)
+                  .withValues(alpha: 0.72),
+              radius: AppDesignTokens.radiusCard,
+              borderWidth: AppDesignTokens.hairlineBorderWidth,
+              blurBackground: true,
+              child: Text(
+                payload,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: CupertinoColors.label.resolveFrom(context),
                 ),
               ),
             ),

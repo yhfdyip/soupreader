@@ -1,12 +1,16 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
-import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../models/book.dart';
@@ -84,10 +88,14 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
           final filteredHistory = _applySearchFilter(history);
           final totalReadDurationMs =
               _settingsService.getTotalBookReadRecordDurationMs();
+          final isSearching = _searchQuery.trim().isNotEmpty;
 
           return Column(
             children: [
-              _buildSearchBox(),
+              _buildSearchBox(
+                visibleCount: filteredHistory.length,
+                totalCount: history.length,
+              ),
               _buildAllTimeHeader(
                 allTimeMs: totalReadDurationMs,
                 hasHistory: history.isNotEmpty,
@@ -95,29 +103,10 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
               ),
               Expanded(
                 child: filteredHistory.isEmpty
-                    ? _buildEmptyState(
-                        context,
-                        isSearching: _searchQuery.trim().isNotEmpty,
-                      )
-                    : ListView.builder(
-                        itemCount: filteredHistory.length,
-                        itemBuilder: (context, index) {
-                          final book = filteredHistory[index];
-                          return GestureDetector(
-                            onLongPress: () => _showActions(book),
-                            child: CupertinoListTile.notched(
-                              title: Text(book.title),
-                              subtitle: Text(
-                                _subtitleForBook(
-                                  book,
-                                  readRecordDurationByBookId,
-                                ),
-                              ),
-                              trailing: const CupertinoListTileChevron(),
-                              onTap: () => _openReader(book),
-                            ),
-                          );
-                        },
+                    ? _buildEmptyState(isSearching: isSearching)
+                    : _buildHistoryList(
+                        filteredHistory,
+                        readRecordDurationByBookId,
                       ),
               ),
             ],
@@ -127,16 +116,40 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     );
   }
 
-  Widget _buildSearchBox() {
+  Widget _buildSearchBox({
+    required int visibleCount,
+    required int totalCount,
+  }) {
+    final tokens = AppUiTokens.resolve(context);
+    final theme = CupertinoTheme.of(context);
+    final isSearching = _searchQuery.trim().isNotEmpty;
+    final summary = isSearching ? '搜索结果（$visibleCount）' : '阅读记录（$totalCount）';
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-      child: CupertinoSearchTextField(
-        controller: _searchController,
-        placeholder: '搜索',
-        onChanged: (value) {
-          if (!mounted) return;
-          setState(() => _searchQuery = value);
-        },
+      padding: AppManageSearchField.outerPadding,
+      child: Column(
+        children: [
+          AppManageSearchField(
+            controller: _searchController,
+            placeholder: '搜索书名',
+            onChanged: (value) {
+              if (!mounted) return;
+              setState(() => _searchQuery = value);
+            },
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              summary,
+              style: theme.textTheme.textStyle.copyWith(
+                fontSize: 12,
+                color: tokens.colors.secondaryLabel,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -146,85 +159,111 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     required bool hasHistory,
     required List<Book> history,
   }) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground.resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: CupertinoColors.separator.resolveFrom(context),
-          width: 0.6,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '总阅读时间',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+    final tokens = AppUiTokens.resolve(context);
+    final theme = CupertinoTheme.of(context);
+    final canClear = hasHistory && !_clearingAll;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+        borderColor: tokens.colors.separator.withValues(alpha: 0.74),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '总阅读时间',
+                    style: theme.textTheme.textStyle.copyWith(
+                      fontSize: 13,
+                      color: tokens.colors.secondaryLabel,
+                      letterSpacing: -0.2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _formatDuration(allTimeMs),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: CupertinoColors.label.resolveFrom(context),
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDuration(allTimeMs),
+                    style: theme.textTheme.textStyle.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: tokens.colors.label,
+                      letterSpacing: -0.24,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            onPressed: (!hasHistory || _clearingAll)
-                ? null
-                : () => _clearAllReadRecord(history),
-            child: _clearingAll
-                ? const CupertinoActivityIndicator(radius: 9)
-                : const Text('清空'),
-            minimumSize: const Size(28, 28),
-          ),
-        ],
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              onPressed: canClear ? () => _clearAllReadRecord(history) : null,
+              minimumSize: const Size(44, 44),
+              child: _clearingAll
+                  ? const CupertinoActivityIndicator(radius: 9)
+                  : const Text('清空'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, {required bool isSearching}) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            CupertinoIcons.clock,
-            size: 64,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            isSearching ? '无匹配记录' : '暂无阅读记录',
-            style: TextStyle(
-              fontSize: 17,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+  Widget _buildHistoryList(
+    List<Book> books,
+    Map<String, int> readRecordDurationByBookId,
+  ) {
+    final tokens = AppUiTokens.resolve(context);
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      itemCount: books.length,
+      itemBuilder: (context, index) {
+        final book = books[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress: () => _showActions(book),
+            child: AppCard(
+              padding: EdgeInsets.zero,
+              child: AppListTile(
+                title: Text(
+                  book.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  _subtitleForBook(book, readRecordDurationByBookId),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.24,
+                    color: tokens.colors.secondaryLabel,
+                    letterSpacing: -0.16,
+                  ),
+                ),
+                onTap: () => _openReader(book),
+              ),
             ),
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState({required bool isSearching}) {
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(size: 88),
+      title: isSearching ? '无匹配记录' : '暂无阅读记录',
+      message: isSearching ? '请尝试更换搜索关键字' : '继续阅读一本书后，这里会自动记录历史',
     );
   }
 
   List<Book> _applySearchFilter(List<Book> books) {
     final key = _searchQuery.trim();
     if (key.isEmpty) return books;
+    final lowerKey = key.toLowerCase();
     return books
-        .where((book) => book.title.toLowerCase().contains(key.toLowerCase()))
+        .where((book) => book.title.toLowerCase().contains(lowerKey))
         .toList(growable: false);
   }
 

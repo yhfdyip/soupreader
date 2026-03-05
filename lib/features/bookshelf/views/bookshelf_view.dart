@@ -5,9 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_cover_image.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
@@ -2108,19 +2111,28 @@ class _BookshelfViewState extends State<BookshelfView> {
       children: [
         Text(pageTitle),
         const SizedBox(width: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
+        DecoratedBox(
+          decoration: ShapeDecoration(
             color: CupertinoColors.systemRed.resolveFrom(context),
-            borderRadius: BorderRadius.circular(999),
+            shape: ContinuousRectangleBorder(
+              borderRadius: const BorderRadius.all(Radius.circular(14)),
+              side: BorderSide(
+                color: CupertinoColors.white.withValues(alpha: 0.28),
+                width: AppDesignTokens.hairlineBorderWidth,
+              ),
+            ),
           ),
-          child: Text(
-            count > 99 ? '99+' : '$count',
-            style: const TextStyle(
-              fontSize: 11,
-              color: CupertinoColors.white,
-              fontWeight: FontWeight.w600,
-              height: 1.1,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            child: Text(
+              count > 99 ? '99+' : '$count',
+              style: const TextStyle(
+                fontSize: 11,
+                color: CupertinoColors.white,
+                fontWeight: FontWeight.w600,
+                height: 1.1,
+                letterSpacing: -0.2,
+              ),
             ),
           ),
         ),
@@ -2140,18 +2152,14 @@ class _BookshelfViewState extends State<BookshelfView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+          AppNavBarButton(
             onPressed: _openGlobalSearch,
-            child: const Icon(CupertinoIcons.search),
+            child: const Icon(CupertinoIcons.search, size: 22),
           ),
-          CupertinoButton(
+          AppNavBarButton(
             key: _moreMenuKey,
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
-            child: const Icon(CupertinoIcons.line_horizontal_3),
+            child: const Icon(CupertinoIcons.line_horizontal_3, size: 22),
           ),
         ],
       ),
@@ -2232,11 +2240,14 @@ class _BookshelfViewState extends State<BookshelfView> {
     final selectedIndex = _resolveStyle1SelectedTabIndex(groups);
     final separatorColor = CupertinoColors.separator.resolveFrom(context);
     final activeColor = CupertinoTheme.of(context).primaryColor;
-    final textColor = CupertinoColors.label.resolveFrom(context);
     return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: separatorColor, width: 0.5),
+      decoration: ShapeDecoration(
+        color: CupertinoColors.transparent,
+        shape: Border(
+          bottom: BorderSide(
+            color: separatorColor,
+            width: AppDesignTokens.hairlineBorderWidth,
+          ),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -2248,42 +2259,61 @@ class _BookshelfViewState extends State<BookshelfView> {
           separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (context, index) {
             final group = groups[index];
-            final selected = index == selectedIndex;
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _onStyle1GroupTap(index, group),
-              onLongPress: () => _onStyle1GroupLongPress(group),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOut,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? activeColor.withValues(alpha: 0.14)
-                      : CupertinoColors.tertiarySystemGroupedBackground
-                          .resolveFrom(context),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: selected
-                        ? activeColor.withValues(alpha: 0.45)
-                        : separatorColor.withValues(alpha: 0.8),
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  group.groupName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: selected ? activeColor : textColor,
-                  ),
-                ),
-              ),
+            return _buildStyle1GroupChip(
+              group: group,
+              index: index,
+              selected: index == selectedIndex,
+              activeColor: activeColor,
+              separatorColor: separatorColor,
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStyle1GroupChip({
+    required BookshelfBookGroup group,
+    required int index,
+    required bool selected,
+    required Color activeColor,
+    required Color separatorColor,
+  }) {
+    final textColor = CupertinoColors.label.resolveFrom(context);
+    final bgColor = selected
+        ? activeColor.withValues(alpha: 0.14)
+        : CupertinoColors.tertiarySystemGroupedBackground.resolveFrom(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _onStyle1GroupTap(index, group),
+      onLongPress: () => _onStyle1GroupLongPress(group),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: ShapeDecoration(
+          color: bgColor,
+          shape: ContinuousRectangleBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(16)),
+            side: BorderSide(
+              color: selected
+                  ? activeColor.withValues(alpha: 0.45)
+                  : separatorColor.withValues(alpha: 0.8),
+              width: AppDesignTokens.hairlineBorderWidth,
+            ),
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          group.groupName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            letterSpacing: -0.2,
+            color: selected ? activeColor : textColor,
+          ),
         ),
       ),
     );
@@ -2309,49 +2339,31 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Widget _buildEmptyState() {
-    final theme = CupertinoTheme.of(context);
-    final secondaryLabel = CupertinoColors.secondaryLabel.resolveFrom(context);
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            CupertinoIcons.book,
-            size: 52,
-            color: secondaryLabel,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '书架空空如也',
-            style: theme.textTheme.navTitleTextStyle.copyWith(
-              color: CupertinoColors.label.resolveFrom(context),
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(size: 90),
+      title: '书架空空如也',
+      message: '先导入一本本地书，或从搜索添加网络书籍',
+      action: CupertinoButton.filled(
+        onPressed: _importLocalBook,
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              CupertinoIcons.doc,
+              size: 17,
+              color: CupertinoColors.white,
             ),
-          ),
-          const SizedBox(height: 24),
-          CupertinoButton(
-            color: theme.primaryColor,
-            onPressed: _importLocalBook,
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  CupertinoIcons.doc,
-                  size: 17,
-                  color: CupertinoColors.white,
-                ),
-                SizedBox(width: 6),
-                Text(
-                  '导入本地书籍',
-                  style: TextStyle(
-                    color: CupertinoColors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+            SizedBox(width: 6),
+            Text(
+              '导入本地书籍',
+              style: TextStyle(
+                color: CupertinoColors.white,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
