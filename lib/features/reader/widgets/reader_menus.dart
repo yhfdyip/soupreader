@@ -318,40 +318,6 @@ class ReaderTopMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildRoundIcon({
-    Key? key,
-    required IconData icon,
-    required VoidCallback? onTap,
-    VoidCallback? onLongPress,
-    required Color iconColor,
-    required Color backgroundColor,
-    required Color borderColor,
-  }) {
-    return CupertinoButton(
-      key: key,
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: onTap,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onLongPress: onLongPress,
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            icon,
-            color: iconColor,
-            size: 18,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildSourceActionChip({
     required String label,
     required VoidCallback onTap,
