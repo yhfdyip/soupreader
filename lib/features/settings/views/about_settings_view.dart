@@ -176,12 +176,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
             DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    tokens.colors.accent.withValues(alpha: 0.88),
-                    tokens.colors.accent.withValues(alpha: 0.6),
-                  ],
-                ),
+                color: tokens.colors.accent,
               ),
               child: const SizedBox(
                 width: 42,

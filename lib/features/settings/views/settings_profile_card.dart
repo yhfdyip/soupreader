@@ -141,10 +141,6 @@ class SettingsProfileCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: tokens.colors.accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: tokens.colors.accent.withValues(alpha: 0.25),
-          width: AppDesignTokens.hairlineBorderWidth,
-        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

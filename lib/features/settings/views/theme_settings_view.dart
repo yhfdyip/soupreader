@@ -408,12 +408,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
             DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    tokens.colors.accent.withValues(alpha: 0.9),
-                    tokens.colors.accent.withValues(alpha: 0.62),
-                  ],
-                ),
+                color: tokens.colors.accent,
               ),
               child: SizedBox(
                 width: 42,

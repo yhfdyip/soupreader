@@ -105,7 +105,6 @@ class SourceEditLegacyTabSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
     final sectionColor =
         CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
     return Padding(
@@ -114,10 +113,6 @@ class SourceEditLegacyTabSwitcher extends StatelessWidget {
         decoration: BoxDecoration(
           color: sectionColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: borderColor.withValues(alpha: 0.7),
-            width: 0.6,
-          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(6),

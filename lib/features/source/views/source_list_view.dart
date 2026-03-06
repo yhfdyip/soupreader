@@ -1000,7 +1000,7 @@ class _SourceListViewState extends State<SourceListView> {
           color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
           border: Border(
             top: BorderSide(
-              color: CupertinoColors.systemGrey4.resolveFrom(context),
+              color: CupertinoColors.separator.resolveFrom(context),
               width: SourceUiTokens.borderWidth,
             ),
           ),
@@ -1371,7 +1371,7 @@ class _SourceListViewState extends State<SourceListView> {
                 ),
                 Container(
                   height: 0.5,
-                  color: CupertinoColors.systemGrey4.resolveFrom(sheetContext),
+                  color: CupertinoColors.separator.resolveFrom(sheetContext),
                 ),
                 Expanded(
                   child: StreamBuilder<List<BookSource>>(
@@ -1389,7 +1389,7 @@ class _SourceListViewState extends State<SourceListView> {
                         separatorBuilder: (_, __) => Container(
                           height: 0.5,
                           color:
-                              CupertinoColors.systemGrey4.resolveFrom(context),
+                              CupertinoColors.separator.resolveFrom(context),
                         ),
                         itemBuilder: (context, index) {
                           final group = groups[index];
@@ -3178,7 +3178,7 @@ class _SourceListViewState extends State<SourceListView> {
                         separatorBuilder: (_, __) => Container(
                           height: 0.5,
                           color:
-                              CupertinoColors.systemGrey4.resolveFrom(context),
+                              CupertinoColors.separator.resolveFrom(context),
                         ),
                         itemBuilder: (context, index) {
                           final candidate = dialogCandidates[index];
