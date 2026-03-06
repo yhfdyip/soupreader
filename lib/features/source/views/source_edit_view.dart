@@ -1060,12 +1060,6 @@ class _SourceEditViewState extends State<SourceEditView> {
         color: CupertinoColors.secondarySystemGroupedBackground
             .resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: CupertinoColors.separator.resolveFrom(context).withValues(
-                alpha: 0.36,
-              ),
-          width: 0.6,
-        ),
       ),
       child: child,
     );
