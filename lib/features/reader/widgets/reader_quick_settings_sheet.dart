@@ -356,36 +356,39 @@ class _SliderRow extends StatelessWidget {
     final safeMax = _safeMax();
     final safeValue = _safeValue();
     final canSlide = min.isFinite && max.isFinite && max > min;
-    return Row(
-      children: [
-        SizedBox(
-          width: 44,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: labelColor,
-              fontSize: ReaderSettingsTokens.rowMetaSize,
+    return SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: labelColor,
+                fontSize: ReaderSettingsTokens.rowMetaSize,
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: CupertinoSlider(
-            value: safeValue,
-            min: safeMin,
-            max: safeMax,
-            activeColor: activeColor,
-            onChanged: canSlide ? onChanged : null,
+          Expanded(
+            child: CupertinoSlider(
+              value: safeValue,
+              min: safeMin,
+              max: safeMax,
+              activeColor: activeColor,
+              onChanged: canSlide ? onChanged : null,
+            ),
           ),
-        ),
-        SizedBox(
-          width: 46,
-          child: Text(
-            format(safeValue),
-            textAlign: TextAlign.end,
-            style: TextStyle(color: valueColor, fontSize: 12),
+          SizedBox(
+            width: 46,
+            child: Text(
+              format(safeValue),
+              textAlign: TextAlign.end,
+              style: TextStyle(color: valueColor, fontSize: 12),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -407,9 +410,9 @@ class _TypographyTab extends StatelessWidget {
       children: [
         _Section(
           title: '字号与间距',
-          child: Column(
-            children: [
-              _SliderRow(
+          child: _SliderGroup(
+            rows: [
+              _SliderRowData(
                 label: '字号',
                 value: settings.fontSize,
                 min: 12,
@@ -419,8 +422,7 @@ class _TypographyTab extends StatelessWidget {
                   settings.copyWith(fontSize: v),
                 ),
               ),
-              const SizedBox(height: 6),
-              _SliderRow(
+              _SliderRowData(
                 label: '行距',
                 value: settings.lineHeight,
                 min: 1.0,
@@ -430,8 +432,7 @@ class _TypographyTab extends StatelessWidget {
                   settings.copyWith(lineHeight: v),
                 ),
               ),
-              const SizedBox(height: 6),
-              _SliderRow(
+              _SliderRowData(
                 label: '字距',
                 value: settings.letterSpacing,
                 min: -2.0,
@@ -441,8 +442,7 @@ class _TypographyTab extends StatelessWidget {
                   settings.copyWith(letterSpacing: v),
                 ),
               ),
-              const SizedBox(height: 6),
-              _SliderRow(
+              _SliderRowData(
                 label: '段距',
                 value: settings.paragraphSpacing,
                 min: 0,
@@ -1173,6 +1173,55 @@ class _SwitchGroup extends StatelessWidget {
               height: 0.5,
               color: dividerColor,
             ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SliderRowData {
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final String Function(double) format;
+  final ValueChanged<double> onChanged;
+
+  const _SliderRowData({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.format,
+    required this.onChanged,
+  });
+}
+
+class _SliderGroup extends StatelessWidget {
+  final List<_SliderRowData> rows;
+
+  const _SliderGroup({required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final dividerColor = isDark
+        ? CupertinoColors.separator.darkColor
+        : CupertinoColors.separator.color;
+
+    return Column(
+      children: [
+        for (int i = 0; i < rows.length; i++) ...[
+          _SliderRow(
+            label: rows[i].label,
+            value: rows[i].value,
+            min: rows[i].min,
+            max: rows[i].max,
+            format: rows[i].format,
+            onChanged: rows[i].onChanged,
+          ),
+          if (i < rows.length - 1)
+            Container(height: 0.5, color: dividerColor),
         ],
       ],
     );
