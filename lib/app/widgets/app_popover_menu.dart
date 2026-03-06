@@ -5,7 +5,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/design_tokens.dart';
-import '../theme/typography.dart';
 import '../theme/ui_tokens.dart';
 import 'app_squircle_surface.dart';
 

@@ -31,10 +31,8 @@ class AppEmptyState extends StatelessWidget {
     final labelColor = CupertinoColors.label.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final trimmedMessage = (message ?? '').trim();
-    final isDark = (theme.brightness ?? Brightness.light) == Brightness.dark;
-    final panelColor = isDark
-        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.86)
-        : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
+    final panelColor = CupertinoColors.secondarySystemGroupedBackground
+        .resolveFrom(context);
 
     return Center(
       child: Padding(
@@ -57,13 +55,10 @@ class AppEmptyState extends StatelessWidget {
                 blurBackground: true,
                 shadows: <BoxShadow>[
                   BoxShadow(
-                    color: (isDark
-                            ? CupertinoColors.black
-                            : const Color(0xFF0B2F66))
-                        .withValues(alpha: isDark ? 0.26 : 0.12),
-                    offset: const Offset(0, 10),
-                    blurRadius: 24,
-                    spreadRadius: -12,
+                    color: CupertinoColors.black.withValues(alpha: 0.1),
+                    offset: const Offset(0, 6),
+                    blurRadius: 16,
+                    spreadRadius: -8,
                   ),
                 ],
                 child: Column(

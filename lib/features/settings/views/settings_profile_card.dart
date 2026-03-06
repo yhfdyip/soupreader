@@ -12,24 +12,13 @@ class SettingsProfileCard extends StatelessWidget {
     required this.modeLabel,
   });
 
-  static const double _cardRadius = 24;
   static const double _cardPaddingHorizontal = 14;
   static const double _cardPaddingVertical = 13;
   static const double _cardRevealOffset = 12;
-  static const double _cardShadowBlur = 30;
-  static const double _cardShadowSpread = -14;
-  static const double _cardShadowY = 10;
   static const double _avatarSize = 42;
-  static const double _avatarRadius = 14;
-  static const double _chipRadius = 14;
-  static const double _bezelAlpha = 0.56;
-  static const double _darkMaterialAlpha = 0.84;
-  static const double _lightMaterialAlpha = 0.9;
-  static const double _borderAlpha = 0.86;
-  static const double _ambientTopAlpha = 0.34;
-  static const double _ambientBottomAlpha = 0.28;
-  static const double _shadowDarkAlpha = 0.28;
-  static const double _shadowLightAlpha = 0.11;
+  static const double _avatarRadius = 12;
+  static const double _shadowDarkAlpha = 0.22;
+  static const double _shadowLightAlpha = 0.08;
 
   final AppAppearanceMode appearanceMode;
   final String modeLabel;
@@ -38,7 +27,6 @@ class SettingsProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = AppUiTokens.resolve(context);
     final appearanceIcon = _appearanceIconForMode(appearanceMode);
-    final palette = _resolvePalette(tokens.isDark);
     final content = Row(
       children: [
         _buildAvatar(tokens),
@@ -52,7 +40,7 @@ class SettingsProfileCard extends StatelessWidget {
       duration: AppDesignTokens.motionSpring,
       curve: Curves.easeOutQuart,
       tween: Tween<double>(begin: 0, end: 1),
-      child: _buildSurface(tokens, palette, content),
+      child: _buildSurface(tokens, content),
       builder: (_, value, child) {
         return Transform.translate(
           offset: Offset(0, (1 - value) * _cardRevealOffset),
@@ -71,118 +59,42 @@ class SettingsProfileCard extends StatelessWidget {
     };
   }
 
-  _ProfileCardPalette _resolvePalette(bool isDark) {
-    final background = isDark
-        ? AppDesignTokens.glassDarkMaterial
-            .withValues(alpha: _darkMaterialAlpha)
-        : AppDesignTokens.glassLightMaterial.withValues(
-            alpha: _lightMaterialAlpha,
-          );
-    final border =
-        (isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight)
-            .withValues(alpha: _borderAlpha);
-    final bezel = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _bezelAlpha);
+  Widget _buildSurface(AppUiTokens tokens, Widget content) {
+    final isDark = tokens.isDark;
     final shadow = (isDark ? CupertinoColors.black : const Color(0xFF052049))
         .withValues(alpha: isDark ? _shadowDarkAlpha : _shadowLightAlpha);
-    return _ProfileCardPalette(
-      background: background,
-      border: border,
-      bezel: bezel,
-      shadow: shadow,
-    );
-  }
-
-  Widget _buildSurface(
-    AppUiTokens tokens,
-    _ProfileCardPalette palette,
-    Widget content,
-  ) {
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
-      backgroundColor: palette.background,
-      borderColor: palette.border,
+      backgroundColor: tokens.colors.sectionBackground,
+      borderColor: tokens.colors.separator,
       borderWidth: AppDesignTokens.hairlineBorderWidth,
-      radius: _cardRadius,
-      blurBackground: true,
+      radius: AppDesignTokens.radiusCard,
+      blurBackground: false,
       shadows: [
         BoxShadow(
-          color: palette.shadow,
-          offset: const Offset(0, _cardShadowY),
-          blurRadius: _cardShadowBlur,
-          spreadRadius: _cardShadowSpread,
+          color: shadow,
+          offset: const Offset(0, 2),
+          blurRadius: 12,
+          spreadRadius: -4,
         ),
       ],
-      child: Stack(
-        children: [
-          Positioned.fill(child: _buildAmbient(tokens)),
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: palette.bezel),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              _cardPaddingHorizontal,
-              _cardPaddingVertical,
-              _cardPaddingHorizontal,
-              _cardPaddingVertical,
-            ),
-            child: content,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmbient(AppUiTokens tokens) {
-    final isDark = tokens.isDark;
-    final topColor = (isDark
-            ? AppDesignTokens.ambientTopDark
-            : AppDesignTokens.ambientTopLight)
-        .withValues(alpha: _ambientTopAlpha);
-    final bottomColor = (isDark
-            ? AppDesignTokens.ambientBottomDark
-            : AppDesignTokens.ambientBottomLight)
-        .withValues(alpha: _ambientBottomAlpha);
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [topColor, bottomColor, const Color(0x00000000)],
-            stops: const [0.0, 0.64, 1.0],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          _cardPaddingHorizontal,
+          _cardPaddingVertical,
+          _cardPaddingHorizontal,
+          _cardPaddingVertical,
         ),
+        child: content,
       ),
     );
   }
 
   Widget _buildAvatar(AppUiTokens tokens) {
-    final borderColor = (tokens.isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: 0.7);
     return DecoratedBox(
-      decoration: ShapeDecoration(
-        shape: ContinuousRectangleBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(_avatarRadius)),
-          side: BorderSide(
-            color: borderColor,
-            width: AppDesignTokens.hairlineBorderWidth,
-          ),
-        ),
-        gradient: LinearGradient(
-          colors: [
-            tokens.colors.accent.withValues(alpha: 0.9),
-            tokens.colors.accent.withValues(alpha: 0.62),
-          ],
-        ),
+      decoration: BoxDecoration(
+        color: tokens.colors.accent,
+        borderRadius: BorderRadius.circular(_avatarRadius),
       ),
       child: const SizedBox(
         width: _avatarSize,
@@ -226,14 +138,12 @@ class SettingsProfileCard extends StatelessWidget {
 
   Widget _buildAppearanceChip(AppUiTokens tokens, IconData appearanceIcon) {
     return DecoratedBox(
-      decoration: ShapeDecoration(
+      decoration: BoxDecoration(
         color: tokens.colors.accent.withValues(alpha: 0.12),
-        shape: ContinuousRectangleBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(_chipRadius)),
-          side: BorderSide(
-            color: tokens.colors.accent.withValues(alpha: 0.3),
-            width: AppDesignTokens.hairlineBorderWidth,
-          ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: tokens.colors.accent.withValues(alpha: 0.25),
+          width: AppDesignTokens.hairlineBorderWidth,
         ),
       ),
       child: Padding(
@@ -263,17 +173,3 @@ class SettingsProfileCard extends StatelessWidget {
   }
 }
 
-@immutable
-class _ProfileCardPalette {
-  const _ProfileCardPalette({
-    required this.background,
-    required this.border,
-    required this.bezel,
-    required this.shadow,
-  });
-
-  final Color background;
-  final Color border;
-  final Color bezel;
-  final Color shadow;
-}

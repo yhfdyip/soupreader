@@ -4,7 +4,6 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
-import '../../../app/widgets/app_squircle_surface.dart';
 
 class DiscoverySearchHeader extends StatelessWidget {
   const DiscoverySearchHeader({
@@ -22,12 +21,8 @@ class DiscoverySearchHeader extends StatelessWidget {
   static const double _shellHorizontalPadding = 10;
   static const double _shellBottomPadding = 8;
   static const double _shellRevealOffset = 10;
-  static const double _glassDarkAlpha = 0.84;
-  static const double _glassLightAlpha = 0.9;
-  static const double _borderAlpha = 0.82;
-  static const double _bezelAlpha = 0.52;
-  static const double _shadowDarkAlpha = 0.24;
-  static const double _shadowLightAlpha = 0.1;
+  static const double _shadowDarkAlpha = 0.18;
+  static const double _shadowLightAlpha = 0.08;
   static const double _cancelButtonHorizontalPadding = 10;
 
   final TextEditingController controller;
@@ -61,23 +56,11 @@ class DiscoverySearchHeader extends StatelessWidget {
 
   _DiscoveryHeaderShellStyle _resolveShellStyle(AppUiTokens uiTokens) {
     final isDark = uiTokens.isDark;
-    final background = isDark
-        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: _glassDarkAlpha)
-        : AppDesignTokens.glassLightMaterial
-            .withValues(alpha: _glassLightAlpha);
-    final border =
-        (isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight)
-            .withValues(alpha: _borderAlpha);
-    final bezel = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _bezelAlpha);
     final shadow = (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E))
         .withValues(alpha: isDark ? _shadowDarkAlpha : _shadowLightAlpha);
     return _DiscoveryHeaderShellStyle(
-      background: background,
-      border: border,
-      bezel: bezel,
+      background: uiTokens.colors.sectionBackground,
+      border: uiTokens.colors.separator,
       shadow: shadow,
     );
   }
@@ -87,40 +70,31 @@ class DiscoverySearchHeader extends StatelessWidget {
     AppUiTokens uiTokens,
     _DiscoveryHeaderShellStyle shell,
   ) {
-    return AppSquircleSurface(
-      padding: EdgeInsets.zero,
-      backgroundColor: shell.background,
-      borderColor: shell.border,
-      borderWidth: AppDesignTokens.hairlineBorderWidth,
-      radius: _shellRadius,
-      blurBackground: true,
-      shadows: [
-        BoxShadow(
-          color: shell.shadow,
-          offset: const Offset(0, 8),
-          blurRadius: 20,
-          spreadRadius: -12,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: shell.background,
+        borderRadius: BorderRadius.circular(_shellRadius),
+        border: Border.all(
+          color: shell.border,
+          width: AppDesignTokens.hairlineBorderWidth,
         ),
-      ],
-      child: Stack(
-        children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: shell.bezel),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              _shellHorizontalPadding,
-              _shellTopPadding,
-              _shellHorizontalPadding,
-              _shellBottomPadding,
-            ),
-            child: _buildContent(context, uiTokens),
+        boxShadow: [
+          BoxShadow(
+            color: shell.shadow,
+            offset: const Offset(0, 4),
+            blurRadius: 12,
+            spreadRadius: -6,
           ),
         ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          _shellHorizontalPadding,
+          _shellTopPadding,
+          _shellHorizontalPadding,
+          _shellBottomPadding,
+        ),
+        child: _buildContent(context, uiTokens),
       ),
     );
   }
@@ -207,12 +181,10 @@ class _DiscoveryHeaderShellStyle {
   const _DiscoveryHeaderShellStyle({
     required this.background,
     required this.border,
-    required this.bezel,
     required this.shadow,
   });
 
   final Color background;
   final Color border;
-  final Color bezel;
   final Color shadow;
 }

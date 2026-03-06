@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import 'theme/cupertino_theme.dart';
+import 'widgets/app_error_widget.dart';
 import '../core/config/migration_exclusions.dart';
 import '../core/models/app_settings.dart';
 import '../features/bookshelf/views/bookshelf_view.dart';
@@ -266,21 +267,10 @@ class _MainScreenState extends State<MainScreen> {
             } catch (e, st) {
               debugPrint('[main-tab] tab $tabId build error: $e');
               debugPrintStack(stackTrace: st);
-              return CupertinoPageScaffold(
-                navigationBar: CupertinoNavigationBar(
-                  middle: Text('${tabId.name} 异常'),
-                ),
-                child: SafeArea(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        '页面构建异常:\n$e',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
+              return AppErrorWidget(
+                title: '${tabId.name} 异常',
+                message: '页面构建异常: $e',
+                stackTrace: '$st',
               );
             }
           },

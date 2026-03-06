@@ -2112,14 +2112,12 @@ class _BookshelfViewState extends State<BookshelfView> {
         Text(pageTitle),
         const SizedBox(width: 6),
         DecoratedBox(
-          decoration: ShapeDecoration(
+          decoration: BoxDecoration(
             color: CupertinoColors.systemRed.resolveFrom(context),
-            shape: ContinuousRectangleBorder(
-              borderRadius: const BorderRadius.all(Radius.circular(14)),
-              side: BorderSide(
-                color: CupertinoColors.white.withValues(alpha: 0.28),
-                width: AppDesignTokens.hairlineBorderWidth,
-              ),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: CupertinoColors.white.withValues(alpha: 0.28),
+              width: AppDesignTokens.hairlineBorderWidth,
             ),
           ),
           child: Padding(
@@ -2241,9 +2239,8 @@ class _BookshelfViewState extends State<BookshelfView> {
     final separatorColor = CupertinoColors.separator.resolveFrom(context);
     final activeColor = CupertinoTheme.of(context).primaryColor;
     return Container(
-      decoration: ShapeDecoration(
-        color: CupertinoColors.transparent,
-        shape: Border(
+      decoration: BoxDecoration(
+        border: Border(
           bottom: BorderSide(
             color: separatorColor,
             width: AppDesignTokens.hairlineBorderWidth,
@@ -2291,16 +2288,14 @@ class _BookshelfViewState extends State<BookshelfView> {
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: ShapeDecoration(
+        decoration: BoxDecoration(
           color: bgColor,
-          shape: ContinuousRectangleBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(16)),
-            side: BorderSide(
-              color: selected
-                  ? activeColor.withValues(alpha: 0.45)
-                  : separatorColor.withValues(alpha: 0.8),
-              width: AppDesignTokens.hairlineBorderWidth,
-            ),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? activeColor.withValues(alpha: 0.45)
+                : separatorColor.withValues(alpha: 0.8),
+            width: AppDesignTokens.hairlineBorderWidth,
           ),
         ),
         alignment: Alignment.center,
@@ -2593,8 +2588,8 @@ class _BookshelfViewState extends State<BookshelfView> {
       color: uiTokens.colors.card,
       borderRadius: BorderRadius.circular(uiTokens.radii.card),
       border: Border.all(
-        color: uiTokens.colors.separator.withValues(alpha: 0.72),
-        width: 0.8,
+        color: uiTokens.colors.separator,
+        width: AppDesignTokens.hairlineBorderWidth,
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
 import 'design_tokens.dart';
-import 'typography.dart';
 
 /// 全局 Cupertino 视觉主题（作用于全页面）。
 class AppCupertinoTheme {
@@ -14,13 +13,16 @@ class AppCupertinoTheme {
     final isDark = brightness == Brightness.dark;
     final scaffoldBackground =
         isDark ? AppDesignTokens.pageBgDark : AppDesignTokens.pageBgLight;
+    // iOS label 色：浅色 #000000，深色 #FFFFFF。
     final textColor =
-        isDark ? AppDesignTokens.textInverse : AppDesignTokens.textStrong;
+        isDark ? CupertinoColors.white : CupertinoColors.black;
+    // iOS secondaryLabel：浅色 60% 黑，深色 60% 白。
     final secondaryText = isDark
-        ? AppDesignTokens.textInverse.withValues(alpha: 0.74)
-        : AppDesignTokens.textMuted;
+        ? CupertinoColors.white.withValues(alpha: 0.6)
+        : CupertinoColors.black.withValues(alpha: 0.6);
+    // iOS 蓝色在深浅模式下均为 #0A84FF（深色）/ #007AFF（浅色）。
     final actionColor =
-        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+        isDark ? AppDesignTokens.brandPrimary : const Color(0xFF007AFF);
 
     return CupertinoThemeData(
       brightness: brightness,
@@ -28,41 +30,37 @@ class AppCupertinoTheme {
       scaffoldBackgroundColor: scaffoldBackground,
       barBackgroundColor: navBarBackground(brightness, scaffoldBackground),
       textTheme: CupertinoTextThemeData(
+        // 不指定 fontFamily，让系统在 iOS 上自动使用 SF Pro。
         textStyle: TextStyle(
-          fontFamily: AppTypography.fontFamilySans,
           color: textColor,
-          fontSize: 16,
+          fontSize: 17,
           height: 1.35,
-          letterSpacing: -0.08,
+          letterSpacing: -0.41,
         ),
         navTitleTextStyle: TextStyle(
-          fontFamily: AppTypography.fontFamilySans,
           color: textColor,
           fontSize: 17,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.24,
+          letterSpacing: -0.41,
         ),
         navLargeTitleTextStyle: TextStyle(
-          fontFamily: AppTypography.fontFamilySans,
           color: textColor,
-          fontSize: 33,
+          fontSize: 34,
           fontWeight: FontWeight.w700,
           height: 1.18,
-          letterSpacing: -0.5,
+          letterSpacing: 0.37,
         ),
         actionTextStyle: TextStyle(
-          fontFamily: AppTypography.fontFamilySans,
           color: actionColor,
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          letterSpacing: -0.08,
+          fontSize: 17,
+          fontWeight: FontWeight.w400,
+          letterSpacing: -0.41,
         ),
         tabLabelTextStyle: TextStyle(
-          fontFamily: AppTypography.fontFamilySans,
           color: secondaryText,
           fontSize: 10,
           fontWeight: FontWeight.w500,
-          letterSpacing: -0.2,
+          letterSpacing: -0.24,
         ),
       ),
     );
@@ -90,29 +88,29 @@ class AppCupertinoTheme {
   }
 
   static Color tabBarActive(Brightness brightness) {
+    // 与 iOS 系统 TabBar 激活色对齐。
     return brightness == Brightness.dark
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
+        ? AppDesignTokens.brandPrimary
+        : const Color(0xFF007AFF);
   }
 
   static Color tabBarInactive(Brightness brightness) {
+    // iOS tabBar inactive：systemGray（约 60% 不透明）。
     return brightness == Brightness.dark
-        ? AppDesignTokens.textInverse.withValues(alpha: 0.62)
-        : AppDesignTokens.textMuted.withValues(alpha: 0.9);
+        ? CupertinoColors.white.withValues(alpha: 0.6)
+        : CupertinoColors.black.withValues(alpha: 0.6);
   }
 
   static Border tabBarBorder(Brightness brightness) {
-    final bezel = brightness == Brightness.dark
-        ? AppDesignTokens.glassInnerHighlightDark
-        : AppDesignTokens.glassInnerHighlightLight;
+    // 原生 iOS TabBar 只有顶部一条分隔线，无底部 bezel。
     final separator = brightness == Brightness.dark
-        ? AppDesignTokens.borderDark.withValues(alpha: 0.9)
-        : AppDesignTokens.borderLight.withValues(alpha: 0.9);
+        ? AppDesignTokens.borderDark
+        : AppDesignTokens.borderLight;
     return Border(
       top: BorderSide(
-          color: separator, width: AppDesignTokens.hairlineBorderWidth),
-      bottom:
-          BorderSide(color: bezel, width: AppDesignTokens.hairlineBorderWidth),
+        color: separator,
+        width: AppDesignTokens.hairlineBorderWidth,
+      ),
     );
   }
 }

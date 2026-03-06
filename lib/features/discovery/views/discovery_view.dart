@@ -730,16 +730,12 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required String activeGroup,
   }) {
     return DecoratedBox(
-      decoration: ShapeDecoration(
+      decoration: BoxDecoration(
         color: uiTokens.colors.accent.withValues(alpha: 0.12),
-        shape: ContinuousRectangleBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(uiTokens.radii.control),
-          ),
-          side: BorderSide(
-            color: uiTokens.colors.accent.withValues(alpha: 0.28),
-            width: SourceUiTokens.borderWidth,
-          ),
+        borderRadius: BorderRadius.circular(uiTokens.radii.control),
+        border: Border.all(
+          color: uiTokens.colors.accent.withValues(alpha: 0.28),
+          width: SourceUiTokens.borderWidth,
         ),
       ),
       child: Padding(
@@ -1161,16 +1157,12 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: _minTapSize),
         child: DecoratedBox(
-          decoration: ShapeDecoration(
+          decoration: BoxDecoration(
             color: backgroundColor,
-            shape: ContinuousRectangleBorder(
-              borderRadius: BorderRadius.all(
-                Radius.circular(uiTokens.radii.control),
-              ),
-              side: BorderSide(
-                color: borderColor,
-                width: SourceUiTokens.borderWidth,
-              ),
+            borderRadius: BorderRadius.circular(uiTokens.radii.control),
+            border: Border.all(
+              color: borderColor,
+              width: SourceUiTokens.borderWidth,
             ),
           ),
           child: Padding(

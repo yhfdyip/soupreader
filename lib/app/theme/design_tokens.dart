@@ -21,15 +21,15 @@ class AppDesignTokens {
   static const Color textMuted = Color(0xFF6D7482);
   static const Color textInverse = Color(0xFFEFF2FF);
 
-  static const Color pageBgLight = Color(0xFFF3F7FF);
-  static const Color pageBgDark = Color(0xFF090C12);
+  static const Color pageBgLight = Color(0xFFF2F2F7); // iOS systemGroupedBackground
+  static const Color pageBgDark = Color(0xFF1C1C1E); // iOS systemGroupedBackground dark
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF171A22);
+  static const Color surfaceDark = Color(0xFF2C2C2E); // iOS secondarySystemBackground dark
 
-  static const Color borderLight = Color(0xFFD2DCEE);
-  static const Color borderDark = Color(0xFF38404F);
-  static const Color dividerLight = Color(0xFFC7D3E8);
-  static const Color dividerDark = Color(0xFF2B3446);
+  static const Color borderLight = Color(0xFFC6C6C8); // iOS separator light
+  static const Color borderDark = Color(0xFF38383A); // iOS separator dark
+  static const Color dividerLight = Color(0xFFC6C6C8);
+  static const Color dividerDark = Color(0xFF38383A);
 
   // ===== 玻璃材质 =====
   static const Color glassLightMaterial = Color(0x99FFFFFF);
@@ -42,10 +42,10 @@ class AppDesignTokens {
   static const Color ambientBottomDark = Color(0x3356D8BA);
 
   // ===== 统一几何 =====
-  static const double radiusControl = 12;
-  static const double radiusCard = 20;
-  static const double radiusPopup = 24;
-  static const double radiusSheet = 30;
+  static const double radiusControl = 10;
+  static const double radiusCard = 13; // iOS insetGrouped section radius
+  static const double radiusPopup = 14;
+  static const double radiusSheet = 13; // iOS action sheet radius
   static const double hairlineBorderWidth = 0.5;
   static const double glassBlurSigma = 20;
 

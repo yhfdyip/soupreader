@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
 
 export 'app_card.dart';
@@ -39,11 +38,6 @@ class AppListView extends StatelessWidget {
 }
 
 class AppListSection extends StatelessWidget {
-  static const double _kDarkSectionAlpha = 0.84;
-  static const double _kLightSectionAlpha = 0.88;
-  static const double _kAmbientTopAlpha = 0.18;
-  static const double _kAmbientBottomAlpha = 0.14;
-
   final Widget? header;
   final Widget? footer;
   final List<Widget> children;
@@ -62,66 +56,18 @@ class AppListSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = AppUiTokens.resolve(context);
-    final borderColor = tokens.colors.separator.withValues(alpha: 0.74);
-    final cardBackground = tokens.colors.sectionBackground.withValues(
-      alpha: tokens.isDark ? _kDarkSectionAlpha : _kLightSectionAlpha,
-    );
-    final bezelColor = (tokens.isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: 0.54);
-    final ambientTop = (tokens.isDark
-            ? AppDesignTokens.ambientTopDark
-            : AppDesignTokens.ambientTopLight)
-        .withValues(alpha: _kAmbientTopAlpha);
-    final ambientBottom = (tokens.isDark
-            ? AppDesignTokens.ambientBottomDark
-            : AppDesignTokens.ambientBottomLight)
-        .withValues(alpha: _kAmbientBottomAlpha);
-    final sectionShape = ContinuousRectangleBorder(
-      borderRadius: BorderRadius.all(Radius.circular(tokens.radii.card)),
-      side: BorderSide(
-        color: borderColor,
-        width: AppDesignTokens.hairlineBorderWidth,
+    // 使用系统标准色，与 iOS insetGrouped 列表视觉完全一致。
+    return CupertinoListSection.insetGrouped(
+      header: header,
+      footer: footer,
+      hasLeading: hasLeading,
+      margin: margin,
+      backgroundColor: tokens.colors.groupedBackground,
+      decoration: BoxDecoration(
+        color: tokens.colors.sectionBackground,
       ),
-    );
-    return ClipPath(
-      clipper: ShapeBorderClipper(shape: sectionShape),
-      child: CupertinoListSection.insetGrouped(
-        header: header,
-        footer: footer,
-        hasLeading: hasLeading,
-        margin: margin,
-        backgroundColor: tokens.colors.groupedBackground,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [ambientTop, cardBackground, ambientBottom],
-            stops: const [0.0, 0.52, 1.0],
-          ),
-          border: Border(
-            top: BorderSide(
-              color: bezelColor,
-              width: AppDesignTokens.hairlineBorderWidth,
-            ),
-            left: BorderSide(
-              color: borderColor,
-              width: AppDesignTokens.hairlineBorderWidth,
-            ),
-            right: BorderSide(
-              color: borderColor,
-              width: AppDesignTokens.hairlineBorderWidth,
-            ),
-            bottom: BorderSide(
-              color: borderColor,
-              width: AppDesignTokens.hairlineBorderWidth,
-            ),
-          ),
-        ),
-        separatorColor: borderColor,
-        children: children,
-      ),
+      separatorColor: tokens.colors.separator,
+      children: children,
     );
   }
 }

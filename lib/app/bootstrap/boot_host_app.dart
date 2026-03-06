@@ -7,13 +7,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../../app/theme/cupertino_theme.dart';
 import '../../core/bootstrap/boot_log.dart';
-import '../../core/build/build_info.dart';
 import '../../core/models/app_settings.dart';
 import '../../core/services/exception_log_service.dart';
 import '../../core/services/settings_service.dart';
-import '../widgets/app_global_ui_chrome.dart';
 import '../main_screen.dart';
 import 'app_bootstrap.dart';
+import 'booting_progress_view.dart';
 import 'boot_failure_view.dart';
 
 class BootHostApp extends StatefulWidget {
@@ -190,21 +189,38 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     return _logLines.sublist(start).reversed.join('\n').trim();
   }
 
+  Future<void> _copyBootLog(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: _bootLogPayload()));
+    if (!context.mounted) return;
+    await showCupertinoBottomDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('已复制'),
+        content: const Text('启动日志已复制到剪贴板。'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('好'),
+          ),
+        ],
+      ),
+    );
+  }
+
   CupertinoApp _buildBootingApp() {
     final brightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
     final theme = AppCupertinoTheme.build(brightness);
     final elapsedSeconds =
         (DateTime.now().millisecondsSinceEpoch - _startedAtMs) / 1000.0;
+    final hasLogs = _logLines.isNotEmpty;
 
     return CupertinoApp(
       key: const ValueKey('boot'),
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
       theme: theme,
-      builder: (context, child) => AppGlobalUiChrome(
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) => child ?? const SizedBox.shrink(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -214,132 +230,13 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
         Locale('zh', 'CN'),
         Locale('en', 'US'),
       ],
-      home: Builder(
-        builder: (innerContext) {
-          return CupertinoPageScaffold(
-            backgroundColor: const Color(0xFFFFF4D6),
-            child: SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-                children: [
-                  Text(
-                    'BOOT HOST  '
-                    'ref=${BuildInfo.gitRef}  '
-                    'sha=${BuildInfo.gitShaShort}  '
-                    'build=${BuildInfo.buildNumber}  '
-                    '${BuildInfo.isRelease ? 'release' : 'debug'}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: CupertinoColors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const SizedBox(height: 6),
-                  const Center(child: CupertinoActivityIndicator()),
-                  const SizedBox(height: 14),
-                  const Center(
-                    child: Text(
-                      '正在初始化…',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '步骤：$_step',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel
-                          .resolveFrom(innerContext),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  if (_logLines.isNotEmpty)
-                    Text(
-                      '最新：${_latestLogLine()}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: CupertinoColors.tertiaryLabel
-                            .resolveFrom(innerContext),
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '已用时：${elapsedSeconds.toStringAsFixed(0)}s',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.tertiaryLabel
-                          .resolveFrom(innerContext),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  if (_logLines.isNotEmpty) ...[
-                    CupertinoButton.filled(
-                      onPressed: () async {
-                        await Clipboard.setData(
-                          ClipboardData(text: _bootLogPayload()),
-                        );
-                        if (!innerContext.mounted) return;
-                        await showCupertinoBottomDialog<void>(
-                          context: innerContext,
-                          builder: (ctx) => CupertinoAlertDialog(
-                            title: const Text('已复制'),
-                            content: const Text('启动日志已复制到剪贴板。'),
-                            actions: [
-                              CupertinoDialogAction(
-                                onPressed: () => Navigator.of(ctx).pop(),
-                                child: const Text('好'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      child: const Text('复制启动日志'),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '启动日志（最新在上）',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: CupertinoColors.secondaryLabel
-                            .resolveFrom(innerContext),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.secondarySystemGroupedBackground
-                            .resolveFrom(innerContext),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: CupertinoColors.separator
-                              .resolveFrom(innerContext)
-                              .withValues(alpha: 0.7),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(
-                          _bootLogTailPayload(),
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1.35,
-                            color:
-                                CupertinoColors.label.resolveFrom(innerContext),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          );
-        },
+      home: BootingProgressView(
+        step: _step,
+        elapsedSeconds: elapsedSeconds,
+        latestLogLine: _latestLogLine(),
+        bootLogTail: _bootLogTailPayload(),
+        hasLogs: hasLogs,
+        onCopyLog: _copyBootLog,
       ),
     );
   }
@@ -375,9 +272,7 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
       theme: theme,
-      builder: (context, child) => AppGlobalUiChrome(
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) => child ?? const SizedBox.shrink(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

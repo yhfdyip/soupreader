@@ -37,7 +37,7 @@ class _OptionPickerHeader extends StatelessWidget {
             style: TextStyle(
               color: titleColor,
               fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               letterSpacing: -0.24,
             ),
           ),
@@ -63,6 +63,7 @@ class _OptionPickerHeader extends StatelessWidget {
 }
 
 class _OptionPickerBody<T> extends StatelessWidget {
+  final Widget header;
   final List<OptionPickerItem<T>> items;
   final T? currentValue;
   final Color accent;
@@ -74,6 +75,7 @@ class _OptionPickerBody<T> extends StatelessWidget {
   final VoidCallback onCancel;
 
   const _OptionPickerBody({
+    required this.header,
     required this.items,
     required this.currentValue,
     required this.accent,
@@ -97,17 +99,14 @@ class _OptionPickerBody<T> extends StatelessWidget {
         shrinkWrap: true,
         physics: const BouncingScrollPhysics(),
         children: [
+          header,
           _OptionPickerCard(
             color: cardColor,
             borderColor: borderColor,
             radius: ui.radii.card,
-            child: CupertinoListSection.insetGrouped(
+            child: AppListSection(
               margin: EdgeInsets.zero,
               hasLeading: false,
-              backgroundColor: CupertinoColors.transparent,
-              decoration:
-                  const BoxDecoration(color: CupertinoColors.transparent),
-              separatorColor: borderColor,
               children: [
                 for (final item in items)
                   _OptionPickerRow<T>(
@@ -125,13 +124,9 @@ class _OptionPickerBody<T> extends StatelessWidget {
               color: cardColor,
               borderColor: borderColor,
               radius: ui.radii.card,
-              child: CupertinoListSection.insetGrouped(
+              child: AppListSection(
                 margin: EdgeInsets.zero,
                 hasLeading: false,
-                backgroundColor: CupertinoColors.transparent,
-                decoration:
-                    const BoxDecoration(color: CupertinoColors.transparent),
-                separatorColor: borderColor,
                 children: [
                   CupertinoListTile.notched(
                     title: Text(
@@ -154,10 +149,6 @@ class _OptionPickerBody<T> extends StatelessWidget {
 }
 
 class _OptionPickerCard extends StatelessWidget {
-  static const double _kAmbientTopAlpha = 0.2;
-  static const double _kAmbientBottomAlpha = 0.16;
-  static const double _kBezelAlpha = 0.5;
-
   final Widget child;
   final Color color;
   final Color borderColor;
@@ -172,11 +163,6 @@ class _OptionPickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = AppUiTokens.resolve(context).isDark;
-    final bezelColor = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _kBezelAlpha);
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: color,
@@ -184,133 +170,7 @@ class _OptionPickerCard extends StatelessWidget {
       borderWidth: AppDesignTokens.hairlineBorderWidth,
       radius: radius,
       blurBackground: true,
-      child: Stack(
-        children: [
-          Positioned.fill(child: _buildAmbientLayer(isDark)),
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: bezelColor),
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmbientLayer(bool isDark) {
-    final topColor = (isDark
-            ? AppDesignTokens.ambientTopDark
-            : AppDesignTokens.ambientTopLight)
-        .withValues(alpha: _kAmbientTopAlpha);
-    final bottomColor = (isDark
-            ? AppDesignTokens.ambientBottomDark
-            : AppDesignTokens.ambientBottomLight)
-        .withValues(alpha: _kAmbientBottomAlpha);
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [topColor, bottomColor, const Color(0x00000000)],
-            stops: const [0.0, 0.64, 1.0],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OptionPickerRow<T> extends StatelessWidget {
-  final OptionPickerItem<T> item;
-  final bool selected;
-  final Color accent;
-  final VoidCallback? onTap;
-
-  const _OptionPickerRow({
-    required this.item,
-    required this.selected,
-    required this.accent,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ui = AppUiTokens.resolve(context);
-    final labelColor =
-        item.enabled ? ui.colors.label : ui.colors.secondaryLabel;
-    final subtitleColor = ui.colors.secondaryLabel;
-    final titleStyle = TextStyle(
-      color: labelColor,
-      fontWeight: FontWeight.w600,
-      letterSpacing: -0.2,
-    );
-    final subtitle = (item.subtitle ?? '').trim();
-
-    return CupertinoListTile.notched(
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: titleStyle,
-            ),
-          ),
-          if (item.isRecommended)
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: DecoratedBox(
-                decoration: ShapeDecoration(
-                  color: accent.withValues(alpha: 0.13),
-                  shape: ContinuousRectangleBorder(
-                    borderRadius: const BorderRadius.all(Radius.circular(14)),
-                    side: BorderSide(
-                      color: accent.withValues(alpha: 0.28),
-                      width: AppDesignTokens.hairlineBorderWidth,
-                    ),
-                  ),
-                ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  child: Text(
-                    '推荐',
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-      subtitle: subtitle.isEmpty
-          ? null
-          : Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: subtitleColor,
-                fontSize: 12,
-                letterSpacing: -0.2,
-              ),
-            ),
-      trailing: selected
-          ? Icon(
-              CupertinoIcons.check_mark,
-              size: ui.iconSizes.listTrailing,
-              color: accent,
-            )
-          : null,
-      onTap: onTap,
+      child: child,
     );
   }
 }

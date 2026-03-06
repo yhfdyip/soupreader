@@ -1,14 +1,13 @@
 import 'package:flutter/cupertino.dart';
 
 import '../theme/design_tokens.dart';
+import 'app_error_widget.dart';
 
 typedef AppSliverBodyBuilder = Widget Function(BuildContext context);
 
 /// 统一页面容器：导航栏 + 页面背景 + SafeArea。
 class AppCupertinoPageScaffold extends StatelessWidget {
   static const double _kTabBarHeight = 50.0;
-  static const double _kAmbientGlowLarge = 320.0;
-  static const double _kAmbientGlowSmall = 240.0;
 
   final String title;
   final Widget child;
@@ -70,63 +69,6 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     );
   }
 
-  Widget _buildBackground({
-    required Color backgroundColor,
-    required Brightness brightness,
-    required Widget child,
-  }) {
-    final isDark = brightness == Brightness.dark;
-    final topGlowColor = isDark
-        ? AppDesignTokens.ambientTopDark
-        : AppDesignTokens.ambientTopLight;
-    final bottomGlowColor = isDark
-        ? AppDesignTokens.ambientBottomDark
-        : AppDesignTokens.ambientBottomLight;
-    final gradientTop =
-        isDark ? AppDesignTokens.pageBgDark : AppDesignTokens.pageBgLight;
-    final gradientBottom =
-        isDark ? const Color(0xFF06080D) : const Color(0xFFE8F0FF);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[gradientTop, backgroundColor, gradientBottom],
-          stops: const <double>[0.0, 0.38, 1.0],
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          IgnorePointer(
-            child: RepaintBoundary(
-              child: Stack(
-                children: [
-                  Align(
-                    alignment: const Alignment(-0.9, -1.15),
-                    child: _AmbientGlow(
-                      color: topGlowColor,
-                      diameter: _kAmbientGlowLarge,
-                    ),
-                  ),
-                  Align(
-                    alignment: const Alignment(1.2, 1.15),
-                    child: _AmbientGlow(
-                      color: bottomGlowColor,
-                      diameter: _kAmbientGlowSmall,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-
   Widget _buildDefaultSliverBody() {
     return SliverSafeArea(
       // Sliver 模式下使用 CupertinoNavigationBar（可能为半透明）。
@@ -151,20 +93,10 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     } catch (e, st) {
       debugPrint('[AppCupertinoPageScaffold] build error: $e');
       debugPrintStack(stackTrace: st);
-      // 降级为最简单的非 Sliver 页面，显示具体异常信息。
-      return CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(
-          middle: Text(title),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              '页面框架异常:\n$e\n\n$st',
-              style: const TextStyle(fontSize: 11),
-            ),
-          ),
-        ),
+      return AppErrorWidget(
+        title: title,
+        message: '页面框架异常: $e',
+        stackTrace: '$st',
       );
     }
   }
@@ -181,17 +113,12 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
     // 保留半透明玻璃层，避免 alphaBlend 后退化为不透明背景导致失去系统模糊。
     final defaultNavBarBackground = navSurface;
+    // 原生 iOS 导航栏只有底部一条分隔线。
     final border = Border(
-      top: BorderSide(
-        color: isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight,
-        width: AppDesignTokens.hairlineBorderWidth,
-      ),
       bottom: BorderSide(
         color: isDark
-            ? AppDesignTokens.borderDark.withValues(alpha: 0.9)
-            : AppDesignTokens.borderLight.withValues(alpha: 0.92),
+            ? AppDesignTokens.borderDark
+            : AppDesignTokens.borderLight,
         width: AppDesignTokens.hairlineBorderWidth,
       ),
     );
@@ -222,14 +149,10 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     if (!useSliverNavigationBar) {
       return CupertinoPageScaffold(
         navigationBar: navBar,
-        child: _buildBackground(
-          backgroundColor: baseBackground,
-          brightness: brightness,
-          child: SafeArea(
-            top: includeTopSafeArea,
-            bottom: includeBottomSafeArea,
-            child: child,
-          ),
+        child: SafeArea(
+          top: includeTopSafeArea,
+          bottom: includeBottomSafeArea,
+          child: child,
         ),
       );
     }
@@ -247,15 +170,10 @@ class AppCupertinoPageScaffold extends StatelessWidget {
       debugPrintStack(stackTrace: st);
       bodySliver = SliverFillRemaining(
         hasScrollBody: false,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              '页面构建异常:\n$e',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
+        child: AppErrorWidget(
+          title: title,
+          message: '页面构建异常: $e',
+          stackTrace: '$st',
         ),
       );
     }
@@ -272,54 +190,19 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     return CupertinoPageScaffold(
       backgroundColor: baseBackground,
       navigationBar: navBar,
-      child: _buildBackground(
-        backgroundColor: baseBackground,
-        brightness: brightness,
-        child: CustomScrollView(
-          primary: false,
-          controller: sliverScrollController,
-          physics: sliverScrollPhysics ??
-              const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-          slivers: [
-            bodySliver,
-            SliverPadding(
-              padding: EdgeInsets.only(bottom: bottomPadding),
+      child: CustomScrollView(
+        primary: false,
+        controller: sliverScrollController,
+        physics: sliverScrollPhysics ??
+            const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AmbientGlow extends StatelessWidget {
-  const _AmbientGlow({
-    required this.color,
-    required this.diameter,
-  });
-
-  final Color color;
-  final double diameter;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: diameter,
-      height: diameter,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: <Color>[
-              color,
-              color.withValues(alpha: color.a * 0.28),
-              const Color(0x00000000),
-            ],
-            stops: const <double>[0.0, 0.55, 1.0],
+        slivers: [
+          bodySliver,
+          SliverPadding(
+            padding: EdgeInsets.only(bottom: bottomPadding),
           ),
-        ),
+        ],
       ),
     );
   }

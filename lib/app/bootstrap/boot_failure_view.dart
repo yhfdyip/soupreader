@@ -48,17 +48,10 @@ class BootFailureView extends StatelessWidget {
     final isDark =
         (CupertinoTheme.of(context).brightness ?? Brightness.light) ==
             Brightness.dark;
-    final pageBackground =
-        isDark ? AppDesignTokens.pageBgDark : AppDesignTokens.pageBgLight;
 
     return CupertinoPageScaffold(
-      backgroundColor: pageBackground,
-      navigationBar: CupertinoNavigationBar(
-        backgroundColor: (isDark
-                ? AppDesignTokens.glassDarkMaterial
-                : AppDesignTokens.glassLightMaterial)
-            .withValues(alpha: 0.9),
-        middle: const Text('启动异常'),
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('启动异常'),
       ),
       child: SafeArea(
         child: ListView(
@@ -97,10 +90,8 @@ class BootFailureView extends StatelessWidget {
   }
 
   Widget _buildFailureCard(BuildContext context, bool isDark) {
-    final panelColor = (isDark
-            ? AppDesignTokens.glassDarkMaterial
-            : AppDesignTokens.glassLightMaterial)
-        .withValues(alpha: isDark ? 0.9 : 0.92);
+    final panelColor =
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
     return AppSquircleSurface(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       backgroundColor: panelColor,

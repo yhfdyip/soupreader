@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import 'app_card.dart';
 import '../theme/design_tokens.dart';
-import 'app_squircle_surface.dart';
 import 'cupertino_bottom_dialog.dart';
 
 /// 在 Release 模式下，Flutter 默认的 ErrorWidget 往往只是一块灰色区域，
@@ -32,14 +32,7 @@ class AppErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final payload = _payload();
-    final isDark =
-        (CupertinoTheme.of(context).brightness ?? Brightness.light) ==
-            Brightness.dark;
-    final panelColor = isDark
-        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.88)
-        : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),
       navigationBar: CupertinoNavigationBar(
         middle: Text(title),
       ),
@@ -75,15 +68,9 @@ class AppErrorWidget extends StatelessWidget {
               child: const Text('复制异常信息'),
             ),
             const SizedBox(height: 12),
-            AppSquircleSurface(
+            AppCard(
               padding: const EdgeInsets.all(12),
-              backgroundColor: panelColor,
-              borderColor: CupertinoColors.separator
-                  .resolveFrom(context)
-                  .withValues(alpha: 0.72),
-              radius: AppDesignTokens.radiusCard,
-              borderWidth: AppDesignTokens.hairlineBorderWidth,
-              blurBackground: true,
+              borderRadius: AppDesignTokens.radiusCard,
               child: Text(
                 payload,
                 style: TextStyle(

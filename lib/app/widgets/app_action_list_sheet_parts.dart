@@ -21,10 +21,6 @@ class _SheetHandle extends StatelessWidget {
 }
 
 class _SheetCard extends StatelessWidget {
-  static const double _kAmbientTopAlpha = 0.2;
-  static const double _kAmbientBottomAlpha = 0.16;
-  static const double _kBezelAlpha = 0.5;
-
   final Widget child;
   final Color backgroundColor;
   final Color borderColor;
@@ -39,11 +35,6 @@ class _SheetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = AppUiTokens.resolve(context).isDark;
-    final bezelColor = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _kBezelAlpha);
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: backgroundColor,
@@ -51,42 +42,7 @@ class _SheetCard extends StatelessWidget {
       borderWidth: AppDesignTokens.hairlineBorderWidth,
       radius: radius,
       blurBackground: true,
-      child: Stack(
-        children: [
-          Positioned.fill(child: _buildAmbientLayer(isDark)),
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: bezelColor),
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmbientLayer(bool isDark) {
-    final topColor = (isDark
-            ? AppDesignTokens.ambientTopDark
-            : AppDesignTokens.ambientTopLight)
-        .withValues(alpha: _kAmbientTopAlpha);
-    final bottomColor = (isDark
-            ? AppDesignTokens.ambientBottomDark
-            : AppDesignTokens.ambientBottomLight)
-        .withValues(alpha: _kAmbientBottomAlpha);
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [topColor, bottomColor, const Color(0x00000000)],
-            stops: const [0.0, 0.64, 1.0],
-          ),
-        ),
-      ),
+      child: child,
     );
   }
 }
@@ -125,9 +81,8 @@ class _SheetHeader extends StatelessWidget {
             textAlign: titleAlign,
             style: TextStyle(
               color: titleColor,
-              fontFamily: AppTypography.fontFamilySans,
               fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -139,8 +94,7 @@ class _SheetHeader extends StatelessWidget {
               textAlign: titleAlign,
               style: TextStyle(
                 color: messageColor,
-                fontFamily: AppTypography.fontFamilySans,
-                fontSize: 13,
+                                fontSize: 13,
                 height: 1.3,
               ),
             ),
@@ -198,8 +152,7 @@ class _ActionRow<T> extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: textColor,
-                      fontFamily: AppTypography.fontFamilySans,
-                      fontWeight: FontWeight.w600,
+                                            fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -240,8 +193,7 @@ class _CancelRow extends StatelessWidget {
             label,
             style: TextStyle(
               color: labelColor,
-              fontFamily: AppTypography.fontFamilySans,
-              fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w600,
             ),
           ),
         ),

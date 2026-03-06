@@ -7,8 +7,8 @@ import 'package:flutter/cupertino.dart';
 class SourceUiTokens {
   const SourceUiTokens._();
 
-  static const double radiusCard = 18;
-  static const double radiusControl = 12;
+  static const double radiusCard = 13;
+  static const double radiusControl = 10;
   static const double borderWidth = 0.5;
   static const double pagePaddingHorizontal = 12;
   static const double discoveryHeaderGap = 8;

@@ -8,7 +8,6 @@ import 'bootstrap/app_bootstrap.dart';
 import 'bootstrap/boot_failure_view.dart';
 import 'main_screen.dart';
 import 'theme/cupertino_theme.dart';
-import 'widgets/app_global_ui_chrome.dart';
 import '../core/models/app_settings.dart';
 import '../core/services/settings_service.dart';
 
@@ -141,9 +140,7 @@ class _SoupReaderAppState extends State<SoupReaderApp>
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
       theme: cupertinoTheme,
-      builder: (context, child) => AppGlobalUiChrome(
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) => child ?? const SizedBox.shrink(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

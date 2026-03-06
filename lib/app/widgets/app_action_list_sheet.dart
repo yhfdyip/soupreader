@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/design_tokens.dart';
-import '../theme/typography.dart';
 import '../theme/ui_tokens.dart';
 import 'app_glass_sheet_panel.dart';
 import 'app_squircle_surface.dart';
@@ -57,6 +56,11 @@ Future<T?> showAppActionListSheet<T>({
 class _AppActionListSheet<T> extends StatelessWidget {
   static const double _maxHeightFactor = 0.74;
   static const double _rowHeight = 48;
+  static const double _minTopSpacing = 16.0;
+  static const double _panelTopPadding = 8.0;
+  static const double _handleHeight = 5.0;
+  static const double _handleSpacing = 8.0;
+  static const double _minScrollableHeight = _rowHeight * 2;
 
   final String title;
   final String? message;
@@ -80,9 +84,15 @@ class _AppActionListSheet<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final ui = AppUiTokens.resolve(context);
     final accent = accentColor ?? ui.colors.accent;
-    final bottomInset = math.max(MediaQuery.of(context).padding.bottom, 8.0);
+    final mediaQuery = MediaQuery.of(context);
+    final bottomInset = math.max(mediaQuery.padding.bottom, 8.0);
     final trimmedMessage = (message ?? '').trim();
-    final maxHeight = MediaQuery.sizeOf(context).height * _maxHeightFactor;
+    final sheetMaxHeight = _resolveSheetMaxHeight(mediaQuery);
+    final maxHeight = _resolveScrollableMaxHeight(
+      mediaQuery: mediaQuery,
+      bottomInset: bottomInset,
+      sheetMaxHeight: sheetMaxHeight,
+    );
     final children = _buildChildren(
       context,
       ui: ui,
@@ -92,28 +102,52 @@ class _AppActionListSheet<T> extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: AppGlassSheetPanel(
-        contentPadding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
-        radius: ui.radii.sheet,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _SheetHandle(
-              color: ui.colors.secondaryLabel.withValues(alpha: 0.38),
-            ),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: maxHeight),
-              child: ListView(
-                shrinkWrap: true,
-                physics: const BouncingScrollPhysics(),
-                children: children,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: sheetMaxHeight),
+        child: AppGlassSheetPanel(
+          contentPadding: EdgeInsets.fromLTRB(10, _panelTopPadding, 10, bottomInset),
+          radius: ui.radii.sheet,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SheetHandle(
+                color: ui.colors.secondaryLabel.withValues(alpha: 0.38),
               ),
-            ),
-          ],
+              const SizedBox(height: _handleSpacing),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: ListView(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  children: children,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  double _resolveSheetMaxHeight(MediaQueryData mediaQuery) {
+    final availableHeight =
+        mediaQuery.size.height - mediaQuery.padding.top - _minTopSpacing;
+    return math.max(_minScrollableHeight, availableHeight);
+  }
+
+  double _resolveScrollableMaxHeight({
+    required MediaQueryData mediaQuery,
+    required double bottomInset,
+    required double sheetMaxHeight,
+  }) {
+    final maxByFactor = mediaQuery.size.height * _maxHeightFactor;
+    final fixedChromeHeight =
+        _panelTopPadding + bottomInset + _handleHeight + _handleSpacing;
+    final maxByViewport = math.max(
+      _minScrollableHeight,
+      sheetMaxHeight - fixedChromeHeight,
+    );
+    return math.min(maxByFactor, maxByViewport);
   }
 
   void _dismissWithFeedback(BuildContext context, [T? value]) {

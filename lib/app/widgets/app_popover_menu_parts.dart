@@ -1,10 +1,6 @@
 part of 'app_popover_menu.dart';
 
 class _PopoverSurface extends StatelessWidget {
-  static const double _kAmbientTopAlpha = 0.2;
-  static const double _kAmbientBottomAlpha = 0.16;
-  static const double _kBezelAlpha = 0.5;
-
   final Widget child;
   final Color backgroundColor;
   final Color borderColor;
@@ -19,15 +15,10 @@ class _PopoverSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uiTokens = AppUiTokens.resolve(context);
-    final isDark = uiTokens.isDark;
+    final isDark = AppUiTokens.resolve(context).isDark;
     final shadowColor =
         (isDark ? CupertinoColors.black : const Color(0xFF0B2F66))
-            .withValues(alpha: isDark ? 0.3 : 0.14);
-    final bezelColor = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _kBezelAlpha);
+            .withValues(alpha: isDark ? 0.28 : 0.12);
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: backgroundColor,
@@ -38,47 +29,12 @@ class _PopoverSurface extends StatelessWidget {
       shadows: <BoxShadow>[
         BoxShadow(
           color: shadowColor,
-          blurRadius: 22,
-          offset: const Offset(0, 10),
-          spreadRadius: -10,
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+          spreadRadius: -8,
         ),
       ],
-      child: Stack(
-        children: [
-          Positioned.fill(child: _buildAmbientLayer(isDark)),
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: bezelColor),
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmbientLayer(bool isDark) {
-    final topColor = (isDark
-            ? AppDesignTokens.ambientTopDark
-            : AppDesignTokens.ambientTopLight)
-        .withValues(alpha: _kAmbientTopAlpha);
-    final bottomColor = (isDark
-            ? AppDesignTokens.ambientBottomDark
-            : AppDesignTokens.ambientBottomLight)
-        .withValues(alpha: _kAmbientBottomAlpha);
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [topColor, bottomColor, const Color(0x00000000)],
-            stops: const [0.0, 0.64, 1.0],
-          ),
-        ),
-      ),
+      child: child,
     );
   }
 }
@@ -135,7 +91,6 @@ class _PopoverMenuRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: textColor,
-                          fontFamily: AppTypography.fontFamilySans,
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
                           letterSpacing: -0.2,

@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import '../theme/design_tokens.dart';
 import '../theme/source_ui_tokens.dart';
 import 'app_squircle_surface.dart';
 
@@ -8,9 +7,6 @@ import 'app_squircle_surface.dart';
 class SourceConsistentCard extends StatelessWidget {
   static const double _kDarkSurfaceAlpha = 0.86;
   static const double _kLightSurfaceAlpha = 0.9;
-  static const double _kAmbientTopAlpha = 0.26;
-  static const double _kAmbientBottomAlpha = 0.2;
-  static const double _kBezelAlpha = 0.52;
   static const double _kShadowDarkAlpha = 0.22;
   static const double _kShadowLightAlpha = 0.1;
 
@@ -47,16 +43,10 @@ class SourceConsistentCard extends StatelessWidget {
             .withValues(alpha: SourceUiTokens.discoveryExpandedCardBorderAlpha);
     final shadow = (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E))
         .withValues(alpha: isDark ? _kShadowDarkAlpha : _kShadowLightAlpha);
-    final bezel = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _kBezelAlpha);
     return _SourceCardStyle(
-      isDark: isDark,
       background: background,
       border: border,
       shadow: shadow,
-      bezel: bezel,
     );
   }
 
@@ -76,62 +66,24 @@ class SourceConsistentCard extends StatelessWidget {
           spreadRadius: -11,
         ),
       ],
-      child: Stack(
-        children: [
-          Positioned.fill(child: _buildAmbientLayer(style.isDark)),
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: style.bezel),
-            ),
-          ),
-          Padding(
-            padding: padding,
-            child: child,
-          ),
-        ],
+      child: Padding(
+        padding: padding,
+        child: child,
       ),
     );
   }
 
-  Widget _buildAmbientLayer(bool isDark) {
-    final topColor = (isDark
-            ? AppDesignTokens.ambientTopDark
-            : AppDesignTokens.ambientTopLight)
-        .withValues(alpha: _kAmbientTopAlpha);
-    final bottomColor = (isDark
-            ? AppDesignTokens.ambientBottomDark
-            : AppDesignTokens.ambientBottomLight)
-        .withValues(alpha: _kAmbientBottomAlpha);
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [topColor, bottomColor, const Color(0x00000000)],
-            stops: const [0.0, 0.65, 1.0],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 @immutable
 class _SourceCardStyle {
   const _SourceCardStyle({
-    required this.isDark,
     required this.background,
     required this.border,
     required this.shadow,
-    required this.bezel,
   });
 
-  final bool isDark;
   final Color background;
   final Color border;
   final Color shadow;
-  final Color bezel;
 }

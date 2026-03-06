@@ -40,7 +40,6 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
   static const double _kGlassDarkAlpha = 0.36;
   static const double _kGlassLightAlpha = 0.5;
   static const double _kGlassBorderAlpha = 0.7;
-  static const double _kGlassBezelAlpha = 0.5;
   static const double _kGlassShadowDarkAlpha = 0.22;
   static const double _kGlassShadowLightAlpha = 0.08;
 
@@ -97,18 +96,7 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
           spreadRadius: -8,
         ),
       ],
-      child: Stack(
-        children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: style.bezel),
-            ),
-          ),
-          widget.child,
-        ],
-      ),
+      child: widget.child,
     );
   }
 
@@ -118,10 +106,6 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
       alpha: isDark ? _kGlassDarkAlpha : _kGlassLightAlpha,
     );
     final border = ui.colors.separator.withValues(alpha: _kGlassBorderAlpha);
-    final bezel = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _kGlassBezelAlpha);
     final shadow =
         (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E)).withValues(
       alpha: isDark ? _kGlassShadowDarkAlpha : _kGlassShadowLightAlpha,
@@ -129,7 +113,6 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
     return _NavButtonGlassStyle(
       background: background,
       border: border,
-      bezel: bezel,
       shadow: shadow,
     );
   }
@@ -151,12 +134,10 @@ class _NavButtonGlassStyle {
   const _NavButtonGlassStyle({
     required this.background,
     required this.border,
-    required this.bezel,
     required this.shadow,
   });
 
   final Color background;
   final Color border;
-  final Color bezel;
   final Color shadow;
 }

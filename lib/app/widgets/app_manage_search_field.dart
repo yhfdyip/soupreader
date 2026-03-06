@@ -2,18 +2,12 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
-import 'app_squircle_surface.dart';
 
 class AppManageSearchField extends StatelessWidget {
   static const EdgeInsets outerPadding = EdgeInsets.fromLTRB(12, 8, 12, 10);
   static const double height = 38;
   static const double _focusedBorderAlpha = 0.9;
   static const double _idleBorderAlpha = 0.78;
-  static const double _focusedShadowDarkAlpha = 0.28;
-  static const double _idleShadowDarkAlpha = 0.24;
-  static const double _focusedShadowLightAlpha = 0.14;
-  static const double _idleShadowLightAlpha = 0.1;
-  static const double _bezelAlpha = 0.56;
 
   final TextEditingController controller;
   final String placeholder;
@@ -34,7 +28,7 @@ class AppManageSearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     final ui = AppUiTokens.resolve(context);
     final baseStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final style = _resolveSurfaceStyle(ui, focusNode?.hasFocus ?? false);
+    final style = _resolveSurfaceStyle(context, ui, focusNode?.hasFocus ?? false);
     final iconColor = ui.colors.secondaryLabel.withValues(alpha: 0.95);
     return _buildSurface(
       ui: ui,
@@ -44,29 +38,19 @@ class AppManageSearchField extends StatelessWidget {
     );
   }
 
-  _SearchSurfaceStyle _resolveSurfaceStyle(AppUiTokens ui, bool isFocused) {
-    final isDark = ui.isDark;
-    final background = isDark
-        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.9)
-        : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
+  _SearchSurfaceStyle _resolveSurfaceStyle(
+    BuildContext context,
+    AppUiTokens ui,
+    bool isFocused,
+  ) {
+    // iOS 搜索框标准背景：tertiarySystemFill，随系统深浅色自动适配。
+    final background = CupertinoColors.tertiarySystemFill.resolveFrom(context);
     final border = ui.colors.separator.withValues(
       alpha: isFocused ? _focusedBorderAlpha : _idleBorderAlpha,
     );
-    final shadow =
-        (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E)).withValues(
-      alpha: isDark
-          ? (isFocused ? _focusedShadowDarkAlpha : _idleShadowDarkAlpha)
-          : (isFocused ? _focusedShadowLightAlpha : _idleShadowLightAlpha),
-    );
-    final bezel = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _bezelAlpha);
     return _SearchSurfaceStyle(
       background: background,
       border: border,
-      shadow: shadow,
-      bezel: bezel,
     );
   }
 
@@ -78,33 +62,16 @@ class AppManageSearchField extends StatelessWidget {
   }) {
     return SizedBox(
       height: height,
-      child: AppSquircleSurface(
-        padding: EdgeInsets.zero,
-        backgroundColor: style.background,
-        borderColor: style.border,
-        radius: ui.radii.control,
-        borderWidth: AppDesignTokens.hairlineBorderWidth,
-        blurBackground: true,
-        shadows: <BoxShadow>[
-          BoxShadow(
-            color: style.shadow,
-            offset: const Offset(0, 6),
-            blurRadius: 14,
-            spreadRadius: -9,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: style.background,
+          borderRadius: BorderRadius.circular(ui.radii.control),
+          border: Border.all(
+            color: style.border,
+            width: AppDesignTokens.hairlineBorderWidth,
           ),
-        ],
-        child: Stack(
-          children: [
-            Align(
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                height: AppDesignTokens.hairlineBorderWidth,
-                child: ColoredBox(color: style.bezel),
-              ),
-            ),
-            _buildInputField(baseStyle, ui, iconColor),
-          ],
         ),
+        child: _buildInputField(baseStyle, ui, iconColor),
       ),
     );
   }
@@ -146,12 +113,8 @@ class _SearchSurfaceStyle {
   const _SearchSurfaceStyle({
     required this.background,
     required this.border,
-    required this.shadow,
-    required this.bezel,
   });
 
   final Color background;
   final Color border;
-  final Color shadow;
-  final Color bezel;
 }

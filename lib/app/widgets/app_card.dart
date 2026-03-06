@@ -8,11 +8,8 @@ class AppCard extends StatelessWidget {
   static const double _kDarkSurfaceAlpha = 0.86;
   static const double _kLightSurfaceAlpha = 0.88;
   static const double _kBorderAlpha = 0.74;
-  static const double _kBezelAlpha = 0.52;
-  static const double _kAmbientTopAlpha = 0.24;
-  static const double _kAmbientBottomAlpha = 0.2;
-  static const double _kShadowDarkAlpha = 0.28;
-  static const double _kShadowLightAlpha = 0.09;
+  static const double _kShadowDarkAlpha = 0.22;
+  static const double _kShadowLightAlpha = 0.08;
 
   final EdgeInsetsGeometry padding;
   final Widget child;
@@ -48,15 +45,10 @@ class AppCard extends StatelessWidget {
         .withValues(alpha: _kBorderAlpha);
     final shadow = (isDark ? CupertinoColors.black : const Color(0xFF042852))
         .withValues(alpha: isDark ? _kShadowDarkAlpha : _kShadowLightAlpha);
-    final bezel = (isDark
-            ? AppDesignTokens.glassInnerHighlightDark
-            : AppDesignTokens.glassInnerHighlightLight)
-        .withValues(alpha: _kBezelAlpha);
     return _AppCardStyle(
       background: background,
       border: border,
       shadow: shadow,
-      bezel: bezel,
     );
   }
 
@@ -79,47 +71,13 @@ class AppCard extends StatelessWidget {
           spreadRadius: -12,
         ),
       ],
-      child: Stack(
-        children: [
-          Positioned.fill(child: _buildAmbientLayer(tokens.isDark)),
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: AppDesignTokens.hairlineBorderWidth,
-              child: ColoredBox(color: style.bezel),
-            ),
-          ),
-          Padding(
-            padding: padding,
-            child: child,
-          ),
-        ],
+      child: Padding(
+        padding: padding,
+        child: child,
       ),
     );
   }
 
-  Widget _buildAmbientLayer(bool isDark) {
-    final topColor = (isDark
-            ? AppDesignTokens.ambientTopDark
-            : AppDesignTokens.ambientTopLight)
-        .withValues(alpha: _kAmbientTopAlpha);
-    final bottomColor = (isDark
-            ? AppDesignTokens.ambientBottomDark
-            : AppDesignTokens.ambientBottomLight)
-        .withValues(alpha: _kAmbientBottomAlpha);
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [topColor, bottomColor, const Color(0x00000000)],
-            stops: const [0.0, 0.66, 1.0],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 @immutable
@@ -128,11 +86,9 @@ class _AppCardStyle {
     required this.background,
     required this.border,
     required this.shadow,
-    required this.bezel,
   });
 
   final Color background;
   final Color border;
   final Color shadow;
-  final Color bezel;
 }
