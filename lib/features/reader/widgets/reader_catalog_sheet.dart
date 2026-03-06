@@ -112,22 +112,22 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? AppDesignTokens.surfaceDark : const Color(0xFFFAF8F5);
+      _isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7);
 
   Color get _textStrong =>
-      _isDark ? AppDesignTokens.textInverse : const Color(0xFF333333);
+      _isDark ? CupertinoColors.white : const Color(0xFF1C1C1E);
 
   Color get _textNormal =>
-      _isDark ? AppDesignTokens.textMuted : const Color(0xFF666666);
+      _isDark ? CupertinoColors.systemGrey.resolveFrom(context) : const Color(0xFF3C3C43);
 
   Color get _textSubtle =>
-      _isDark ? AppDesignTokens.textMuted : const Color(0xFF888888);
+      _isDark ? CupertinoColors.systemGrey2.resolveFrom(context) : const Color(0xFF6C6C70);
 
   Color get _lineColor =>
-      _isDark ? AppDesignTokens.borderDark : const Color(0xFFEEEEEE);
+      _isDark ? AppDesignTokens.borderDark : const Color(0xFFC6C6C8);
 
   Color get _cardMutedBg =>
-      _isDark ? AppDesignTokens.pageBgDark : const Color(0xFFF0EDE8);
+      _isDark ? const Color(0xFF2C2C2E) : CupertinoColors.white;
 
   @override
   void initState() {
