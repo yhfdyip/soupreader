@@ -8130,17 +8130,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         child: FadeTransition(
           opacity: _menuFadeAnim,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
             decoration: BoxDecoration(
-              color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.78 : 0.9),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: _uiBorder),
+              color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.88 : 0.94),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
                   color: CupertinoColors.black
-                      .withValues(alpha: _isUiDark ? 0.2 : 0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 5),
+                      .withValues(alpha: _isUiDark ? 0.25 : 0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -8198,29 +8197,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     required VoidCallback onTap,
     bool active = false,
   }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: active
-              ? _uiAccent.withValues(alpha: 0.18)
-              : _uiPanelBg.withValues(alpha: _isUiDark ? 0.86 : 0.9),
-          borderRadius: BorderRadius.circular(19),
-          border: Border.all(
-            color: active ? _uiAccent : _uiBorder,
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          width: 40,
+          height: 36,
+          decoration: BoxDecoration(
+            color: active
+                ? _uiAccent.withValues(alpha: 0.18)
+                : _uiPanelBg.withValues(alpha: _isUiDark ? 0.86 : 0.9),
+            borderRadius: BorderRadius.circular(10),
           ),
-        ),
-        child: Semantics(
-          button: true,
-          label: semanticLabel,
           child: Icon(
             icon,
-            size: 19,
+            size: 20,
             color: active ? _uiAccent : _uiTextStrong,
           ),
         ),
