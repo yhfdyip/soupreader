@@ -460,14 +460,14 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           ],
           _buildTabItem(
             foreground: foreground,
-            icon: CupertinoIcons.circle_grid_3x3,
+            icon: CupertinoIcons.textformat,
             label: '界面',
             onTap: widget.onShowInterfaceSettings,
           ),
           const Spacer(flex: 2),
           _buildTabItem(
             foreground: foreground,
-            icon: CupertinoIcons.gear,
+            icon: CupertinoIcons.slider_horizontal_3,
             label: '设置',
             onTap: widget.onShowBehaviorSettings,
           ),
@@ -488,7 +488,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   }) {
     final contentColor = active ? (activeColor ?? foreground) : foreground;
     return SizedBox(
-      width: 64,
+      width: 70,
       child: CupertinoButton(
         padding: EdgeInsets.zero,
         minimumSize: Size.zero,
@@ -497,29 +497,30 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           behavior: HitTestBehavior.opaque,
           onLongPress: onLongPress,
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 7, top: 4),
+            padding: const EdgeInsets.only(bottom: 6, top: 6),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: 22,
+                  height: 24,
                   child: Center(
                     child: Icon(
                       icon,
-                      size: 22,
+                      size: 24,
                       color: contentColor,
                     ),
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     color: contentColor,
                     fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                    letterSpacing: -0.2,
                   ),
                 ),
               ],
