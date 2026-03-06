@@ -2,8 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_card.dart';
+import '../../../app/widgets/app_glass_sheet_panel.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-
 import '../../../core/services/exception_log_service.dart';
 
 Future<void> showAppLogDialog(BuildContext context) {
@@ -15,81 +17,101 @@ Future<void> showAppLogDialog(BuildContext context) {
 }
 
 class _AppLogDialog extends StatelessWidget {
+  static const double _kWidthFactor = 0.92;
+  static const double _kHeightFactor = 0.78;
+  static const double _kMaxWidth = 560;
+  static const double _kMaxHeight = 640;
+
   const _AppLogDialog();
 
   @override
   Widget build(BuildContext context) {
     final service = ExceptionLogService();
+    final ui = AppUiTokens.resolve(context);
     final screenSize = MediaQuery.sizeOf(context);
-    final width = math.min(screenSize.width * 0.92, 520.0);
-    final height = math.min(screenSize.height * 0.78, 620.0);
-    final separator = CupertinoColors.separator.resolveFrom(context);
+    final width = math.min(screenSize.width * _kWidthFactor, _kMaxWidth);
+    final height = math.min(screenSize.height * _kHeightFactor, _kMaxHeight);
+    final separator = ui.colors.separator.withValues(alpha: 0.78);
 
     return Center(
-      child: CupertinoPopupSurface(
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: CupertinoPageScaffold(
-            backgroundColor:
-                CupertinoColors.systemBackground.resolveFrom(context),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 48),
-                        const Expanded(
-                          child: Text(
-                            '日志',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          onPressed: service.clear,
-                          child: const Text('清除'),
-                          minimumSize: Size(30, 30),
-                        ),
-                      ],
-                    ),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: AppGlassSheetPanel(
+          contentPadding: EdgeInsets.zero,
+          radius: ui.radii.sheet,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _AppLogHeader(onClear: service.clear),
+                Container(height: ui.sizes.dividerThickness, color: separator),
+                Expanded(
+                  child: ValueListenableBuilder<List<ExceptionLogEntry>>(
+                    valueListenable: service.listenable,
+                    builder: (context, logs, _) => _AppLogList(logs: logs),
                   ),
-                  Container(height: 0.5, color: separator),
-                  Expanded(
-                    child: ValueListenableBuilder<List<ExceptionLogEntry>>(
-                      valueListenable: service.listenable,
-                      builder: (context, logs, _) {
-                        if (logs.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
-                        return ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                          itemCount: logs.length,
-                          separatorBuilder: (_, __) => Container(
-                            height: 0.5,
-                            color: separator,
-                          ),
-                          itemBuilder: (context, index) {
-                            final entry = logs[index];
-                            return _AppLogTile(entry: entry);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AppLogHeader extends StatelessWidget {
+  final VoidCallback onClear;
+
+  const _AppLogHeader({required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+      child: Row(
+        children: [
+          const SizedBox(width: 48),
+          const Expanded(
+            child: Text(
+              '日志',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            onPressed: onClear,
+            minimumSize: const Size(30, 30),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppLogList extends StatelessWidget {
+  final List<ExceptionLogEntry> logs;
+
+  const _AppLogList({required this.logs});
+
+  @override
+  Widget build(BuildContext context) {
+    if (logs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return ListView.separated(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+      itemCount: logs.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) => _AppLogTile(entry: logs[index]),
     );
   }
 }
@@ -104,34 +126,18 @@ class _AppLogTile extends StatelessWidget {
     if (stack.isEmpty) return;
     await showCupertinoBottomDialog<void>(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('Log'),
-        content: SizedBox(
-          width: 280,
-          child: SingleChildScrollView(
-            child: Text(
-              stack,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
+      builder: (_) => _AppLogStackTraceDialog(stackTrace: stack),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final secondaryLabel = CupertinoColors.secondaryLabel.resolveFrom(context);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _showStackTrace(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -139,7 +145,7 @@ class _AppLogTile extends StatelessWidget {
               _formatTime(entry.timestampMs),
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                color: secondaryLabel,
               ),
             ),
             const SizedBox(height: 2),
@@ -148,6 +154,83 @@ class _AppLogTile extends StatelessWidget {
               style: const TextStyle(fontSize: 14),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AppLogStackTraceDialog extends StatelessWidget {
+  static const double _kWidthFactor = 0.9;
+  static const double _kHeightFactor = 0.72;
+  static const double _kMaxWidth = 760;
+  static const double _kMaxHeight = 560;
+
+  final String stackTrace;
+
+  const _AppLogStackTraceDialog({required this.stackTrace});
+
+  @override
+  Widget build(BuildContext context) {
+    final ui = AppUiTokens.resolve(context);
+    final screenSize = MediaQuery.sizeOf(context);
+    final width = math.min(screenSize.width * _kWidthFactor, _kMaxWidth);
+    final height = math.min(screenSize.height * _kHeightFactor, _kMaxHeight);
+    final separator = ui.colors.separator.withValues(alpha: 0.78);
+
+    return Center(
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: AppGlassSheetPanel(
+          contentPadding: EdgeInsets.zero,
+          radius: ui.radii.sheet,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '日志堆栈',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: () => Navigator.of(context).pop(),
+                        minimumSize: const Size(30, 30),
+                        child: const Text('关闭'),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(height: ui.sizes.dividerThickness, color: separator),
+                Expanded(
+                  child: CupertinoScrollbar(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                      child: Text(
+                        stackTrace,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: ui.colors.label,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

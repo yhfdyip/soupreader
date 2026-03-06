@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -797,43 +798,35 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Future<void> _showSearchSettingsSheet() async {
-    final action = await showCupertinoBottomDialog<_SearchSettingAction>(
+    final action = await showAppActionListSheet<_SearchSettingAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('搜索设置'),
-        message: const Text('以下设置会自动保存'),
-        actions: [
-          _buildSettingsAction(
-            ctx,
-            action: _SearchSettingAction.precisionSearch,
-            label: '精准搜索',
-            checked: _isPrecisionSearchEnabled,
-          ),
-          _buildSettingsAction(
-            ctx,
-            action: _SearchSettingAction.sourceManage,
-            label: '书源管理',
-            value: '',
-          ),
-          _buildSettingsAction(
-            ctx,
-            action: _SearchSettingAction.scope,
-            label: '多分组/书源',
-          ),
-          _buildSettingsAction(
-            ctx,
-            action: _SearchSettingAction.logs,
-            label: '日志',
-            value: '',
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
+      title: '搜索设置',
+      message: '以下设置会自动保存',
+      showCancel: true,
+      items: [
+        AppActionListItem<_SearchSettingAction>(
+          value: _SearchSettingAction.precisionSearch,
+          icon: _isPrecisionSearchEnabled
+              ? CupertinoIcons.check_mark_circled_solid
+              : CupertinoIcons.search,
+          label: _isPrecisionSearchEnabled ? '✓ 精准搜索' : '精准搜索',
         ),
-      ),
+        const AppActionListItem<_SearchSettingAction>(
+          value: _SearchSettingAction.sourceManage,
+          icon: CupertinoIcons.book,
+          label: '书源管理',
+        ),
+        const AppActionListItem<_SearchSettingAction>(
+          value: _SearchSettingAction.scope,
+          icon: CupertinoIcons.square_grid_2x2,
+          label: '多分组/书源',
+        ),
+        const AppActionListItem<_SearchSettingAction>(
+          value: _SearchSettingAction.logs,
+          icon: CupertinoIcons.doc_text,
+          label: '日志',
+        ),
+      ],
     );
 
     if (action == null) return;
@@ -851,40 +844,6 @@ class _SearchViewState extends State<SearchView> {
         await _openAppLogDialog();
         break;
     }
-  }
-
-  CupertinoActionSheetAction _buildSettingsAction(
-    BuildContext ctx, {
-    required _SearchSettingAction action,
-    required String label,
-    String value = '',
-    bool checked = false,
-    bool isDestructive = false,
-  }) {
-    return CupertinoActionSheetAction(
-      isDestructiveAction: isDestructive,
-      onPressed: () => Navigator.pop(ctx, action),
-      child: Row(
-        children: [
-          Expanded(child: Text(label)),
-          if (value.isNotEmpty) ...[
-            Text(
-              value,
-              style: TextStyle(
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                fontSize: 14,
-              ),
-            ),
-            if (checked) const SizedBox(width: 8),
-          ],
-          if (checked)
-            const Icon(
-              CupertinoIcons.check_mark,
-              size: 18,
-            ),
-        ],
-      ),
-    );
   }
 
   Future<void> _togglePrecisionSearchLikeLegado() async {

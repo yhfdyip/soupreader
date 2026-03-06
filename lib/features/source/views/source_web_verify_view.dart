@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -32,6 +33,18 @@ class SourceWebVerifyView extends StatefulWidget {
 
   @override
   State<SourceWebVerifyView> createState() => _SourceWebVerifyViewState();
+}
+
+enum _SourceWebVerifyAction {
+  openInBrowser,
+  copyUrl,
+  fullScreen,
+  disableSource,
+  deleteSource,
+  reload,
+  importCookies,
+  copyCookieHeader,
+  clearCookie,
 }
 
 class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
@@ -423,94 +436,98 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
     Navigator.of(context).pop();
   }
 
-  void _showMoreMenu() {
-    showCupertinoBottomDialog<void>(
+  Future<void> _showMoreMenu() async {
+    final hasSource = widget.sourceOrigin.trim().isNotEmpty;
+    final menuUrl = (_currentUrl.isEmpty ? widget.initialUrl : _currentUrl);
+    final action = await showAppActionListSheet<_SourceWebVerifyAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (_) => CupertinoActionSheet(
-        title: const Text('操作'),
-        message: Text(
-          (_currentUrl.isEmpty ? widget.initialUrl : _currentUrl),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+      title: '操作',
+      message: menuUrl,
+      showCancel: true,
+      items: <AppActionListItem<_SourceWebVerifyAction>>[
+        const AppActionListItem<_SourceWebVerifyAction>(
+          value: _SourceWebVerifyAction.openInBrowser,
+          icon: CupertinoIcons.globe,
+          label: '浏览器打开',
         ),
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('浏览器打开'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _openInBrowser();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('拷贝 URL'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _copyBaseUrl();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('全屏'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _toggleFullScreen();
-            },
-          ),
-          if (widget.sourceOrigin.trim().isNotEmpty)
-            CupertinoActionSheetAction(
-              isDestructiveAction: true,
-              child: const Text('禁用源'),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await _disableCurrentSource();
-              },
-            ),
-          if (widget.sourceOrigin.trim().isNotEmpty)
-            CupertinoActionSheetAction(
-              isDestructiveAction: true,
-              child: const Text('删除源'),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await _confirmDeleteCurrentSource();
-              },
-            ),
-          CupertinoActionSheetAction(
-            child: const Text('刷新'),
-            onPressed: () {
-              Navigator.of(context).pop();
-              _controller.reload();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('导入 Cookie 到解析引擎'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _importCookies();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('复制 Cookie 值'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _copyCookieHeader();
-            },
-          ),
-          CupertinoActionSheetAction(
+        const AppActionListItem<_SourceWebVerifyAction>(
+          value: _SourceWebVerifyAction.copyUrl,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '拷贝 URL',
+        ),
+        const AppActionListItem<_SourceWebVerifyAction>(
+          value: _SourceWebVerifyAction.fullScreen,
+          icon: CupertinoIcons.fullscreen,
+          label: '全屏',
+        ),
+        if (hasSource)
+          const AppActionListItem<_SourceWebVerifyAction>(
+            value: _SourceWebVerifyAction.disableSource,
+            icon: CupertinoIcons.pause_circle,
+            label: '禁用源',
             isDestructiveAction: true,
-            child: const Text('清空 WebView Cookie'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final ok = await WebViewCookieBridge.clearAllCookies();
-              await _showMessage(ok ? '已清空 Cookie' : '清空失败或不支持');
-            },
           ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.of(context).pop(),
+        if (hasSource)
+          const AppActionListItem<_SourceWebVerifyAction>(
+            value: _SourceWebVerifyAction.deleteSource,
+            icon: CupertinoIcons.delete,
+            label: '删除源',
+            isDestructiveAction: true,
+          ),
+        const AppActionListItem<_SourceWebVerifyAction>(
+          value: _SourceWebVerifyAction.reload,
+          icon: CupertinoIcons.refresh,
+          label: '刷新',
         ),
-      ),
+        const AppActionListItem<_SourceWebVerifyAction>(
+          value: _SourceWebVerifyAction.importCookies,
+          icon: CupertinoIcons.square_arrow_down,
+          label: '导入 Cookie 到解析引擎',
+        ),
+        const AppActionListItem<_SourceWebVerifyAction>(
+          value: _SourceWebVerifyAction.copyCookieHeader,
+          icon: CupertinoIcons.doc_text,
+          label: '复制 Cookie 值',
+        ),
+        const AppActionListItem<_SourceWebVerifyAction>(
+          value: _SourceWebVerifyAction.clearCookie,
+          icon: CupertinoIcons.delete_solid,
+          label: '清空 WebView Cookie',
+          isDestructiveAction: true,
+        ),
+      ],
     );
+    if (action == null) return;
+    switch (action) {
+      case _SourceWebVerifyAction.openInBrowser:
+        await _openInBrowser();
+        return;
+      case _SourceWebVerifyAction.copyUrl:
+        await _copyBaseUrl();
+        return;
+      case _SourceWebVerifyAction.fullScreen:
+        await _toggleFullScreen();
+        return;
+      case _SourceWebVerifyAction.disableSource:
+        await _disableCurrentSource();
+        return;
+      case _SourceWebVerifyAction.deleteSource:
+        await _confirmDeleteCurrentSource();
+        return;
+      case _SourceWebVerifyAction.reload:
+        _controller.reload();
+        return;
+      case _SourceWebVerifyAction.importCookies:
+        await _importCookies();
+        return;
+      case _SourceWebVerifyAction.copyCookieHeader:
+        await _copyCookieHeader();
+        return;
+      case _SourceWebVerifyAction.clearCookie:
+        final ok = await WebViewCookieBridge.clearAllCookies();
+        await _showMessage(ok ? '已清空 Cookie' : '清空失败或不支持');
+        return;
+    }
   }
 
   Color _accentColor(BuildContext context) {

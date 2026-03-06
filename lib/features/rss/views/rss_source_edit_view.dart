@@ -1,16 +1,16 @@
 import 'dart:convert';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/rss_source.dart';
 import 'rss_source_debug_view.dart';
+import 'rss_source_edit_form.dart';
 
 class RssSourceEditView extends StatefulWidget {
   const RssSourceEditView({
@@ -208,6 +208,18 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
     );
   }
 
+  void _onEnabledChanged(bool value) {
+    setState(() {
+      _enabled = value;
+    });
+  }
+
+  void _onSingleUrlChanged(bool value) {
+    setState(() {
+      _singleUrl = value;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = _isEditing ? '编辑订阅源' : '新增订阅源';
@@ -233,92 +245,18 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
-          : AppListView(
-              padding: const EdgeInsets.only(top: 12, bottom: 24),
-              children: [
-                CupertinoFormSection.insetGrouped(
-                  header: const Text('基本信息'),
-                  children: [
-                    CupertinoTextFormFieldRow(
-                      controller: _nameController,
-                      placeholder: '源名称',
-                      prefix: const Text('名称'),
-                      textInputAction: TextInputAction.next,
-                    ),
-                    CupertinoTextFormFieldRow(
-                      controller: _urlController,
-                      placeholder: 'https://example.com/rss',
-                      prefix: const Text('URL'),
-                      textInputAction: TextInputAction.next,
-                      keyboardType: TextInputType.url,
-                      autocorrect: false,
-                    ),
-                    CupertinoTextFormFieldRow(
-                      controller: _groupController,
-                      placeholder: '分组A,分组B',
-                      prefix: const Text('分组'),
-                      textInputAction: TextInputAction.next,
-                    ),
-                    CupertinoTextFormFieldRow(
-                      controller: _commentController,
-                      placeholder: '注释',
-                      prefix: const Text('注释'),
-                      textInputAction: TextInputAction.next,
-                    ),
-                  ],
-                ),
-                CupertinoFormSection.insetGrouped(
-                  header: const Text('规则与状态'),
-                  children: [
-                    CupertinoTextFormFieldRow(
-                      controller: _loginUrlController,
-                      placeholder: '登录地址（可选）',
-                      prefix: const Text('登录'),
-                      textInputAction: TextInputAction.next,
-                      keyboardType: TextInputType.url,
-                      autocorrect: false,
-                    ),
-                    CupertinoTextFormFieldRow(
-                      controller: _sortUrlController,
-                      placeholder: '分类地址/脚本（可选）',
-                      prefix: const Text('分类'),
-                      textInputAction: TextInputAction.next,
-                    ),
-                    CupertinoTextFormFieldRow(
-                      controller: _customOrderController,
-                      placeholder: '0',
-                      prefix: const Text('排序'),
-                      textInputAction: TextInputAction.done,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        signed: true,
-                        decimal: false,
-                      ),
-                    ),
-                    CupertinoFormRow(
-                      prefix: const Text('启用'),
-                      child: CupertinoSwitch(
-                        value: _enabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _enabled = value;
-                          });
-                        },
-                      ),
-                    ),
-                    CupertinoFormRow(
-                      prefix: const Text('singleUrl'),
-                      child: CupertinoSwitch(
-                        value: _singleUrl,
-                        onChanged: (value) {
-                          setState(() {
-                            _singleUrl = value;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          : RssSourceEditForm(
+              nameController: _nameController,
+              urlController: _urlController,
+              groupController: _groupController,
+              commentController: _commentController,
+              loginUrlController: _loginUrlController,
+              sortUrlController: _sortUrlController,
+              customOrderController: _customOrderController,
+              enabled: _enabled,
+              singleUrl: _singleUrl,
+              onEnabledChanged: _onEnabledChanged,
+              onSingleUrlChanged: _onSingleUrlChanged,
             ),
     );
   }

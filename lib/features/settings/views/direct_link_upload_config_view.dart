@@ -1,16 +1,16 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
-
-import '../../../app/widgets/app_action_list_sheet.dart';
-import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/option_picker_sheet.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../models/direct_link_upload_rule.dart';
 import '../services/direct_link_upload_config_service.dart';
+import 'direct_link_upload_config_form.dart';
 
 enum _DirectLinkUploadConfigMenuAction {
   copyRule,
@@ -145,9 +145,7 @@ class _DirectLinkUploadConfigViewState
   Future<void> _copyRuleToClipboard() async {
     final rule = _buildRuleFromForm();
     if (rule == null) return;
-    await Clipboard.setData(
-      ClipboardData(text: jsonEncode(rule.toJson())),
-    );
+    await Clipboard.setData(ClipboardData(text: jsonEncode(rule.toJson())));
   }
 
   Future<void> _importDefaultRule() async {
@@ -214,25 +212,10 @@ class _DirectLinkUploadConfigViewState
     );
   }
 
-  Widget _buildFooterActions() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
-      child: Row(
-        children: [
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          const Spacer(),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            onPressed: _saveAndClose,
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
+  void _onCompressChanged(bool value) {
+    setState(() {
+      _compress = value;
+    });
   }
 
   @override
@@ -245,47 +228,14 @@ class _DirectLinkUploadConfigViewState
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.only(top: 8, bottom: 12),
-                    children: [
-                      CupertinoFormSection.insetGrouped(
-                        children: [
-                          CupertinoTextFormFieldRow(
-                            controller: _uploadUrlController,
-                            prefix: const Text('上传URL'),
-                            placeholder: '上传 URL',
-                          ),
-                          CupertinoTextFormFieldRow(
-                            controller: _downloadUrlRuleController,
-                            prefix: const Text('下载URL规则'),
-                            placeholder: '下载URL规则(downloadUrls)',
-                          ),
-                          CupertinoTextFormFieldRow(
-                            controller: _summaryController,
-                            prefix: const Text('注释'),
-                            placeholder: '注释',
-                          ),
-                          CupertinoFormRow(
-                            prefix: const Text('是否压缩'),
-                            child: CupertinoSwitch(
-                              value: _compress,
-                              onChanged: (value) {
-                                setState(() {
-                                  _compress = value;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                _buildFooterActions(),
-              ],
+          : DirectLinkUploadConfigForm(
+              uploadUrlController: _uploadUrlController,
+              downloadUrlRuleController: _downloadUrlRuleController,
+              summaryController: _summaryController,
+              compress: _compress,
+              onCompressChanged: _onCompressChanged,
+              onCancel: () => Navigator.of(context).pop(),
+              onConfirm: _saveAndClose,
             ),
     );
   }

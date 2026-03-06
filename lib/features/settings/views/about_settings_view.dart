@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_glass_sheet_panel.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
@@ -887,53 +888,54 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
     final screenSize = MediaQuery.sizeOf(context);
     final width = math.min(screenSize.width * 0.92, 680.0);
     final height = math.min(screenSize.height * 0.82, 760.0);
-    final separator = CupertinoColors.separator.resolveFrom(context);
-    final bodyColor = CupertinoColors.label.resolveFrom(context);
+    final ui = AppUiTokens.resolve(context);
+    final separator = ui.colors.separator.withValues(alpha: 0.78);
 
     return Center(
-      child: CupertinoPopupSurface(
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: CupertinoPageScaffold(
-            backgroundColor:
-                CupertinoColors.systemBackground.resolveFrom(context),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
-                    child: Row(
-                      children: [
-                        CupertinoButton(
-                          padding: const EdgeInsets.all(4),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Icon(CupertinoIcons.xmark),
-                          minimumSize: Size(30, 30),
-                        ),
-                        Expanded(
-                          child: Text(
-                            widget.updateInfo.tagName,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                            ),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: AppGlassSheetPanel(
+          contentPadding: EdgeInsets.zero,
+          radius: ui.radii.sheet,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
+                  child: Row(
+                    children: [
+                      CupertinoButton(
+                        padding: const EdgeInsets.all(4),
+                        onPressed: () => Navigator.of(context).pop(),
+                        minimumSize: const Size(30, 30),
+                        child: const Icon(CupertinoIcons.xmark),
+                      ),
+                      Expanded(
+                        child: Text(
+                          widget.updateInfo.tagName,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          onPressed: widget.onDownload,
-                          child: const Text('下载'),
-                          minimumSize: Size(30, 30),
-                        ),
-                      ],
-                    ),
+                      ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: widget.onDownload,
+                        minimumSize: const Size(30, 30),
+                        child: const Text('下载'),
+                      ),
+                    ],
                   ),
-                  Container(height: 0.5, color: separator),
-                  Expanded(
+                ),
+                Container(height: ui.sizes.dividerThickness, color: separator),
+                Expanded(
+                  child: CupertinoScrollbar(
                     child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
                       child: SelectableRegion(
                         focusNode: _focusNode,
@@ -943,14 +945,14 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.48,
-                            color: bodyColor,
+                            color: ui.colors.label,
                           ),
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -101,38 +103,37 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
   }
 
   Widget _buildRecordList() {
+    final tokens = AppUiTokens.resolve(context);
     return ListView.separated(
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       itemCount: _records.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final record = _records[index];
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: CupertinoColors.secondarySystemGroupedBackground
-                .resolveFrom(context),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                (record.title ?? '').trim().isEmpty
-                    ? '未命名文章'
-                    : record.title!.trim(),
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                record.record,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: AppCard(
+            padding: const EdgeInsets.all(12),
+            borderColor: tokens.colors.separator.withValues(alpha: 0.72),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  (record.title ?? '').trim().isEmpty
+                      ? '未命名文章'
+                      : record.title!.trim(),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  record.record,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: tokens.colors.secondaryLabel,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

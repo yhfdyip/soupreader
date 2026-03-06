@@ -8,8 +8,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 
 class SourceQrShareView extends StatelessWidget {
   const SourceQrShareView({
@@ -25,6 +27,7 @@ class SourceQrShareView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final uiTokens = AppUiTokens.resolve(context);
     final title = subject.trim().isEmpty ? '书源二维码' : subject.trim();
     return AppCupertinoPageScaffold(
       title: title,
@@ -59,31 +62,37 @@ class SourceQrShareView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
+            AppCard(
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: CupertinoColors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: QrImageView(
-                data: text,
-                version: QrVersions.auto,
-                size: 260,
-                eyeStyle: const QrEyeStyle(
-                  eyeShape: QrEyeShape.square,
-                  color: CupertinoColors.black,
-                ),
-                dataModuleStyle: const QrDataModuleStyle(
-                  dataModuleShape: QrDataModuleShape.square,
-                  color: CupertinoColors.black,
+              backgroundColor: CupertinoColors.white,
+              borderColor: uiTokens.colors.separator.withValues(alpha: 0.72),
+              child: SizedBox(
+                width: 260,
+                height: 260,
+                child: QrImageView(
+                  data: text,
+                  version: QrVersions.auto,
+                  size: 260,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: CupertinoColors.black,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: CupertinoColors.black,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 18),
-            Text(
-              hintText,
-              style: TextStyle(
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            AppCard(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              borderColor: uiTokens.colors.separator.withValues(alpha: 0.72),
+              child: Text(
+                hintText,
+                style: TextStyle(
+                  color: uiTokens.colors.secondaryLabel,
+                ),
               ),
             ),
           ],

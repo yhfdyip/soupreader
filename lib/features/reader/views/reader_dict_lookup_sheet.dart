@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:html/parser.dart' as html_parser;
 
+import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_glass_sheet_panel.dart';
 import '../models/dict_rule.dart';
 import '../services/dict_rule_store.dart';
 
@@ -21,6 +24,11 @@ class ReaderDictLookupSheet extends StatefulWidget {
 }
 
 class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
+  static const double _kWidthFactor = 0.92;
+  static const double _kHeightFactor = 0.78;
+  static const double _kMaxWidth = 760;
+  static const double _kMaxHeight = 720;
+
   late final DictRuleStore _dictRuleStore;
   late final FocusNode _resultFocusNode;
 
@@ -166,7 +174,7 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
     );
   }
 
-  Widget _buildResultPanel() {
+  Widget _buildResultPanel(AppUiTokens ui) {
     if (_loadingRules || _loadingResult) {
       return const Center(child: CupertinoActivityIndicator());
     }
@@ -180,71 +188,94 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
         selectionControls: cupertinoTextSelectionControls,
         child: Text(
           _displayText,
-          style: const TextStyle(fontSize: 14, height: 1.45),
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.45,
+            color: ui.colors.label,
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildHeader(BuildContext context) {
+    final secondaryColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: Row(
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            onPressed: () => Navigator.of(context).pop(),
+            minimumSize: const Size(30, 30),
+            child: const Text('关闭'),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '字典',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.selectedText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: secondaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 56),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider(AppUiTokens ui) {
+    return Container(
+      height: ui.sizes.dividerThickness,
+      color: ui.colors.separator.withValues(alpha: 0.78),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.of(context).size.height * 0.78;
-    return CupertinoPopupSurface(
-      isSurfacePainted: true,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: maxHeight,
-          child: Column(
-            children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                child: Row(
-                  children: [
-                    CupertinoButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('关闭'),
-                      minimumSize: Size(30, 30),
-                    ),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            '字典',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            widget.selectedText,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 56),
-                  ],
-                ),
-              ),
-              if (_rules.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: _buildRuleTabs(),
-                ),
-              const SizedBox(height: 6),
-              Expanded(child: _buildResultPanel()),
-            ],
+    final ui = AppUiTokens.resolve(context);
+    final size = MediaQuery.sizeOf(context);
+    final width = math.min(size.width * _kWidthFactor, _kMaxWidth);
+    final height = math.min(size.height * _kHeightFactor, _kMaxHeight);
+
+    return Center(
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: AppGlassSheetPanel(
+          contentPadding: EdgeInsets.zero,
+          radius: ui.radii.sheet,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                _buildHeader(context),
+                _buildDivider(ui),
+                if (_rules.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child: _buildRuleTabs(),
+                  ),
+                const SizedBox(height: 6),
+                Expanded(child: _buildResultPanel(ui)),
+              ],
+            ),
           ),
         ),
       ),

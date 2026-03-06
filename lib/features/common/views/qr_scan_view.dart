@@ -5,8 +5,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/services/exception_log_service.dart';
 
 class QrScanView extends StatefulWidget {
@@ -154,6 +156,7 @@ class _QrScanViewState extends State<QrScanView> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AppUiTokens.resolve(context);
     return AppCupertinoPageScaffold(
       title: widget.title,
       trailing: Row(
@@ -182,30 +185,38 @@ class _QrScanViewState extends State<QrScanView> {
           ),
           SafeArea(
             top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: CupertinoButton.filled(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      onPressed: () => _controller.toggleTorch(),
-                      child: const Text('切换闪光灯'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: CupertinoButton(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('取消'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _buildBottomActions(tokens),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBottomActions(AppUiTokens tokens) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        borderColor: tokens.colors.separator.withValues(alpha: 0.72),
+        child: Row(
+          children: [
+            Expanded(
+              child: CupertinoButton.filled(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                onPressed: () => _controller.toggleTorch(),
+                child: const Text('切换闪光灯'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: CupertinoButton(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

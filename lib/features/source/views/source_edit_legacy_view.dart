@@ -14,6 +14,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
@@ -38,6 +39,8 @@ import '../services/source_login_url_resolver.dart';
 import '../services/source_rule_complete.dart';
 import 'keyboard_assists_config_sheet.dart';
 import 'source_debug_legacy_view.dart';
+import 'source_edit_legacy_field_section.dart';
+import 'source_edit_legacy_sections.dart';
 import 'source_login_form_view.dart';
 import 'source_login_webview_view.dart';
 
@@ -72,8 +75,29 @@ class SourceEditLegacyView extends StatefulWidget {
   State<SourceEditLegacyView> createState() => _SourceEditLegacyViewState();
 }
 
+enum _SourceEditMoreAction {
+  login,
+  search,
+  clearCookie,
+  toggleAutoComplete,
+  copySource,
+  pasteSource,
+  setSourceVariable,
+  importQr,
+  shareQr,
+  shareText,
+  help,
+}
+
 class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   static const String _prefRuleHelpShown = 'source_edit_rule_help_shown_v1';
+  static const String _insertActionAssistPrefix = 'assist:';
+  static const String _insertActionConfig = 'insert_action_config';
+  static const String _insertActionUrlOption = 'insert_action_url_option';
+  static const String _insertActionRuleHelp = 'insert_action_rule_help';
+  static const String _insertActionJsHelp = 'insert_action_js_help';
+  static const String _insertActionRegexHelp = 'insert_action_regex_help';
+  static const String _insertActionGroupOrFile = 'insert_action_group_or_file';
   static const Map<String, String> _fieldLabels = <String, String>{
     'bookSourceUrl': '书源地址',
     'bookSourceName': '书源名称',
@@ -124,33 +148,6 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     'imageDecode': '图片解码',
     'payAction': '购买动作',
   };
-  static const Map<int, Widget> _tabSwitcherItems = <int, Widget>{
-    0: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text('基础'),
-    ),
-    1: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text('搜索'),
-    ),
-    2: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text('发现'),
-    ),
-    3: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text('详情'),
-    ),
-    4: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text('目录'),
-    ),
-    5: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text('正文'),
-    ),
-  };
-
   late final DatabaseService _db;
   late final SourceRepository _repo;
   late final SourceExploreKindsService _exploreKindsService;
@@ -415,323 +412,299 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Widget _buildTopSettings() {
-    final accentColor = CupertinoTheme.of(context).primaryColor;
-    return CupertinoListSection.insetGrouped(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 4),
-      children: [
-        CupertinoListTile.notched(
-          title: const Text('书源类型'),
-          additionalInfo: Text(
-            _typeLabel(_bookSourceType),
-            style: TextStyle(
-              color: accentColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          trailing: const CupertinoListTileChevron(),
-          onTap: _pickBookSourceType,
-        ),
-        _buildTopSwitchTile(
-          text: '启用书源',
-          helper: '控制该书源是否参与搜索与阅读流程',
-          value: _enabled,
-          onChanged: (value) => setState(() => _enabled = value),
-        ),
-        _buildTopSwitchTile(
-          text: '启用发现',
-          helper: '关闭后该书源不会在发现页显示',
-          value: _enabledExplore,
-          onChanged: (value) => setState(() => _enabledExplore = value),
-        ),
-        _buildTopSwitchTile(
-          text: '自动保存 Cookie',
-          helper: '请求命中登录态时自动更新 Cookie',
-          value: _enabledCookieJar,
-          onChanged: (value) => setState(() => _enabledCookieJar = value),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTopSwitchTile({
-    required String text,
-    required String helper,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    final helperColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
-    return CupertinoListTile.notched(
-      title: Text(text),
-      subtitle: Text(
-        helper,
-        style: TextStyle(
-          fontSize: 12,
-          color: helperColor,
-        ),
-      ),
-      trailing: CupertinoSwitch(
-        value: value,
-        onChanged: onChanged,
-      ),
-      onTap: () => onChanged(!value),
+    return SourceEditLegacyTopSettingsSection(
+      bookSourceType: _bookSourceType,
+      typeLabelBuilder: _typeLabel,
+      onPickBookSourceType: _pickBookSourceType,
+      enabled: _enabled,
+      onEnabledChanged: (value) => setState(() => _enabled = value),
+      enabledExplore: _enabledExplore,
+      onEnabledExploreChanged: (value) =>
+          setState(() => _enabledExplore = value),
+      enabledCookieJar: _enabledCookieJar,
+      onEnabledCookieJarChanged: (value) =>
+          setState(() => _enabledCookieJar = value),
     );
   }
 
   Widget _buildTabSwitcher() {
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
-    final sectionColor =
-        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: sectionColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: borderColor.withValues(alpha: 0.7),
-            width: 0.6,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: CupertinoSlidingSegmentedControl<int>(
-              groupValue: _tab,
-              children: _tabSwitcherItems,
-              onValueChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  _tab = value;
-                  _activeFieldKey = null;
-                  _activeFieldController = null;
-                });
-              },
-            ),
-          ),
-        ),
-      ),
+    return SourceEditLegacyTabSwitcher(
+      tab: _tab,
+      onTabChanged: (value) {
+        setState(() {
+          _tab = value;
+          _activeFieldKey = null;
+          _activeFieldController = null;
+        });
+      },
     );
   }
 
   Widget _buildBaseTab() {
-    return ListView(
-      children: [
-        CupertinoListSection.insetGrouped(
-          header: const Text('基础信息'),
-          children: [
-            _buildTextFieldTile('bookSourceUrl', _bookSourceUrlCtrl),
-            _buildTextFieldTile('bookSourceName', _bookSourceNameCtrl),
-            _buildTextFieldTile('bookSourceGroup', _bookSourceGroupCtrl),
-            _buildTextFieldTile('bookSourceComment', _bookSourceCommentCtrl,
-                maxLines: 3),
-            _buildTextFieldTile('loginUrl', _loginUrlCtrl),
-            _buildTextFieldTile('loginUi', _loginUiCtrl, maxLines: 3),
-            _buildTextFieldTile('loginCheckJs', _loginCheckJsCtrl, maxLines: 3),
-            _buildTextFieldTile('coverDecodeJs', _coverDecodeJsCtrl,
-                maxLines: 3),
-            _buildTextFieldTile('bookUrlPattern', _bookUrlPatternCtrl),
-            _buildTextFieldTile('header', _headerCtrl, maxLines: 3),
-            _buildTextFieldTile('variableComment', _variableCommentCtrl,
-                maxLines: 2),
-            _buildTextFieldTile('concurrentRate', _concurrentRateCtrl),
-            _buildTextFieldTile('jsLib', _jsLibCtrl, maxLines: 4),
-          ],
+    return _buildRuleTabSection(
+      title: '基础信息',
+      fields: <SourceEditLegacyFieldSpec>[
+        SourceEditLegacyFieldSpec(
+            key: 'bookSourceUrl', controller: _bookSourceUrlCtrl),
+        SourceEditLegacyFieldSpec(
+            key: 'bookSourceName', controller: _bookSourceNameCtrl),
+        SourceEditLegacyFieldSpec(
+            key: 'bookSourceGroup', controller: _bookSourceGroupCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'bookSourceComment',
+          controller: _bookSourceCommentCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(key: 'loginUrl', controller: _loginUrlCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'loginUi',
+          controller: _loginUiCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'loginCheckJs',
+          controller: _loginCheckJsCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'coverDecodeJs',
+          controller: _coverDecodeJsCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'bookUrlPattern',
+          controller: _bookUrlPatternCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'header',
+          controller: _headerCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'variableComment',
+          controller: _variableCommentCtrl,
+          maxLines: 2,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'concurrentRate',
+          controller: _concurrentRateCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'jsLib',
+          controller: _jsLibCtrl,
+          maxLines: 4,
         ),
       ],
     );
   }
 
   Widget _buildSearchTab() {
-    return ListView(
-      children: [
-        CupertinoListSection.insetGrouped(
-          header: const Text('搜索规则'),
-          children: [
-            _buildTextFieldTile('searchUrl', _searchUrlCtrl),
-            _buildTextFieldTile('checkKeyWord', _searchCheckKeyWordCtrl),
-            _buildTextFieldTile('bookList', _searchBookListCtrl),
-            _buildTextFieldTile('name', _searchNameCtrl),
-            _buildTextFieldTile('author', _searchAuthorCtrl),
-            _buildTextFieldTile('kind', _searchKindCtrl),
-            _buildTextFieldTile('wordCount', _searchWordCountCtrl),
-            _buildTextFieldTile('lastChapter', _searchLastChapterCtrl),
-            _buildTextFieldTile('intro', _searchIntroCtrl),
-            _buildTextFieldTile('coverUrl', _searchCoverUrlCtrl),
-            _buildTextFieldTile('bookUrl', _searchBookUrlCtrl),
-          ],
+    return _buildRuleTabSection(
+      title: '搜索规则',
+      fields: <SourceEditLegacyFieldSpec>[
+        SourceEditLegacyFieldSpec(key: 'searchUrl', controller: _searchUrlCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'checkKeyWord',
+          controller: _searchCheckKeyWordCtrl,
         ),
+        SourceEditLegacyFieldSpec(
+            key: 'bookList', controller: _searchBookListCtrl),
+        SourceEditLegacyFieldSpec(key: 'name', controller: _searchNameCtrl),
+        SourceEditLegacyFieldSpec(key: 'author', controller: _searchAuthorCtrl),
+        SourceEditLegacyFieldSpec(key: 'kind', controller: _searchKindCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'wordCount',
+          controller: _searchWordCountCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'lastChapter',
+          controller: _searchLastChapterCtrl,
+        ),
+        SourceEditLegacyFieldSpec(key: 'intro', controller: _searchIntroCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'coverUrl',
+          controller: _searchCoverUrlCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+            key: 'bookUrl', controller: _searchBookUrlCtrl),
       ],
     );
   }
 
   Widget _buildExploreTab() {
-    return ListView(
-      children: [
-        CupertinoListSection.insetGrouped(
-          header: const Text('发现规则'),
-          children: [
-            _buildTextFieldTile('exploreUrl', _exploreUrlCtrl),
-            _buildTextFieldTile('bookList', _exploreBookListCtrl),
-            _buildTextFieldTile('name', _exploreNameCtrl),
-            _buildTextFieldTile('author', _exploreAuthorCtrl),
-            _buildTextFieldTile('kind', _exploreKindCtrl),
-            _buildTextFieldTile('wordCount', _exploreWordCountCtrl),
-            _buildTextFieldTile('lastChapter', _exploreLastChapterCtrl),
-            _buildTextFieldTile('intro', _exploreIntroCtrl),
-            _buildTextFieldTile('coverUrl', _exploreCoverUrlCtrl),
-            _buildTextFieldTile('bookUrl', _exploreBookUrlCtrl),
-          ],
+    return _buildRuleTabSection(
+      title: '发现规则',
+      fields: <SourceEditLegacyFieldSpec>[
+        SourceEditLegacyFieldSpec(
+            key: 'exploreUrl', controller: _exploreUrlCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'bookList',
+          controller: _exploreBookListCtrl,
+        ),
+        SourceEditLegacyFieldSpec(key: 'name', controller: _exploreNameCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'author',
+          controller: _exploreAuthorCtrl,
+        ),
+        SourceEditLegacyFieldSpec(key: 'kind', controller: _exploreKindCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'wordCount',
+          controller: _exploreWordCountCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'lastChapter',
+          controller: _exploreLastChapterCtrl,
+        ),
+        SourceEditLegacyFieldSpec(key: 'intro', controller: _exploreIntroCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'coverUrl',
+          controller: _exploreCoverUrlCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'bookUrl',
+          controller: _exploreBookUrlCtrl,
         ),
       ],
     );
   }
 
   Widget _buildInfoTab() {
-    return ListView(
-      children: [
-        CupertinoListSection.insetGrouped(
-          header: const Text('详情规则'),
-          children: [
-            _buildTextFieldTile('init', _infoInitCtrl),
-            _buildTextFieldTile('name', _infoNameCtrl),
-            _buildTextFieldTile('author', _infoAuthorCtrl),
-            _buildTextFieldTile('kind', _infoKindCtrl),
-            _buildTextFieldTile('wordCount', _infoWordCountCtrl),
-            _buildTextFieldTile('lastChapter', _infoLastChapterCtrl),
-            _buildTextFieldTile('intro', _infoIntroCtrl),
-            _buildTextFieldTile('coverUrl', _infoCoverUrlCtrl),
-            _buildTextFieldTile('tocUrl', _infoTocUrlCtrl),
-            _buildTextFieldTile('canReName', _infoCanRenameCtrl),
-            _buildTextFieldTile('downloadUrls', _infoDownloadUrlsCtrl),
-          ],
+    return _buildRuleTabSection(
+      title: '详情规则',
+      fields: <SourceEditLegacyFieldSpec>[
+        SourceEditLegacyFieldSpec(key: 'init', controller: _infoInitCtrl),
+        SourceEditLegacyFieldSpec(key: 'name', controller: _infoNameCtrl),
+        SourceEditLegacyFieldSpec(key: 'author', controller: _infoAuthorCtrl),
+        SourceEditLegacyFieldSpec(key: 'kind', controller: _infoKindCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'wordCount',
+          controller: _infoWordCountCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'lastChapter',
+          controller: _infoLastChapterCtrl,
+        ),
+        SourceEditLegacyFieldSpec(key: 'intro', controller: _infoIntroCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'coverUrl',
+          controller: _infoCoverUrlCtrl,
+        ),
+        SourceEditLegacyFieldSpec(key: 'tocUrl', controller: _infoTocUrlCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'canReName',
+          controller: _infoCanRenameCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'downloadUrls',
+          controller: _infoDownloadUrlsCtrl,
         ),
       ],
     );
   }
 
   Widget _buildTocTab() {
-    return ListView(
-      children: [
-        CupertinoListSection.insetGrouped(
-          header: const Text('目录规则'),
-          children: [
-            _buildTextFieldTile('preUpdateJs', _tocPreUpdateJsCtrl,
-                maxLines: 3),
-            _buildTextFieldTile('chapterList', _tocChapterListCtrl),
-            _buildTextFieldTile('chapterName', _tocChapterNameCtrl),
-            _buildTextFieldTile('chapterUrl', _tocChapterUrlCtrl),
-            _buildTextFieldTile('formatJs', _tocFormatJsCtrl, maxLines: 3),
-            _buildTextFieldTile('isVolume', _tocIsVolumeCtrl),
-            _buildTextFieldTile('updateTime', _tocUpdateTimeCtrl),
-            _buildTextFieldTile('isVip', _tocIsVipCtrl),
-            _buildTextFieldTile('isPay', _tocIsPayCtrl),
-            _buildTextFieldTile('nextTocUrl', _tocNextTocUrlCtrl),
-          ],
+    return _buildRuleTabSection(
+      title: '目录规则',
+      fields: <SourceEditLegacyFieldSpec>[
+        SourceEditLegacyFieldSpec(
+          key: 'preUpdateJs',
+          controller: _tocPreUpdateJsCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'chapterList',
+          controller: _tocChapterListCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'chapterName',
+          controller: _tocChapterNameCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'chapterUrl',
+          controller: _tocChapterUrlCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'formatJs',
+          controller: _tocFormatJsCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+            key: 'isVolume', controller: _tocIsVolumeCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'updateTime',
+          controller: _tocUpdateTimeCtrl,
+        ),
+        SourceEditLegacyFieldSpec(key: 'isVip', controller: _tocIsVipCtrl),
+        SourceEditLegacyFieldSpec(key: 'isPay', controller: _tocIsPayCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'nextTocUrl',
+          controller: _tocNextTocUrlCtrl,
         ),
       ],
     );
   }
 
   Widget _buildContentTab() {
-    return ListView(
-      children: [
-        CupertinoListSection.insetGrouped(
-          header: const Text('正文规则'),
-          children: [
-            _buildTextFieldTile('content', _contentContentCtrl, maxLines: 4),
-            _buildTextFieldTile('title', _contentTitleCtrl),
-            _buildTextFieldTile('nextContentUrl', _contentNextContentUrlCtrl),
-            _buildTextFieldTile('webJs', _contentWebJsCtrl, maxLines: 3),
-            _buildTextFieldTile('sourceRegex', _contentSourceRegexCtrl,
-                maxLines: 3),
-            _buildTextFieldTile('replaceRegex', _contentReplaceRegexCtrl,
-                maxLines: 3),
-            _buildTextFieldTile('imageStyle', _contentImageStyleCtrl,
-                maxLines: 3),
-            _buildTextFieldTile('imageDecode', _contentImageDecodeCtrl,
-                maxLines: 3),
-            _buildTextFieldTile('payAction', _contentPayActionCtrl,
-                maxLines: 3),
-          ],
+    return _buildRuleTabSection(
+      title: '正文规则',
+      fields: <SourceEditLegacyFieldSpec>[
+        SourceEditLegacyFieldSpec(
+          key: 'content',
+          controller: _contentContentCtrl,
+          maxLines: 4,
+        ),
+        SourceEditLegacyFieldSpec(key: 'title', controller: _contentTitleCtrl),
+        SourceEditLegacyFieldSpec(
+          key: 'nextContentUrl',
+          controller: _contentNextContentUrlCtrl,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'webJs',
+          controller: _contentWebJsCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'sourceRegex',
+          controller: _contentSourceRegexCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'replaceRegex',
+          controller: _contentReplaceRegexCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'imageStyle',
+          controller: _contentImageStyleCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'imageDecode',
+          controller: _contentImageDecodeCtrl,
+          maxLines: 3,
+        ),
+        SourceEditLegacyFieldSpec(
+          key: 'payAction',
+          controller: _contentPayActionCtrl,
+          maxLines: 3,
         ),
       ],
     );
   }
 
-  CupertinoListTile _buildTextFieldTile(
-    String key,
-    TextEditingController controller, {
-    int maxLines = 1,
+  Widget _buildRuleTabSection({
+    required String title,
+    required List<SourceEditLegacyFieldSpec> fields,
   }) {
-    final isActiveField = identical(_activeFieldController, controller);
-    final titleStyle = CupertinoTheme.of(
-      context,
-    ).textTheme.textStyle.copyWith(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        );
-    final trailing =
-        isActiveField ? _buildInsertActionButton(key, controller) : null;
-    return CupertinoListTile.notched(
-      title: Text(_labelForField(key), style: titleStyle),
-      subtitle: _buildFieldInput(
-        key: key,
-        controller: controller,
-        maxLines: maxLines,
-      ),
-      trailing: trailing,
-    );
-  }
-
-  Widget _buildInsertActionButton(
-    String key,
-    TextEditingController controller,
-  ) {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: const Size(36, 36),
-      onPressed: () {
-        _markActiveField(key, controller);
+    return SourceEditLegacyRuleTabSection(
+      title: title,
+      fields: fields,
+      activeFieldController: _activeFieldController,
+      labelBuilder: _labelForField,
+      onFieldActivated: _markActiveField,
+      onShowInsertActions: () {
         _showInsertActions();
       },
-      child: const Icon(CupertinoIcons.wand_stars, size: 18),
-    );
-  }
-
-  Widget _buildFieldInput({
-    required String key,
-    required TextEditingController controller,
-    required int maxLines,
-  }) {
-    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
-    final fieldColor = CupertinoColors.systemGrey6.resolveFrom(context);
-    final placeholderColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: CupertinoTextField(
-        controller: controller,
-        maxLines: maxLines,
-        minLines: maxLines > 1 ? 2 : 1,
-        placeholder: key,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        decoration: BoxDecoration(
-          color: fieldColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: borderColor.withValues(alpha: 0.65),
-            width: 0.6,
-          ),
-        ),
-        style: textStyle.copyWith(fontSize: 14),
-        placeholderStyle: textStyle.copyWith(
-          fontSize: 13,
-          color: placeholderColor,
-        ),
-        onTap: () => _markActiveField(key, controller),
-        onChanged: (_) => _markActiveField(key, controller),
-      ),
     );
   }
 
@@ -756,28 +729,32 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Future<void> _pickBookSourceType() async {
-    final selected = await showCupertinoBottomDialog<int>(
+    final selected = await showAppActionListSheet<int>(
       context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('书源类型'),
-        actions: [
-          for (final entry in const <MapEntry<int, String>>[
-            MapEntry(0, '默认'),
-            MapEntry(1, '音频'),
-            MapEntry(2, '图片'),
-            MapEntry(3, '文件'),
-          ])
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.pop(popupContext, entry.key),
-              child: Text(entry.value),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
+      title: '书源类型',
+      showCancel: true,
+      items: const [
+        AppActionListItem<int>(
+          value: 0,
+          icon: CupertinoIcons.book,
+          label: '默认',
         ),
-      ),
+        AppActionListItem<int>(
+          value: 1,
+          icon: CupertinoIcons.music_note,
+          label: '音频',
+        ),
+        AppActionListItem<int>(
+          value: 2,
+          icon: CupertinoIcons.photo,
+          label: '图片',
+        ),
+        AppActionListItem<int>(
+          value: 3,
+          icon: CupertinoIcons.doc_text,
+          label: '文件',
+        ),
+      ],
     );
 
     if (selected == null || !mounted) return;
@@ -786,98 +763,108 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
 
   Future<void> _showMore() async {
     if (!mounted) return;
-
-    await showCupertinoBottomDialog<void>(
+    final hasLogin = _loginUrlCtrl.text.trim().isNotEmpty;
+    final selected = await showAppActionListSheet<_SourceEditMoreAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('更多'),
-        actions: [
-          if (_loginUrlCtrl.text.trim().isNotEmpty)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(popupContext);
-                _saveAndOpenLogin();
-              },
-              child: const Text('登录'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _saveAndSearch();
-            },
-            child: const Text('搜索'),
+      title: '更多',
+      showCancel: true,
+      items: <AppActionListItem<_SourceEditMoreAction>>[
+        if (hasLogin)
+          const AppActionListItem<_SourceEditMoreAction>(
+            value: _SourceEditMoreAction.login,
+            icon: CupertinoIcons.person_crop_circle_badge_checkmark,
+            label: '登录',
           ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _clearCookie();
-            },
-            child: const Text('清除 Cookie'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              setState(() => _autoComplete = !_autoComplete);
-            },
-            child: Text('${_autoComplete ? '✓ ' : ''}自动补全'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _copySourceJson();
-            },
-            child: const Text('复制书源'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _pasteSourceJson();
-            },
-            child: const Text('粘贴源'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _setSourceVariable();
-            },
-            child: const Text('设置源变量'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _importFromQrCode();
-            },
-            child: const Text('二维码导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _shareSourceJsonQr();
-            },
-            child: const Text('二维码分享'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _shareSourceJsonText();
-            },
-            child: const Text('字符串分享'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _showMessage(SourceHelpTexts.ruleHelp);
-            },
-            child: const Text('帮助'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.search,
+          icon: CupertinoIcons.search,
+          label: '搜索',
         ),
-      ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.clearCookie,
+          icon: CupertinoIcons.delete,
+          label: '清除 Cookie',
+        ),
+        AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.toggleAutoComplete,
+          icon: _autoComplete
+              ? CupertinoIcons.check_mark_circled_solid
+              : CupertinoIcons.check_mark_circled,
+          label: '${_autoComplete ? '✓ ' : ''}自动补全',
+        ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.copySource,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '复制书源',
+        ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.pasteSource,
+          icon: CupertinoIcons.doc_on_clipboard,
+          label: '粘贴源',
+        ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.setSourceVariable,
+          icon: CupertinoIcons.slider_horizontal_3,
+          label: '设置源变量',
+        ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.importQr,
+          icon: CupertinoIcons.qrcode_viewfinder,
+          label: '二维码导入',
+        ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.shareQr,
+          icon: CupertinoIcons.qrcode,
+          label: '二维码分享',
+        ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.shareText,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '字符串分享',
+        ),
+        const AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.help,
+          icon: CupertinoIcons.question_circle,
+          label: '帮助',
+        ),
+      ],
     );
+    if (selected == null) return;
+    switch (selected) {
+      case _SourceEditMoreAction.login:
+        await _saveAndOpenLogin();
+        return;
+      case _SourceEditMoreAction.search:
+        await _saveAndSearch();
+        return;
+      case _SourceEditMoreAction.clearCookie:
+        await _clearCookie();
+        return;
+      case _SourceEditMoreAction.toggleAutoComplete:
+        setState(() => _autoComplete = !_autoComplete);
+        return;
+      case _SourceEditMoreAction.copySource:
+        await _copySourceJson();
+        return;
+      case _SourceEditMoreAction.pasteSource:
+        await _pasteSourceJson();
+        return;
+      case _SourceEditMoreAction.setSourceVariable:
+        await _setSourceVariable();
+        return;
+      case _SourceEditMoreAction.importQr:
+        await _importFromQrCode();
+        return;
+      case _SourceEditMoreAction.shareQr:
+        await _shareSourceJsonQr();
+        return;
+      case _SourceEditMoreAction.shareText:
+        await _shareSourceJsonText();
+        return;
+      case _SourceEditMoreAction.help:
+        _showMessage(SourceHelpTexts.ruleHelp);
+        return;
+    }
   }
 
   Future<void> _maybeShowRuleHelp() async {
@@ -894,73 +881,85 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     if (!mounted) return;
     final fieldKey = _activeFieldKey;
     final onGroupField = fieldKey == 'bookSourceGroup';
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<String>(
       context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('编辑工具'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _showKeyboardAssistsConfig();
-            },
-            child: const Text('辅助按键配置'),
-          ),
-          for (final assist in keyboardAssists)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(popupContext);
-                _insertTextToActiveField(assist.value);
-              },
-              child: Text(assist.key),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _insertUrlOption();
-            },
-            child: const Text('插入URL参数'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _showMessage(SourceHelpTexts.ruleHelp);
-            },
-            child: const Text('书源教程'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _showMessage(SourceHelpTexts.jsHelp);
-            },
-            child: const Text('js教程'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _showMessage(SourceHelpTexts.regexHelp);
-            },
-            child: const Text('正则教程'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              if (onGroupField) {
-                _insertGroup();
-              } else {
-                _insertFilePath();
-              }
-            },
-            child: Text(onGroupField ? '插入分组' : '选择文件'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
+      title: '编辑工具',
+      showCancel: true,
+      items: <AppActionListItem<String>>[
+        const AppActionListItem<String>(
+          value: _insertActionConfig,
+          icon: CupertinoIcons.settings,
+          label: '辅助按键配置',
         ),
-      ),
+        for (var i = 0; i < keyboardAssists.length; i++)
+          AppActionListItem<String>(
+            value: '$_insertActionAssistPrefix$i',
+            icon: CupertinoIcons.keyboard,
+            label: keyboardAssists[i].key,
+          ),
+        const AppActionListItem<String>(
+          value: _insertActionUrlOption,
+          icon: CupertinoIcons.link,
+          label: '插入URL参数',
+        ),
+        const AppActionListItem<String>(
+          value: _insertActionRuleHelp,
+          icon: CupertinoIcons.book,
+          label: '书源教程',
+        ),
+        const AppActionListItem<String>(
+          value: _insertActionJsHelp,
+          icon: CupertinoIcons.chevron_left_slash_chevron_right,
+          label: 'js教程',
+        ),
+        const AppActionListItem<String>(
+          value: _insertActionRegexHelp,
+          icon: CupertinoIcons.textformat_abc,
+          label: '正则教程',
+        ),
+        AppActionListItem<String>(
+          value: _insertActionGroupOrFile,
+          icon:
+              onGroupField ? CupertinoIcons.collections : CupertinoIcons.folder,
+          label: onGroupField ? '插入分组' : '选择文件',
+        ),
+      ],
     );
+    if (selected == null) return;
+    if (selected.startsWith(_insertActionAssistPrefix)) {
+      final index = int.tryParse(
+        selected.substring(_insertActionAssistPrefix.length),
+      );
+      if (index == null || index < 0 || index >= keyboardAssists.length) return;
+      _insertTextToActiveField(keyboardAssists[index].value);
+      return;
+    }
+    switch (selected) {
+      case _insertActionConfig:
+        await _showKeyboardAssistsConfig();
+        return;
+      case _insertActionUrlOption:
+        await _insertUrlOption();
+        return;
+      case _insertActionRuleHelp:
+        _showMessage(SourceHelpTexts.ruleHelp);
+        return;
+      case _insertActionJsHelp:
+        _showMessage(SourceHelpTexts.jsHelp);
+        return;
+      case _insertActionRegexHelp:
+        _showMessage(SourceHelpTexts.regexHelp);
+        return;
+      case _insertActionGroupOrFile:
+        if (onGroupField) {
+          await _insertGroup();
+        } else {
+          await _insertFilePath();
+        }
+        return;
+      default:
+        return;
+    }
   }
 
   Future<void> _showKeyboardAssistsConfig() async {
@@ -1148,23 +1147,18 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       return;
     }
 
-    final selected = await showCupertinoBottomDialog<String>(
+    final selected = await showAppActionListSheet<String>(
       context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('选择分组'),
-        actions: [
-          for (final group in groups)
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.pop(popupContext, group),
-              child: Text(group),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择分组',
+      showCancel: true,
+      items: [
+        for (final group in groups)
+          AppActionListItem<String>(
+            value: group,
+            icon: CupertinoIcons.collections,
+            label: group,
+          ),
+      ],
     );
     if (selected == null || selected.trim().isEmpty) return;
     _insertTextToActiveField(selected);

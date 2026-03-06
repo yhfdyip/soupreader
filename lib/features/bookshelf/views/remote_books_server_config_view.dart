@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/remote_server.dart';
 import '../services/remote_server_store.dart';
@@ -159,16 +160,15 @@ class _RemoteBooksServerConfigViewState
         onPressed: _saving ? null : _saveServerConfig,
         child: _saving ? const CupertinoActivityIndicator() : const Text('保存'),
       ),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('WebDav'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('名称'),
                 additionalInfo: Text(_brief(_nameDraft)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editField(
                   title: '名称',
                   placeholder: '请输入名称',
@@ -178,10 +178,9 @@ class _RemoteBooksServerConfigViewState
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('地址'),
                 additionalInfo: Text(_brief(_urlDraft)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editField(
                   title: '地址',
                   placeholder: 'https://dav.example.com/books/',
@@ -191,10 +190,9 @@ class _RemoteBooksServerConfigViewState
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('账号'),
                 additionalInfo: Text(_brief(_usernameDraft)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editField(
                   title: '账号',
                   placeholder: '请输入账号',
@@ -204,10 +202,9 @@ class _RemoteBooksServerConfigViewState
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('密码'),
                 additionalInfo: Text(_maskSecret(_passwordDraft)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editField(
                   title: '密码',
                   placeholder: '请输入密码',
@@ -220,6 +217,7 @@ class _RemoteBooksServerConfigViewState
               ),
             ],
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );

@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -48,6 +50,8 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
   }
 
   Widget _buildEmbeddedView(BuildContext context) {
+    final separatorColor =
+        AppUiTokens.resolve(context).colors.separator.withValues(alpha: 0.78);
     return Column(
       children: [
         Padding(
@@ -79,8 +83,8 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
           ),
         ),
         Container(
-          height: 0.5,
-          color: CupertinoColors.systemGrey4.resolveFrom(context),
+          height: AppUiTokens.resolve(context).sizes.dividerThickness,
+          color: separatorColor,
         ),
         Expanded(child: _buildGroupList()),
       ],
@@ -102,46 +106,44 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
         return AppListView(
           padding: const EdgeInsets.only(top: 12, bottom: 20),
           children: [
-            for (var index = 0; index < groups.length; index++) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: AppCard(
-                  padding: EdgeInsets.zero,
-                  child: CupertinoListTile.notched(
-                    title: Text(groups[index]),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(28, 28),
-                          onPressed: () => _editGroup(groups[index]),
-                          child: const Icon(
-                            CupertinoIcons.pencil,
-                            size: 18,
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(28, 28),
-                          onPressed: () => _removeGroup(groups[index]),
-                          child: Icon(
-                            CupertinoIcons.delete,
-                            color:
-                                CupertinoColors.systemRed.resolveFrom(context),
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              if (index < groups.length - 1) const SizedBox(height: 8),
-            ],
+            AppListSection(
+              hasLeading: false,
+              children: groups.map(_buildGroupTile).toList(growable: false),
+            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildGroupTile(String group) {
+    return AppListTile(
+      title: Text(group),
+      showChevron: false,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(28, 28),
+            onPressed: () => _editGroup(group),
+            child: const Icon(
+              CupertinoIcons.pencil,
+              size: 18,
+            ),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(28, 28),
+            onPressed: () => _removeGroup(group),
+            child: Icon(
+              CupertinoIcons.delete,
+              color: CupertinoColors.systemRed.resolveFrom(context),
+              size: 18,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/dict_rule.dart';
+import 'rule_edit_form_card.dart';
 
 enum _DictRuleEditMenuAction {
   copyRule,
@@ -49,32 +52,22 @@ class _DictRuleEditViewState extends State<DictRuleEditView> {
   }
 
   Future<void> _showMoreMenu() async {
-    final selected = await showCupertinoBottomDialog<_DictRuleEditMenuAction>(
+    final selected = await showAppActionListSheet<_DictRuleEditMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('字典规则'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleEditMenuAction.copyRule,
-            ),
-            child: const Text('复制规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleEditMenuAction.pasteRule,
-            ),
-            child: const Text('粘贴规则'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      title: '字典规则',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_DictRuleEditMenuAction>(
+          value: _DictRuleEditMenuAction.copyRule,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '复制规则',
         ),
-      ),
+        AppActionListItem<_DictRuleEditMenuAction>(
+          value: _DictRuleEditMenuAction.pasteRule,
+          icon: CupertinoIcons.doc_on_clipboard,
+          label: '粘贴规则',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
@@ -164,26 +157,26 @@ class _DictRuleEditViewState extends State<DictRuleEditView> {
           ),
         ],
       ),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
         children: [
-          CupertinoFormSection.insetGrouped(
-            header: const Text('规则内容'),
-            children: [
-              CupertinoTextFormFieldRow(
-                controller: _nameController,
-                prefix: const Text('名称'),
+          RuleEditFormCard(
+            sectionTitle: '规则内容',
+            fields: [
+              RuleEditFieldSpec(
+                label: '名称',
                 placeholder: '请输入名称',
+                controller: _nameController,
               ),
-              CupertinoTextFormFieldRow(
-                controller: _urlRuleController,
-                prefix: const Text('URL规则'),
+              RuleEditFieldSpec(
+                label: 'URL规则',
                 placeholder: '请输入URL规则',
+                controller: _urlRuleController,
               ),
-              CupertinoTextFormFieldRow(
-                controller: _showRuleController,
-                prefix: const Text('显示规则'),
+              RuleEditFieldSpec(
+                label: '显示规则',
                 placeholder: '请输入显示规则',
+                controller: _showRuleController,
               ),
             ],
           ),

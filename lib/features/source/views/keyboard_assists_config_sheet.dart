@@ -1,6 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_card.dart';
 import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_glass_sheet_panel.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../core/services/keyboard_assist_store.dart';
@@ -31,6 +36,11 @@ class _KeyboardAssistsConfigDialog extends StatefulWidget {
 
 class _KeyboardAssistsConfigDialogState
     extends State<_KeyboardAssistsConfigDialog> {
+  static const double _kWidthFactor = 0.9;
+  static const double _kHeightFactor = 0.9;
+  static const double _kMaxWidth = 720;
+  static const double _kMaxHeight = 760;
+
   List<KeyboardAssistEntry> _items = const <KeyboardAssistEntry>[];
   bool _loading = true;
 
@@ -128,113 +138,142 @@ class _KeyboardAssistsConfigDialogState
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+    final ui = AppUiTokens.resolve(context);
+    final size = MediaQuery.sizeOf(context);
+    final width = math.min(size.width * _kWidthFactor, _kMaxWidth);
+    final height = math.min(size.height * _kHeightFactor, _kMaxHeight);
+
     return Center(
-      child: CupertinoPopupSurface(
-        child: SizedBox(
-          width: size.width * 0.9,
-          height: size.height * 0.9,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                child: Row(
-                  children: [
-                    CupertinoButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('关闭'),
-                    ),
-                    const Expanded(
-                      child: Center(
-                        child: Text(
-                          '辅助按键配置',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: AppGlassSheetPanel(
+          contentPadding: EdgeInsets.zero,
+          radius: ui.radii.sheet,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  child: Row(
+                    children: [
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('关闭'),
+                      ),
+                      const Expanded(
+                        child: Center(
+                          child: Text(
+                            '辅助按键配置',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: () => _editAssist(null),
+                        child: const Icon(CupertinoIcons.add),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildSeparator(ui),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CupertinoActivityIndicator())
+                      : _items.isEmpty
+                          ? const AppEmptyState(
+                              illustration:
+                                  AppEmptyPlanetIllustration(size: 80),
+                              title: '暂无辅助按键',
+                              message: '点击右上角加号添加辅助按键',
+                            )
+                          : ListView.separated(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+                              itemCount: _items.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final item = _items[index];
+                                return _KeyboardAssistListTile(
+                                  item: item,
+                                  onTap: () => _editAssist(item),
+                                  onDelete: () => _deleteAssist(item),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KeyboardAssistListTile extends StatelessWidget {
+  final KeyboardAssistEntry item;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _KeyboardAssistListTile({
+    required this.item,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final secondaryLabel = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final destructiveColor =
+        CupertinoColors.destructiveRed.resolveFrom(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+        child: SizedBox(
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.key,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    CupertinoButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      onPressed: () => _editAssist(null),
-                      child: const Icon(CupertinoIcons.add),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.value.isEmpty ? '（空值）' : item.value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: secondaryLabel,
+                      ),
                     ),
                   ],
                 ),
               ),
-              _buildSeparator(context),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CupertinoActivityIndicator())
-                    : _items.isEmpty
-                        ? const AppEmptyState(
-                            illustration: AppEmptyPlanetIllustration(size: 80),
-                            title: '暂无辅助按键',
-                            message: '点击右上角加号添加辅助按键',
-                          )
-                        : ListView.separated(
-                            itemCount: _items.length,
-                            separatorBuilder: (_, __) =>
-                                _buildSeparator(context),
-                            itemBuilder: (context, index) {
-                              final item = _items[index];
-                              return GestureDetector(
-                                onTap: () => _editAssist(item),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              item.key,
-                                              style: const TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              item.value.isEmpty
-                                                  ? '（空值）'
-                                                  : item.value,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: CupertinoColors
-                                                    .secondaryLabel
-                                                    .resolveFrom(context),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      CupertinoButton(
-                                        padding: const EdgeInsets.all(4),
-                                        minimumSize: const Size(28, 28),
-                                        onPressed: () => _deleteAssist(item),
-                                        child: Icon(
-                                          CupertinoIcons.delete,
-                                          size: 18,
-                                          color: CupertinoColors.destructiveRed
-                                              .resolveFrom(context),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+              CupertinoButton(
+                padding: const EdgeInsets.all(4),
+                minimumSize: const Size(28, 28),
+                onPressed: onDelete,
+                child: Icon(
+                  CupertinoIcons.delete,
+                  size: 18,
+                  color: destructiveColor,
+                ),
               ),
             ],
           ),
@@ -242,11 +281,11 @@ class _KeyboardAssistsConfigDialogState
       ),
     );
   }
+}
 
-  Widget _buildSeparator(BuildContext context) {
-    return Container(
-      height: 0.5,
-      color: CupertinoColors.separator.resolveFrom(context),
-    );
-  }
+Widget _buildSeparator(AppUiTokens ui) {
+  return Container(
+    height: ui.sizes.dividerThickness,
+    color: ui.colors.separator.withValues(alpha: 0.78),
+  );
 }

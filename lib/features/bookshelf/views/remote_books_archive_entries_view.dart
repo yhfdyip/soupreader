@@ -95,22 +95,19 @@ class _RemoteBooksArchiveEntriesViewState
     BuildContext context,
     RemoteBooksArchiveCandidate item,
   ) {
-    final separator = CupertinoColors.separator.resolveFrom(context);
+    final tokens = AppUiTokens.resolve(context);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => Navigator.of(context).pop(item.fileName),
-      child: Container(
+      child: AppCard(
         padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground.resolveFrom(context),
-          border: Border(bottom: BorderSide(color: separator, width: 0.5)),
-        ),
+        borderColor: tokens.colors.separator.withValues(alpha: 0.72),
         child: Row(
           children: [
             Icon(
               _resolveIcon(item),
               size: 18,
-              color: CupertinoColors.activeBlue.resolveFrom(context),
+              color: tokens.colors.accent,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -128,8 +125,7 @@ class _RemoteBooksArchiveEntriesViewState
                     '${item.extension.toUpperCase()} · ${_formatBytes(item.sizeInBytes)}',
                     style: TextStyle(
                       fontSize: 12,
-                      color:
-                          CupertinoColors.secondaryLabel.resolveFrom(context),
+                      color: tokens.colors.secondaryLabel,
                     ),
                   ),
                 ],
@@ -138,7 +134,7 @@ class _RemoteBooksArchiveEntriesViewState
             Icon(
               CupertinoIcons.chevron_forward,
               size: 16,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              color: tokens.colors.tertiaryLabel,
             ),
           ],
         ),
@@ -173,8 +169,10 @@ class _RemoteBooksArchiveEntriesViewState
           Expanded(
             child: candidates.isEmpty
                 ? _buildEmptyState()
-                : ListView.builder(
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
                     itemCount: candidates.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (itemContext, index) {
                       return _buildCandidateTile(
                         itemContext,

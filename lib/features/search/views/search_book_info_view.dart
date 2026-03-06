@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/theme/source_ui_tokens.dart';
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -1022,37 +1023,33 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }) async {
     final options = await _loadTxtTocRuleOptions();
     if (!mounted) return null;
-    return showCupertinoBottomDialog<String?>(
+    final normalizedCurrent = currentRegex.trim();
+    final items = <AppActionListItem<String>>[
+      AppActionListItem<String>(
+        value: '',
+        icon: normalizedCurrent.isEmpty
+            ? CupertinoIcons.check_mark_circled_solid
+            : CupertinoIcons.circle,
+        label: normalizedCurrent.isEmpty ? '✓ 自动识别（默认）' : '自动识别（默认）',
+      ),
+      ...options.map(
+        (option) => AppActionListItem<String>(
+          value: option.rule,
+          icon: normalizedCurrent == option.rule
+              ? CupertinoIcons.check_mark_circled_solid
+              : CupertinoIcons.doc_text,
+          label: normalizedCurrent == option.rule
+              ? '✓ ${option.name}'
+              : option.name,
+        ),
+      ),
+    ];
+    return showAppActionListSheet<String>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) {
-        final normalizedCurrent = currentRegex.trim();
-        return CupertinoActionSheet(
-          title: const Text('TXT 目录规则'),
-          message: const Text('选择后会立即重建本地 TXT 目录。'),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.pop(sheetContext, ''),
-              child: Text(
-                normalizedCurrent.isEmpty ? '✓ 自动识别（默认）' : '自动识别（默认）',
-              ),
-            ),
-            for (final option in options)
-              CupertinoActionSheetAction(
-                onPressed: () => Navigator.pop(sheetContext, option.rule),
-                child: Text(
-                  normalizedCurrent == option.rule
-                      ? '✓ ${option.name}'
-                      : option.name,
-                ),
-              ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(sheetContext),
-            child: const Text('取消'),
-          ),
-        );
-      },
+      title: 'TXT 目录规则',
+      message: '选择后会立即重建本地 TXT 目录。',
+      showCancel: true,
+      items: items,
     );
   }
 
@@ -3847,21 +3844,6 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
   static const Key _menuSearchCloseKey =
       Key('search_book_toc_menu_search_close');
   static const Key _menuMoreActionKey = Key('search_book_toc_menu_more_action');
-  static const Key _menuReverseTocActionKey =
-      Key('search_book_toc_menu_reverse_toc_action');
-  static const Key _menuUseReplaceActionKey =
-      Key('search_book_toc_menu_use_replace_action');
-  static const Key _menuLoadWordCountActionKey =
-      Key('search_book_toc_menu_load_word_count_action');
-  static const Key _menuTocRuleActionKey =
-      Key('search_book_toc_menu_toc_rule_action');
-  static const Key _menuSplitLongChapterActionKey =
-      Key('search_book_toc_menu_split_long_chapter_action');
-  static const Key _menuExportBookmarkActionKey =
-      Key('search_book_toc_menu_export_bookmark_action');
-  static const Key _menuExportBookmarkMarkdownActionKey =
-      Key('search_book_toc_menu_export_markdown_action');
-  static const Key _menuLogActionKey = Key('search_book_toc_menu_log_action');
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -3957,23 +3939,6 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
     );
   }
 
-  Widget _buildCheckableActionLabel({
-    required String title,
-    required bool checked,
-  }) {
-    if (!checked) {
-      return Text(title);
-    }
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(CupertinoIcons.check_mark, size: 18),
-        const SizedBox(width: 6),
-        Text(title),
-      ],
-    );
-  }
-
   Future<void> _showTocMenu() async {
     if (_runningUseReplaceAction ||
         _runningLoadWordCountAction ||
@@ -3983,93 +3948,65 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
         _runningExportBookmarkMarkdownAction) {
       return;
     }
-    final selected = await showCupertinoBottomDialog<_SearchBookTocMenuAction>(
-      context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('目录操作'),
-        actions: [
-          if (widget.showTxtTocRuleAction)
-            CupertinoActionSheetAction(
-              key: _menuTocRuleActionKey,
-              onPressed: () =>
-                  Navigator.pop(sheetContext, _SearchBookTocMenuAction.tocRule),
-              child: const Text('TXT 目录规则'),
-            ),
-          if (widget.showSplitLongChapterAction)
-            CupertinoActionSheetAction(
-              key: _menuSplitLongChapterActionKey,
-              onPressed: () => Navigator.pop(
-                sheetContext,
-                _SearchBookTocMenuAction.splitLongChapter,
-              ),
-              child: _buildCheckableActionLabel(
-                title: '拆分超长章节',
-                checked: _splitLongChapterEnabled,
-              ),
-            ),
-          CupertinoActionSheetAction(
-            key: _menuReverseTocActionKey,
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _SearchBookTocMenuAction.reverseToc,
-            ),
-            child: const Text('反转目录'),
-          ),
-          if (widget.showUseReplaceAction)
-            CupertinoActionSheetAction(
-              key: _menuUseReplaceActionKey,
-              onPressed: () => Navigator.pop(
-                sheetContext,
-                _SearchBookTocMenuAction.useReplace,
-              ),
-              child: _buildCheckableActionLabel(
-                title: '使用替换',
-                checked: _useReplaceEnabled,
-              ),
-            ),
-          if (widget.showLoadWordCountAction)
-            CupertinoActionSheetAction(
-              key: _menuLoadWordCountActionKey,
-              onPressed: () => Navigator.pop(
-                sheetContext,
-                _SearchBookTocMenuAction.loadWordCount,
-              ),
-              child: _buildCheckableActionLabel(
-                title: '加载字数',
-                checked: _loadWordCountEnabled,
-              ),
-            ),
-          if (widget.showExportBookmarkAction)
-            CupertinoActionSheetAction(
-              key: _menuExportBookmarkActionKey,
-              onPressed: () => Navigator.pop(
-                sheetContext,
-                _SearchBookTocMenuAction.exportBookmark,
-              ),
-              child: const Text('导出'),
-            ),
-          if (widget.showExportBookmarkAction)
-            CupertinoActionSheetAction(
-              key: _menuExportBookmarkMarkdownActionKey,
-              onPressed: () => Navigator.pop(
-                sheetContext,
-                _SearchBookTocMenuAction.exportBookmarkMarkdown,
-              ),
-              child: const Text('导出(MD)'),
-            ),
-          CupertinoActionSheetAction(
-            key: _menuLogActionKey,
-            onPressed: () =>
-                Navigator.pop(sheetContext, _SearchBookTocMenuAction.log),
-            child: const Text('日志'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+    final items = <AppActionListItem<_SearchBookTocMenuAction>>[
+      if (widget.showTxtTocRuleAction)
+        const AppActionListItem<_SearchBookTocMenuAction>(
+          value: _SearchBookTocMenuAction.tocRule,
+          icon: CupertinoIcons.doc_text,
+          label: 'TXT 目录规则',
         ),
+      if (widget.showSplitLongChapterAction)
+        AppActionListItem<_SearchBookTocMenuAction>(
+          value: _SearchBookTocMenuAction.splitLongChapter,
+          icon: _splitLongChapterEnabled
+              ? CupertinoIcons.check_mark_circled_solid
+              : CupertinoIcons.textformat_size,
+          label: _splitLongChapterEnabled ? '✓ 拆分超长章节' : '拆分超长章节',
+        ),
+      const AppActionListItem<_SearchBookTocMenuAction>(
+        value: _SearchBookTocMenuAction.reverseToc,
+        icon: CupertinoIcons.arrow_up_arrow_down,
+        label: '反转目录',
       ),
+      if (widget.showUseReplaceAction)
+        AppActionListItem<_SearchBookTocMenuAction>(
+          value: _SearchBookTocMenuAction.useReplace,
+          icon: _useReplaceEnabled
+              ? CupertinoIcons.check_mark_circled_solid
+              : CupertinoIcons.textformat,
+          label: _useReplaceEnabled ? '✓ 使用替换' : '使用替换',
+        ),
+      if (widget.showLoadWordCountAction)
+        AppActionListItem<_SearchBookTocMenuAction>(
+          value: _SearchBookTocMenuAction.loadWordCount,
+          icon: _loadWordCountEnabled
+              ? CupertinoIcons.check_mark_circled_solid
+              : CupertinoIcons.number,
+          label: _loadWordCountEnabled ? '✓ 加载字数' : '加载字数',
+        ),
+      if (widget.showExportBookmarkAction)
+        const AppActionListItem<_SearchBookTocMenuAction>(
+          value: _SearchBookTocMenuAction.exportBookmark,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '导出',
+        ),
+      if (widget.showExportBookmarkAction)
+        const AppActionListItem<_SearchBookTocMenuAction>(
+          value: _SearchBookTocMenuAction.exportBookmarkMarkdown,
+          icon: CupertinoIcons.doc_text_fill,
+          label: '导出(MD)',
+        ),
+      const AppActionListItem<_SearchBookTocMenuAction>(
+        value: _SearchBookTocMenuAction.log,
+        icon: CupertinoIcons.doc_text_search,
+        label: '日志',
+      ),
+    ];
+    final selected = await showAppActionListSheet<_SearchBookTocMenuAction>(
+      context: context,
+      title: '目录操作',
+      showCancel: true,
+      items: items,
     );
     if (selected == null) return;
     switch (selected) {

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/remote_server.dart';
 import '../services/remote_server_store.dart';
@@ -159,13 +160,14 @@ class _RemoteBooksServersViewState extends State<RemoteBooksServersView> {
 
   Widget _buildServerRow(RemoteServer server) {
     final selected = server.id == _selectedServerId;
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: Text(server.displayName),
       subtitle: Text(
         server.normalizedUrl.isEmpty ? '未设置地址' : server.normalizedUrl,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
+      showChevron: false,
       onTap: () {
         if (_loading) return;
         setState(() {
@@ -250,14 +252,15 @@ class _RemoteBooksServersViewState extends State<RemoteBooksServersView> {
         child: CupertinoActivityIndicator(),
       );
     }
-    return ListView(
-      padding: const EdgeInsets.only(top: 8, bottom: 12),
+    return AppListView(
       children: [
-        CupertinoListSection.insetGrouped(
+        AppListSection(
+          hasLeading: false,
           children: [
-            CupertinoListTile.notched(
+            AppListTile(
               title: const Text('默认'),
               subtitle: const Text('使用全局 WebDav 配置'),
+              showChevron: false,
               onTap: () {
                 if (_loading) return;
                 setState(() {
@@ -271,6 +274,7 @@ class _RemoteBooksServersViewState extends State<RemoteBooksServersView> {
             ..._servers.map(_buildServerRow),
           ],
         ),
+        const SizedBox(height: 12),
       ],
     );
   }

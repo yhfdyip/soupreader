@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -45,6 +46,15 @@ class SourceDebugLegacyView extends StatefulWidget {
 
   @override
   State<SourceDebugLegacyView> createState() => _SourceDebugLegacyViewState();
+}
+
+enum _SourceDebugMoreAction {
+  searchRaw,
+  bookRaw,
+  tocRaw,
+  contentRaw,
+  refreshExplore,
+  help,
 }
 
 class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
@@ -300,29 +310,25 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
 
   Future<void> _pickExploreQuick() async {
     if (_exploreKinds.isEmpty) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<int>(
       context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('选择发现'),
-        actions: [
-          for (var i = 0; i < _exploreKinds.length; i++)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(popupContext);
-                final kind = _exploreKinds[i];
-                setState(() => _selectedExploreIndex = i);
-                _runExploreQuick(kind);
-              },
-              child: Text(_exploreKinds[i].title),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择发现',
+      showCancel: true,
+      items: [
+        for (var i = 0; i < _exploreKinds.length; i++)
+          AppActionListItem<int>(
+            value: i,
+            icon: CupertinoIcons.compass,
+            label: _exploreKinds[i].title,
+          ),
+      ],
     );
+    if (selected == null || selected < 0 || selected >= _exploreKinds.length) {
+      return;
+    }
+    final kind = _exploreKinds[selected];
+    setState(() => _selectedExploreIndex = selected);
+    _runExploreQuick(kind);
   }
 
   void _applyPrefix(String prefix) {
@@ -397,61 +403,64 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
   }
 
   Future<void> _showMoreMenu() async {
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_SourceDebugMoreAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('更多'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _openSearchRawSource();
-            },
-            child: const Text('搜索源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _openBookRawSource();
-            },
-            child: const Text('书籍源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _openTocRawSource();
-            },
-            child: const Text('目录源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _openContentRawSource();
-            },
-            child: const Text('正文源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _refreshExploreKinds();
-            },
-            child: const Text('刷新发现'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              Navigator.pop(popupContext);
-              await _showDebugHelp();
-            },
-            child: const Text('帮助'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
+      title: '更多',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_SourceDebugMoreAction>(
+          value: _SourceDebugMoreAction.searchRaw,
+          icon: CupertinoIcons.search,
+          label: '搜索源码',
         ),
-      ),
+        AppActionListItem<_SourceDebugMoreAction>(
+          value: _SourceDebugMoreAction.bookRaw,
+          icon: CupertinoIcons.book,
+          label: '书籍源码',
+        ),
+        AppActionListItem<_SourceDebugMoreAction>(
+          value: _SourceDebugMoreAction.tocRaw,
+          icon: CupertinoIcons.list_bullet,
+          label: '目录源码',
+        ),
+        AppActionListItem<_SourceDebugMoreAction>(
+          value: _SourceDebugMoreAction.contentRaw,
+          icon: CupertinoIcons.doc_text,
+          label: '正文源码',
+        ),
+        AppActionListItem<_SourceDebugMoreAction>(
+          value: _SourceDebugMoreAction.refreshExplore,
+          icon: CupertinoIcons.refresh,
+          label: '刷新发现',
+        ),
+        AppActionListItem<_SourceDebugMoreAction>(
+          value: _SourceDebugMoreAction.help,
+          icon: CupertinoIcons.question_circle,
+          label: '帮助',
+        ),
+      ],
     );
+    if (selected == null) return;
+    switch (selected) {
+      case _SourceDebugMoreAction.searchRaw:
+        await _openSearchRawSource();
+        return;
+      case _SourceDebugMoreAction.bookRaw:
+        await _openBookRawSource();
+        return;
+      case _SourceDebugMoreAction.tocRaw:
+        await _openTocRawSource();
+        return;
+      case _SourceDebugMoreAction.contentRaw:
+        await _openContentRawSource();
+        return;
+      case _SourceDebugMoreAction.refreshExplore:
+        await _refreshExploreKinds();
+        return;
+      case _SourceDebugMoreAction.help:
+        await _showDebugHelp();
+        return;
+    }
   }
 
   Future<void> _showDebugHelp() async {

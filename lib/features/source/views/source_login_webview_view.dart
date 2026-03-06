@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -35,6 +36,13 @@ class SourceLoginWebViewView extends StatefulWidget {
 
   @override
   State<SourceLoginWebViewView> createState() => _SourceLoginWebViewViewState();
+}
+
+enum _SourceLoginWebviewAction {
+  openInBrowser,
+  copyUrl,
+  reload,
+  clearCookie,
 }
 
 class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
@@ -265,54 +273,52 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
 
   Future<void> _showMoreMenu() async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final menuUrl = (_currentUrl.isEmpty ? _initialUrl : _currentUrl);
+    final action = await showAppActionListSheet<_SourceLoginWebviewAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('操作'),
-        message: Text(
-          (_currentUrl.isEmpty ? _initialUrl : _currentUrl),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+      title: '操作',
+      message: menuUrl,
+      showCancel: true,
+      items: const [
+        AppActionListItem<_SourceLoginWebviewAction>(
+          value: _SourceLoginWebviewAction.openInBrowser,
+          icon: CupertinoIcons.globe,
+          label: '浏览器打开',
         ),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _openInBrowser();
-            },
-            child: const Text('浏览器打开'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _copyUrl();
-            },
-            child: const Text('拷贝 URL'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              unawaited(_reloadOrStop());
-            },
-            child: const Text('刷新'),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () async {
-              Navigator.pop(sheetContext);
-              final ok = await WebViewCookieBridge.clearAllCookies();
-              await _showMessage(ok ? '已清空 Cookie' : '清空失败或不支持');
-            },
-            child: const Text('清空 WebView Cookie'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+        AppActionListItem<_SourceLoginWebviewAction>(
+          value: _SourceLoginWebviewAction.copyUrl,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '拷贝 URL',
         ),
-      ),
+        AppActionListItem<_SourceLoginWebviewAction>(
+          value: _SourceLoginWebviewAction.reload,
+          icon: CupertinoIcons.refresh,
+          label: '刷新',
+        ),
+        AppActionListItem<_SourceLoginWebviewAction>(
+          value: _SourceLoginWebviewAction.clearCookie,
+          icon: CupertinoIcons.delete,
+          label: '清空 WebView Cookie',
+          isDestructiveAction: true,
+        ),
+      ],
     );
+    if (action == null) return;
+    switch (action) {
+      case _SourceLoginWebviewAction.openInBrowser:
+        await _openInBrowser();
+        return;
+      case _SourceLoginWebviewAction.copyUrl:
+        await _copyUrl();
+        return;
+      case _SourceLoginWebviewAction.reload:
+        unawaited(_reloadOrStop());
+        return;
+      case _SourceLoginWebviewAction.clearCookie:
+        final ok = await WebViewCookieBridge.clearAllCookies();
+        await _showMessage(ok ? '已清空 Cookie' : '清空失败或不支持');
+        return;
+    }
   }
 
   Future<void> _loadUrl(String url) async {

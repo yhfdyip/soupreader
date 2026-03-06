@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/txt_toc_rule.dart';
+import 'rule_edit_form_card.dart';
 
 enum _TxtTocRuleEditMenuAction {
   copyRule,
@@ -49,30 +52,22 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
   }
 
   Future<void> _showMoreMenu() async {
-    final selected = await showCupertinoBottomDialog<_TxtTocRuleEditMenuAction>(
+    final selected = await showAppActionListSheet<_TxtTocRuleEditMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('TXT 目录规则'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(sheetContext, _TxtTocRuleEditMenuAction.copyRule),
-            child: const Text('复制规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleEditMenuAction.pasteRule,
-            ),
-            child: const Text('粘贴规则'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      title: 'TXT 目录规则',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_TxtTocRuleEditMenuAction>(
+          value: _TxtTocRuleEditMenuAction.copyRule,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '复制规则',
         ),
-      ),
+        AppActionListItem<_TxtTocRuleEditMenuAction>(
+          value: _TxtTocRuleEditMenuAction.pasteRule,
+          icon: CupertinoIcons.doc_on_clipboard,
+          label: '粘贴规则',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
@@ -184,26 +179,26 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
           ),
         ],
       ),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
         children: [
-          CupertinoFormSection.insetGrouped(
-            header: const Text('规则内容'),
-            children: [
-              CupertinoTextFormFieldRow(
-                controller: _nameController,
-                prefix: const Text('名称'),
+          RuleEditFormCard(
+            sectionTitle: '规则内容',
+            fields: [
+              RuleEditFieldSpec(
+                label: '名称',
                 placeholder: '请输入名称',
+                controller: _nameController,
               ),
-              CupertinoTextFormFieldRow(
-                controller: _ruleController,
-                prefix: const Text('正则'),
+              RuleEditFieldSpec(
+                label: '正则',
                 placeholder: '请输入正则',
+                controller: _ruleController,
               ),
-              CupertinoTextFormFieldRow(
-                controller: _exampleController,
-                prefix: const Text('示例'),
+              RuleEditFieldSpec(
+                label: '示例',
                 placeholder: '请输入示例',
+                controller: _exampleController,
               ),
             ],
           ),

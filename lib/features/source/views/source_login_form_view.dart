@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -76,32 +77,23 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
 
   Future<void> _showMoreMenu() async {
     if (_loading || !mounted) return;
-    final selected = await showCupertinoBottomDialog<_SourceLoginMenuAction>(
+    final selected = await showAppActionListSheet<_SourceLoginMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _SourceLoginMenuAction.showLoginHeader,
-            ),
-            child: const Text('查看登录头'),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _SourceLoginMenuAction.deleteLoginHeader,
-            ),
-            child: const Text('删除登录头'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      title: '操作',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_SourceLoginMenuAction>(
+          value: _SourceLoginMenuAction.showLoginHeader,
+          icon: CupertinoIcons.doc_text_search,
+          label: '查看登录头',
         ),
-      ),
+        AppActionListItem<_SourceLoginMenuAction>(
+          value: _SourceLoginMenuAction.deleteLoginHeader,
+          icon: CupertinoIcons.delete,
+          label: '删除登录头',
+          isDestructiveAction: true,
+        ),
+      ],
     );
     if (selected == _SourceLoginMenuAction.showLoginHeader) {
       await _showLoginHeaderDialog();
