@@ -640,9 +640,9 @@ class _InterfaceTab extends StatelessWidget {
         ),
         _Section(
           title: '内容边距',
-          child: Column(
-            children: [
-              _SliderRow(
+          child: _SliderGroup(
+            rows: [
+              _SliderRowData(
                 label: '上边',
                 value: settings.paddingTop,
                 min: 0,
@@ -655,8 +655,7 @@ class _InterfaceTab extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _SliderRow(
+              _SliderRowData(
                 label: '下边',
                 value: settings.paddingBottom,
                 min: 0,
@@ -669,8 +668,7 @@ class _InterfaceTab extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _SliderRow(
+              _SliderRowData(
                 label: '左边',
                 value: settings.paddingLeft,
                 min: 0,
@@ -683,8 +681,7 @@ class _InterfaceTab extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _SliderRow(
+              _SliderRowData(
                 label: '右边',
                 value: settings.paddingRight,
                 min: 0,
