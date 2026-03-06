@@ -7863,19 +7863,24 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               opacity: _searchMenuFadeAnim,
               child: SafeArea(
             top: false,
-            child: Container(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
               margin: const EdgeInsets.fromLTRB(6, 0, 6, 0),
               decoration: BoxDecoration(
-                color: _uiPanelBg.withValues(alpha: 0.97),
+                color: _uiPanelBg.withValues(alpha: 0.85),
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12),
+                  top: Radius.circular(16),
                 ),
-                border: Border.all(color: _uiBorder),
                 boxShadow: [
                   BoxShadow(
                     color: navBtnShadow,
-                    blurRadius: 14,
-                    offset: const Offset(0, -4),
+                    blurRadius: 20,
+                    offset: const Offset(0, -2),
                   ),
                 ],
               ),
@@ -7999,6 +8004,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               ),
             ),
           ),
+              ),
+            ),
             ),
           ),
         ),
