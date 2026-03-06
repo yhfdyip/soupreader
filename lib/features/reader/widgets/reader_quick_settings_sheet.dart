@@ -590,13 +590,27 @@ class _InterfaceTab extends StatelessWidget {
           title: '亮度',
           child: Column(
             children: [
-              _SwitchRow(
-                label: '跟随系统',
-                value: settings.useSystemBrightness,
-                onChanged: (v) => onSettingsChanged(
-                    settings.copyWith(useSystemBrightness: v)),
+              _SwitchGroup(
+                rows: [
+                  _SwitchRowData(
+                    label: '跟随系统',
+                    value: settings.useSystemBrightness,
+                    onChanged: (v) => onSettingsChanged(
+                        settings.copyWith(useSystemBrightness: v)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
+              Builder(builder: (context) {
+                final isDark =
+                    CupertinoTheme.of(context).brightness == Brightness.dark;
+                return Container(
+                  height: 0.5,
+                  color: isDark
+                      ? CupertinoColors.separator.darkColor
+                      : CupertinoColors.separator.color,
+                );
+              }),
+              const SizedBox(height: 4),
               IgnorePointer(
                 ignoring: settings.useSystemBrightness,
                 child: Opacity(
