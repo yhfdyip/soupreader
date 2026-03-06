@@ -253,9 +253,12 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
             final isSelected = _selectedZone == zone;
             final actionColor = _getActionColor(action);
 
-            return GestureDetector(
-              onTap: () => _showActionPicker(zone),
-              child: Container(
+            return CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              onPressed: () => _showActionPicker(zone),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
                 margin: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   color:
@@ -264,9 +267,9 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
                     color: isSelected
                         ? _accent
                         : actionColor.withValues(alpha: 0.45),
-                    width: isSelected ? 1.8 : 1,
+                    width: isSelected ? 2.0 : 1,
                   ),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,

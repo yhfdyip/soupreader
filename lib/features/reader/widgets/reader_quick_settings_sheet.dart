@@ -66,33 +66,32 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final sheetBg = ReaderSettingsTokens.sheetBackground(isDark: isDark);
-    final height = MediaQuery.of(context).size.height * 0.62;
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
+    final height = MediaQuery.of(context).size.height * 0.65;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: Container(
+        height: height,
         color: sheetBg,
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppDesignTokens.radiusPopup)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            _buildGrabber(),
-            _buildHeader(),
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: _buildTabs(),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: _buildBody(),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              _buildGrabber(),
+              _buildHeader(),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: _buildTabs(),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: _buildBody(),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
