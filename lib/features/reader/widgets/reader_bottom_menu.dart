@@ -329,11 +329,14 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             key: _brightnessPanelKey,
             width: _brightnessPanelWidth,
             height: panelHeight,
-            child: DecoratedBox(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: DecoratedBox(
               decoration: BoxDecoration(
                 color: panelColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: borderColor),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
                 children: [
@@ -424,6 +427,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                     ),
                   ),
                 ],
+              ),
+                ),
               ),
             ),
           ),
