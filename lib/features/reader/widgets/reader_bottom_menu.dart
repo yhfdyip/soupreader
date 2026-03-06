@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
@@ -109,32 +111,37 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       );
     }
 
-    Widget bottomPanel = Container(
-      key: _bottomMenuPanelKey,
-      decoration: BoxDecoration(
-        color: style.panelBackground,
-        boxShadow: [
-          BoxShadow(
-            color: style.shadowColor,
-            blurRadius: 24,
-            offset: const Offset(0, -2),
+    Widget bottomPanel = ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          key: _bottomMenuPanelKey,
+          decoration: BoxDecoration(
+            color: style.panelBackground.withValues(alpha: 0.85),
+            boxShadow: [
+              BoxShadow(
+                color: style.shadowColor,
+                blurRadius: 24,
+                offset: const Offset(0, -2),
+              ),
+            ],
           ),
-        ],
-      ),
-      // 让菜单面板本体直接覆盖到底部安全区，避免系统手势区露出正文底色。
-      padding: EdgeInsets.only(
-        bottom: bottomPadding + (bottomPadding > 0 ? 4 : 8),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildChapterSlider(
-            foreground: style.primaryText,
-            mutedForeground: style.secondaryText,
+          // 让菜单面板本体直接覆盖到底部安全区，避免系统手势区露出正文底色。
+          padding: EdgeInsets.only(
+            bottom: bottomPadding + (bottomPadding > 0 ? 4 : 8),
           ),
-          const SizedBox(height: 2),
-          _buildBottomTabs(foreground: style.primaryText),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildChapterSlider(
+                foreground: style.primaryText,
+                mutedForeground: style.secondaryText,
+              ),
+              const SizedBox(height: 2),
+              _buildBottomTabs(foreground: style.primaryText),
+            ],
+          ),
+        ),
       ),
     );
     if (slideAnim != null && fadeAnim != null) {

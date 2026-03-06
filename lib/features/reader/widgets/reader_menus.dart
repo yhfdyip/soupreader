@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
@@ -93,7 +95,10 @@ class ReaderTopMenu extends StatelessWidget {
     final fadeAnim = menuFadeAnimation;
     final slideAnim = menuSlideAnimation;
 
-    Widget panel = Container(
+    Widget panel = ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
         key: _readerTopMenuPanelKey,
         padding: EdgeInsets.only(
           top: mediaQuery.padding.top + 10,
@@ -102,7 +107,7 @@ class ReaderTopMenu extends StatelessWidget {
           bottom: 12,
         ),
         decoration: BoxDecoration(
-          color: style.panelBackground,
+          color: style.panelBackground.withValues(alpha: 0.85),
           boxShadow: [
             BoxShadow(
               color: style.shadowColor,
@@ -270,7 +275,9 @@ class ReaderTopMenu extends StatelessWidget {
             ],
           ],
         ),
-      );
+      ),
+    ),
+    );
 
     if (slideAnim != null && fadeAnim != null) {
       panel = SlideTransition(
