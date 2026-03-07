@@ -2069,7 +2069,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                 color: CupertinoColors.systemBackground
                     .resolveFrom(context)
                     .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
               ),
               child: Text(
                 message,
@@ -2283,7 +2283,7 @@ class _BookshelfViewState extends State<BookshelfView> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
           border: Border.all(
             color: selected
                 ? activeColor.withValues(alpha: 0.45)
