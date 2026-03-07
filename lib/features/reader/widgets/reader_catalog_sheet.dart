@@ -112,7 +112,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? AppDesignTokens.pageBgDark : AppDesignTokens.pageBgLight;
+      CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
       CupertinoColors.label.resolveFrom(context);
