@@ -503,7 +503,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
               CupertinoIcons.ellipsis_circle,
               size: 20,
               color: _busy
-                  ? AppDesignTokens.textMuted.withValues(alpha: 0.55)
+                  ? CupertinoColors.tertiaryLabel.resolveFrom(context)
                   : _textNormal,
             ),
           ),
@@ -514,7 +514,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
               CupertinoIcons.trash,
               size: 20,
               color: _busy
-                  ? AppDesignTokens.textMuted.withValues(alpha: 0.55)
+                  ? CupertinoColors.tertiaryLabel.resolveFrom(context)
                   : _textNormal,
             ),
           ),
@@ -525,7 +525,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
               CupertinoIcons.arrow_clockwise,
               size: 20,
               color: _busy
-                  ? AppDesignTokens.textMuted.withValues(alpha: 0.55)
+                  ? CupertinoColors.tertiaryLabel.resolveFrom(context)
                   : _textNormal,
             ),
           ),

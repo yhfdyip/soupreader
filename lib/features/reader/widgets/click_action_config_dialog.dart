@@ -180,7 +180,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   Widget _buildGrabber() {
     final color = _isDark
         ? CupertinoColors.white.withValues(alpha: 0.24)
-        : AppDesignTokens.textMuted.withValues(alpha: 0.35);
+        : CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 10),

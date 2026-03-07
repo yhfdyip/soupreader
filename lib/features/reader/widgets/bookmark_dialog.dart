@@ -253,7 +253,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   Widget _buildGrabber() {
     final color = _isDark
         ? CupertinoColors.white.withValues(alpha: 0.24)
-        : AppDesignTokens.textMuted.withValues(alpha: 0.35);
+        : CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 10),
@@ -397,9 +397,7 @@ class BookmarkIndicator extends StatelessWidget {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final activeColor =
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
-    final inactiveColor = isDark
-        ? CupertinoColors.systemGrey.resolveFrom(context)
-        : AppDesignTokens.textMuted;
+    final inactiveColor = CupertinoColors.secondaryLabel.resolveFrom(context);
 
     return CupertinoButton(
       padding: const EdgeInsets.all(8),
