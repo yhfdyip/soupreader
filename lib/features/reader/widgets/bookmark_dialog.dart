@@ -43,21 +43,20 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+      _isDark ? AppDesignTokens.pageBgDark : CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
-      _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+      CupertinoColors.label.resolveFrom(context);
 
-  Color get _textSubtle => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
-      : AppDesignTokens.textMuted;
+  Color get _textSubtle =>
+      CupertinoColors.secondaryLabel.resolveFrom(context);
 
   Color get _lineColor =>
-      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+      CupertinoColors.separator.resolveFrom(context);
 
   Color get _cardBg => _isDark
       ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1)
-      : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
+      : CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
 
   Color get _dangerBg => _isDark
       ? AppDesignTokens.error.withValues(alpha: 0.24)
@@ -115,9 +114,9 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
               margin: const EdgeInsets.only(bottom: 28),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: (_isDark ? const Color(0xFF2C2C2E) : _panelBg)
+                color: (_isDark ? AppDesignTokens.surfaceDark : _panelBg)
                     .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                 border: Border.all(color: _lineColor.withValues(alpha: 0.9)),
               ),
               child: Text(
@@ -169,7 +168,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
       height: MediaQuery.of(context).size.height * 0.6,
       decoration: BoxDecoration(
         color: _panelBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
       ),
       child: SafeArea(
         top: false,
@@ -298,7 +297,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: _dangerBg,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
           border: Border.all(
             color: AppDesignTokens.error.withValues(alpha: 0.5),
           ),
@@ -312,7 +311,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: _cardBg,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
           border: Border.all(color: _lineColor.withValues(alpha: 0.85)),
         ),
         child: CupertinoButton(
