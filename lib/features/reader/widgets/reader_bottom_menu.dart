@@ -201,8 +201,40 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final canPrev = widget.currentChapterIndex > 0;
     final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
+    // 进度标签：显示当前章节/页面进度
+    final progressLabel = chapterMode
+        ? '${widget.currentChapterIndex + 1} / ${widget.totalChapters}'
+        : '${widget.currentPageIndex + 1} / ${widget.totalPages}';
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                chapterMode ? '章节' : '页面',
+                style: TextStyle(
+                  color: mutedForeground,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                progressLabel,
+                style: TextStyle(
+                  color: mutedForeground,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 4),
       child: Row(
         children: [
           _buildChapterNavButton(
@@ -257,6 +289,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           ),
         ],
       ),
+    ),
+      ],
     );
   }
 
