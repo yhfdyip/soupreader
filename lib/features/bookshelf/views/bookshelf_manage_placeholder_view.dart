@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -1523,7 +1524,7 @@ class _SelectionSummaryBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1673,7 +1674,7 @@ class _BookSelectionTile extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
           border: Border.all(color: borderColor),
         ),
         child: Row(
@@ -1840,7 +1841,7 @@ class _BookshelfManageSourcePickerViewState
                             color: CupertinoColors
                                 .secondarySystemGroupedBackground
                                 .resolveFrom(context),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
                           ),
                           child: Row(
                             children: [
