@@ -67,7 +67,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final sheetBg = ReaderSettingsTokens.sheetBackground(isDark: isDark);
-    final height = MediaQuery.of(context).size.height * 0.65;
+    final height = MediaQuery.sizeOf(context).height * 0.65;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       child: Container(
@@ -79,12 +79,12 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
             children: [
               _buildGrabber(),
               _buildHeader(),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: _buildTabs(),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
@@ -101,12 +101,12 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   Widget _buildGrabber() {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final grabberColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.24)
+        ? CupertinoColors.white.withValues(alpha: 0.3)
         : CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
-        margin: const EdgeInsets.only(top: 10, bottom: 8),
-        width: 40,
+        margin: const EdgeInsets.only(top: 8, bottom: 6),
+        width: 36,
         height: 4,
         decoration: BoxDecoration(
           color: grabberColor,
@@ -120,37 +120,45 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final textColor =
         isDark ? CupertinoColors.white : CupertinoColors.label.resolveFrom(context);
+    final secondaryColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.5)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.fromLTRB(16, 2, 8, 0),
       child: Row(
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => Navigator.pop(context),
-            child: Icon(
-              CupertinoIcons.xmark,
-              color: textColor,
-              size: 20,
-            ),
-          ),
           Expanded(
             child: Text(
               '阅读设置',
-              textAlign: TextAlign.center,
               style: TextStyle(
                 color: textColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.3,
               ),
             ),
           ),
           CupertinoButton(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            minimumSize: Size.zero,
             onPressed: _showMoreActions,
             child: Icon(
-              CupertinoIcons.ellipsis,
-              color: textColor,
-              size: 22,
+              CupertinoIcons.ellipsis_circle,
+              color: secondaryColor,
+              size: 20,
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            minimumSize: Size.zero,
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              '完成',
+              style: TextStyle(
+                color: ReaderSettingsTokens.accent(isDark: isDark),
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -159,30 +167,31 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   }
 
   Widget _buildTabs() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return SizedBox(
+      width: double.infinity,
       child: CupertinoSlidingSegmentedControl<ReaderQuickSettingsTab>(
         groupValue: _tab,
+        padding: const EdgeInsets.all(3),
         onValueChanged: (v) {
           if (v == null) return;
           setState(() => _tab = v);
         },
         children: const <ReaderQuickSettingsTab, Widget>{
           ReaderQuickSettingsTab.typography: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text('字体'),
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('界面', textAlign: TextAlign.center),
           ),
           ReaderQuickSettingsTab.interface: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text('界面'),
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('设置', textAlign: TextAlign.center),
           ),
           ReaderQuickSettingsTab.page: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text('翻页'),
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('翻页', textAlign: TextAlign.center),
           ),
           ReaderQuickSettingsTab.more: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text('其他'),
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('其他', textAlign: TextAlign.center),
           ),
         },
       ),
@@ -291,14 +300,14 @@ class _Section extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 5),
           child: Text(
-            title.toUpperCase(),
+            title,
             style: TextStyle(
               color: titleColor,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.5,
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0,
             ),
           ),
         ),
@@ -585,7 +594,7 @@ class _MarginPresetRow extends StatelessWidget {
         minimumSize: Size.zero,
         onPressed: () => onSettingsChanged(_apply(v)),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: AppDesignTokens.motionQuick,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: selected
@@ -944,10 +953,9 @@ class _MoreTab extends StatelessWidget {
         ),
         _Section(
           title: '高级',
-          child: CupertinoButton(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            onPressed: onOpenFullSettings,
-            child: const Text('打开完整阅读设置'),
+          child: _SettingsLinkRow(
+            label: '完整阅读设置',
+            onTap: onOpenFullSettings,
           ),
         ),
         const SizedBox(height: 14),
@@ -967,27 +975,42 @@ class _ScreenOrientationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = [
-      (ReadingSettings.screenOrientationUnspecified, '跟随'),
-      (ReadingSettings.screenOrientationPortrait, '竖屏'),
-      (ReadingSettings.screenOrientationLandscape, '横屏'),
-      (ReadingSettings.screenOrientationSensor, '传感器'),
-    ];
-    final safeValue = options.any((o) => o.$1 == value)
+    final safeValue = [
+      ReadingSettings.screenOrientationUnspecified,
+      ReadingSettings.screenOrientationPortrait,
+      ReadingSettings.screenOrientationLandscape,
+      ReadingSettings.screenOrientationSensor,
+    ].contains(value)
         ? value
         : ReadingSettings.screenOrientationUnspecified;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final option in options)
-          _ModeChip(
-            label: option.$2,
-            selected: safeValue == option.$1,
-            disabled: false,
-            onTap: () => onChanged(option.$1),
+    return SizedBox(
+      width: double.infinity,
+      child: CupertinoSlidingSegmentedControl<int>(
+        groupValue: safeValue,
+        padding: const EdgeInsets.all(3),
+        onValueChanged: (v) {
+          if (v == null) return;
+          onChanged(v);
+        },
+        children: const <int, Widget>{
+          ReadingSettings.screenOrientationUnspecified: Padding(
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('跟随', textAlign: TextAlign.center),
           ),
-      ],
+          ReadingSettings.screenOrientationPortrait: Padding(
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('竖屏', textAlign: TextAlign.center),
+          ),
+          ReadingSettings.screenOrientationLandscape: Padding(
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('横屏', textAlign: TextAlign.center),
+          ),
+          ReadingSettings.screenOrientationSensor: Padding(
+            padding: EdgeInsets.symmetric(vertical: 7),
+            child: Text('传感器', textAlign: TextAlign.center),
+          ),
+        },
+      ),
     );
   }
 }
@@ -1061,7 +1084,7 @@ class _ThemeCell extends StatelessWidget {
       minimumSize: Size.zero,
       onPressed: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: AppDesignTokens.motionQuick,
         decoration: BoxDecoration(
           color: theme.background,
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
@@ -1204,7 +1227,7 @@ class _ModeChip extends StatelessWidget {
         minimumSize: Size.zero,
         onPressed: disabled ? null : onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: AppDesignTokens.motionQuick,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: baseColor,
@@ -1418,6 +1441,48 @@ class _FontFamilyRow extends StatelessWidget {
             onTap: () => onChanged(i),
           ),
       ],
+    );
+  }
+}
+
+class _SettingsLinkRow extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _SettingsLinkRow({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
+    final chevronColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.25)
+        : CupertinoColors.tertiaryLabel.resolveFrom(context);
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontSize: ReaderSettingsTokens.rowTitleSize,
+                ),
+              ),
+            ),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: chevronColor,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

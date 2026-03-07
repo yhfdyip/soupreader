@@ -604,6 +604,7 @@ class _SourceAvailabilityCheckViewState
                           border: Border.all(
                             color: _diagnosisLabelColor(item.diagnosis.primary)
                                 .withValues(alpha: 0.35),
+                            width: 0.5,
                           ),
                         ),
                         child: Text(

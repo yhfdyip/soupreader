@@ -940,7 +940,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   void _warmupSimulationFrames() {
     if (!mounted || !_needsShaderImages) return;
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     _ensureShaderImages(
       size,
       allowRecord: true,
@@ -949,7 +949,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Future<ui.Image> _convertToHighResImage(ui.Picture picture, Size size) async {
-    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     final int w = (size.width * dpr).toInt();
     final int h = (size.height * dpr).toInt();
 
@@ -1188,7 +1188,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       if (epoch != _precacheEpoch) return;
       if (_gestureInProgress || _isMoved || _isRunning || _isStarted) return;
 
-      final size = MediaQuery.of(context).size;
+      final size = MediaQuery.sizeOf(context);
       final didWork = _precacheOnePicture(size);
       if (_needsShaderImages) {
         _ensureShaderImages(
@@ -1282,7 +1282,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final effectiveMode = _effectivePageTurnMode;
     if (effectiveMode == PageTurnMode.none) {
       if (_needsPictureCache) {
-        final size = MediaQuery.of(context).size;
+        final size = MediaQuery.sizeOf(context);
         _ensureDirectionTargetPicture(
           size,
           direction: _direction,
@@ -1297,7 +1297,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       return;
     }
     if (_needsPictureCache) {
-      final size = MediaQuery.of(context).size;
+      final size = MediaQuery.sizeOf(context);
       _ensureDirectionTargetPicture(
         size,
         direction: _direction,
@@ -1328,7 +1328,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final direction = _direction;
     final token = ++_simulationPrepareToken;
     _isPreparingSimulationTurn = true;
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
 
     try {
       final ready = await _prepareSimulationTurnFrames(
@@ -1416,7 +1416,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final content = _factory.curPage;
     if (content.trim().isEmpty) return '';
 
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     final contentWidth =
         size.width - widget.padding.left - widget.padding.right;
     if (!contentWidth.isFinite || contentWidth <= 0) {
@@ -1663,7 +1663,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   int _resolveClickAction(Offset position) {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     final col = (position.dx / size.width * 3).floor().clamp(0, 2);
     final row = (position.dy / size.height * 3).floor().clamp(0, 2);
     const zones = [
@@ -1681,7 +1681,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _abortAnim();
     if (!_factory.hasNext()) return false;
 
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     final touchStartY = startY ?? size.height * 0.9;
     final y = touchStartY > size.height / 2 ? size.height * 0.9 : 1.0;
 
@@ -1696,7 +1696,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _abortAnim();
     if (!_factory.hasPrev()) return false;
 
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     _setStartPoint(0, size.height);
     _setDirection(_PageDirection.prev);
     _startTurnAnimation();
@@ -1706,7 +1706,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado: setDirection ===
   void _setDirection(_PageDirection direction) {
     _direction = direction;
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
 
     // === P2/P4: 在方向确定时计算角点（对标 Legado SimulationPageDelegate.setDirection）===
     if (direction == _PageDirection.prev) {
@@ -1741,7 +1741,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === P2: 计算角点（对标 Legado calcCornerXY）===
   void _calcCornerXY(double x, double y) {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     _cornerX = x <= size.width / 2 ? 0 : size.width;
     _cornerY = y <= size.height / 2 ? 0 : size.height;
   }
@@ -1776,7 +1776,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado: Cover/Slide onAnimStart ===
   void _onAnimStartHorizontalLegacy() {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     double distanceX;
     if (_direction == _PageDirection.next) {
       if (_isCancel) {
@@ -1800,7 +1800,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado: onAnimStart (SimulationPageDelegate) ===
   void _onAnimStart() {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     double dx, dy;
 
     // 使用预先计算的角点（对标 Legado mCornerX, mCornerY）
@@ -1834,7 +1834,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // P5: 动态动画时长计算（对标 Legado PageDelegate.startScroll）
   void _startScroll(
       double startX, double startY, double dx, double dy, int animationSpeed) {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     int duration;
     if (dx != 0) {
       duration = (animationSpeed * dx.abs() / size.width).toInt();
@@ -2003,7 +2003,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Widget _buildAnimatedPages() {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     final screenWidth = size.width;
     final isRunning = _isMoved || _isRunning || _isStarted;
     final effectiveMode = _effectivePageTurnMode;
@@ -2369,7 +2369,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         cornerY: _cornerY,
         shaderProgram: pageCurlProgram!,
         curPageImage: imageToCurl,
-        devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
+        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       ),
     );
   }
@@ -2450,7 +2450,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _isCancel = false;
     _direction = _PageDirection.none;
     if (_needsShaderImages) {
-      final size = MediaQuery.of(context).size;
+      final size = MediaQuery.sizeOf(context);
       _ensureShaderImages(
         size,
         allowRecord: true,
@@ -2508,7 +2508,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (_isMoved) {
-      final size = MediaQuery.of(context).size;
+      final size = MediaQuery.sizeOf(context);
 
       // === P3: 中间区域Y坐标强制调整（对标 Legado SimulationPageDelegate.onTouch）===
       double adjustedY = focusY;

@@ -138,8 +138,8 @@ class _SourceSortSheetState extends State<_SourceSortSheet> {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: titleColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -336,8 +336,8 @@ class _SourceGroupFilterSheet extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: titleColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),

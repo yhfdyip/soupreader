@@ -62,7 +62,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: MediaQuery.sizeOf(context).height * 0.75,
       decoration: BoxDecoration(
         color: _panelBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
@@ -217,12 +217,12 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
 
   Widget _buildGrabber() {
     final color = _isDark
-        ? CupertinoColors.white.withValues(alpha: 0.24)
+        ? CupertinoColors.white.withValues(alpha: 0.3)
         : CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
-        margin: const EdgeInsets.only(top: 10),
-        width: 38,
+        margin: const EdgeInsets.only(top: 8, bottom: 2),
+        width: 36,
         height: 4,
         decoration: BoxDecoration(
           color: color,
@@ -234,10 +234,10 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: _lineColor),
+          bottom: BorderSide(color: _lineColor, width: 0.5),
         ),
       ),
       child: Row(
@@ -247,19 +247,23 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
               '排版设置',
               style: TextStyle(
                 color: _textStrong,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.3,
               ),
             ),
           ),
           CupertinoButton(
-            padding: const EdgeInsets.all(6),
-            minimumSize: const Size(30, 30),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            minimumSize: Size.zero,
             onPressed: () => Navigator.pop(context),
-            child: Icon(
-              CupertinoIcons.xmark,
-              color: _textSubtle,
-              size: 18,
+            child: Text(
+              '完成',
+              style: TextStyle(
+                color: _accent,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -367,7 +371,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _chipBg,
-          border: Border.all(color: _lineColor),
+          border: Border.all(color: _lineColor, width: 0.5),
         ),
         child: Icon(
           icon,
@@ -406,7 +410,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                   minimumSize: Size.zero,
                   onPressed: () => onChanged(index),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
+                    duration: AppDesignTokens.motionQuick,
                     margin: EdgeInsets.only(
                       right: index < options.length - 1 ? 8 : 0,
                     ),
@@ -417,7 +421,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                       borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                       border: Border.all(
                         color: isSelected ? _accent : _lineColor,
-                        width: isSelected ? 1.5 : 1.0,
+                        width: isSelected ? 1.5 : 0.5,
                       ),
                     ),
                     child: Center(

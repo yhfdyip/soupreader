@@ -243,8 +243,6 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
   Color get _divider =>
       CupertinoColors.separator.resolveFrom(context);
 
-  Color get _shadow =>
-      CupertinoColors.black.withValues(alpha: _isDark ? 0.2 : 0.08);
 
   @override
   void initState() {
@@ -301,26 +299,21 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
     bool highlighted = false,
   }) {
     final color = highlighted ? _accent : _textStrong;
-    return SizedBox(
-      width: 64,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
-        onPressed: onTap,
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: SizedBox(
+        width: double.infinity,
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 6, top: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                height: 22,
-                child: Center(
-                  child: Icon(
-                    icon,
-                    size: 22,
-                    color: color,
-                  ),
-                ),
+              Icon(
+                icon,
+                size: 22,
+                color: color,
               ),
               const SizedBox(height: 3),
               Text(
@@ -347,15 +340,8 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
       decoration: BoxDecoration(
         color: _panelBg,
         border: Border(
-          top: BorderSide(color: _divider),
+          top: BorderSide(color: _divider, width: 0.5),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: _shadow,
-            blurRadius: 14,
-            offset: const Offset(0, -4),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,
@@ -404,32 +390,27 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Spacer(),
-                _buildActionItem(
+                Expanded(child: _buildActionItem(
                   icon: CupertinoIcons.list_bullet,
                   label: '目录',
                   onTap: widget.onOpenChapterList,
-                ),
-                const Spacer(flex: 2),
-                _buildActionItem(
+                )),
+                Expanded(child: _buildActionItem(
                   icon: CupertinoIcons.square_grid_2x2,
                   label: '主菜单',
                   onTap: widget.onShowMainMenu,
-                ),
-                const Spacer(flex: 2),
-                _buildActionItem(
+                )),
+                Expanded(child: _buildActionItem(
                   icon: CupertinoIcons.stop_circle_fill,
                   label: '停止',
                   onTap: _handleStop,
                   highlighted: true,
-                ),
-                const Spacer(flex: 2),
-                _buildActionItem(
+                )),
+                Expanded(child: _buildActionItem(
                   icon: CupertinoIcons.circle_grid_3x3,
                   label: '设置',
                   onTap: widget.onOpenPageAnimSettings,
-                ),
-                const Spacer(),
+                )),
               ],
             ),
           ],

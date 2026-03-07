@@ -197,8 +197,9 @@ class _AppLogStackTraceDialog extends StatelessWidget {
                         child: Text(
                           '日志堆栈',
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ),

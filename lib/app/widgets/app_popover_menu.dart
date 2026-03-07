@@ -207,7 +207,7 @@ _PopoverAnchor _resolveAnchor({
   return _PopoverAnchor(
     rect: anchorOffset & renderBox.size,
     overlaySize: overlayObject.size,
-    safePadding: MediaQuery.of(context).padding,
+    safePadding: MediaQuery.paddingOf(context),
   );
 }
 

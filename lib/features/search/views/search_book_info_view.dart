@@ -3134,7 +3134,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final warningColor = CupertinoColors.systemOrange.resolveFrom(context);
     final coverUrl = _displayCoverUrl;
     final heroTopExtend =
-        MediaQuery.of(context).padding.top + kMinInteractiveDimensionCupertino;
+        MediaQuery.paddingOf(context).top + kMinInteractiveDimensionCupertino;
 
     final kind = _pickFirstNonEmpty([
       _detail?.kind ?? '',
@@ -3418,7 +3418,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         const SizedBox(height: 10),
                         _CupertinoCardContainer(
                           borderColor: destructiveColor,
-                          borderWidth: 1,
+                          borderWidth: 0.5,
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                           child: Text(
                             _error!,
@@ -3433,7 +3433,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         const SizedBox(height: 10),
                         _CupertinoCardContainer(
                           borderColor: warningColor,
-                          borderWidth: 1,
+                          borderWidth: 0.5,
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                           child: Text(
                             _tocError!,

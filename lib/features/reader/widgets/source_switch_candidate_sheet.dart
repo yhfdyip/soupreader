@@ -1109,7 +1109,7 @@ class _SourceSwitchCandidateSheetState
     final colors = CupertinoTheme.of(context);
     final compactTapSquare =
         AppUiTokens.resolve(context).sizes.compactTapSquare;
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     final filtered = _filteredCandidates;
     final showCheckAuthorAction = widget.onCheckAuthorChanged != null;
     final showLoadInfoAction = widget.onLoadInfoChanged != null;
@@ -1134,17 +1134,19 @@ class _SourceSwitchCandidateSheetState
         ),
         child: Column(
           children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey3.resolveFrom(context),
-                borderRadius: BorderRadius.circular(2),
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 8, bottom: 4),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: CupertinoColors.separator.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Row(
                 children: [
                   Expanded(
@@ -1155,8 +1157,9 @@ class _SourceSwitchCandidateSheetState
                               Text(
                                 '换源（${widget.keyword}）',
                                 style: const TextStyle(
-                                  fontSize: 17,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.3,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

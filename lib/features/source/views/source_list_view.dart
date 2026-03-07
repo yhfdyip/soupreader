@@ -2683,7 +2683,7 @@ class _SourceListViewState extends State<SourceListView> {
         return CupertinoPopupSurface(
           isSurfacePainted: true,
           child: SizedBox(
-            height: math.min(MediaQuery.of(context).size.height * 0.72, 560),
+            height: math.min(MediaQuery.sizeOf(context).height * 0.72, 560),
             child: StatefulBuilder(
               builder: (context, setDialogState) {
                 return Column(
@@ -2918,7 +2918,7 @@ class _SourceListViewState extends State<SourceListView> {
               final totalCount = dialogCandidates.length;
               return SizedBox(
                 height: math.min(
-                  MediaQuery.of(context).size.height * 0.86,
+                  MediaQuery.sizeOf(context).height * 0.86,
                   680,
                 ),
                 child: Column(
@@ -3821,7 +3821,7 @@ class _SourceListViewState extends State<SourceListView> {
                 decoration: BoxDecoration(
                   color: background,
                   borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
-                  border: Border.all(color: border),
+                  border: Border.all(color: border, width: 0.5),
                 ),
                 child: Text(
                   message,

@@ -211,7 +211,7 @@ extension _ReplaceRuleImportX on _ReplaceRuleListViewState {
           return CupertinoPopupSurface(
             isSurfacePainted: true,
             child: SizedBox(
-              height: math.min(MediaQuery.of(context).size.height * 0.72, 560),
+              height: math.min(MediaQuery.sizeOf(context).height * 0.72, 560),
               child: StatefulBuilder(
                 builder: (context, setDialogState) {
                   return Column(
@@ -495,7 +495,7 @@ extension _ReplaceRuleImportX on _ReplaceRuleListViewState {
                   : '全选（$selectedCount/$totalCount）';
               return SizedBox(
                 height: math.min(
-                  MediaQuery.of(context).size.height * 0.86,
+                  MediaQuery.sizeOf(context).height * 0.86,
                   680,
                 ),
                 child: Column(

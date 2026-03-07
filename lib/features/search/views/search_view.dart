@@ -1198,7 +1198,7 @@ class _SearchViewState extends State<SearchView> {
       child: AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         borderColor: borderColor.withValues(alpha: 0.82),
-        borderWidth: 1,
+        borderWidth: 0.5,
         child: child,
       ),
     );

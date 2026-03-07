@@ -63,7 +63,7 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
+    final screenSize = MediaQuery.sizeOf(context);
     final maxWidth = (screenSize.width * 0.9).clamp(280.0, 560.0).toDouble();
     final maxHeight = (screenSize.height * 0.85).clamp(360.0, 760.0).toDouble();
     return Center(
@@ -73,7 +73,7 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
         decoration: BoxDecoration(
           color: _panelBg,
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-          border: Border.all(color: _lineColor),
+          border: Border.all(color: _lineColor, width: 0.5),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),

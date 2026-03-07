@@ -112,22 +112,26 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            child: CupertinoSlidingSegmentedControl<_SearchScopeMode>(
-              groupValue: _mode,
-              children: const {
-                _SearchScopeMode.group: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Text('分组'),
-                ),
-                _SearchScopeMode.source: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Text('书源'),
-                ),
-              },
-              onValueChanged: (value) {
-                if (value == null) return;
-                setState(() => _mode = value);
-              },
+            child: SizedBox(
+              width: double.infinity,
+              child: CupertinoSlidingSegmentedControl<_SearchScopeMode>(
+                groupValue: _mode,
+                padding: const EdgeInsets.all(3),
+                children: const {
+                  _SearchScopeMode.group: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 7),
+                    child: Text('分组', textAlign: TextAlign.center),
+                  ),
+                  _SearchScopeMode.source: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 7),
+                    child: Text('书源', textAlign: TextAlign.center),
+                  ),
+                },
+                onValueChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _mode = value);
+                },
+              ),
             ),
           ),
           Expanded(
@@ -140,7 +144,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: uiTokens.colors.separator, width: 1),
+                top: BorderSide(color: uiTokens.colors.separator, width: 0.5),
               ),
             ),
             child: Row(

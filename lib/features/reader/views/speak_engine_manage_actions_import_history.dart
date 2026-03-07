@@ -12,7 +12,7 @@ extension _SpeakEngineManageImportHistoryActions
           return CupertinoPopupSurface(
             isSurfacePainted: true,
             child: SizedBox(
-              height: math.min(MediaQuery.of(context).size.height * 0.72, 560),
+              height: math.min(MediaQuery.sizeOf(context).height * 0.72, 560),
               child: StatefulBuilder(
                 builder: (context, setDialogState) {
                   return Column(

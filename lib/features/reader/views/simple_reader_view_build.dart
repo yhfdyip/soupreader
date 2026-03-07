@@ -1107,7 +1107,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
       child: image,
     );
     if (imageStyle == _SimpleReaderViewState._legacyImageStyleSingle) {
-      final viewportHeight = MediaQuery.of(context).size.height;
+      final viewportHeight = MediaQuery.sizeOf(context).height;
       final singleHeight =
           (viewportHeight - _settings.paddingTop - _settings.paddingBottom)
               .clamp(220.0, 1200.0)
@@ -2436,7 +2436,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
       } else {
         await _scrollController.animateTo(
           target,
-          duration: const Duration(milliseconds: 220),
+          duration: AppDesignTokens.motionNormal,
           curve: Curves.easeOutCubic,
         );
       }
@@ -2703,7 +2703,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     final navBtnShadow = CupertinoColors.black.withValues(
       alpha: _isUiDark ? 0.32 : 0.12,
     );
-    final sideButtonTop = MediaQuery.of(context).size.height * 0.42;
+    final sideButtonTop = MediaQuery.sizeOf(context).height * 0.42;
 
     return Stack(
       children: [
@@ -2758,13 +2758,12 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: navBtnShadow,
-                    blurRadius: 20,
-                    offset: const Offset(0, -2),
+                border: Border(
+                  top: BorderSide(
+                    color: _uiBorder.withValues(alpha: 0.5),
+                    width: 0.5,
                   ),
-                ],
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2778,6 +2777,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
                       border: Border(
                         bottom: BorderSide(
                           color: _uiBorder.withValues(alpha: 0.9),
+                          width: 0.5,
                         ),
                       ),
                     ),
@@ -2848,6 +2848,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
                       border: Border(
                         top: BorderSide(
                           color: _uiBorder.withValues(alpha: 0.78),
+                          width: 0.5,
                         ),
                       ),
                     ),
@@ -2961,8 +2962,8 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
             label,
             style: TextStyle(
               color: color,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -2981,27 +2982,30 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     return Semantics(
       label: semanticsLabel,
       button: true,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: onTap,
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _uiBorder),
-            boxShadow: [
-              BoxShadow(
-                color: shadowColor,
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: onTap,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: _isUiDark ? 0.78 : 0.85),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _uiBorder.withValues(alpha: 0.6),
+                  width: 0.5,
+                ),
               ),
-            ],
-          ),
-          child: Icon(
-            icon,
-            color: onTap == null ? _uiTextSubtle : _uiTextStrong,
+              child: Icon(
+                icon,
+                size: 20,
+                color: onTap == null ? _uiTextSubtle : _uiTextStrong,
+              ),
+            ),
           ),
         ),
       ),
@@ -3009,7 +3013,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
   }
 
   Widget _buildFloatingActionRail() {
-    final topOffset = MediaQuery.of(context).padding.top + 92;
+    final topOffset = MediaQuery.paddingOf(context).top + 92;
     final actionOrder = ReaderLegacyQuickActionHelper.legacyOrder;
     return Positioned(
       right: 8,
@@ -3021,26 +3025,24 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.75 : 0.82),
+                  color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.78 : 0.85),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: CupertinoColors.black
-                          .withValues(alpha: _isUiDark ? 0.25 : 0.12),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(
+                    color: _isUiDark
+                        ? CupertinoColors.white.withValues(alpha: 0.10)
+                        : CupertinoColors.black.withValues(alpha: 0.06),
+                    width: 0.5,
+                  ),
                 ),
                 child: Column(
                   children:
                       List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
                     if (index.isOdd) {
-                      return const SizedBox(height: 6);
+                      return const SizedBox(height: 2);
                     }
                     final action = actionOrder[index ~/ 2];
                     return _buildLegacyQuickActionButton(action);
@@ -3072,7 +3074,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
         );
       case ReaderLegacyQuickAction.replaceRule:
         return _buildFloatingActionButton(
-          icon: CupertinoIcons.refresh,
+          icon: CupertinoIcons.arrow_2_squarepath,
           semanticLabel: '替换规则',
           onTap: () => unawaited(_openReplaceRuleListFromMenu()),
         );
@@ -3100,14 +3102,14 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
         minimumSize: Size.zero,
         onPressed: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: AppDesignTokens.motionQuick,
           curve: Curves.easeOut,
-          width: 40,
-          height: 36,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             color: active
-                ? _uiAccent.withValues(alpha: 0.18)
-                : _uiPanelBg.withValues(alpha: _isUiDark ? 0.86 : 0.9),
+                ? _uiAccent.withValues(alpha: _isUiDark ? 0.22 : 0.15)
+                : CupertinoColors.black.withValues(alpha: 0.0),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(

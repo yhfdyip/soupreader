@@ -135,7 +135,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
+      height: MediaQuery.sizeOf(context).height * 0.6,
       decoration: BoxDecoration(
         color: _panelBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
@@ -148,10 +148,10 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
             // 标题栏
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
+              padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
               decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: _lineColor),
+                  bottom: BorderSide(color: _lineColor, width: 0.5),
                 ),
               ),
               child: Row(
@@ -161,40 +161,49 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
                       '书签（${_bookmarks.length}）',
                       style: TextStyle(
                         color: _textStrong,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ),
                   CupertinoButton(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: const Size(30, 30),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    minimumSize: Size.zero,
                     onPressed: _addBookmark,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(CupertinoIcons.add, color: _accent, size: 16),
-                        const SizedBox(width: 4),
+                        Icon(CupertinoIcons.add, color: _accent, size: 15),
+                        const SizedBox(width: 3),
                         Text(
                           '添加',
                           style: TextStyle(
                             color: _accent,
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
                   CupertinoButton(
-                    padding: const EdgeInsets.all(6),
-                    minimumSize: const Size(30, 30),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    minimumSize: Size.zero,
                     onPressed: () => Navigator.pop(context),
-                    child: Icon(
-                      CupertinoIcons.xmark,
-                      color: _textSubtle,
-                      size: 18,
+                    child: Text(
+                      '完成',
+                      style: TextStyle(
+                        color: _accent,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],
@@ -222,12 +231,12 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
   Widget _buildGrabber() {
     final color = _isDark
-        ? CupertinoColors.white.withValues(alpha: 0.24)
+        ? CupertinoColors.white.withValues(alpha: 0.3)
         : CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
-        margin: const EdgeInsets.only(top: 10),
-        width: 38,
+        margin: const EdgeInsets.only(top: 8, bottom: 2),
+        width: 36,
         height: 4,
         decoration: BoxDecoration(
           color: color,
@@ -270,6 +279,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
           border: Border.all(
             color: AppDesignTokens.error.withValues(alpha: 0.5),
+            width: 0.5,
           ),
         ),
         child: const Icon(
@@ -282,7 +292,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
         decoration: BoxDecoration(
           color: _cardBg,
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-          border: Border.all(color: _lineColor.withValues(alpha: 0.85)),
+          border: Border.all(color: _lineColor.withValues(alpha: 0.85), width: 0.5),
         ),
         child: CupertinoButton(
           padding: EdgeInsets.zero,

@@ -70,6 +70,7 @@ class _ReadingThemeSettingsViewState extends State<ReadingThemeSettingsView> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: theme.text.withValues(alpha: 0.45),
+                      width: 0.5,
                     ),
                   ),
                 ),

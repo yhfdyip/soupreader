@@ -3204,7 +3204,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   int _resolveClickAction(Offset position) {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     final col = (position.dx / size.width * 3).floor().clamp(0, 2);
     final row = (position.dy / size.height * 3).floor().clamp(0, 2);
     const zones = [
@@ -4667,7 +4667,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
 
     // 获取屏幕尺寸，确保固定全屏布局
-    final screenSize = MediaQuery.of(context).size;
+    final screenSize = MediaQuery.sizeOf(context);
     final isScrollMode = _settings.pageTurnMode == PageTurnMode.scroll;
     final scrollTipTotalPages = _resolveScrollTipTotalPages();
     final scrollTipCurrentPage = _resolveScrollTipCurrentPage(
@@ -4858,7 +4858,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
                     if (_isLoadingChapter || _isCurrentFactoryChapterLoading)
                       Positioned(
-                        top: MediaQuery.of(context).padding.top + 12,
+                        top: MediaQuery.paddingOf(context).top + 12,
                         right: 16,
                         child: const CupertinoActivityIndicator(),
                       ),

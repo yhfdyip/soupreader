@@ -367,22 +367,26 @@ extension _BookshelfManageX on _BookshelfViewState {
                         style: TextStyle(fontSize: 13),
                       ),
                       const SizedBox(height: 6),
-                      CupertinoSlidingSegmentedControl<int>(
-                        groupValue: groupStyle,
-                        children: const {
-                          0: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: Text('样式一'),
-                          ),
-                          1: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: Text('样式二'),
-                          ),
-                        },
-                        onValueChanged: (value) {
-                          if (value == null) return;
-                          setDialogState(() => groupStyle = value);
-                        },
+                      SizedBox(
+                        width: double.infinity,
+                        child: CupertinoSlidingSegmentedControl<int>(
+                          groupValue: groupStyle,
+                          padding: const EdgeInsets.all(3),
+                          children: const {
+                            0: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 7),
+                              child: Text('样式一', textAlign: TextAlign.center),
+                            ),
+                            1: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 7),
+                              child: Text('样式二', textAlign: TextAlign.center),
+                            ),
+                          },
+                          onValueChanged: (value) {
+                            if (value == null) return;
+                            setDialogState(() => groupStyle = value);
+                          },
+                        ),
                       ),
                       _buildLayoutSwitchRow(
                         title: '显示未读数量',

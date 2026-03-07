@@ -139,6 +139,7 @@ extension _SourceEditDebugX on _SourceEditViewState {
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
                           color: statusColor.withValues(alpha: 0.36),
+                          width: 0.5,
                         ),
                       ),
                       child: Text(
@@ -175,6 +176,7 @@ extension _SourceEditDebugX on _SourceEditViewState {
                         color: CupertinoColors.systemRed
                             .resolveFrom(context)
                             .withValues(alpha: 0.35),
+                        width: 0.5,
                       ),
                     ),
                     child: Text(
@@ -1627,6 +1629,7 @@ extension _SourceEditDebugX on _SourceEditViewState {
                           borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                           border: Border.all(
                             color: _labelColor(label).withValues(alpha: 0.35),
+                            width: 0.5,
                           ),
                         ),
                         child: Text(

@@ -122,24 +122,29 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
   Widget _buildRuleTabs() {
     if (_rules.isEmpty) return const SizedBox.shrink();
     if (_rules.length <= 4) {
-      return CupertinoSlidingSegmentedControl<int>(
-        groupValue: _selectedIndex,
-        children: {
-          for (var i = 0; i < _rules.length; i++)
-            i: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              child: Text(
-                _rules[i].name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13),
+      return SizedBox(
+        width: double.infinity,
+        child: CupertinoSlidingSegmentedControl<int>(
+          groupValue: _selectedIndex,
+          padding: const EdgeInsets.all(3),
+          children: {
+            for (var i = 0; i < _rules.length; i++)
+              i: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Text(
+                  _rules[i].name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13),
+                ),
               ),
-            ),
-        },
-        onValueChanged: (value) {
-          if (value == null) return;
-          unawaited(_selectRule(value));
-        },
+          },
+          onValueChanged: (value) {
+            if (value == null) return;
+            unawaited(_selectRule(value));
+          },
+        ),
       );
     }
     return SizedBox(
@@ -217,8 +222,9 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
                 const Text(
                   '字典',
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
                   ),
                 ),
                 const SizedBox(height: 2),

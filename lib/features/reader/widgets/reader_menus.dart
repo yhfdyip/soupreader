@@ -101,20 +101,19 @@ class ReaderTopMenu extends StatelessWidget {
         child: Container(
         key: _readerTopMenuPanelKey,
         padding: EdgeInsets.only(
-          top: mediaQuery.padding.top + 10,
+          top: mediaQuery.padding.top + 8,
           left: horizontalPadding,
           right: horizontalPadding,
-          bottom: 12,
+          bottom: 10,
         ),
         decoration: BoxDecoration(
           color: style.panelBackground.withValues(alpha: 0.85),
-          boxShadow: [
-            BoxShadow(
-              color: style.shadowColor,
-              blurRadius: 20,
-              offset: const Offset(0, 2),
+          border: Border(
+            bottom: BorderSide(
+              color: style.borderColor.withValues(alpha: 0.5),
+              width: 0.5,
             ),
-          ],
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,12 +121,10 @@ class ReaderTopMenu extends StatelessWidget {
           children: [
             Row(
               children: [
-                _buildNavButton(
-                  icon: CupertinoIcons.back,
+                _buildBackButton(
                   onTap: () => Navigator.pop(context),
                   color: style.primaryText,
                 ),
-                const SizedBox(width: 4),
                 Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -297,6 +294,36 @@ class ReaderTopMenu extends StatelessWidget {
     );
   }
 
+  Widget _buildBackButton({
+    required VoidCallback onTap,
+    required Color color,
+  }) {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: SizedBox(
+        height: 36,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.back, color: color, size: 22),
+            const SizedBox(width: 1),
+            Text(
+              '返回',
+              style: TextStyle(
+                color: color,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildNavButton({
     Key? key,
     required IconData icon,
@@ -339,20 +366,34 @@ class ReaderTopMenu extends StatelessWidget {
       onPressed: onTap,
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+          border: Border.all(color: borderColor, width: 0.5),
         ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              CupertinoIcons.chevron_down,
+              size: 10,
+              color: textColor.withValues(alpha: 0.6),
+            ),
+          ],
         ),
       ),
     );
@@ -400,7 +441,7 @@ class ReaderBottomMenu extends StatelessWidget {
       right: 0,
       child: Container(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 8,
+          bottom: MediaQuery.paddingOf(context).bottom + 8,
           top: 16,
           left: 16,
           right: 16,
@@ -497,7 +538,7 @@ class ReaderBottomMenu extends StatelessWidget {
                         useSystemBrightness: !settings.useSystemBrightness));
                   },
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
+                    duration: AppDesignTokens.motionQuick,
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(

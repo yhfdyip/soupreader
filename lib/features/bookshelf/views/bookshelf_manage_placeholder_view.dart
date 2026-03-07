@@ -1676,7 +1676,7 @@ class _BookSelectionTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-          border: Border.all(color: borderColor),
+          border: Border.all(color: borderColor, width: 0.5),
         ),
         child: Row(
           children: [

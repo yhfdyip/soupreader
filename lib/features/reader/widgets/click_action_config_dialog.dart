@@ -123,7 +123,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: MediaQuery.sizeOf(context).height * 0.75,
       decoration: BoxDecoration(
         color: _panelBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
@@ -179,12 +179,12 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
 
   Widget _buildGrabber() {
     final color = _isDark
-        ? CupertinoColors.white.withValues(alpha: 0.24)
+        ? CupertinoColors.white.withValues(alpha: 0.3)
         : CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
-        margin: const EdgeInsets.only(top: 10),
-        width: 38,
+        margin: const EdgeInsets.only(top: 8, bottom: 2),
+        width: 36,
         height: 4,
         decoration: BoxDecoration(
           color: color,
@@ -196,10 +196,10 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: _lineColor),
+          bottom: BorderSide(color: _lineColor, width: 0.5),
         ),
       ),
       child: Row(
@@ -209,19 +209,23 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
               '点击区域设置',
               style: TextStyle(
                 color: _textStrong,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.3,
               ),
             ),
           ),
           CupertinoButton(
-            padding: const EdgeInsets.all(6),
-            minimumSize: const Size(30, 30),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            minimumSize: Size.zero,
             onPressed: () => Navigator.pop(context),
-            child: Icon(
-              CupertinoIcons.xmark,
-              color: _textSubtle,
-              size: 18,
+            child: Text(
+              '完成',
+              style: TextStyle(
+                color: _accent,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -235,7 +239,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       child: Container(
         decoration: BoxDecoration(
           color: _chipBg,
-          border: Border.all(color: _lineColor),
+          border: Border.all(color: _lineColor, width: 0.5),
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
         ),
         child: GridView.builder(
@@ -256,7 +260,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
               minimumSize: Size.zero,
               onPressed: () => _showActionPicker(zone),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
+                duration: AppDesignTokens.motionQuick,
                 margin: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   color:
@@ -265,7 +269,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
                     color: isSelected
                         ? _accent
                         : actionColor.withValues(alpha: 0.45),
-                    width: isSelected ? 2.0 : 1,
+                    width: isSelected ? 2.0 : 0.5,
                   ),
                   borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                 ),
@@ -310,7 +314,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
           decoration: BoxDecoration(
             color: actionColor.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl / 2),
-            border: Border.all(color: actionColor.withValues(alpha: 0.4)),
+            border: Border.all(color: actionColor.withValues(alpha: 0.4), width: 0.5),
           ),
           child: Text(
             ClickAction.getName(action),

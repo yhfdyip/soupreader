@@ -74,17 +74,13 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
   Color get _textSubtle =>
       CupertinoColors.tertiaryLabel.resolveFrom(context);
 
-  Color get _chipBg => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.2)
-      : CupertinoColors.systemGroupedBackground.resolveFrom(context);
-
   Color get _cardBg =>
       CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.sizeOf(context).height * 0.7,
       decoration: BoxDecoration(
         color: _panelBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
@@ -115,74 +111,59 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                 children: [
                   // Tab 切换
                   Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: CupertinoSlidingSegmentedControl<int>(
-                        groupValue: _currentTab,
-                        backgroundColor: _chipBg,
-                        thumbColor: _accent,
-                        children: {
-                          0: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Text(
-                              '目录 (${widget.chapters.length})',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: _currentTab == 0
-                                    ? CupertinoColors.white
-                                    : _textSubtle,
-                              ),
+                    child: CupertinoSlidingSegmentedControl<int>(
+                      groupValue: _currentTab,
+                      padding: const EdgeInsets.all(3),
+                      children: {
+                        0: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            '目录 (${widget.chapters.length})',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _currentTab == 0
+                                  ? _textStrong
+                                  : _textSubtle,
                             ),
                           ),
-                          1: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Text(
-                              '书签 (${widget.bookmarks.length})',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: _currentTab == 1
-                                    ? CupertinoColors.white
-                                    : _textSubtle,
-                              ),
+                        ),
+                        1: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            '书签 (${widget.bookmarks.length})',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _currentTab == 1
+                                  ? _textStrong
+                                  : _textSubtle,
                             ),
                           ),
-                        },
-                        onValueChanged: (value) {
-                          setState(() {
-                            _currentTab = value ?? 0;
-                          });
-                        },
-                      ),
+                        ),
+                      },
+                      onValueChanged: (value) {
+                        setState(() {
+                          _currentTab = value ?? 0;
+                        });
+                      },
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // 倒序按钮
+                  const SizedBox(width: 8),
                   CupertinoButton(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: Size.zero,
                     onPressed: () {
                       setState(() {
                         _isReversed = !_isReversed;
                       });
                     },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _isReversed
-                              ? CupertinoIcons.arrow_up
-                              : CupertinoIcons.arrow_down,
-                          color: _accent,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _isReversed ? '倒序' : '正序',
-                          style: TextStyle(
-                            color: _accent,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
+                    child: Icon(
+                      _isReversed
+                          ? CupertinoIcons.sort_up
+                          : CupertinoIcons.sort_down,
+                      color: _isReversed ? _accent : _textNormal,
+                      size: 20,
                     ),
                   ),
                 ],
@@ -323,6 +304,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                 color: _isDark
                     ? AppDesignTokens.borderDark.withValues(alpha: 0.6)
                     : AppDesignTokens.borderLight,
+                width: 0.5,
               ),
             ),
             child: Column(

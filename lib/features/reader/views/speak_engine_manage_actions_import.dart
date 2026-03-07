@@ -140,7 +140,7 @@ extension _SpeakEngineManageImportActions on _SpeakEngineManageViewState {
                   : '全选($selectedCount/$totalCount)';
               return SizedBox(
                 height: math.min(
-                  MediaQuery.of(context).size.height * 0.86,
+                  MediaQuery.sizeOf(context).height * 0.86,
                   680,
                 ),
                 child: Column(

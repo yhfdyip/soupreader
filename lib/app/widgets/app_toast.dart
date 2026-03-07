@@ -72,7 +72,7 @@ class _AppToastOverlayState extends State<_AppToastOverlay>
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: MediaQuery.of(context).padding.bottom + 28,
+      bottom: MediaQuery.paddingOf(context).bottom + 28,
       left: 0,
       right: 0,
       child: SafeArea(

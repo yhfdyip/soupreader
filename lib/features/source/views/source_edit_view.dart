@@ -479,22 +479,26 @@ class _SourceEditViewState extends State<SourceEditView> {
 
   @override
   Widget build(BuildContext context) {
-    final tabControl = CupertinoSlidingSegmentedControl<int>(
-      groupValue: _tab,
-      children: const {
-        0: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('基础')),
-        1: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('规则')),
-        2: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('JSON')),
-        3: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8), child: Text('调试')),
-      },
-      onValueChanged: (v) {
-        if (v == null) return;
-        setState(() => _tab = v);
-      },
+    final tabControl = SizedBox(
+      width: double.infinity,
+      child: CupertinoSlidingSegmentedControl<int>(
+        groupValue: _tab,
+        padding: const EdgeInsets.all(3),
+        children: const {
+          0: Padding(
+              padding: EdgeInsets.symmetric(vertical: 7), child: Text('基础', textAlign: TextAlign.center)),
+          1: Padding(
+              padding: EdgeInsets.symmetric(vertical: 7), child: Text('规则', textAlign: TextAlign.center)),
+          2: Padding(
+              padding: EdgeInsets.symmetric(vertical: 7), child: Text('JSON', textAlign: TextAlign.center)),
+          3: Padding(
+              padding: EdgeInsets.symmetric(vertical: 7), child: Text('调试', textAlign: TextAlign.center)),
+        },
+        onValueChanged: (v) {
+          if (v == null) return;
+          setState(() => _tab = v);
+        },
+      ),
     );
 
     return AppCupertinoPageScaffold(
@@ -516,10 +520,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: tabControl,
-            ),
+            child: tabControl,
           ),
           Expanded(
             child: IndexedStack(

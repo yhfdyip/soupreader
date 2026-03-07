@@ -398,7 +398,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
+      height: MediaQuery.sizeOf(context).height * 0.88,
       decoration: BoxDecoration(
         color: _panelBg,
         borderRadius: const BorderRadius.vertical(
@@ -424,12 +424,12 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     final color = CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
-        margin: const EdgeInsets.only(top: 10, bottom: 2),
+        margin: const EdgeInsets.only(top: 8, bottom: 2),
         width: 36,
-        height: 5,
+        height: 4,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(2.5),
+          borderRadius: BorderRadius.circular(2),
         ),
       ),
     );
@@ -437,7 +437,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       child: Row(
         children: [
           _BookCover(
@@ -454,7 +454,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                   style: TextStyle(
                     color: _textStrong,
                     fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -553,8 +553,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         _scheduleScrollToCurrentChapter();
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        duration: AppDesignTokens.motionQuick,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -568,7 +568,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           style: TextStyle(
             color: isSelected ? _accent : _textNormal,
             fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
       ),
@@ -899,7 +899,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       itemCount: bookmarks.length,
       separatorBuilder: (_, __) => Container(
-        height: 1,
+        height: 0.5,
         color: _lineColor,
       ),
       itemBuilder: (context, index) {
