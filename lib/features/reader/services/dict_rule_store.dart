@@ -6,8 +6,8 @@ import 'package:fast_gbk/fast_gbk.dart';
 import 'package:flutter/services.dart';
 import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/preferences_store.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/dict_rule.dart';
 
@@ -45,10 +45,12 @@ class DictRuleStore {
   };
 
   final Dio _httpClient;
+  final PreferencesStore _preferencesStore;
   final RuleParserEngine _ruleParserEngine;
 
   DictRuleStore({
     Dio? httpClient,
+    PreferencesStore? preferencesStore,
     RuleParserEngine? ruleParserEngine,
   })  : _httpClient = httpClient ??
             Dio(
@@ -60,11 +62,11 @@ class DictRuleStore {
                 headers: _defaultHeaders,
               ),
             ),
+        _preferencesStore = preferencesStore ?? defaultPreferencesStore,
         _ruleParserEngine = ruleParserEngine ?? RuleParserEngine();
 
   Future<List<DictRule>> loadRules() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey)?.trim();
+    final raw = (await _preferencesStore.getString(_prefsKey))?.trim();
     if (raw != null && raw.isNotEmpty) {
       try {
         return DictRule.listFromJsonText(raw);
@@ -76,8 +78,7 @@ class DictRuleStore {
   }
 
   Future<void> saveRules(List<DictRule> rules) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, DictRule.listToJsonText(rules));
+    await _preferencesStore.setString(_prefsKey, DictRule.listToJsonText(rules));
   }
 
   Future<void> saveRule({

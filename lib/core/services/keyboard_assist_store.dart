@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'preferences_store.dart';
 
 /// 辅助按键配置项（对齐 legado `KeyboardAssist` 语义）。
 ///
@@ -64,6 +64,12 @@ class KeyboardAssistEntry {
 
 class KeyboardAssistStore {
   static const String _prefsKey = 'keyboard_assists';
+
+  KeyboardAssistStore({
+    PreferencesStore? preferencesStore,
+  }) : _preferencesStore = preferencesStore ?? defaultPreferencesStore;
+
+  final PreferencesStore _preferencesStore;
 
   Future<List<KeyboardAssistEntry>> loadAll({int type = 0}) async {
     final all = await _loadAllTypes();
@@ -132,8 +138,7 @@ class KeyboardAssistStore {
   }
 
   Future<List<KeyboardAssistEntry>> _loadAllTypes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey)?.trim();
+    final raw = (await _preferencesStore.getString(_prefsKey))?.trim();
     if (raw == null || raw.isEmpty) return <KeyboardAssistEntry>[];
     try {
       final decoded = jsonDecode(raw);
@@ -155,12 +160,11 @@ class KeyboardAssistStore {
   }
 
   Future<void> _saveAllTypes(List<KeyboardAssistEntry> entries) async {
-    final prefs = await SharedPreferences.getInstance();
     if (entries.isEmpty) {
-      await prefs.remove(_prefsKey);
+      await _preferencesStore.remove(_prefsKey);
       return;
     }
     final encoded = jsonEncode(entries.map((item) => item.toJson()).toList());
-    await prefs.setString(_prefsKey, encoded);
+    await _preferencesStore.setString(_prefsKey, encoded);
   }
 }

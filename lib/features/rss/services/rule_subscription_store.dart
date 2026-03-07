@@ -1,15 +1,20 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/preferences_store.dart';
 import '../models/rule_subscription.dart';
 
 class RuleSubscriptionStore {
   static const String _prefsKey = 'rule_subscriptions';
 
+  RuleSubscriptionStore({
+    PreferencesStore? preferencesStore,
+  }) : _preferencesStore = preferencesStore ?? defaultPreferencesStore;
+
   final ValueNotifier<List<RuleSubscription>> _listenable =
       ValueNotifier<List<RuleSubscription>>(const <RuleSubscription>[]);
+  final PreferencesStore _preferencesStore;
 
   bool _initialized = false;
 
@@ -91,8 +96,7 @@ class RuleSubscriptionStore {
   }
 
   Future<void> _reload() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey)?.trim();
+    final raw = (await _preferencesStore.getString(_prefsKey))?.trim();
     if (raw == null || raw.isEmpty) {
       _listenable.value = const <RuleSubscription>[];
       return;
@@ -118,8 +122,7 @@ class RuleSubscriptionStore {
   Future<void> _save(List<RuleSubscription> subscriptions) async {
     final normalized = subscriptions.toList(growable: false)
       ..sort(_compareRuleSubscription);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await _preferencesStore.setString(
       _prefsKey,
       jsonEncode(
         normalized

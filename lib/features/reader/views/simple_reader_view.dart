@@ -67,6 +67,7 @@ import '../services/reader_charset_service.dart';
 import '../services/reader_key_paging_helper.dart';
 import '../services/reader_legacy_quick_action_helper.dart';
 import '../services/reader_image_request_parser.dart';
+import '../services/reader_image_resolver.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_legacy_menu_helper.dart';
 import '../services/reader_refresh_scope_helper.dart';
@@ -97,6 +98,7 @@ import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/reader_txt_toc_rule_dialog.dart';
+import '../widgets/reader_quick_settings_sheet.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_dict_lookup_sheet.dart';
 
@@ -507,6 +509,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   int _longImageFirstFrameErrorSamples = 0;
   final Map<String, String> _readerImageCookieHeaderByHost = <String, String>{};
   final Set<String> _readerImageCookieLoadInFlight = <String>{};
+  final ReaderImageResolver _readerImageResolver =
+      const ReaderImageResolver(isWeb: kIsWeb);
   Duration _recentChapterFetchDuration = Duration.zero;
   final Map<String, _ReaderImageWarmupSourceTelemetry>
       _imageWarmupTelemetryBySource =
@@ -6168,7 +6172,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   String _normalizeReaderImageSrc(String raw) {
-    return raw.trim();
+    return _readerImageResolver.normalizeSrc(raw);
   }
 
   ImageProvider<Object>? _resolveReaderImageProvider(String src) {
@@ -6179,81 +6183,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   ImageProvider<Object>? _resolveReaderImageProviderFromRequest(
     ReaderImageRequest request,
   ) {
-    final value = request.url.trim();
-    if (value.isEmpty) return null;
-    final lower = value.toLowerCase();
-    if (lower.startsWith('data:image')) {
-      final commaIndex = value.indexOf(',');
-      if (commaIndex <= 0 || commaIndex >= value.length - 1) {
-        return null;
-      }
-      try {
-        final bytes = base64Decode(value.substring(commaIndex + 1));
-        return MemoryImage(bytes);
-      } catch (_) {
-        return null;
-      }
-    }
-    if (!kIsWeb && value.startsWith('file://')) {
-      final uri = Uri.tryParse(value);
-      if (uri != null) {
-        return FileImage(File(uri.toFilePath()));
-      }
-    }
-    if (!kIsWeb && p.isAbsolute(value)) {
-      final file = File(value);
-      if (file.existsSync()) {
-        return FileImage(file);
-      }
-    }
-    final uri = Uri.tryParse(value);
-    if (uri == null || !_isHttpLikeUri(uri)) {
-      return null;
-    }
+    final uri = Uri.tryParse(request.url.trim());
     final headers = _composeReaderImageHeaders(request, uri: uri);
-    if (headers.isEmpty) {
-      return NetworkImage(value);
-    }
-    return NetworkImage(value, headers: headers);
+    return _readerImageResolver.resolveProvider(request, headers: headers);
   }
 
   Map<String, String> _composeReaderImageHeaders(
     ReaderImageRequest request, {
     Uri? uri,
   }) {
-    final out = <String, String>{};
     final source = _resolveCurrentSource();
-    if (source != null) {
-      out.addAll(ReaderImageRequestParser.parseHeaderText(source.header));
-    }
-    out.addAll(request.headers);
-
-    final targetUri = uri ?? Uri.tryParse(request.url);
-    if (targetUri == null || !_isHttpLikeUri(targetUri)) {
-      return out;
-    }
-
-    final cookieKey = _readerImageCookieCacheKey(targetUri);
-    final cachedCookie = _readerImageCookieHeaderByHost[cookieKey];
-    if (cachedCookie != null &&
-        cachedCookie.isNotEmpty &&
-        !_containsHeaderKey(out, 'Cookie')) {
-      out['Cookie'] = cachedCookie;
-    }
-
-    final referer = _readerImageReferer();
-    if (referer != null && referer.isNotEmpty) {
-      if (!_containsHeaderKey(out, 'Referer')) {
-        out['Referer'] = referer;
-      }
-      if (!_containsHeaderKey(out, 'Origin')) {
-        final refererUri = Uri.tryParse(referer);
-        if (refererUri != null && _isHttpLikeUri(refererUri)) {
-          out['Origin'] = refererUri.origin;
-        }
-      }
-    }
-    return out;
+    return _readerImageResolver.composeHeaders(
+      request: request,
+      sourceHeaderText: source?.header,
+      referer: _readerImageReferer(),
+      cachedCookieHeaders: _readerImageCookieHeaderByHost,
+      uri: uri,
+    );
   }
 
   Future<void> _ensureReaderImageCookieHeaderCached(
@@ -6298,41 +6244,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   String _readerImageCookieCacheKey(Uri uri) {
-    final host = uri.host.toLowerCase();
-    final scheme = uri.scheme.toLowerCase();
-    final port = uri.hasPort ? uri.port : (scheme == 'https' ? 443 : 80);
-    return '$scheme://$host:$port';
+    return _readerImageResolver.cookieCacheKey(uri);
   }
 
   String? _readerImageReferer() {
     final chapterUrl =
         (_currentChapterIndex >= 0 && _currentChapterIndex < _chapters.length)
-            ? (_chapters[_currentChapterIndex].url ?? '').trim()
-            : '';
-    if (chapterUrl.isNotEmpty) {
-      final chapterUri = Uri.tryParse(chapterUrl);
-      if (chapterUri != null && _isHttpLikeUri(chapterUri)) {
-        return chapterUri.toString();
-      }
-    }
-    final sourceUrl = (_currentSourceUrl ?? '').trim();
-    if (sourceUrl.isNotEmpty) {
-      final sourceUri = Uri.tryParse(sourceUrl);
-      if (sourceUri != null && _isHttpLikeUri(sourceUri)) {
-        return sourceUri.toString();
-      }
-    }
-    return null;
+            ? _chapters[_currentChapterIndex].url
+            : null;
+    return _readerImageResolver.resolveReferer(
+      chapterUrl: chapterUrl,
+      sourceUrl: _currentSourceUrl,
+    );
   }
 
   bool _isHttpLikeUri(Uri uri) {
-    final scheme = uri.scheme.toLowerCase();
-    return scheme == 'http' || scheme == 'https';
-  }
-
-  bool _containsHeaderKey(Map<String, String> headers, String name) {
-    final lower = name.toLowerCase();
-    return headers.keys.any((key) => key.toLowerCase() == lower);
+    return _readerImageResolver.isHttpLikeUri(uri);
   }
 
   void _syncScrollSegmentsAfterTransformChange() {
@@ -6391,12 +6318,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   void _openInterfaceSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showReadStyleDialog();
+    _showQuickSettingsSheet(initialTab: ReaderQuickSettingsTab.typography);
   }
 
   void _openBehaviorSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showLegacyMoreConfigDialog();
+    _showQuickSettingsSheet(initialTab: ReaderQuickSettingsTab.interface);
+  }
+
+  void _showQuickSettingsSheet({
+    ReaderQuickSettingsTab initialTab = ReaderQuickSettingsTab.typography,
+  }) {
+    showCupertinoBottomSheetDialog<void>(
+      context: context,
+      builder: (context) => ReaderQuickSettingsSheet(
+        settings: _settings,
+        themes: _activeReadStyles,
+        initialTab: initialTab,
+        onSettingsChanged: (next) => _updateSettings(next),
+        onOpenFullSettings: () {
+          Navigator.pop(context);
+          _showReadingSettingsSheet();
+        },
+      ),
+    );
   }
 
   void _openReadAloudFromMenu() {
@@ -12180,6 +12125,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
+  // ignore: unused_element
   void _showReadStyleDialog() {
     showCupertinoBottomSheetDialog<void>(
       context: context,
@@ -13353,7 +13299,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  // ignore: unused_element
   void _showReadingSettingsSheet({
     String title = '阅读设置',
     int initialTab = 0,
@@ -13445,6 +13390,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
+  // ignore: unused_element
   void _showLegacyMoreConfigDialog() {
     showCupertinoBottomSheetDialog<void>(
       context: context,

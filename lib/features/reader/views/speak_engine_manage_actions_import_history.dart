@@ -164,46 +164,23 @@ extension _SpeakEngineManageImportHistoryActions
   }
 
   Future<List<String>> _loadOnlineImportHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final listValue = prefs
-        .getStringList(_SpeakEngineManageViewState._onlineImportHistoryKey);
-    if (listValue != null) {
-      return _normalizeOnlineImportHistory(listValue);
-    }
-    final textValue =
-        prefs.getString(_SpeakEngineManageViewState._onlineImportHistoryKey);
-    if (textValue != null && textValue.trim().isNotEmpty) {
-      return _normalizeOnlineImportHistory(textValue.split(RegExp(r'[\n,]')));
-    }
-    return <String>[];
+    return _onlineImportHistoryStore.load(
+      _SpeakEngineManageViewState._onlineImportHistoryKey,
+    );
   }
 
   Future<void> _saveOnlineImportHistory(List<String> history) async {
-    final prefs = await SharedPreferences.getInstance();
-    final normalized = _normalizeOnlineImportHistory(history);
-    await prefs.setStringList(
+    await _onlineImportHistoryStore.save(
       _SpeakEngineManageViewState._onlineImportHistoryKey,
-      normalized,
+      history,
     );
   }
 
   Future<void> _pushOnlineImportHistory(String url) async {
-    final history = await _loadOnlineImportHistory();
-    history.remove(url);
-    history.insert(0, url);
-    await _saveOnlineImportHistory(history);
+    await _onlineImportHistoryStore.push(
+      _SpeakEngineManageViewState._onlineImportHistoryKey,
+      url,
+    );
   }
 
-  List<String> _normalizeOnlineImportHistory(Iterable<String> values) {
-    final unique = <String>{};
-    final normalized = <String>[];
-    for (final value in values) {
-      final trimmed = value.trim();
-      if (trimmed.isEmpty || !unique.add(trimmed)) {
-        continue;
-      }
-      normalized.add(trimmed);
-    }
-    return normalized;
-  }
 }

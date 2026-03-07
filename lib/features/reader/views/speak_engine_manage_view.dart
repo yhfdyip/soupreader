@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
@@ -14,6 +13,7 @@ import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../core/services/online_import_history_store.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../models/http_tts_rule.dart';
 import '../services/http_tts_rule_store.dart';
@@ -35,6 +35,8 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
   static const String _onlineImportHistoryKey = 'ttsUrlKey';
 
   final HttpTtsRuleStore _ruleStore = HttpTtsRuleStore();
+  final OnlineImportHistoryStore _onlineImportHistoryStore =
+      OnlineImportHistoryStore();
 
   bool _loading = true;
   bool _importingDefault = false;

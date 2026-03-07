@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/preferences_store.dart';
 import '../models/http_tts_rule.dart';
 
 enum HttpTtsImportCandidateState {
@@ -31,14 +31,16 @@ class HttpTtsRuleStore {
   static const int _maxImportDepth = 3;
 
   final Dio _httpClient;
+  final PreferencesStore _preferencesStore;
 
   HttpTtsRuleStore({
     Dio? httpClient,
-  }) : _httpClient = httpClient ?? Dio();
+    PreferencesStore? preferencesStore,
+  }) : _httpClient = httpClient ?? Dio(),
+       _preferencesStore = preferencesStore ?? defaultPreferencesStore;
 
   Future<List<HttpTtsRule>> loadRules() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey)?.trim();
+    final raw = (await _preferencesStore.getString(_prefsKey))?.trim();
     if (raw == null || raw.isEmpty) {
       return const <HttpTtsRule>[];
     }
@@ -50,9 +52,8 @@ class HttpTtsRuleStore {
   }
 
   Future<void> saveRules(List<HttpTtsRule> rules) async {
-    final prefs = await SharedPreferences.getInstance();
     final raw = HttpTtsRule.listToJsonText(rules);
-    await prefs.setString(_prefsKey, raw);
+    await _preferencesStore.setString(_prefsKey, raw);
   }
 
   Future<void> upsertRule(HttpTtsRule rule) async {

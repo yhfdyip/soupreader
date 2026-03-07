@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -16,6 +15,7 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
+import '../../../core/services/online_import_history_store.dart';
 import '../../../core/services/source_variable_store.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../../core/services/qr_scan_service.dart';
@@ -87,6 +87,8 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   final GlobalKey _groupMenuKey = GlobalKey();
   final GlobalKey _mainMenuKey = GlobalKey();
   final Set<String> _selectedSourceUrls = <String>{};
+  final OnlineImportHistoryStore _onlineImportHistoryStore =
+      OnlineImportHistoryStore();
 
   @override
   void initState() {
@@ -1260,44 +1262,15 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   }
 
   Future<List<String>> _loadOnlineImportHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final listValue = prefs.getStringList(_onlineImportHistoryKey);
-    if (listValue != null) {
-      return _normalizeOnlineImportHistory(listValue);
-    }
-    final textValue = prefs.getString(_onlineImportHistoryKey);
-    if (textValue != null && textValue.trim().isNotEmpty) {
-      return _normalizeOnlineImportHistory(
-        textValue.split(RegExp(r'[\n,]')),
-      );
-    }
-    return <String>[];
+    return _onlineImportHistoryStore.load(_onlineImportHistoryKey);
   }
 
   Future<void> _saveOnlineImportHistory(List<String> history) async {
-    final prefs = await SharedPreferences.getInstance();
-    final normalized = _normalizeOnlineImportHistory(history);
-    await prefs.setStringList(_onlineImportHistoryKey, normalized);
+    await _onlineImportHistoryStore.save(_onlineImportHistoryKey, history);
   }
 
   Future<void> _pushOnlineImportHistory(String url) async {
-    final history = await _loadOnlineImportHistory();
-    history.remove(url);
-    history.insert(0, url);
-    await _saveOnlineImportHistory(history);
-  }
-
-  List<String> _normalizeOnlineImportHistory(Iterable<String> values) {
-    final unique = <String>{};
-    final normalized = <String>[];
-    for (final value in values) {
-      final trimmed = value.trim();
-      if (trimmed.isEmpty || !unique.add(trimmed)) {
-        continue;
-      }
-      normalized.add(trimmed);
-    }
-    return normalized;
+    await _onlineImportHistoryStore.push(_onlineImportHistoryKey, url);
   }
 
   Future<void> _commitImportResult(RssSourceImportResult result) async {

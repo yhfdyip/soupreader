@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'preferences_store.dart';
 
 /// 书源登录态存储（按书源键缓存登录信息）
 ///
@@ -9,6 +9,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SourceLoginStore {
   static const String _headerPrefix = 'loginHeader_';
   static const String _infoPrefix = 'userInfo_';
+  static PreferencesStore _preferencesStore = defaultPreferencesStore;
+
+  static void debugReplacePreferencesStore(PreferencesStore store) {
+    _preferencesStore = store;
+  }
+
+  static void debugResetPreferencesStore() {
+    _preferencesStore = defaultPreferencesStore;
+  }
 
   static String _normalizeSourceKey(String sourceKey) {
     return sourceKey.trim();
@@ -27,8 +36,7 @@ class SourceLoginStore {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return null;
 
-    final prefs = await SharedPreferences.getInstance();
-    final text = prefs.getString(_headerKey(key))?.trim();
+    final text = (await _preferencesStore.getString(_headerKey(key)))?.trim();
     if (text == null || text.isEmpty) return null;
 
     try {
@@ -51,8 +59,7 @@ class SourceLoginStore {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return null;
 
-    final prefs = await SharedPreferences.getInstance();
-    final text = prefs.getString(_headerKey(key));
+    final text = await _preferencesStore.getString(_headerKey(key));
     if (text == null || text.trim().isEmpty) return null;
     return text;
   }
@@ -71,13 +78,12 @@ class SourceLoginStore {
       normalized[headerKey] = v;
     });
 
-    final prefs = await SharedPreferences.getInstance();
     if (normalized.isEmpty) {
-      await prefs.remove(_headerKey(key));
+      await _preferencesStore.remove(_headerKey(key));
       return;
     }
 
-    await prefs.setString(_headerKey(key), jsonEncode(normalized));
+    await _preferencesStore.setString(_headerKey(key), jsonEncode(normalized));
   }
 
   static Future<void> putLoginHeaderJson(
@@ -86,9 +92,8 @@ class SourceLoginStore {
     if (key.isEmpty) return;
 
     final text = headerJson.trim();
-    final prefs = await SharedPreferences.getInstance();
     if (text.isEmpty) {
-      await prefs.remove(_headerKey(key));
+      await _preferencesStore.remove(_headerKey(key));
       return;
     }
 
@@ -106,27 +111,25 @@ class SourceLoginStore {
     });
 
     if (normalized.isEmpty) {
-      await prefs.remove(_headerKey(key));
+      await _preferencesStore.remove(_headerKey(key));
       return;
     }
 
-    await prefs.setString(_headerKey(key), jsonEncode(normalized));
+    await _preferencesStore.setString(_headerKey(key), jsonEncode(normalized));
   }
 
   static Future<void> removeLoginHeader(String sourceKey) async {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_headerKey(key));
+    await _preferencesStore.remove(_headerKey(key));
   }
 
   static Future<String?> getLoginInfo(String sourceKey) async {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return null;
 
-    final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString(_infoKey(key));
+    final value = await _preferencesStore.getString(_infoKey(key));
     if (value == null || value.trim().isEmpty) return null;
     return value;
   }
@@ -135,21 +138,19 @@ class SourceLoginStore {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
     final text = info?.trim();
     if (text == null || text.isEmpty) {
-      await prefs.remove(_infoKey(key));
+      await _preferencesStore.remove(_infoKey(key));
       return;
     }
 
-    await prefs.setString(_infoKey(key), info!);
+    await _preferencesStore.setString(_infoKey(key), info!);
   }
 
   static Future<void> removeLoginInfo(String sourceKey) async {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_infoKey(key));
+    await _preferencesStore.remove(_infoKey(key));
   }
 }

@@ -456,6 +456,39 @@ class _TypographyTab extends StatelessWidget {
           ),
         ),
         _Section(
+          title: '文字排版',
+          child: Column(
+            children: [
+              _SwitchGroup(
+                rows: [
+                  _SwitchRowData(
+                    label: '两端对齐',
+                    value: settings.textFullJustify,
+                    onChanged: (v) => onSettingsChanged(
+                      settings.copyWith(textFullJustify: v),
+                    ),
+                  ),
+                  _SwitchRowData(
+                    label: '段首缩进',
+                    value: settings.paragraphIndent.isNotEmpty,
+                    onChanged: (v) => onSettingsChanged(
+                      settings.copyWith(
+                        paragraphIndent: v ? '　　' : '',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _TextBoldRow(
+                value: settings.textBold,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(textBold: v)),
+              ),
+            ],
+          ),
+        ),
+        _Section(
           title: '边距',
           child: _MarginPresetRow(
             settings: settings,
@@ -728,6 +761,37 @@ class _InterfaceTab extends StatelessWidget {
             ],
           ),
         ),
+        _Section(
+          title: '状态栏',
+          child: _SwitchGroup(
+            rows: [
+              _SwitchRowData(
+                label: '显示状态栏',
+                value: settings.showStatusBar,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(showStatusBar: v)),
+              ),
+              _SwitchRowData(
+                label: '显示时间',
+                value: settings.showTime,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(showTime: v)),
+              ),
+              _SwitchRowData(
+                label: '显示进度',
+                value: settings.showProgress,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(showProgress: v)),
+              ),
+              _SwitchRowData(
+                label: '显示电量',
+                value: settings.showBattery,
+                onChanged: (v) =>
+                    onSettingsChanged(settings.copyWith(showBattery: v)),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 14),
       ],
     );
@@ -817,9 +881,14 @@ class _MoreTab extends StatelessWidget {
                 rows: [
                   _SwitchRowData(
                     label: '屏幕常亮',
-                    value: settings.keepScreenOn,
+                    value: settings.keepLightSeconds ==
+                        ReadingSettings.keepLightAlways,
                     onChanged: (v) => onSettingsChanged(
-                      settings.copyWith(keepScreenOn: v),
+                      settings.copyWith(
+                        keepLightSeconds: v
+                            ? ReadingSettings.keepLightAlways
+                            : ReadingSettings.keepLightFollowSystem,
+                      ),
                     ),
                   ),
                   _SwitchRowData(
@@ -829,13 +898,6 @@ class _MoreTab extends StatelessWidget {
                       settings.copyWith(cleanChapterTitle: v),
                     ),
                   ),
-                  if (_supportsVolumeKeyPaging)
-                    _SwitchRowData(
-                      label: '音量键翻页',
-                      value: settings.volumeKeyPage,
-                      onChanged: (v) =>
-                          onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
-                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -999,9 +1061,6 @@ class _PageTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
-    final activeTrackColor = ReaderSettingsTokens.accent(isDark: isDark);
     final modes = PageTurnModeUi.values(current: settings.pageTurnMode);
     return ListView(
       physics: const BouncingScrollPhysics(),
@@ -1208,6 +1267,57 @@ class _SliderGroup extends StatelessWidget {
           if (i < rows.length - 1)
             Container(height: 0.5, color: dividerColor),
         ],
+      ],
+    );
+  }
+}
+
+class _TextBoldRow extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _TextBoldRow({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final safeValue = (value == -1 || value == 0 || value == 1) ? value : 0;
+    return Row(
+      children: [
+        Text(
+          '字重',
+          style: TextStyle(
+            color: ReaderSettingsTokens.rowTitleColor(isDark: isDark),
+            fontSize: ReaderSettingsTokens.rowTitleSize,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: CupertinoSlidingSegmentedControl<int>(
+            groupValue: safeValue,
+            onValueChanged: (v) {
+              if (v == null) return;
+              onChanged(v);
+            },
+            children: const <int, Widget>{
+              -1: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Text('细体'),
+              ),
+              0: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Text('正常'),
+              ),
+              1: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Text('粗体'),
+              ),
+            },
+          ),
+        ),
       ],
     );
   }

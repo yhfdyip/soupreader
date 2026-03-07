@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/preferences_store.dart';
 import '../models/txt_toc_rule.dart';
 
 enum TxtTocRuleImportCandidateState {
@@ -34,9 +34,11 @@ class TxtTocRuleStore {
   static const int _maxImportDepth = 3;
 
   final Dio _httpClient;
+  final PreferencesStore _preferencesStore;
 
   TxtTocRuleStore({
     Dio? httpClient,
+    PreferencesStore? preferencesStore,
   }) : _httpClient = httpClient ??
             Dio(
               BaseOptions(
@@ -45,11 +47,11 @@ class TxtTocRuleStore {
                 followRedirects: true,
                 maxRedirects: 8,
               ),
-            );
+            ),
+       _preferencesStore = preferencesStore ?? defaultPreferencesStore;
 
   Future<List<TxtTocRule>> loadRules() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey)?.trim();
+    final raw = (await _preferencesStore.getString(_prefsKey))?.trim();
     if (raw != null && raw.isNotEmpty) {
       try {
         return TxtTocRule.listFromJsonText(raw);
@@ -61,8 +63,10 @@ class TxtTocRuleStore {
   }
 
   Future<void> saveRules(List<TxtTocRule> rules) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, TxtTocRule.listToJsonText(rules));
+    await _preferencesStore.setString(
+      _prefsKey,
+      TxtTocRule.listToJsonText(rules),
+    );
   }
 
   Future<void> upsertRule(TxtTocRule rule) async {

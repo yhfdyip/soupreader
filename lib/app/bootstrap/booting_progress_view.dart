@@ -4,21 +4,34 @@ import 'package:flutter/cupertino.dart';
 
 import '../widgets/app_card.dart';
 import '../../app/theme/design_tokens.dart';
-import '../../core/build/build_info.dart';
+import 'boot_build_info_label.dart';
 
+/// 展示应用启动中的进度、耗时与最近日志。
 class BootingProgressView extends StatelessWidget {
   static const EdgeInsets _kPagePadding = EdgeInsets.fromLTRB(20, 24, 20, 24);
   static const EdgeInsets _kCardPadding = EdgeInsets.fromLTRB(16, 16, 16, 16);
   static const EdgeInsets _kLogCardPadding =
       EdgeInsets.fromLTRB(12, 12, 12, 12);
 
+  /// 当前启动步骤名。
   final String step;
+
+  /// 自启动开始累计的秒数。
   final double elapsedSeconds;
+
+  /// 最近一条启动日志。
   final String latestLogLine;
+
+  /// 最近若干条启动日志内容。
   final String bootLogTail;
+
+  /// 是否存在可展示的启动日志。
   final bool hasLogs;
+
+  /// 用户点击复制按钮时触发的回调。
   final Future<void> Function(BuildContext context) onCopyLog;
 
+  /// 创建启动进度展示页。
   const BootingProgressView({
     super.key,
     required this.step,
@@ -39,7 +52,7 @@ class BootingProgressView extends StatelessWidget {
         child: ListView(
           padding: _kPagePadding,
           children: [
-            _buildBuildInfo(context, muted),
+            const BootBuildInfoLabel(includeBootHostPrefix: true),
             const SizedBox(height: 12),
             _buildStatusCard(context, muted, tertiary),
             if (hasLogs) ...[
@@ -53,20 +66,6 @@ class BootingProgressView extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildBuildInfo(BuildContext context, Color color) {
-    return Text(
-      'BOOT HOST  ref=${BuildInfo.gitRef}  '
-      'sha=${BuildInfo.gitShaShort}  '
-      'build=${BuildInfo.buildNumber}  '
-      '${BuildInfo.isRelease ? 'release' : 'debug'}',
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: color,
       ),
     );
   }

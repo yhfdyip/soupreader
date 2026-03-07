@@ -1,16 +1,23 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
-
 import '../widgets/app_squircle_surface.dart';
-import '../widgets/cupertino_bottom_dialog.dart';
 import '../../app/theme/design_tokens.dart';
-import '../../core/build/build_info.dart';
+import 'boot_build_info_label.dart';
+import 'boot_build_info_text.dart';
 import 'app_bootstrap.dart';
+import 'boot_copy_feedback.dart';
 
+/// 展示应用启动失败信息，并允许用户复制日志或重试。
 class BootFailureView extends StatelessWidget {
+  /// 启动失败详情。
   final BootFailure failure;
+
+  /// 当前是否处于重试中。
   final bool retrying;
+
+  /// 点击重试按钮时触发的回调。
   final VoidCallback onRetry;
+
+  /// 启动过程中的附加日志文本。
   final String bootLog;
 
   const BootFailureView({
@@ -24,11 +31,7 @@ class BootFailureView extends StatelessWidget {
   String _payload() {
     final out = StringBuffer()
       ..writeln('BootFailure')
-      ..writeln(
-        'build: ref=${BuildInfo.gitRef} sha=${BuildInfo.gitSha} '
-        'build=${BuildInfo.buildNumber} '
-        '${BuildInfo.isRelease ? 'release' : 'debug'}',
-      )
+      ..writeln(buildBootPayloadInfoText())
       ..writeln('step=${failure.stepName}')
       ..writeln('error=${failure.error}')
       ..writeln('')
@@ -45,10 +48,6 @@ class BootFailureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark =
-        (CupertinoTheme.of(context).brightness ?? Brightness.light) ==
-            Brightness.dark;
-
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('启动异常'),
@@ -57,9 +56,9 @@ class BootFailureView extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
           children: [
-            _buildBuildInfo(context),
+            const BootBuildInfoLabel(),
             const SizedBox(height: 14),
-            _buildFailureCard(context, isDark),
+            _buildFailureCard(context),
             const SizedBox(height: 18),
             CupertinoButton.filled(
               onPressed: retrying ? null : onRetry,
@@ -76,20 +75,7 @@ class BootFailureView extends StatelessWidget {
     );
   }
 
-  Widget _buildBuildInfo(BuildContext context) {
-    return Text(
-      'ref=${BuildInfo.gitRef}  sha=${BuildInfo.gitShaShort}  '
-      'build=${BuildInfo.buildNumber}  '
-      '${BuildInfo.isRelease ? 'release' : 'debug'}',
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: CupertinoColors.secondaryLabel.resolveFrom(context),
-      ),
-    );
-  }
-
-  Widget _buildFailureCard(BuildContext context, bool isDark) {
+  Widget _buildFailureCard(BuildContext context) {
     final panelColor =
         CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
     return AppSquircleSurface(
@@ -126,21 +112,11 @@ class BootFailureView extends StatelessWidget {
     );
   }
 
-  Future<void> _copyPayload(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: _payload()));
-    if (!context.mounted) return;
-    await showCupertinoBottomDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('已复制'),
-        content: const Text('启动失败信息已复制到剪贴板。'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('好'),
-          ),
-        ],
-      ),
+  Future<void> _copyPayload(BuildContext context) {
+    return copyTextWithFeedback(
+      context,
+      text: _payload(),
+      successMessage: '启动失败信息已复制到剪贴板。',
     );
   }
 }

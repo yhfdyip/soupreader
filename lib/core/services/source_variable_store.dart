@@ -1,10 +1,19 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'preferences_store.dart';
 
 /// 书源变量存储（按书源键持久化）
 ///
 /// 键格式：`sourceVariable_{bookSourceUrl}`
 class SourceVariableStore {
   static const String _prefix = 'sourceVariable_';
+  static PreferencesStore _preferencesStore = defaultPreferencesStore;
+
+  static void debugReplacePreferencesStore(PreferencesStore store) {
+    _preferencesStore = store;
+  }
+
+  static void debugResetPreferencesStore() {
+    _preferencesStore = defaultPreferencesStore;
+  }
 
   static String _normalizeSourceKey(String sourceKey) {
     return sourceKey.trim();
@@ -18,28 +27,25 @@ class SourceVariableStore {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return null;
 
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_variableKey(key));
+    return _preferencesStore.getString(_variableKey(key));
   }
 
   static Future<void> putVariable(String sourceKey, String? variable) async {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
     if (variable == null) {
-      await prefs.remove(_variableKey(key));
+      await _preferencesStore.remove(_variableKey(key));
       return;
     }
 
-    await prefs.setString(_variableKey(key), variable);
+    await _preferencesStore.setString(_variableKey(key), variable);
   }
 
   static Future<void> removeVariable(String sourceKey) async {
     final key = _normalizeSourceKey(sourceKey);
     if (key.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_variableKey(key));
+    await _preferencesStore.remove(_variableKey(key));
   }
 }

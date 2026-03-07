@@ -1,8 +1,7 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/models/app_settings.dart';
+import '../../../core/services/preferences_store.dart';
 import '../../source/services/rule_parser_engine.dart';
 
 /// 搜索页本地状态存储（历史词 + 结果缓存）。
@@ -13,13 +12,15 @@ class SearchCacheService {
   static const int _maxCacheEntries = 24;
   static const int _maxCacheResultsPerEntry = 160;
 
-  Future<SharedPreferences> get _prefs async {
-    return SharedPreferences.getInstance();
-  }
+  SearchCacheService({
+    PreferencesStore? preferencesStore,
+  }) : _preferencesStore = preferencesStore ?? defaultPreferencesStore;
+
+  final PreferencesStore _preferencesStore;
 
   Future<List<String>> loadHistory() async {
-    final prefs = await _prefs;
-    final raw = prefs.getStringList(_historyKey) ?? const <String>[];
+    final raw =
+        await _preferencesStore.getStringList(_historyKey) ?? const <String>[];
     return _normalizeHistory(raw);
   }
 
@@ -28,31 +29,30 @@ class SearchCacheService {
     if (normalized.isEmpty) {
       return loadHistory();
     }
-    final prefs = await _prefs;
-    final current = prefs.getStringList(_historyKey) ?? const <String>[];
+    final current =
+        await _preferencesStore.getStringList(_historyKey) ?? const <String>[];
     final next = <String>[
       normalized,
       ...current.where((item) => item.trim() != normalized),
     ];
     final cleaned = _normalizeHistory(next);
-    await prefs.setStringList(_historyKey, cleaned);
+    await _preferencesStore.setStringList(_historyKey, cleaned);
     return cleaned;
   }
 
   Future<List<String>> deleteHistoryKeyword(String keyword) async {
     final target = keyword.trim();
-    final prefs = await _prefs;
-    final current = prefs.getStringList(_historyKey) ?? const <String>[];
+    final current =
+        await _preferencesStore.getStringList(_historyKey) ?? const <String>[];
     final next =
         current.where((item) => item.trim() != target).toList(growable: false);
     final cleaned = _normalizeHistory(next);
-    await prefs.setStringList(_historyKey, cleaned);
+    await _preferencesStore.setStringList(_historyKey, cleaned);
     return cleaned;
   }
 
   Future<void> clearHistory() async {
-    final prefs = await _prefs;
-    await prefs.remove(_historyKey);
+    await _preferencesStore.remove(_historyKey);
   }
 
   String buildCacheKey({
@@ -128,8 +128,7 @@ class SearchCacheService {
 
   Future<int> clearCache() async {
     final entries = await _readCacheEntries();
-    final prefs = await _prefs;
-    await prefs.remove(_cacheKey);
+    await _preferencesStore.remove(_cacheKey);
     return entries.length;
   }
 
@@ -147,8 +146,7 @@ class SearchCacheService {
   }
 
   Future<List<SearchCacheEntry>> _readCacheEntries() async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(_cacheKey);
+    final raw = await _preferencesStore.getString(_cacheKey);
     if (raw == null || raw.trim().isEmpty) {
       return const <SearchCacheEntry>[];
     }
@@ -172,15 +170,14 @@ class SearchCacheService {
   }
 
   Future<void> _writeCacheEntries(List<SearchCacheEntry> entries) async {
-    final prefs = await _prefs;
     if (entries.isEmpty) {
-      await prefs.remove(_cacheKey);
+      await _preferencesStore.remove(_cacheKey);
       return;
     }
     final payload = <String, Object?>{
       'entries': entries.map((entry) => entry.toJson()).toList(growable: false),
     };
-    await prefs.setString(_cacheKey, json.encode(payload));
+    await _preferencesStore.setString(_cacheKey, json.encode(payload));
   }
 }
 

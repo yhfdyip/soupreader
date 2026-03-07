@@ -1,13 +1,13 @@
-import 'dart:async';
-import 'dart:ui' show PlatformDispatcher;
-
 import 'package:flutter/cupertino.dart';
 
+import 'app/bootstrap/app_bootstrap.dart';
 import 'app/bootstrap/boot_host_app.dart';
+import 'app/bootstrap/global_error_handlers.dart';
 import 'core/services/exception_log_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final exceptionLogService = ExceptionLogService();
 
   // ── 全局错误处理 ──
   // 不设置 ErrorWidget.builder。
@@ -16,45 +16,15 @@ void main() {
   //    'RenderBox is not a subtype of RenderSliver' 二次崩溃。
   // 默认 ErrorWidget 在 Release 模式下为灰色方块，虽不美观但不会引发级联崩溃。
 
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('[flutter-error] ${details.exceptionAsString()}');
-    ExceptionLogService().record(
-      node: 'global.flutter_error',
-      message: details.exceptionAsString(),
-      error: details.exception,
-      stackTrace: details.stack,
-      context: <String, dynamic>{
-        if (details.library != null) 'library': details.library!,
-      },
-    );
-    if (details.stack != null) {
-      debugPrintStack(stackTrace: details.stack);
-    }
-  };
-
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    debugPrint('[platform-error] $error');
-    ExceptionLogService().record(
-      node: 'global.platform_error',
-      message: 'PlatformDispatcher.onError',
-      error: error,
-      stackTrace: stack,
-    );
-    debugPrintStack(stackTrace: stack);
-    return true;
-  };
-
-  runZonedGuarded(() {
-    runApp(const BootHostApp());
-  }, (Object error, StackTrace stack) {
-    debugPrint('[zone-error] $error');
-    ExceptionLogService().record(
-      node: 'global.zone_error',
-      message: 'runZonedGuarded 捕获未处理异常',
-      error: error,
-      stackTrace: stack,
-    );
-    debugPrintStack(stackTrace: stack);
-  });
+  installGlobalErrorHandlers(exceptionLogService: exceptionLogService);
+  runGuardedApp(
+    () => runApp(
+      BootHostApp(
+        bootDependencies: BootDependencies.defaults(
+          exceptionLogService: exceptionLogService,
+        ),
+      ),
+    ),
+    exceptionLogService: exceptionLogService,
+  );
 }

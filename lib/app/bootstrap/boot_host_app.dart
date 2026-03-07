@@ -1,22 +1,29 @@
 import 'dart:async';
-import '../widgets/cupertino_bottom_dialog.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-
-import '../../app/theme/cupertino_theme.dart';
 import '../../core/bootstrap/boot_log.dart';
 import '../../core/models/app_settings.dart';
 import '../../core/services/exception_log_service.dart';
 import '../../core/services/settings_service.dart';
 import '../main_screen.dart';
 import 'app_bootstrap.dart';
-import 'booting_progress_view.dart';
+import 'boot_app_shell.dart';
+import 'boot_copy_feedback.dart';
 import 'boot_failure_view.dart';
+import 'boot_log_buffer.dart';
+import 'booting_progress_view.dart';
 
+/// 应用启动宿主，负责展示启动进度页并在成功后切入主界面。
 class BootHostApp extends StatefulWidget {
-  const BootHostApp({super.key});
+  /// 可选的启动依赖覆盖，用于测试或自定义装配。
+  final BootDependencies? bootDependencies;
+
+  /// 创建一个可注入启动依赖的宿主应用。
+  const BootHostApp({
+    super.key,
+    this.bootDependencies,
+  });
 
   @override
   State<BootHostApp> createState() => _BootHostAppState();
@@ -26,19 +33,23 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
   static const Duration _kTickerInterval = Duration(seconds: 1);
   static const int _kMaxLogLines = 160;
   static const int _kVisibleLogLines = 18;
+  static const String _kBootStartStep = 'boot.start';
 
-  final List<String> _logLines = <String>[];
+  late final BootLogBuffer _bootLogBuffer;
+  late final BootDependencies _bootDependencies =
+      widget.bootDependencies ?? BootDependencies.defaults();
+  late final SettingsService _settingsService =
+      _bootDependencies.settingsService;
+  late final ExceptionLogService _exceptionLogService =
+      _bootDependencies.exceptionLogService;
   Timer? _ticker;
   int _startedAtMs = 0;
-  String _step = 'boot.start';
+  String _step = _kBootStartStep;
 
   BootFailure? _failure;
   bool _booting = true;
-
-  // ── bootstrap 成功后使用 ──
-  final SettingsService _settingsService = SettingsService();
-  late Brightness _platformBrightness;
   bool _settingsReady = false;
+  late Brightness _platformBrightness;
 
   @override
   void initState() {
@@ -46,22 +57,14 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _platformBrightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    _bootLogBuffer = BootLogBuffer(
+      maxLines: _kMaxLogLines,
+      visibleLines: _kVisibleLogLines,
+    );
     _startedAtMs = DateTime.now().millisecondsSinceEpoch;
-
-    BootLog.bind(_appendLog);
-    _appendLog('[boot-host] mounted');
-
-    _ticker = Timer.periodic(_kTickerInterval, (_) {
-      if (!mounted) return;
-      if (!_booting) return;
-      setState(() {});
-    });
-
-    // Ensure the first frame is rendered before starting heavy init work.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(_runBootstrap());
-    });
+    _activateBootLog('[boot-host] mounted');
+    _startTicker();
+    _scheduleBootstrap();
   }
 
   @override
@@ -69,32 +72,55 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     _ticker?.cancel();
     BootLog.unbind();
     WidgetsBinding.instance.removeObserver(this);
-    if (_settingsReady) {
-      _settingsService.appSettingsListenable
-          .removeListener(_onAppSettingsChanged);
-    }
+    _removeSettingsListener();
     super.dispose();
   }
 
   @override
   void didChangePlatformBrightness() {
-    setState(() {
-      _platformBrightness =
-          WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    _platformBrightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    _refreshUiState();
+  }
+
+  void _startTicker() {
+    _ticker = Timer.periodic(_kTickerInterval, (_) {
+      if (!mounted || !_booting) return;
+      setState(() {});
     });
-    _applySystemUiOverlayStyle();
+  }
+
+  void _scheduleBootstrap() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_runBootstrap());
+    });
+  }
+
+  void _removeSettingsListener() {
+    if (!_settingsReady) return;
+    _settingsService.appSettingsListenable
+        .removeListener(_onAppSettingsChanged);
+    _settingsReady = false;
   }
 
   void _onAppSettingsChanged() {
     if (!mounted) return;
+    _refreshUiState();
+  }
+
+  void _refreshUiState() {
     setState(() {});
     _applySystemUiOverlayStyle();
   }
 
+  AppSettings get _currentAppSettings {
+    if (_settingsReady) return _settingsService.appSettings;
+    return const AppSettings();
+  }
+
   Brightness get _effectiveBrightness {
-    if (!_settingsReady) return _platformBrightness;
-    final settings = _settingsService.appSettings;
-    switch (settings.appearanceMode) {
+    switch (_currentAppSettings.appearanceMode) {
       case AppAppearanceMode.followSystem:
         return _platformBrightness;
       case AppAppearanceMode.light:
@@ -106,6 +132,13 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     }
   }
 
+  Brightness get _shellBrightness {
+    if (_booting) return _platformBrightness;
+    return _effectiveBrightness;
+  }
+
+  String get _shellKey => _booting ? 'boot' : 'main';
+
   void _applySystemUiOverlayStyle() {
     final brightness = _effectiveBrightness;
     SystemChrome.setSystemUIOverlayStyle(
@@ -116,10 +149,7 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
   }
 
   void _appendLog(String message) {
-    _logLines.add(message);
-    if (_logLines.length > _kMaxLogLines) {
-      _logLines.removeRange(0, _logLines.length - _kMaxLogLines);
-    }
+    _bootLogBuffer.append(message);
     if (!mounted) return;
     setState(() {});
   }
@@ -129,43 +159,79 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     _appendLog('[boot] step=$step');
   }
 
-  Future<void> _runBootstrap() async {
+  void _resetBootstrapState() {
     setState(() {
       _failure = null;
       _booting = true;
-      _step = 'boot.start';
+      _step = _kBootStartStep;
       _startedAtMs = DateTime.now().millisecondsSinceEpoch;
-      _logLines.clear();
+      _bootLogBuffer.clear();
     });
+  }
 
-    BootLog.bind(_appendLog);
-    _appendLog('[boot-host] bootstrap begin');
-
-    BootFailure? failure;
+  Future<BootFailure?> _performBootstrap() async {
     try {
-      failure = await bootstrapApp(onStepChanged: _setStep);
-    } catch (e, st) {
-      _appendLog('[boot-host] unexpected error: $e');
-      ExceptionLogService().record(
+      return await bootstrapApp(
+        onStepChanged: _setStep,
+        dependencies: _bootDependencies,
+      );
+    } catch (error, stackTrace) {
+      _appendLog('[boot-host] unexpected error: $error');
+      _exceptionLogService.record(
         node: 'bootstrap.unexpected',
         message: '启动流程发生未捕获异常',
-        error: e,
-        stackTrace: st,
+        error: error,
+        stackTrace: stackTrace,
       );
-      failure = BootFailure(stepName: 'unknown', error: e, stack: st);
+      return BootFailure.unknown(
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
+  }
 
+  void _handleBootstrapSuccess() {
+    _appendLog('[boot-host] bootstrap ok');
+    BootLog.unbind();
+    _bindSettingsListener();
+    _applySystemUiOverlayStyle();
+  }
+
+  void _bindSettingsListener() {
+    if (_settingsReady) return;
+    _settingsReady = true;
+    _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
+  }
+
+  void _handleBootstrapFailure(BootFailure failure) {
+    _appendLog('[boot-host] bootstrap failed: ${failure.stepName}');
+  }
+
+  Future<void> _runBootstrap() async {
+    _prepareBootstrapRun();
+
+    final failure = await _performBootstrap();
     if (!mounted) return;
 
+    _finishBootstrap(failure);
+  }
+
+  void _prepareBootstrapRun() {
+    _removeSettingsListener();
+    _resetBootstrapState();
+    _activateBootLog('[boot-host] bootstrap begin');
+  }
+
+  void _activateBootLog(String initialMessage) {
+    BootLog.bind(_appendLog);
+    _appendLog(initialMessage);
+  }
+
+  void _finishBootstrap(BootFailure? failure) {
     if (failure == null) {
-      _appendLog('[boot-host] bootstrap ok');
-      BootLog.unbind();
-      // Bootstrap 成功，开始监听设置变化。
-      _settingsReady = true;
-      _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
-      _applySystemUiOverlayStyle();
+      _handleBootstrapSuccess();
     } else {
-      _appendLog('[boot-host] bootstrap failed: ${failure.stepName}');
+      _handleBootstrapFailure(failure);
     }
 
     setState(() {
@@ -174,115 +240,61 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     });
   }
 
-  String _bootLogPayload() => _logLines.join('\n').trim();
-
-  String _latestLogLine() {
-    if (_logLines.isEmpty) return '';
-    return _logLines.last.trim();
+  void _retryBootstrap() {
+    unawaited(_runBootstrap());
   }
 
-  String _bootLogTailPayload() {
-    if (_logLines.isEmpty) return '';
-    final start =
-        (_logLines.length - _kVisibleLogLines).clamp(0, _logLines.length);
-    // Show newest first so the "current stuck line" is visible without scrolling.
-    return _logLines.sublist(start).reversed.join('\n').trim();
-  }
-
-  Future<void> _copyBootLog(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: _bootLogPayload()));
-    if (!context.mounted) return;
-    await showCupertinoBottomDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('已复制'),
-        content: const Text('启动日志已复制到剪贴板。'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('好'),
-          ),
-        ],
-      ),
+  Future<void> _copyBootLog(BuildContext context) {
+    return copyTextWithFeedback(
+      context,
+      text: _bootLogBuffer.payload(),
+      successMessage: '启动日志已复制到剪贴板。',
     );
   }
 
-  CupertinoApp _buildBootingApp() {
-    final brightness =
-        WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    final theme = AppCupertinoTheme.build(brightness);
-    final elapsedSeconds =
-        (DateTime.now().millisecondsSinceEpoch - _startedAtMs) / 1000.0;
-    final hasLogs = _logLines.isNotEmpty;
+  double get _elapsedSeconds {
+    final elapsedMs = DateTime.now().millisecondsSinceEpoch - _startedAtMs;
+    return elapsedMs / 1000.0;
+  }
 
-    return CupertinoApp(
-      key: const ValueKey('boot'),
-      title: 'SoupReader',
-      debugShowCheckedModeBanner: false,
-      theme: theme,
-      builder: (context, child) => child ?? const SizedBox.shrink(),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('zh', 'CN'),
-        Locale('en', 'US'),
-      ],
-      home: BootingProgressView(
-        step: _step,
-        elapsedSeconds: elapsedSeconds,
-        latestLogLine: _latestLogLine(),
-        bootLogTail: _bootLogTailPayload(),
-        hasLogs: hasLogs,
-        onCopyLog: _copyBootLog,
-      ),
+  Widget _buildBootingHome() {
+    return BootingProgressView(
+      step: _step,
+      elapsedSeconds: _elapsedSeconds,
+      latestLogLine: _bootLogBuffer.latestLine(),
+      bootLogTail: _bootLogBuffer.tailPayload(),
+      hasLogs: _bootLogBuffer.hasLogs,
+      onCopyLog: _copyBootLog,
     );
+  }
+
+  Widget _buildReadyHome() {
+    final failure = _failure;
+    if (failure != null) {
+      return BootFailureView(
+        failure: failure,
+        retrying: false,
+        onRetry: _retryBootstrap,
+        bootLog: _bootLogBuffer.payload(),
+      );
+    }
+    return MainScreen(
+      brightness: _shellBrightness,
+      appSettings: _currentAppSettings,
+    );
+  }
+
+  Widget _buildCurrentHome() {
+    if (_booting) return _buildBootingHome();
+    return _buildReadyHome();
   }
 
   @override
   Widget build(BuildContext context) {
-    final failure = _failure;
-    if (_booting) {
-      return _buildBootingApp();
-    }
-
-    final brightness = _effectiveBrightness;
-    final theme = AppCupertinoTheme.build(brightness);
-
-    final Widget home;
-    if (failure != null) {
-      home = BootFailureView(
-        failure: failure,
-        retrying: false,
-        onRetry: () => unawaited(_runBootstrap()),
-        bootLog: _bootLogPayload(),
-      );
-    } else {
-      home = MainScreen(
-        brightness: brightness,
-        appSettings:
-            _settingsReady ? _settingsService.appSettings : const AppSettings(),
-      );
-    }
-
-    return CupertinoApp(
-      key: const ValueKey('main'),
-      title: 'SoupReader',
-      debugShowCheckedModeBanner: false,
-      theme: theme,
-      builder: (context, child) => child ?? const SizedBox.shrink(),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('zh', 'CN'),
-        Locale('en', 'US'),
-      ],
-      home: home,
+    return BootAppShell(
+      shellKey: _shellKey,
+      brightness: _shellBrightness,
+      home: _buildCurrentHome(),
     );
   }
 }

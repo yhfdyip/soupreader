@@ -1,0 +1,23 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
+
+formatter:
+  page_width: 80
+
+linter:
+  rules:
+    avoid_print: true
+    annotate_overrides: false
+    await_only_futures: false
+    control_flow_in_finally: false
+    curly_braces_in_flow_control_structures: false
+    prefer_null_aware_operators: false
+    sort_child_properties_last: false
+    unnecessary_brace_in_string_interps: false
+    unnecessary_const: false
+    unnecessary_string_escapes: false
+    use_build_context_synchronously: false

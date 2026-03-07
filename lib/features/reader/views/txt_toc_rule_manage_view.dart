@@ -5,13 +5,13 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../core/services/online_import_history_store.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -33,6 +33,8 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   final TxtTocRuleStore _ruleStore = TxtTocRuleStore();
   final GlobalKey _moreMenuKey = GlobalKey();
+  final OnlineImportHistoryStore _onlineImportHistoryStore =
+      OnlineImportHistoryStore();
 
   bool _loading = true;
   bool _importingDefault = false;
@@ -990,49 +992,20 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   }
 
   Future<List<String>> _loadOnlineImportHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final listValue = prefs.getStringList(_onlineImportHistoryKey);
-    if (listValue != null) {
-      return _normalizeOnlineImportHistory(listValue);
-    }
-    final textValue = prefs.getString(_onlineImportHistoryKey);
-    if (textValue != null && textValue.trim().isNotEmpty) {
-      return _normalizeOnlineImportHistory(
-        textValue.split(RegExp(r'[\n,]')),
-      );
-    }
-    return <String>[];
+    return _onlineImportHistoryStore.load(_onlineImportHistoryKey);
   }
 
   Future<void> _saveOnlineImportHistory(List<String> history) async {
-    final prefs = await SharedPreferences.getInstance();
-    final normalized = _normalizeOnlineImportHistory(history);
-    await prefs.setStringList(_onlineImportHistoryKey, normalized);
+    await _onlineImportHistoryStore.save(_onlineImportHistoryKey, history);
   }
 
   Future<void> _pushOnlineImportHistory(String url) async {
-    final history = await _loadOnlineImportHistory();
-    history.remove(url);
-    history.insert(0, url);
-    await _saveOnlineImportHistory(history);
+    await _onlineImportHistoryStore.push(_onlineImportHistoryKey, url);
   }
 
   List<String> _buildHistoryWithDefaultUrl(Iterable<String> values) {
     final merged = <String>[_defaultOnlineImportUrl, ...values];
-    return _normalizeOnlineImportHistory(merged);
-  }
-
-  List<String> _normalizeOnlineImportHistory(Iterable<String> values) {
-    final unique = <String>{};
-    final normalized = <String>[];
-    for (final value in values) {
-      final trimmed = value.trim();
-      if (trimmed.isEmpty || !unique.add(trimmed)) {
-        continue;
-      }
-      normalized.add(trimmed);
-    }
-    return normalized;
+    return _onlineImportHistoryStore.normalize(merged);
   }
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
