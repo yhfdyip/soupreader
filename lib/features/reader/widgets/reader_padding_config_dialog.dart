@@ -72,11 +72,11 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
         constraints: BoxConstraints(maxHeight: maxHeight),
         decoration: BoxDecoration(
           color: _panelBg,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
           border: Border.all(color: _lineColor),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
             child: Column(
