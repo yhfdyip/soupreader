@@ -12,7 +12,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../services/source_availability_check_task_service.dart';
 import '../services/source_debug_export_service.dart';
 import 'source_debug_text_view.dart';
-import 'source_debug_legacy_view.dart';
+import 'source_edit_view.dart';
 
 enum _ResultFilter {
   all,
@@ -469,10 +469,13 @@ class _SourceAvailabilityCheckViewState
       );
       return;
     }
+    final raw = _repo.getRawJsonByUrl(source.bookSourceUrl);
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceDebugLegacyView(
-          source: source,
+        builder: (_) => SourceEditView.fromSource(
+          source,
+          rawJson: raw,
+          initialTab: 3,
           initialDebugKey: item.debugKey,
         ),
       ),
