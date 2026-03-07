@@ -1,5 +1,6 @@
-import 'dart:io';
+import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -14,6 +15,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/source_ui_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -1086,7 +1088,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final updatedToc = _loadStoredToc(id);
     final updatedDisplayTitles = await _buildTocDisplayTitles(updatedToc);
     if (mounted) {
-      _showMessage('TXT 目录规则已应用');
+      unawaited(showAppToast(context, message: 'TXT 目录规则已应用'));
     }
     return _SearchBookTocRuleUpdateResult(
       toc: updatedToc,
@@ -1410,10 +1412,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   Future<void> _copyText(String text, String successMessage) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _showMessage(successMessage);
-    });
+    unawaited(showAppToast(context, message: successMessage));
   }
 
   Future<void> _shareBook() async {
