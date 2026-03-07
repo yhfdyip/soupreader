@@ -101,7 +101,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final grabberColor = isDark
         ? CupertinoColors.white.withValues(alpha: 0.24)
-        : AppDesignTokens.textMuted.withValues(alpha: 0.35);
+        : CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 10, bottom: 8),
@@ -118,7 +118,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   Widget _buildHeader() {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final textColor =
-        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+        isDark ? CupertinoColors.white : CupertinoColors.label.resolveFrom(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
@@ -564,10 +564,10 @@ class _MarginPresetRow extends StatelessWidget {
         isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     final chipBg = isDark
         ? CupertinoColors.white.withValues(alpha: 0.1)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
+        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
     final textNormal = isDark
         ? CupertinoColors.white.withValues(alpha: 0.7)
-        : AppDesignTokens.textNormal;
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
     Widget chip(String label, _MarginPreset v) {
       final selected = preset == v;
       return CupertinoButton(
@@ -835,7 +835,7 @@ class _ChineseConverterTypeRow extends StatelessWidget {
           groupValue: safeType,
           backgroundColor: isDark
               ? CupertinoColors.white.withValues(alpha: 0.08)
-              : AppDesignTokens.pageBgLight,
+              : CupertinoColors.systemGroupedBackground.resolveFrom(context),
           thumbColor: ReaderSettingsTokens.accent(isDark: isDark),
           children: {
             for (final mode in ChineseConverterType.values)
@@ -1181,7 +1181,7 @@ class _ModeChip extends StatelessWidget {
     final accent = ReaderSettingsTokens.accent(isDark: isDark);
     final bgNormal = isDark
         ? CupertinoColors.white.withValues(alpha: 0.1)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
+        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
     final textNormal = ReaderSettingsTokens.rowMetaColor(isDark: isDark);
     final baseColor =
         selected ? accent.withValues(alpha: isDark ? 0.18 : 0.12) : bgNormal;
