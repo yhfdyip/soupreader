@@ -1407,7 +1407,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     }
     final hint = result.outputPathOrHint;
     if (hint == null || hint.isEmpty) {
-      _showMessage('导出成功');
+      unawaited(showAppToast(context, message: '导出成功'));
       return;
     }
     _showExportSuccessDialog(hint);
@@ -1428,7 +1428,7 @@ class _BookshelfViewState extends State<BookshelfView> {
               await Clipboard.setData(ClipboardData(text: pathOrHint));
               if (!mounted) return;
               Navigator.pop(dialogContext);
-              _showMessage('已复制到剪贴板');
+              unawaited(showAppToast(context, message: '已复制到剪贴板'));
             },
             child: const Text('复制'),
           ),
