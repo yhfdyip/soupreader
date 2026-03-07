@@ -63,26 +63,23 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+      CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
-      _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+      CupertinoColors.label.resolveFrom(context);
 
-  Color get _textNormal => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context)
-      : AppDesignTokens.textNormal;
+  Color get _textNormal =>
+      CupertinoColors.secondaryLabel.resolveFrom(context);
 
-  Color get _textSubtle => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
-      : AppDesignTokens.textMuted;
+  Color get _textSubtle =>
+      CupertinoColors.tertiaryLabel.resolveFrom(context);
 
   Color get _chipBg => _isDark
       ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.2)
-      : AppDesignTokens.pageBgLight;
+      : CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
-  Color get _cardBg => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1)
-      : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
+  Color get _cardBg =>
+      CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +87,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: BoxDecoration(
         color: _panelBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
       ),
       child: SafeArea(
         top: false,
@@ -229,7 +226,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
               color: isCurrentChapter
                   ? _accent.withValues(alpha: _isDark ? 0.16 : 0.12)
                   : const Color(0x00000000),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl - 2),
               border: isCurrentChapter
                   ? Border.all(
                       color: _accent.withValues(alpha: _isDark ? 0.3 : 0.35),
@@ -272,7 +269,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                     ),
                     decoration: BoxDecoration(
                       color: _accent,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                     ),
                     child: const Text(
                       '当前',
@@ -321,7 +318,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: _cardBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl - 2),
               border: Border.all(
                 color: _isDark
                     ? AppDesignTokens.borderDark.withValues(alpha: 0.6)
