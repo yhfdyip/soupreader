@@ -216,9 +216,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
   }
 
   Widget _buildGrabber() {
-    final color = _isDark
-        ? CupertinoColors.white.withValues(alpha: 0.3)
-        : CupertinoColors.separator.resolveFrom(context);
+    final color = CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 8, bottom: 2),
