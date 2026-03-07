@@ -69,7 +69,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
     final sheetBg = ReaderSettingsTokens.sheetBackground(isDark: isDark);
     final height = MediaQuery.sizeOf(context).height * 0.65;
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
       child: Container(
         height: height,
         color: sheetBg,
@@ -99,10 +99,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   }
 
   Widget _buildGrabber() {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final grabberColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.3)
-        : CupertinoColors.separator.resolveFrom(context);
+    final grabberColor = CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 8, bottom: 6),
@@ -139,7 +136,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
             ),
           ),
           CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             minimumSize: Size.zero,
             onPressed: _showMoreActions,
             child: Icon(
@@ -149,7 +146,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
             ),
           ),
           CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             minimumSize: Size.zero,
             onPressed: () => Navigator.pop(context),
             child: Text(
