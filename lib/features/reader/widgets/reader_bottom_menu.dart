@@ -177,7 +177,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   Widget _buildDivider(Color color) {
     return Container(
       height: 0.5,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       color: color,
     );
   }
@@ -213,7 +212,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final modeLabel = chapterMode ? '章节' : '页面';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 6),
+      padding: const EdgeInsets.fromLTRB(0, 6, 0, 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -229,6 +228,29 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      modeLabel,
+                      style: TextStyle(
+                        color: mutedForeground,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                    Text(
+                      progressLabel,
+                      style: TextStyle(
+                        color: mutedForeground,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(
                   height: 28,
                   child: CupertinoSlider(
@@ -260,27 +282,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                           }
                         : null,
                   ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      modeLabel,
-                      style: TextStyle(
-                        color: mutedForeground,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    Text(
-                      progressLabel,
-                      style: TextStyle(
-                        color: mutedForeground,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -543,16 +544,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         child: SizedBox(
           width: double.infinity,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   icon,
-                  size: 22,
+                  size: 24,
                   color: contentColor,
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
                   label,
                   maxLines: 1,
@@ -560,8 +561,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                   style: TextStyle(
                     fontSize: 10,
                     color: contentColor,
-                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                    letterSpacing: -0.1,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                    letterSpacing: -0.2,
                   ),
                 ),
               ],
