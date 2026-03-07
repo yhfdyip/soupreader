@@ -664,7 +664,7 @@ class _BookshelfViewState extends State<BookshelfView> {
         final result = await _importService.selectImportDirectory();
         if (!mounted) return;
         if (result.success && result.directoryPath != null) {
-          _showMessage('已选择文件夹：${result.directoryPath}');
+          unawaited(showAppToast(context, message: '已选择文件夹：${result.directoryPath}'));
           return;
         }
         if (!result.cancelled && result.errorMessage != null) {
@@ -712,7 +712,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       );
       if (!mounted) return;
       if (result.success && result.directoryPath != null) {
-        _showMessage('已选择文件夹：${result.directoryPath}');
+        unawaited(showAppToast(context, message: '已选择文件夹：${result.directoryPath}'));
       } else if (result.errorMessage != null &&
           result.errorMessage!.isNotEmpty) {
         _showMessage('创建文件夹失败：${result.errorMessage}');

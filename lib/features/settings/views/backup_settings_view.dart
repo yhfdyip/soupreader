@@ -1075,7 +1075,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     setState(() {
       _restoreIgnoreConfig = next;
     });
-    _showMessage('已保存：${next.summary(maxItems: 3)}');
+    unawaited(showAppToast(context, message: '已保存：${next.summary(maxItems: 3)}'));
   }
 
   Future<void> _editBackupPath() async {
@@ -1124,7 +1124,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     if (result == null) return;
     await onSave(result.trim());
     if (!mounted) return;
-    _showMessage('已保存');
+    unawaited(showAppToast(context, message: '已保存'));
   }
 
   Future<void> _testWebDavConnection() async {
