@@ -99,6 +99,7 @@ import 'reader_dict_lookup_sheet.dart';
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 part 'simple_reader_view_build.dart';
 part 'simple_reader_view_actions.dart';
+part 'simple_reader_view_source_switch.dart';
 part 'simple_reader_view_bookmark.dart';
 part 'simple_reader_view_data.dart';
 
