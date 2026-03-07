@@ -11,6 +11,7 @@ import 'app_bootstrap.dart';
 import 'boot_app_shell.dart';
 import 'boot_copy_feedback.dart';
 import 'boot_failure_view.dart';
+import 'boot_action_text.dart';
 import 'boot_log_buffer.dart';
 import 'booting_progress_view.dart';
 
@@ -31,8 +32,6 @@ class BootHostApp extends StatefulWidget {
 
 class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
   static const Duration _kTickerInterval = Duration(seconds: 1);
-  static const int _kMaxLogLines = 160;
-  static const int _kVisibleLogLines = 18;
   static const String _kBootStartStep = 'boot.start';
 
   late final BootLogBuffer _bootLogBuffer;
@@ -57,10 +56,7 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _platformBrightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    _bootLogBuffer = BootLogBuffer(
-      maxLines: _kMaxLogLines,
-      visibleLines: _kVisibleLogLines,
-    );
+    _bootLogBuffer = BootLogBuffer();
     _startedAtMs = DateTime.now().millisecondsSinceEpoch;
     _activateBootLog('[boot-host] mounted');
     _startTicker();
@@ -248,7 +244,7 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     return copyTextWithFeedback(
       context,
       text: _bootLogBuffer.payload(),
-      successMessage: '启动日志已复制到剪贴板。',
+      successMessage: bootLogCopiedMessage,
     );
   }
 

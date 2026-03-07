@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../widgets/app_card.dart';
 import '../../app/theme/design_tokens.dart';
+import 'boot_action_text.dart';
 import 'boot_build_info_label.dart';
 
 /// 展示应用启动中的进度、耗时与最近日志。
@@ -59,7 +60,7 @@ class BootingProgressView extends StatelessWidget {
               const SizedBox(height: 12),
               CupertinoButton.filled(
                 onPressed: () => unawaited(onCopyLog(context)),
-                child: const Text('复制启动日志'),
+                child: const Text(bootCopyLogLabel),
               ),
               const SizedBox(height: 10),
               _buildLogCard(context),

@@ -1,8 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import '../widgets/app_squircle_surface.dart';
 import '../../app/theme/design_tokens.dart';
+import 'boot_action_text.dart';
 import 'boot_build_info_label.dart';
-import 'boot_build_info_text.dart';
+import 'boot_failure_payload.dart';
 import 'app_bootstrap.dart';
 import 'boot_copy_feedback.dart';
 
@@ -28,24 +29,6 @@ class BootFailureView extends StatelessWidget {
     required this.bootLog,
   });
 
-  String _payload() {
-    final out = StringBuffer()
-      ..writeln('BootFailure')
-      ..writeln(buildBootPayloadInfoText())
-      ..writeln('step=${failure.stepName}')
-      ..writeln('error=${failure.error}')
-      ..writeln('')
-      ..writeln('stack:')
-      ..writeln(failure.stack.toString());
-    if (bootLog.trim().isNotEmpty) {
-      out
-        ..writeln('')
-        ..writeln('boot_log:')
-        ..writeln(bootLog.trim());
-    }
-    return out.toString().trim();
-  }
-
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -62,12 +45,12 @@ class BootFailureView extends StatelessWidget {
             const SizedBox(height: 18),
             CupertinoButton.filled(
               onPressed: retrying ? null : onRetry,
-              child: Text(retrying ? '重试中…' : '重试初始化'),
+              child: Text(retrying ? bootRetryingLabel : bootRetryLabel),
             ),
             const SizedBox(height: 10),
             CupertinoButton(
               onPressed: () => _copyPayload(context),
-              child: const Text('复制启动日志'),
+              child: const Text(bootCopyLogLabel),
             ),
           ],
         ),
@@ -115,8 +98,11 @@ class BootFailureView extends StatelessWidget {
   Future<void> _copyPayload(BuildContext context) {
     return copyTextWithFeedback(
       context,
-      text: _payload(),
-      successMessage: '启动失败信息已复制到剪贴板。',
+      text: buildBootFailurePayload(
+        failure: failure,
+        bootLog: bootLog,
+      ),
+      successMessage: bootFailureCopiedMessage,
     );
   }
 }

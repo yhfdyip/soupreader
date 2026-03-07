@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
@@ -229,20 +228,18 @@ class _SpacingSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final dv = Container(
-      height: 0.5,
-      color: isDark
-          ? CupertinoColors.separator.darkColor
-          : CupertinoColors.separator.color,
-    );
+    final dividerColor = isDark
+        ? CupertinoColors.separator.darkColor
+        : CupertinoColors.separator.color;
+    Widget dv() => Container(height: 0.5, color: dividerColor);
     return _FqsSection(
       title: '间距',
       child: Column(
         children: [
           _FqsSliderRow(label: '行距', value: settings.lineHeight, min: 1.0, max: 2.2, format: (v) => v.toStringAsFixed(1), onChanged: (v) => onSettingsChanged(settings.copyWith(lineHeight: v))),
-          dv,
+          dv(),
           _FqsSliderRow(label: '字距', value: settings.letterSpacing, min: -2.0, max: 5.0, format: (v) => v.toStringAsFixed(1), onChanged: (v) => onSettingsChanged(settings.copyWith(letterSpacing: v))),
-          dv,
+          dv(),
           _FqsSliderRow(label: '段距', value: settings.paragraphSpacing, min: 0, max: 18, format: (v) => v.toStringAsFixed(0), onChanged: (v) => onSettingsChanged(settings.copyWith(paragraphSpacing: v))),
         ],
       ),

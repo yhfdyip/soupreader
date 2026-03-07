@@ -1,13 +1,16 @@
 /// 启动阶段的轻量日志缓冲，负责裁剪和导出展示内容。
 class BootLogBuffer {
+  static const int defaultMaxLines = 160;
+  static const int defaultVisibleLines = 18;
+
   final int _maxLines;
   final int _visibleLines;
   final List<String> _lines = <String>[];
 
   /// 创建固定容量的启动日志缓冲。
   BootLogBuffer({
-    required int maxLines,
-    required int visibleLines,
+    int maxLines = defaultMaxLines,
+    int visibleLines = defaultVisibleLines,
   })  : _maxLines = maxLines,
         _visibleLines = visibleLines;
 
