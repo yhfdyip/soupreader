@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_image_request_parser.dart';
+import '../services/reader_image_resolver.dart';
 import 'legacy_justified_text.dart';
 import 'page_factory.dart';
 import 'simulation_page_painter.dart';
@@ -2854,7 +2856,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }) {
     final request = ReaderImageRequestParser.parse(src);
     final displaySrc = request.url.trim().isEmpty ? src.trim() : request.url;
-    final imageProvider = _resolvePagedImageProvider(request);
+    final imageProvider = const ReaderImageResolver(isWeb: kIsWeb)
+        .resolveProvider(request, headers: request.headers);
     if (imageProvider == null) {
       return _buildPagedImageFallback(displaySrc);
     }
@@ -2934,39 +2937,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
-  ImageProvider<Object>? _resolvePagedImageProvider(
-      ReaderImageRequest request) {
-    final value = request.url.trim();
-    if (value.isEmpty) return null;
-    final lower = value.toLowerCase();
-    if (lower.startsWith('data:image')) {
-      final commaIndex = value.indexOf(',');
-      if (commaIndex <= 0 || commaIndex >= value.length - 1) {
-        return null;
-      }
-      try {
-        final bytes = base64Decode(value.substring(commaIndex + 1));
-        return MemoryImage(bytes);
-      } catch (_) {
-        return null;
-      }
-    }
-    final uri = Uri.tryParse(value);
-    if (uri == null) {
-      return null;
-    }
-    if (!uri.hasScheme) {
-      return null;
-    }
-    final scheme = uri.scheme.toLowerCase();
-    if (scheme != 'http' && scheme != 'https') {
-      return null;
-    }
-    if (request.headers.isEmpty) {
-      return NetworkImage(value);
-    }
-    return NetworkImage(value, headers: request.headers);
-  }
 
   void _trackPagedImageIntrinsicSize({
     required String src,
