@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart'
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/theme/typography.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 
@@ -408,6 +409,15 @@ class _TypographyTab extends StatelessWidget {
     return ListView(
       physics: const BouncingScrollPhysics(),
       children: [
+        _Section(
+          title: '字体',
+          child: _FontFamilyRow(
+            fontFamilyIndex: settings.fontFamilyIndex,
+            onChanged: (index) => onSettingsChanged(
+              settings.copyWith(fontFamilyIndex: index),
+            ),
+          ),
+        ),
         _Section(
           title: '字号与间距',
           child: _SliderGroup(
@@ -1376,6 +1386,37 @@ class _TextBoldRow extends StatelessWidget {
             },
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _FontFamilyRow extends StatelessWidget {
+  final int fontFamilyIndex;
+  final ValueChanged<int> onChanged;
+
+  const _FontFamilyRow({
+    required this.fontFamilyIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final safeIndex = (fontFamilyIndex >= 0 &&
+            fontFamilyIndex < ReadingFontFamily.presets.length)
+        ? fontFamilyIndex
+        : 0;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (var i = 0; i < ReadingFontFamily.presets.length; i++)
+          _ModeChip(
+            label: ReadingFontFamily.presets[i].name,
+            selected: safeIndex == i,
+            disabled: false,
+            onTap: () => onChanged(i),
+          ),
       ],
     );
   }
