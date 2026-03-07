@@ -91,7 +91,7 @@ import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/reader_txt_toc_rule_dialog.dart';
-import '../widgets/reader_quick_settings_sheet.dart';
+import '../widgets/reader_font_quick_sheet.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_content_editor.dart';
 import 'reader_dict_lookup_sheet.dart';
@@ -4844,8 +4844,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         onShowChapterList: _openChapterListFromMenu,
                         onShowReadAloud: _openReadAloudFromMenu,
                         onReadAloudLongPress: _openReadAloudDialogFromMenu,
-                        onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
-                        onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
+                        onShowFontSettings: _openFontSettingsFromMenu,
+                        onOpenFullSettings: _openFullSettingsFromMenu,
                         showReadAloud: !MigrationExclusions.excludeTts,
                         readBarStyleFollowPage: _menuFollowPageTone,
                         readAloudRunning: _readAloudSnapshot.isRunning,

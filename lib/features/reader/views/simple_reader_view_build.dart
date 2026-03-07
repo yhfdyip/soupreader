@@ -1263,25 +1263,26 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     _showChapterList();
   }
 
-  void _openInterfaceSettingsFromMenu() {
+  void _openFontSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showQuickSettingsSheet(initialTab: ReaderQuickSettingsTab.typography);
+    _showFontQuickSheet();
   }
 
-  void _openBehaviorSettingsFromMenu() {
+  void _openFullSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showQuickSettingsSheet(initialTab: ReaderQuickSettingsTab.interface);
+    Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => const GlobalReadingSettingsView(),
+      ),
+    );
   }
 
-  void _showQuickSettingsSheet({
-    ReaderQuickSettingsTab initialTab = ReaderQuickSettingsTab.typography,
-  }) {
+  void _showFontQuickSheet() {
     showCupertinoBottomSheetDialog<void>(
       context: context,
-      builder: (context) => ReaderQuickSettingsSheet(
+      builder: (context) => ReaderFontQuickSheet(
         settings: _settings,
         themes: _activeReadStyles,
-        initialTab: initialTab,
         onSettingsChanged: (next) => _updateSettings(next),
         onOpenFullSettings: () {
           Navigator.pop(context);
