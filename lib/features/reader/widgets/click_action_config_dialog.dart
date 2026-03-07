@@ -35,25 +35,23 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+      _isDark ? AppDesignTokens.pageBgDark : CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
-      _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+      CupertinoColors.label.resolveFrom(context);
 
-  Color get _textNormal => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context)
-      : AppDesignTokens.textNormal;
+  Color get _textNormal =>
+      CupertinoColors.secondaryLabel.resolveFrom(context);
 
-  Color get _textSubtle => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
-      : AppDesignTokens.textMuted;
+  Color get _textSubtle =>
+      CupertinoColors.tertiaryLabel.resolveFrom(context);
 
   Color get _lineColor =>
-      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+      CupertinoColors.separator.resolveFrom(context);
 
   Color get _chipBg => _isDark
       ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.16)
-      : AppDesignTokens.pageBgLight;
+      : CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   List<int> get _availableActions {
     return ClickAction.availableActions(
@@ -128,7 +126,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: BoxDecoration(
         color: _panelBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
       ),
       child: SafeArea(
         top: false,
@@ -311,7 +309,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: actionColor.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl / 2),
             border: Border.all(color: actionColor.withValues(alpha: 0.4)),
           ),
           child: Text(
