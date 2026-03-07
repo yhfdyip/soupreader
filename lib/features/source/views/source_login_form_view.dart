@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
@@ -221,7 +223,7 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
       }
 
       // 对齐 legado SourceLoginDialog.menu_ok：成功后仅提示“成功”并关闭页面。
-      await _showMessage('成功');
+      unawaited(showAppToast(context, message: '登录成功'));
       if (!mounted) return;
       Navigator.pop(context);
     } catch (error, stackTrace) {

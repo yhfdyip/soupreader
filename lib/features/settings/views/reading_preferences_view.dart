@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/theme/colors.dart';
@@ -131,7 +132,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
     );
     if (selected == null) return;
     if (PageTurnModeUi.isHidden(selected)) {
-      _showMessage('仿真2模式已隐藏');
+      unawaited(showAppToast(context, message: '仿真2模式已隐藏'));
       return;
     }
     _update(_settings.copyWith(pageTurnMode: selected));
@@ -187,22 +188,6 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       builder: (ctx) => TypographySettingsDialog(
         settings: _settings,
         onSettingsChanged: _update,
-      ),
-    );
-  }
-
-  void _showMessage(String message) {
-    showCupertinoBottomDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text('\n$message'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('好'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
       ),
     );
   }

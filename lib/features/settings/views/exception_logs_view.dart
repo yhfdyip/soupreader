@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
@@ -49,7 +51,7 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
     try {
       await _service.clear();
       if (!mounted) return;
-      await _showMessage('日志已清空');
+      unawaited(showAppToast(context, message: '日志已清空'));
     } catch (error) {
       if (!mounted) return;
       await _showMessage('清空失败：$error');
