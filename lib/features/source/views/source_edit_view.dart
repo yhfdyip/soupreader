@@ -2106,10 +2106,10 @@ class _SourceEditViewState extends State<SourceEditView> {
       }
       if (debug.fetch.body == null || debug.error != null) {
         final reason = (debug.error ?? debug.fetch.error ?? '请求失败').trim();
-        _showMessage('已刷新发现快捷项（${merged.length} 项），请求返回异常：$reason');
+        unawaited(showAppToast(context, message: '已刷新发现快捷项（${merged.length} 项），请求返回异常：$reason'));
         return;
       }
-      _showMessage('已刷新发现快捷项（${merged.length} 项）');
+      unawaited(showAppToast(context, message: '已刷新发现快捷项（${merged.length} 项）'));
     } catch (e) {
       final fallback = _parseExploreQuickEntries(
         exploreUrl: _exploreUrlCtrl.text,
@@ -3250,7 +3250,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
 
     if (cleared > 0) {
-      _showMessage('已清理该书源 Cookie');
+      unawaited(showAppToast(context, message: '已清理该书源 Cookie'));
       return;
     }
     if (lastError != null) {
@@ -3558,7 +3558,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       _loginHeaderCacheCtrl.text = '';
       _loginInfoCtrl.text = '';
     });
-    _showMessage('登录态缓存已清除');
+    unawaited(showAppToast(context, message: '登录态缓存已清除'));
   }
 
   void _syncJsonToFields() {
@@ -3642,7 +3642,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     });
     _validateJson();
     _loadLoginStateForSource(source.bookSourceUrl);
-    _showMessage('已从 JSON 同步到表单');
+    unawaited(showAppToast(context, message: '已从 JSON 同步到表单'));
   }
 
   Future<void> _save() async {
