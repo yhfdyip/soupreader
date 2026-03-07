@@ -42,7 +42,6 @@ import '../services/source_import_selection_helper.dart';
 import '../services/source_login_url_resolver.dart';
 import '../services/source_login_ui_helper.dart';
 import '../../search/models/search_scope_group_helper.dart';
-import 'source_debug_legacy_view.dart';
 import 'source_edit_view.dart';
 import 'source_login_form_view.dart';
 import 'source_login_webview_view.dart';
@@ -2623,10 +2622,13 @@ class _SourceListViewState extends State<SourceListView> {
 
   Future<void> _openSourceDebug(BookSource source) async {
     if (!mounted) return;
+    final raw = _sourceRepo.getRawJsonByUrl(source.bookSourceUrl);
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceDebugLegacyView(
-          source: source,
+        builder: (_) => SourceEditView.fromSource(
+          source,
+          rawJson: raw,
+          initialTab: 3,
         ),
       ),
     );
