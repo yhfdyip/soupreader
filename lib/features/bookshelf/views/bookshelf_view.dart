@@ -12,6 +12,7 @@ import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -2048,41 +2049,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   void _showBottomHint(String message) {
     if (!mounted) return;
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
-      builder: (toastContext) {
-        final navigator = Navigator.of(toastContext);
-        unawaited(Future<void>.delayed(const Duration(milliseconds: 1100), () {
-          if (navigator.mounted && navigator.canPop()) {
-            navigator.pop();
-          }
-        }));
-        return SafeArea(
-          top: false,
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 28),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemBackground
-                    .resolveFrom(context)
-                    .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
-              ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    unawaited(showAppToast(context, message: message));
   }
 
   int _waitUpCount(List<Book> books) {

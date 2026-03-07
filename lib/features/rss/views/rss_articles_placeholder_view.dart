@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_popover_menu.dart';
@@ -865,40 +866,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
 
   void _showToast(String message) {
     if (!mounted) return;
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
-      builder: (toastContext) {
-        final navigator = Navigator.of(toastContext);
-        Future<void>.delayed(const Duration(milliseconds: 1100)).then((_) {
-          if (navigator.mounted && navigator.canPop()) {
-            navigator.pop();
-          }
-        });
-        return SafeArea(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 28),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemBackground
-                    .resolveFrom(context)
-                    .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
-              ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    unawaited(showAppToast(context, message: message));
   }
 
   Future<void> _reloadFavoriteContext() async {
