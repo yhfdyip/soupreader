@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -268,7 +269,7 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
         _currentUrl.trim().isNotEmpty ? _currentUrl.trim() : _initialUrl;
     if (url.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
-    await _showMessage('已复制 URL');
+    unawaited(showAppToast(context, message: '已复制 URL'));
   }
 
   Future<void> _showMoreMenu() async {

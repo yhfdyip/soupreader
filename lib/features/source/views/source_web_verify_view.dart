@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
@@ -284,7 +285,7 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
       return;
     }
     await Clipboard.setData(ClipboardData(text: value));
-    await _showMessage('已复制 Cookie 值（可用于书源 header 的 Cookie 字段）');
+    unawaited(showAppToast(context, message: '已复制 Cookie 值（可用于书源 header 的 Cookie 字段）'));
   }
 
   Future<void> _openInBrowser() async {
