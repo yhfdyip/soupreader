@@ -48,7 +48,7 @@ import '../../source/services/source_cover_loader.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
-import '../../source/views/source_edit_legacy_view.dart';
+import '../../source/views/source_edit_view.dart';
 import '../../source/views/source_list_view.dart';
 import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_login_webview_view.dart';
@@ -10610,7 +10610,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
     final result = await Navigator.of(context).push<String?>(
       CupertinoPageRoute<String?>(
-        builder: (_) => SourceEditLegacyView.fromSource(
+        builder: (_) => SourceEditView.fromSource(
           source,
           rawJson: _sourceRepo.getRawJsonByUrl(source.bookSourceUrl),
         ),

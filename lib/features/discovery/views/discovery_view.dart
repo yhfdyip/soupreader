@@ -27,7 +27,7 @@ import '../../search/views/search_view.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/source_explore_kinds_service.dart';
 import '../../source/services/source_login_url_resolver.dart';
-import '../../source/views/source_edit_legacy_view.dart';
+import '../../source/views/source_edit_view.dart';
 import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_login_webview_view.dart';
 import '../services/discovery_filter_helper.dart';
@@ -428,7 +428,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     if (current == null) {
       await Navigator.of(context).push(
         CupertinoPageRoute<void>(
-          builder: (_) => const SourceEditLegacyView(initialRawJson: '{}'),
+          builder: (_) => const SourceEditView(initialRawJson: '{}'),
         ),
       );
       return;
@@ -436,7 +436,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceEditLegacyView.fromSource(
+        builder: (_) => SourceEditView.fromSource(
           current,
           rawJson: _sourceRepo.getRawJsonByUrl(current.bookSourceUrl),
         ),
