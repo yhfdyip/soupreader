@@ -112,22 +112,22 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7);
+      _isDark ? AppDesignTokens.pageBgDark : AppDesignTokens.pageBgLight;
 
   Color get _textStrong =>
-      _isDark ? CupertinoColors.white : const Color(0xFF1C1C1E);
+      CupertinoColors.label.resolveFrom(context);
 
   Color get _textNormal =>
-      _isDark ? CupertinoColors.systemGrey.resolveFrom(context) : const Color(0xFF3C3C43);
+      CupertinoColors.secondaryLabel.resolveFrom(context);
 
   Color get _textSubtle =>
-      _isDark ? CupertinoColors.systemGrey2.resolveFrom(context) : const Color(0xFF6C6C70);
+      CupertinoColors.tertiaryLabel.resolveFrom(context);
 
   Color get _lineColor =>
-      _isDark ? AppDesignTokens.borderDark : const Color(0xFFC6C6C8);
+      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
 
   Color get _cardMutedBg =>
-      _isDark ? const Color(0xFF2C2C2E) : CupertinoColors.white;
+      _isDark ? AppDesignTokens.surfaceDark : CupertinoColors.white;
 
   @override
   void initState() {
@@ -400,7 +400,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       height: MediaQuery.of(context).size.height * 0.88,
       decoration: BoxDecoration(
         color: _panelBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppDesignTokens.radiusSheet),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -418,9 +420,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   Widget _buildGrabber() {
-    final color = _isDark
-        ? AppDesignTokens.textMuted.withValues(alpha: 0.45)
-        : const Color(0x1F000000);
+    final color = CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 10, bottom: 2),
@@ -590,7 +590,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                   placeholder: placeholder,
                   style: TextStyle(color: _textStrong, fontSize: 14),
                   backgroundColor: _cardMutedBg,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                   onChanged: (value) {
                     setState(() {
                       _searchQuery = value;
@@ -798,7 +798,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             decoration: isCurrent
                 ? BoxDecoration(
                     color: _accent.withValues(alpha: _isDark ? 0.12 : 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                   )
                 : null,
             child: Row(
@@ -909,11 +909,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           background: Container(
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 18),
-            color: _isDark
-                ? CupertinoColors.destructiveRed
-                    .resolveFrom(context)
-                    .withValues(alpha: 0.18)
-                : const Color(0xFFFFEAEA),
+            color: CupertinoColors.destructiveRed
+                .resolveFrom(context)
+                .withValues(alpha: 0.18),
             child: Icon(
               CupertinoIcons.delete,
               color: CupertinoColors.destructiveRed.resolveFrom(context),
