@@ -99,7 +99,7 @@ extension _SpeakEngineManageImportHistoryActions
                                     decoration: BoxDecoration(
                                       color: CupertinoColors.systemGrey6
                                           .resolveFrom(context),
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                                     ),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),

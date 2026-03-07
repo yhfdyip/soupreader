@@ -236,7 +236,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
         decoration: BoxDecoration(
           color: _chipBg,
           border: Border.all(color: _lineColor),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
         ),
         child: GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
@@ -267,7 +267,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
                         : actionColor.withValues(alpha: 0.45),
                     width: isSelected ? 2.0 : 1,
                   ),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,

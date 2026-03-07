@@ -76,7 +76,7 @@ extension _HttpTtsRuleEditLoginActions on _HttpTtsRuleEditViewState {
                 color: CupertinoColors.systemBackground
                     .resolveFrom(context)
                     .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
               ),
               child: Text(
                 message,

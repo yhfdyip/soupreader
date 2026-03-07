@@ -330,13 +330,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             width: _brightnessPanelWidth,
             height: panelHeight,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                 child: DecoratedBox(
               decoration: BoxDecoration(
                 color: panelColor,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
               ),
               child: Column(
                 children: [
