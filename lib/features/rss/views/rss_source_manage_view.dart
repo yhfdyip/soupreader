@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
@@ -745,7 +747,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     }
     final path = (result.outputPath ?? '').trim();
     if (path.isEmpty) {
-      await _showMessage('导出成功');
+      unawaited(showAppToast(context, message: '导出成功'));
       return;
     }
     await _showExportPathDialog(path);

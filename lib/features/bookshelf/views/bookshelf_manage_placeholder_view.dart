@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -1287,7 +1288,7 @@ class _BookshelfManagePlaceholderViewState
       }
       final outputPath = (result.outputPath ?? '').trim();
       if (outputPath.isEmpty) {
-        _showMessage('导出成功');
+        unawaited(showAppToast(context, message: '导出成功'));
         return;
       }
       await _showExportPathDialog(outputPath);
@@ -1308,7 +1309,7 @@ class _BookshelfManagePlaceholderViewState
   Future<void> _showExportPathDialog(String outputPath) async {
     final path = outputPath.trim();
     if (path.isEmpty) {
-      _showMessage('导出成功');
+      unawaited(showAppToast(context, message: '导出成功'));
       return;
     }
     await showCupertinoBottomDialog<void>(
@@ -1327,7 +1328,7 @@ class _BookshelfManagePlaceholderViewState
                 await Clipboard.setData(ClipboardData(text: path));
                 if (!dialogContext.mounted) return;
                 Navigator.of(dialogContext).pop();
-                _showMessage('已复制导出路径');
+                unawaited(showAppToast(context, message: '已复制导出路径'));
               },
               child: const Text('复制路径'),
             ),

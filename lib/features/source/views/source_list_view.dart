@@ -8,6 +8,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/source_ui_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -1985,7 +1986,7 @@ class _SourceListViewState extends State<SourceListView> {
     }
     final path = (result.outputPath ?? '').trim();
     if (path.isEmpty) {
-      _showMessage('导出成功');
+      unawaited(showAppToast(context, message: '导出成功'));
       return;
     }
     await _showExportPathDialog(path);
