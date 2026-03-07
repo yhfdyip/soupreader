@@ -340,8 +340,8 @@ class ReaderTopMenu extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onLongPress: onLongPress,
         child: SizedBox(
-          width: 36,
-          height: 36,
+          width: 44,
+          height: 44,
           child: Icon(
             icon,
             color: color,

@@ -96,9 +96,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: _isDark
-                      ? CupertinoColors.white.withValues(alpha: 0.24)
-                      : _textSubtle.withValues(alpha: 0.35),
+                  color: CupertinoColors.separator.resolveFrom(context),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -151,7 +149,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                   ),
                   const SizedBox(width: 8),
                   CupertinoButton(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(12),
                     minimumSize: Size.zero,
                     onPressed: () {
                       setState(() {
@@ -256,7 +254,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                       '当前',
                       style: TextStyle(
                         color: CupertinoColors.white,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -301,9 +299,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
               color: _cardBg,
               borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl - 2),
               border: Border.all(
-                color: _isDark
-                    ? AppDesignTokens.borderDark.withValues(alpha: 0.6)
-                    : AppDesignTokens.borderLight,
+                color: CupertinoColors.separator.resolveFrom(context),
                 width: 0.5,
               ),
             ),
@@ -316,7 +312,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                   style: TextStyle(
                     color: _textStrong,
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -337,7 +333,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
                     Icon(
                       CupertinoIcons.time,
                       color: _textSubtle,
-                      size: 12,
+                      size: 14,
                     ),
                     const SizedBox(width: 4),
                     Text(

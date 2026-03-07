@@ -169,8 +169,8 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
                   ),
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
+                      horizontal: 12,
+                      vertical: 10,
                     ),
                     minimumSize: Size.zero,
                     onPressed: _addBookmark,
@@ -193,7 +193,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
-                      vertical: 6,
+                      vertical: 10,
                     ),
                     minimumSize: Size.zero,
                     onPressed: () => Navigator.pop(context),
@@ -230,9 +230,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   }
 
   Widget _buildGrabber() {
-    final color = _isDark
-        ? CupertinoColors.white.withValues(alpha: 0.3)
-        : CupertinoColors.separator.resolveFrom(context);
+    final color = CupertinoColors.separator.resolveFrom(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 8, bottom: 2),
@@ -327,8 +325,8 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
                   ),
                 ),
                 CupertinoButton(
-                  padding: const EdgeInsets.all(6),
-                  minimumSize: const Size(28, 28),
+                  padding: const EdgeInsets.all(12),
+                  minimumSize: Size.zero,
                   onPressed: () => _deleteBookmark(bookmark),
                   child: Icon(
                     CupertinoIcons.delete,
