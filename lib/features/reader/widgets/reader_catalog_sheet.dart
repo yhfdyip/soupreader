@@ -125,10 +125,10 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       CupertinoColors.tertiaryLabel.resolveFrom(context);
 
   Color get _lineColor =>
-      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+      CupertinoColors.separator.resolveFrom(context);
 
   Color get _cardMutedBg =>
-      _isDark ? AppDesignTokens.surfaceDark : CupertinoColors.white;
+      CupertinoColors.tertiarySystemFill.resolveFrom(context);
 
   @override
   void initState() {
@@ -558,7 +558,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: isSelected ? _accent : const Color(0x00000000),
+              color: isSelected ? _accent : CupertinoColors.transparent,
               width: 2,
             ),
           ),
@@ -1137,7 +1137,7 @@ class _BookCover extends StatelessWidget {
       title: title,
       width: 50,
       height: 70,
-      borderRadius: 4,
+      borderRadius: 8,
       showTextOnPlaceholder: false,
     );
   }
