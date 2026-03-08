@@ -47,6 +47,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
   bool _importingOnline = false;
   bool _exporting = false;
   List<HttpTtsRule> _rules = const <HttpTtsRule>[];
+  int? _selectedRuleId;
 
   @override
   void initState() {
@@ -82,9 +83,10 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
     _updateState(() => _exporting = value);
   }
 
-  void _setRulesLoaded(List<HttpTtsRule> rules) {
+  void _setRulesLoaded(List<HttpTtsRule> rules, int? selectedRuleId) {
     _updateState(() {
       _rules = rules;
+      _selectedRuleId = selectedRuleId;
       _loading = false;
     });
   }

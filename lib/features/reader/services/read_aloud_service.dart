@@ -68,6 +68,8 @@ abstract class ReadAloudEngine {
   Future<void> stop();
 
   Future<void> dispose();
+
+  Future<void> updateSpeechRate(int rate) async {}
 }
 
 class FlutterReadAloudEngine implements ReadAloudEngine {
@@ -107,6 +109,11 @@ class FlutterReadAloudEngine implements ReadAloudEngine {
     await _tts.stop();
     _initialized = false;
   }
+
+  @override
+  Future<void> updateSpeechRate(int rate) async {
+    await _tts.setSpeechRate(rate.clamp(1, 20) / 10.0);
+  }
 }
 
 class ReadAloudService {
@@ -130,6 +137,7 @@ class ReadAloudService {
   bool _processingCompletion = false;
 
   ReadAloudState _state = ReadAloudState.stopped;
+  int _speechRate = 10;
   int _chapterIndex = -1;
   String _chapterTitle = '';
   List<String> _paragraphs = const <String>[];
@@ -149,6 +157,7 @@ class ReadAloudService {
   bool get isRunning => _state != ReadAloudState.stopped;
   bool get isPlaying => _state == ReadAloudState.playing;
   bool get isPaused => _state == ReadAloudState.paused;
+  int get speechRate => _speechRate;
 
   Future<ReadAloudActionResult> start({
     required int chapterIndex,
@@ -315,7 +324,7 @@ class ReadAloudService {
           success: true,
           message: '朗读上一段',
         );
-      }
+        }
       await _stopInternal(notifyUser: false);
       return const ReadAloudActionResult(
         success: false,
@@ -337,6 +346,11 @@ class ReadAloudService {
   Future<ReadAloudActionResult> stop() async {
     await _stopInternal(notifyUser: true);
     return const ReadAloudActionResult(success: true, message: '朗读已停止');
+  }
+
+  Future<void> updateSpeechRate(int rate) async {
+    _speechRate = rate.clamp(1, 20);
+    await _engine.updateSpeechRate(_speechRate);
   }
 
   Future<void> updateChapter({

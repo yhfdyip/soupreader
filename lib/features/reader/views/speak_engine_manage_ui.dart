@@ -12,10 +12,18 @@ extension _SpeakEngineManageUi on _SpeakEngineManageViewState {
         _buildSectionHeader(tokens, '系统引擎'),
         AppCard(
           padding: EdgeInsets.zero,
-          child: const AppListTile(
-            title: Text('系统默认'),
-            subtitle: Text('跟随设备 TTS 设置'),
+          child: AppListTile(
+            title: const Text('系统默认'),
+            subtitle: const Text('跟随设备 TTS 设置'),
             showChevron: false,
+            onTap: () => _selectEngine(null),
+            additionalInfo: _selectedRuleId == null
+                ? Icon(
+                    CupertinoIcons.checkmark_alt,
+                    color: CupertinoColors.activeBlue.resolveFrom(context),
+                    size: 18,
+                  )
+                : null,
           ),
         ),
         if (_rules.isEmpty)
@@ -58,6 +66,7 @@ extension _SpeakEngineManageUi on _SpeakEngineManageViewState {
     final fallbackTitle = rule.url.trim().isEmpty ? '未命名引擎' : rule.url.trim();
     final title = rule.name.trim().isEmpty ? fallbackTitle : rule.name.trim();
     final subtitle = rule.url.trim().isEmpty ? '未配置 URL' : rule.url.trim();
+    final isSelected = _selectedRuleId == rule.id;
     return AppListTile(
       title: Text(title),
       subtitle: Text(
@@ -65,8 +74,27 @@ extension _SpeakEngineManageUi on _SpeakEngineManageViewState {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      additionalInfo: rule.isDefaultRule ? const Text('默认') : null,
-      onTap: () => _openRuleEditor(rule),
+      additionalInfo: isSelected
+          ? Icon(
+              CupertinoIcons.checkmark_alt,
+              color: CupertinoColors.activeBlue.resolveFrom(context),
+              size: 18,
+            )
+          : rule.isDefaultRule
+              ? const Text('默认')
+              : null,
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(32, 32),
+        onPressed: () => _openRuleEditor(rule),
+        child: Icon(
+          CupertinoIcons.pencil,
+          size: 18,
+          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+        ),
+      ),
+      showChevron: false,
+      onTap: () => _selectEngine(rule.id),
     );
   }
 

@@ -26,6 +26,9 @@ class HttpTtsImportCandidate {
 
 class HttpTtsRuleStore {
   static const String _prefsKey = 'http_tts_rules';
+  static const String _prefsKeySelectedRuleId = 'http_tts_selected_rule_id';
+  static const String _prefsKeySpeechRate = 'read_aloud_speech_rate';
+  static const int _defaultSpeechRate = 10;
   static const String _defaultAssetPath = 'assets/source/httpTTS.json';
   static const String _requestWithoutUaSuffix = '#requestWithoutUA';
   static const int _maxImportDepth = 3;
@@ -38,6 +41,33 @@ class HttpTtsRuleStore {
     PreferencesStore? preferencesStore,
   }) : _httpClient = httpClient ?? Dio(),
        _preferencesStore = preferencesStore ?? defaultPreferencesStore;
+
+  Future<int?> loadSelectedRuleId() async {
+    final raw = await _preferencesStore.getString(_prefsKeySelectedRuleId);
+    if (raw == null || raw.isEmpty) return null;
+    return int.tryParse(raw);
+  }
+
+  Future<void> saveSelectedRuleId(int? id) async {
+    if (id == null) {
+      await _preferencesStore.remove(_prefsKeySelectedRuleId);
+    } else {
+      await _preferencesStore.setString(_prefsKeySelectedRuleId, '$id');
+    }
+  }
+
+  Future<int> loadSpeechRate() async {
+    final raw = await _preferencesStore.getString(_prefsKeySpeechRate);
+    if (raw == null || raw.isEmpty) return _defaultSpeechRate;
+    return int.tryParse(raw)?.clamp(1, 20) ?? _defaultSpeechRate;
+  }
+
+  Future<void> saveSpeechRate(int rate) async {
+    await _preferencesStore.setString(
+      _prefsKeySpeechRate,
+      rate.clamp(1, 20).toString(),
+    );
+  }
 
   Future<List<HttpTtsRule>> loadRules() async {
     final raw = (await _preferencesStore.getString(_prefsKey))?.trim();

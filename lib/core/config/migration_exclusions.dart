@@ -42,7 +42,7 @@ class MigrationExclusions {
   /// 朗读 / TTS（EX-03）。
   static const bool excludeTts = bool.fromEnvironment(
     _keyExcludeTts,
-    defaultValue: true,
+    defaultValue: false,
   );
 
   /// 漫画（EX-04）。

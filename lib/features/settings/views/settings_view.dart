@@ -24,6 +24,7 @@ import 'app_help_dialog.dart';
 import 'backup_settings_view.dart';
 import 'file_manage_view.dart';
 import 'other_settings_view.dart';
+import 'read_aloud_settings_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_profile_card.dart';
 import 'theme_settings_view.dart';
@@ -346,6 +347,21 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                 ],
               ),
+              if (!MigrationExclusions.excludeTts)
+                AppListSection(
+                  header: const Text('朗读'),
+                  children: [
+                    AppListTile(
+                      key: const Key('my_menu_read_aloud'),
+                      leadingIcon: CupertinoIcons.speaker_2,
+                      title: const Text('朗读设置'),
+                      onTap: () => _open(
+                        context,
+                        const ReadAloudSettingsView(),
+                      ),
+                    ),
+                  ],
+                ),
               AppListSection(
                 header: const Text('通用'),
                 children: [

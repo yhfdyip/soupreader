@@ -48,7 +48,6 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
       '校验超时：180秒\n校验项目： 搜索 发现 详情 目录 正文';
 
   bool get _excludeRss => MigrationExclusions.excludeRss;
-  bool get _excludeTts => MigrationExclusions.excludeTts;
   bool get _excludeManga => MigrationExclusions.excludeManga;
   bool get _excludeWebService => MigrationExclusions.excludeWebService;
 
@@ -585,27 +584,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   value: _appSettings.antiAlias,
                   save: _settingsService.saveAntiAlias,
                 ),
-                if (!_excludeTts)
-                  _buildBooleanTile(
-                    title: '全程响应耳机按键',
-                    additionalInfo: '即使退出软件也响应耳机按键',
-                    value: _appSettings.mediaButtonOnExit,
-                    save: _settingsService.saveMediaButtonOnExit,
-                  ),
-                if (!_excludeTts)
-                  _buildBooleanTile(
-                    title: '耳机按键启动朗读',
-                    additionalInfo: '通过耳机按键来启动朗读',
-                    value: _appSettings.readAloudByMediaButton,
-                    save: _settingsService.saveReadAloudByMediaButton,
-                  ),
-                if (!_excludeTts)
-                  _buildBooleanTile(
-                    title: '忽略音频焦点',
-                    additionalInfo: '允许与其他应用同时播放音频',
-                    value: _appSettings.ignoreAudioFocus,
-                    save: _settingsService.saveIgnoreAudioFocus,
-                  ),
+
                 _buildBooleanTile(
                   title: '自动清除过期搜索数据',
                   additionalInfo: '超过一天的搜索数据',

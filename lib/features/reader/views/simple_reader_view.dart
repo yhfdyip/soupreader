@@ -75,6 +75,8 @@ import '../services/reader_source_switch_helper.dart';
 import '../services/reader_system_ui_helper.dart';
 import '../services/reader_theme_mode_helper.dart';
 import '../services/reader_top_bar_action_helper.dart';
+import '../services/http_tts_engine.dart';
+import '../services/http_tts_rule_store.dart';
 import '../services/read_aloud_service.dart';
 import '../services/txt_toc_rule_store.dart';
 import '../utils/chapter_progress_utils.dart';
@@ -91,6 +93,7 @@ import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/reader_txt_toc_rule_dialog.dart';
+import '../widgets/reader_read_aloud_bar.dart';
 import '../widgets/reader_style_quick_sheet.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_content_editor.dart';
@@ -210,10 +213,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   // 自动阅读
   final AutoPager _autoPager = AutoPager();
+  final HttpTtsRuleStore _httpTtsRuleStore = HttpTtsRuleStore();
   bool _showAutoReadPanel = false;
-  late final ReadAloudService _readAloudService;
+  ReadAloudService? _readAloudServiceOrNull;
+  ReadAloudService get _readAloudService =>
+      _readAloudServiceOrNull ??= ReadAloudService(
+        onStateChanged: _handleReadAloudStateChanged,
+        onMessage: _handleReadAloudMessage,
+        onRequestChapterSwitch: _handleReadAloudChapterSwitchRequest,
+      );
   ReadAloudStatusSnapshot _readAloudSnapshot =
       const ReadAloudStatusSnapshot.stopped();
+  int _readAloudSpeechRate = 10;
   FlutterTts? _contentSelectReadAloudTts;
   bool _contentSelectReadAloudTtsReady = false;
   bool _showingReadAloudExclusionDialog = false;
@@ -551,11 +562,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _lastReadRecordAccumulatedAt = DateTime.now();
     _lastReadRecordPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
     _pendingReadRecordDurationMs = 0;
-    _readAloudService = ReadAloudService(
-      onStateChanged: _handleReadAloudStateChanged,
-      onMessage: _handleReadAloudMessage,
-      onRequestChapterSwitch: _handleReadAloudChapterSwitchRequest,
-    );
+    unawaited(_initReadAloudService());
 
     _currentChapterIndex = widget.initialChapter;
     unawaited(() async {
@@ -725,7 +732,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _scrollController.dispose();
     _keyboardFocusNode.dispose();
     _autoPager.dispose();
-    unawaited(_readAloudService.dispose());
+    unawaited(_readAloudServiceOrNull?.dispose());
     unawaited(_disposeContentSelectReadAloudTts());
     _contentSelectMenuLongPressResetTimer?.cancel();
     _contentSelectMenuLongPressResetTimer = null;
@@ -739,6 +746,31 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
     unawaited(_restoreSystemUiAndOrientation());
     super.dispose();
+  }
+
+  Future<void> _initReadAloudService() async {
+    final selectedRuleId = await _httpTtsRuleStore.loadSelectedRuleId();
+    final speechRate = await _httpTtsRuleStore.loadSpeechRate();
+    if (!mounted) return;
+
+    ReadAloudEngine engine;
+    if (selectedRuleId != null) {
+      final rules = await _httpTtsRuleStore.loadRules();
+      final rule = rules.where((r) => r.id == selectedRuleId).firstOrNull;
+      engine = rule != null
+          ? HttpTtsReadAloudEngine(rule: rule, speechRate: speechRate)
+          : FlutterReadAloudEngine();
+    } else {
+      engine = FlutterReadAloudEngine();
+    }
+
+    _readAloudServiceOrNull = ReadAloudService(
+      engine: engine,
+      onStateChanged: _handleReadAloudStateChanged,
+      onMessage: _handleReadAloudMessage,
+      onRequestChapterSwitch: _handleReadAloudChapterSwitchRequest,
+    );
+    setState(() => _readAloudSpeechRate = speechRate);
   }
 
   Future<void> _applyPreferredOrientations(
@@ -4861,6 +4893,33 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         top: MediaQuery.paddingOf(context).top + 12,
                         right: 16,
                         child: const CupertinoActivityIndicator(),
+                      ),
+
+                    // 朗读控制浮层
+                    if (_readAloudSnapshot.isRunning)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: ReaderReadAloudBar(
+                          snapshot: _readAloudSnapshot,
+                          speechRate: _readAloudSpeechRate,
+                          bgColor: _uiPanelBg,
+                          fgColor: _uiTextStrong,
+                          accentColor: _uiAccent,
+                          onPreviousParagraph: () =>
+                              unawaited(_readAloudService.previousParagraph()),
+                          onTogglePauseResume: () =>
+                              unawaited(_readAloudService.togglePauseResume()),
+                          onNextParagraph: () =>
+                              unawaited(_readAloudService.nextParagraph()),
+                          onStop: () => unawaited(_readAloudService.stop()),
+                          onSpeechRateChanged: (rate) {
+                            setState(() => _readAloudSpeechRate = rate);
+                            unawaited(_readAloudService.updateSpeechRate(rate));
+                            unawaited(_httpTtsRuleStore.saveSpeechRate(rate));
+                          },
+                        ),
                       ),
 
                     // 自动阅读控制面板

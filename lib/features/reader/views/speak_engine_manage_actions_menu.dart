@@ -3,14 +3,33 @@ part of 'speak_engine_manage_view.dart';
 extension _SpeakEngineManageMenuActions on _SpeakEngineManageViewState {
   Future<void> _reloadRules() async {
     _setLoading(true);
-    final rules = await _ruleStore.loadRules();
+    final results = await Future.wait([
+      _ruleStore.loadRules(),
+      _ruleStore.loadSelectedRuleId(),
+    ]);
+    final rules = results[0] as List<HttpTtsRule>;
+    final selectedId = results[1] as int?;
     final sorted = rules.toList()
       ..sort((a, b) {
         final byName = a.name.compareTo(b.name);
         if (byName != 0) return byName;
         return a.id.compareTo(b.id);
       });
-    _setRulesLoaded(sorted);
+    _setRulesLoaded(sorted, selectedId);
+  }
+
+  Future<void> _selectEngine(int? ruleId) async {
+    await _ruleStore.saveSelectedRuleId(ruleId);
+    _updateState(() => _selectedRuleId = ruleId);
+    String name;
+    if (ruleId == null) {
+      name = '系统默认';
+    } else {
+      final matched = _rules.where((r) => r.id == ruleId).firstOrNull;
+      final rawName = matched?.name.trim() ?? '';
+      name = rawName.isEmpty ? '未命名引擎' : rawName;
+    }
+    _showToastMessage('已切换到 $name');
   }
 
   HttpTtsRule _buildNewRuleDraft() {
