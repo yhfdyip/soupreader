@@ -91,7 +91,7 @@ import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/reader_txt_toc_rule_dialog.dart';
-import '../widgets/reader_quick_settings_sheet.dart';
+import '../widgets/reader_style_quick_sheet.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_content_editor.dart';
 import 'reader_dict_lookup_sheet.dart';

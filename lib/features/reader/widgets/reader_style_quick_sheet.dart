@@ -1,0 +1,538 @@
+import 'package:flutter/cupertino.dart';
+
+import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
+import '../../../app/theme/typography.dart';
+import '../models/reading_settings.dart';
+
+/// 阅读界面快速调整面板，对应底部菜单「界面」按钮。
+///
+/// 参考 legado ReadStyleDialog，用 iOS 方式重新设计：
+/// chip 行（字体/粗细/缩进/简繁）+ 字号步进 + 行距滑杆 + 翻页模式 + 背景主题。
+class ReaderStyleQuickSheet extends StatefulWidget {
+  final ReadingSettings settings;
+  final List<ReadingThemeColors> themes;
+  final ValueChanged<ReadingSettings> onSettingsChanged;
+
+  const ReaderStyleQuickSheet({
+    super.key,
+    required this.settings,
+    required this.themes,
+    required this.onSettingsChanged,
+  });
+
+  @override
+  State<ReaderStyleQuickSheet> createState() =>
+      _ReaderStyleQuickSheetState();
+}
+
+class _ReaderStyleQuickSheetState
+    extends State<ReaderStyleQuickSheet> {
+  late ReadingSettings _draft;
+
+  @override
+  void initState() {
+    super.initState();
+    _draft = widget.settings;
+  }
+
+  void _apply(ReadingSettings next) {
+    setState(() => _draft = next);
+    widget.onSettingsChanged(next);
+  }
+
+  bool get _isDark =>
+      CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent =>
+      _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = _isDark;
+    final sheetBg = isDark
+        ? CupertinoColors.systemGroupedBackground.darkColor
+        : CupertinoColors.systemGroupedBackground.color;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppDesignTokens.radiusSheet),
+      ),
+      child: Container(
+        color: sheetBg,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildGrabber(),
+              _buildHeader(),
+              _buildDivider(),
+              _buildChipRow(),
+              _buildDivider(),
+              _buildFontSizeRow(),
+              _buildLineHeightRow(),
+              _buildDivider(),
+              _buildPageTurnRow(),
+              _buildDivider(),
+              _buildThemeRow(),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGrabber() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(top: 8, bottom: 6),
+        width: 36,
+        height: 4,
+        decoration: BoxDecoration(
+          color: CupertinoColors.separator.resolveFrom(context),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    final isDark = _isDark;
+    final textColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '界面',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            minimumSize: Size.zero,
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              '完成',
+              style: TextStyle(
+                color: _accent,
+                fontSize: 17,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
+  }
+
+  Widget _buildChipRow() {
+    final isDark = _isDark;
+    // 字体 chip
+    final fontName = ReadingFontFamily.getFontName(_draft.fontFamilyIndex);
+    // 粗细
+    final boldLabels = {-1: '细体', 0: '正常', 1: '粗体'};
+    final boldLabel = boldLabels[_draft.textBold] ?? '正常';
+    final nextBold = (_draft.textBold + 2) % 3 - 1; // -1,0,1 循环
+    // 缩进
+    final indentOptions = ['', '　', '　　', '　　　'];
+    final indentLabels = ['无缩进', '缩进1', '缩进2', '缩进3'];
+    final indentIndex = indentOptions.indexOf(_draft.paragraphIndent)
+        .clamp(0, indentOptions.length - 1);
+    final nextIndent = (indentIndex + 1) % indentOptions.length;
+    final indentLabel = indentLabels[indentIndex];
+    // 简繁
+    final converterLabels = {0: '简繁', 1: '繁→简', 2: '简→繁'};
+    final converterLabel = converterLabels[_draft.chineseConverterType] ?? '简繁';
+    final nextConverter = (_draft.chineseConverterType + 1) % 3;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          _buildChip(
+            label: fontName,
+            onTap: () {
+              final next = (_draft.fontFamilyIndex + 1) %
+                  ReadingFontFamily.presets.length;
+              _apply(_draft.copyWith(fontFamilyIndex: next));
+            },
+            isDark: isDark,
+          ),
+          const Spacer(),
+          _buildChip(
+            label: boldLabel,
+            onTap: () => _apply(_draft.copyWith(textBold: nextBold)),
+            isDark: isDark,
+          ),
+          const Spacer(),
+          _buildChip(
+            label: indentLabel,
+            onTap: () => _apply(
+              _draft.copyWith(paragraphIndent: indentOptions[nextIndent]),
+            ),
+            isDark: isDark,
+          ),
+          const Spacer(),
+          _buildChip(
+            label: converterLabel,
+            onTap: () =>
+                _apply(_draft.copyWith(chineseConverterType: nextConverter)),
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip({
+    required String label,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    final bg = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.1)
+        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    final textColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.85)
+        : CupertinoColors.label.resolveFrom(context);
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFontSizeRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final mutedColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.5)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+    const double minSize = 12, maxSize = 30, step = 1;
+    final sv = _draft.fontSize.isFinite
+        ? _draft.fontSize.clamp(minSize, maxSize)
+        : 18.0;
+    final canDec = sv > minSize;
+    final canInc = sv < maxSize;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            Text('字号',
+                style: TextStyle(
+                    color: labelColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400)),
+            const Spacer(),
+            CupertinoButton(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              minimumSize: Size.zero,
+              onPressed: canDec
+                  ? () => _apply(
+                        _draft.copyWith(
+                            fontSize: (sv - step).clamp(minSize, maxSize)),
+                      )
+                  : null,
+              child: Text('A',
+                  style: TextStyle(
+                      color: canDec ? _accent : mutedColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500)),
+            ),
+            SizedBox(
+              width: 36,
+              child: Text(sv.toStringAsFixed(0),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: labelColor,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600)),
+            ),
+            CupertinoButton(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              minimumSize: Size.zero,
+              onPressed: canInc
+                  ? () => _apply(
+                        _draft.copyWith(
+                            fontSize: (sv + step).clamp(minSize, maxSize)),
+                      )
+                  : null,
+              child: Text('A',
+                  style: TextStyle(
+                      color: canInc ? _accent : mutedColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLineHeightRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final metaColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.5)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+    final sv = _draft.lineHeight.isFinite
+        ? _draft.lineHeight.clamp(1.0, 2.2)
+        : 1.8;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            Text('行距',
+                style: TextStyle(
+                    color: labelColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: CupertinoSlider(
+                value: sv.toDouble(),
+                min: 1.0,
+                max: 2.2,
+                activeColor: _accent,
+                onChanged: (v) =>
+                    _apply(_draft.copyWith(lineHeight: v)),
+              ),
+            ),
+            SizedBox(
+              width: 36,
+              child: Text(sv.toStringAsFixed(1),
+                  textAlign: TextAlign.end,
+                  style: TextStyle(color: metaColor, fontSize: 13)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPageTurnRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final modes = [
+      PageTurnMode.cover,
+      PageTurnMode.slide,
+      PageTurnMode.simulation,
+      PageTurnMode.scroll,
+      PageTurnMode.none,
+    ];
+    final bg = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.1)
+        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    final textNormal = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.7)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Text('翻页',
+              style: TextStyle(
+                  color: labelColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: modes.map((mode) {
+                final selected = _draft.pageTurnMode == mode;
+                final chipBg = selected
+                    ? _accent.withValues(alpha: isDark ? 0.18 : 0.12)
+                    : bg;
+                final chipText = selected ? _accent : textNormal;
+                return Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    onPressed: () =>
+                        _apply(_draft.copyWith(pageTurnMode: mode)),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: chipBg,
+                        borderRadius: BorderRadius.circular(
+                            AppDesignTokens.radiusControl),
+                        border: selected
+                            ? Border.all(
+                                color: _accent.withValues(alpha: 0.5),
+                                width: 1.5)
+                            : null,
+                      ),
+                      child: Text(
+                        mode.name,
+                        style: TextStyle(
+                          color: chipText,
+                          fontSize: 13,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final safeSelected =
+        (_draft.themeIndex >= 0 && _draft.themeIndex < widget.themes.length)
+            ? _draft.themeIndex
+            : 0;
+    final borderNormal = CupertinoColors.separator.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('背景主题',
+              style: TextStyle(
+                  color: labelColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400)),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 52,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: widget.themes.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final selected = i == safeSelected;
+                final t = widget.themes[i];
+                return CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  onPressed: () =>
+                      _apply(_draft.copyWith(themeIndex: i)),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 68,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: t.background,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected ? _accent : borderNormal,
+                        width: selected ? 2.0 : 0.5,
+                      ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: _accent.withValues(alpha: 0.25),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              )
+                            ]
+                          : null,
+                    ),
+                    padding: const EdgeInsets.all(6),
+                    child: Stack(
+                      children: [
+                        Align(
+                          alignment: Alignment.bottomLeft,
+                          child: Text(
+                            t.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: t.text.withValues(alpha: 0.9),
+                              fontSize: 10,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (selected)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: _accent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                CupertinoIcons.checkmark,
+                                color: CupertinoColors.white,
+                                size: 9,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

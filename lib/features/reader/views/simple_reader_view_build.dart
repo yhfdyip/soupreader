@@ -1265,35 +1265,29 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
   void _openInterfaceSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showQuickSettingsSheet(initialTab: ReaderQuickSettingsTab.typography);
+    _showStyleQuickSheet();
   }
 
   void _openBehaviorSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showQuickSettingsSheet(initialTab: ReaderQuickSettingsTab.interface);
-  }
-
-  void _showQuickSettingsSheet({
-    ReaderQuickSettingsTab initialTab = ReaderQuickSettingsTab.typography,
-  }) {
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (context) => ReaderQuickSettingsSheet(
-        settings: _settings,
-        themes: _activeReadStyles,
-        initialTab: initialTab,
-        onSettingsChanged: (next) => _updateSettings(next),
-        onOpenFullSettings: () {
-          Navigator.pop(context);
-          Navigator.of(context).push(
-            CupertinoPageRoute<void>(
-              builder: (_) => const GlobalReadingSettingsView(),
-            ),
-          );
-        },
+    Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => const GlobalReadingSettingsView(),
       ),
     );
   }
+
+  void _showStyleQuickSheet() {
+    showCupertinoBottomSheetDialog<void>(
+      context: context,
+      builder: (context) => ReaderStyleQuickSheet(
+        settings: _settings,
+        themes: _activeReadStyles,
+        onSettingsChanged: (next) => _updateSettings(next),
+      ),
+    );
+  }
+
 
   void _openReadAloudFromMenu() {
     _closeReaderMenuOverlay();
