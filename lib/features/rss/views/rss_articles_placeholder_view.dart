@@ -2368,6 +2368,7 @@ class _RssSortTabBar extends StatelessWidget {
 }
 
 /// RSS 文章列表项（style 0/1，对应 legado item_rss_article_2.xml）
+/// legado 布局：上方大图（全宽）+ 下方标题（2行）+ 日期 + 分割线
 class _RssArticleListTile extends StatelessWidget {
   const _RssArticleListTile({
     required this.article,
@@ -2394,54 +2395,48 @@ class _RssArticleListTile extends StatelessWidget {
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // 上方大图（全宽 220dp，对应 legado item_rss_article_2.xml）
+          if (hasImage)
+            SizedBox(
+              height: 180,
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => Container(
+                  height: 180,
+                  color: CupertinoColors.systemGrey5.resolveFrom(context),
+                ),
+              ),
+            ),
+          // 标题 + 日期
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        article.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: titleColor,
-                          height: 1.35,
-                        ),
-                      ),
-                      if ((article.pubDate ?? '').isNotEmpty) ...
-                        [
-                          const SizedBox(height: 5),
-                          Text(
-                            article.pubDate!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: secondaryLabel,
-                            ),
-                          ),
-                        ],
-                    ],
+                Text(
+                  article.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                    height: 1.35,
                   ),
                 ),
-                if (hasImage) ...
+                if ((article.pubDate ?? '').isNotEmpty) ...
                   [
-                    const SizedBox(width: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        width: 72,
-                        height: 56,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                    const SizedBox(height: 6),
+                    Text(
+                      article.pubDate!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: secondaryLabel,
                       ),
                     ),
                   ],
