@@ -1270,11 +1270,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
   void _openBehaviorSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => const ReadingBehaviorSettingsHubView(),
-      ),
-    );
+    showReaderMoreConfigSheet(context);
   }
 
   void _showStyleQuickSheet() {

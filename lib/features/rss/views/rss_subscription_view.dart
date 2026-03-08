@@ -299,11 +299,9 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
                   ),
                 )
               : null,
-          additionalInfo: Text(
-            source.sourceUrl,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
+          trailing: CupertinoSwitch(
+            value: source.enabled,
+            onChanged: (v) => _toggleSourceEnabled(source, v),
           ),
           onTap: () => _openSource(source),
         ),
@@ -399,6 +397,13 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
         builder: (_) => RssSourceManageView(repository: _repo),
       ),
     );
+  }
+
+  Future<void> _toggleSourceEnabled(RssSource source, bool enabled) async {
+    final current = _repo.getByKey(source.sourceUrl) ?? source;
+    try {
+      await _repo.updateSource(current.copyWith(enabled: enabled));
+    } catch (_) {}
   }
 
   Future<void> _openSource(RssSource source) async {

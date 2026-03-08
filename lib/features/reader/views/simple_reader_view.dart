@@ -94,6 +94,7 @@ import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/reader_txt_toc_rule_dialog.dart';
 import '../widgets/reader_read_aloud_bar.dart';
+import '../widgets/reader_more_config_sheet.dart';
 import '../widgets/reader_style_quick_sheet.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_content_editor.dart';

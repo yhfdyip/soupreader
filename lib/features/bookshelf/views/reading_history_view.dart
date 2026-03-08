@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -225,23 +226,49 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
             behavior: HitTestBehavior.opaque,
             onLongPress: () => _showActions(book),
             child: AppCard(
-              padding: EdgeInsets.zero,
-              child: AppListTile(
-                title: Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  _subtitleForBook(book, readRecordDurationByBookId),
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.24,
-                    color: tokens.colors.secondaryLabel,
-                    letterSpacing: -0.16,
-                  ),
-                ),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: GestureDetector(
                 onTap: () => _openReader(book),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppCoverImage(
+                      urlOrPath: book.coverUrl,
+                      title: book.title,
+                      author: book.author,
+                      width: 48,
+                      height: 67,
+                      borderRadius: 6,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            book.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _subtitleForBook(book, readRecordDurationByBookId),
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.24,
+                              color: tokens.colors.secondaryLabel,
+                              letterSpacing: -0.16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

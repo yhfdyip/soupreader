@@ -819,7 +819,19 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
               final rule = rules[index];
               final selected = _selectedRuleIds.contains(rule.id);
               final title = rule.name.isEmpty ? '(未命名)' : rule.name;
+              final patternPreview = rule.pattern.trim().length > 20
+                  ? '${rule.pattern.trim().substring(0, 20)}…'
+                  : rule.pattern.trim();
+              final replacementPreview =
+                  rule.replacement.trim().isEmpty ? '(空)' : (
+                    rule.replacement.trim().length > 15
+                        ? '${rule.replacement.trim().substring(0, 15)}…'
+                        : rule.replacement.trim());
+              final rulePreview = patternPreview.isEmpty
+                  ? ''
+                  : '$patternPreview → $replacementPreview';
               final subtitle = [
+                if (rulePreview.isNotEmpty) rulePreview,
                 if (rule.group != null && rule.group!.trim().isNotEmpty)
                   rule.group!,
                 rule.isRegex ? '正则' : '普通',

@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
@@ -1679,15 +1680,30 @@ class _BookSelectionTile extends StatelessWidget {
           border: Border.all(color: borderColor, width: 0.5),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              selected
-                  ? CupertinoIcons.check_mark_circled_solid
-                  : CupertinoIcons.circle,
-              size: 20,
-              color: selected
-                  ? activeColor
-                  : CupertinoColors.secondaryLabel.resolveFrom(context),
+            // 选择圆圈
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(
+                selected
+                    ? CupertinoIcons.check_mark_circled_solid
+                    : CupertinoIcons.circle,
+                size: 20,
+                color: selected
+                    ? activeColor
+                    : CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // 封面图（对齐 legado 66×90）
+            AppCoverImage(
+              urlOrPath: book.coverUrl,
+              title: book.title,
+              author: book.author,
+              width: 48,
+              height: 67,
+              borderRadius: 6,
             ),
             const SizedBox(width: 10),
             Expanded(
