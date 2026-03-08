@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/click_action_config_dialog.dart';
@@ -95,6 +96,27 @@ class _ReadingStatusActionSettingsViewState
     );
   }
 
+  Future<void> _pickProgressBarBehavior() async {
+    final selected = await showOptionPickerSheet<ProgressBarBehavior>(
+      context: context,
+      title: '进度条行为',
+      currentValue: _settings.progressBarBehavior,
+      accentColor: AppDesignTokens.brandPrimary,
+      items: const [
+        OptionPickerItem(
+          value: ProgressBarBehavior.page,
+          label: '页面',
+        ),
+        OptionPickerItem(
+          value: ProgressBarBehavior.chapter,
+          label: '章节',
+        ),
+      ],
+    );
+    if (selected == null) return;
+    _update(_settings.copyWith(progressBarBehavior: selected));
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
@@ -142,6 +164,37 @@ class _ReadingStatusActionSettingsViewState
                 value: _settings.showBrightnessView,
                 onChanged: (v) =>
                     _update(_settings.copyWith(showBrightnessView: v)),
+              ),
+            ],
+          ),
+          AppListSection(
+            header: _sectionHeader('菜单栏'),
+            hasLeading: false,
+            children: [
+              _buildSwitchItem(
+                title: '显示标题附加信息',
+                value: _settings.showReadTitleAddition,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(showReadTitleAddition: v)),
+              ),
+              _buildSwitchItem(
+                title: '菜单栏样式跟随页面',
+                value: _settings.readBarStyleFollowPage,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(readBarStyleFollowPage: v)),
+              ),
+            ],
+          ),
+          AppListSection(
+            header: _sectionHeader('进度条'),
+            hasLeading: false,
+            children: [
+              _buildOptionItem(
+                title: '进度条行为',
+                info: _settings.progressBarBehavior == ProgressBarBehavior.chapter
+                    ? '章节'
+                    : '页面',
+                onTap: _pickProgressBarBehavior,
               ),
             ],
           ),

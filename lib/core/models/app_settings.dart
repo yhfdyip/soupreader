@@ -240,6 +240,10 @@ class AppSettings {
   final bool mediaButtonOnExit;
   final bool readAloudByMediaButton;
   final bool ignoreAudioFocus;
+  final bool pauseReadAloudWhilePhoneCalls;
+  final bool readAloudWakeLock;
+  final bool readAloudByPage;
+  final bool streamReadAloudAudio;
   final bool autoClearExpired;
   final bool showAddToShelfAlert;
   final String updateToVariant;
@@ -305,6 +309,10 @@ class AppSettings {
     this.mediaButtonOnExit = true,
     this.readAloudByMediaButton = false,
     this.ignoreAudioFocus = false,
+    this.pauseReadAloudWhilePhoneCalls = true,
+    this.readAloudWakeLock = false,
+    this.readAloudByPage = false,
+    this.streamReadAloudAudio = false,
     this.autoClearExpired = true,
     this.showAddToShelfAlert = true,
     this.updateToVariant = defaultUpdateToVariant,
@@ -523,6 +531,13 @@ class AppSettings {
       readAloudByMediaButton:
           parseBoolWithDefault(json['readAloudByMediaButton'], false),
       ignoreAudioFocus: parseBoolWithDefault(json['ignoreAudioFocus'], false),
+      pauseReadAloudWhilePhoneCalls:
+          parseBoolWithDefault(json['pauseReadAloudWhilePhoneCalls'], true),
+      readAloudWakeLock:
+          parseBoolWithDefault(json['readAloudWakeLock'], false),
+      readAloudByPage: parseBoolWithDefault(json['readAloudByPage'], false),
+      streamReadAloudAudio:
+          parseBoolWithDefault(json['streamReadAloudAudio'], false),
       autoClearExpired: parseBoolWithDefault(json['autoClearExpired'], true),
       showAddToShelfAlert:
           parseBoolWithDefault(json['showAddToShelfAlert'], true),
@@ -680,6 +695,10 @@ class AppSettings {
       'mediaButtonOnExit': mediaButtonOnExit,
       'readAloudByMediaButton': readAloudByMediaButton,
       'ignoreAudioFocus': ignoreAudioFocus,
+      'pauseReadAloudWhilePhoneCalls': pauseReadAloudWhilePhoneCalls,
+      'readAloudWakeLock': readAloudWakeLock,
+      'readAloudByPage': readAloudByPage,
+      'streamReadAloudAudio': streamReadAloudAudio,
       'autoClearExpired': autoClearExpired,
       'showAddToShelfAlert': showAddToShelfAlert,
       'updateToVariant': updateToVariant,
@@ -771,6 +790,10 @@ class AppSettings {
     bool? mediaButtonOnExit,
     bool? readAloudByMediaButton,
     bool? ignoreAudioFocus,
+    bool? pauseReadAloudWhilePhoneCalls,
+    bool? readAloudWakeLock,
+    bool? readAloudByPage,
+    bool? streamReadAloudAudio,
     bool? autoClearExpired,
     bool? showAddToShelfAlert,
     String? updateToVariant,
@@ -839,6 +862,11 @@ class AppSettings {
       readAloudByMediaButton:
           readAloudByMediaButton ?? this.readAloudByMediaButton,
       ignoreAudioFocus: ignoreAudioFocus ?? this.ignoreAudioFocus,
+      pauseReadAloudWhilePhoneCalls:
+          pauseReadAloudWhilePhoneCalls ?? this.pauseReadAloudWhilePhoneCalls,
+      readAloudWakeLock: readAloudWakeLock ?? this.readAloudWakeLock,
+      readAloudByPage: readAloudByPage ?? this.readAloudByPage,
+      streamReadAloudAudio: streamReadAloudAudio ?? this.streamReadAloudAudio,
       autoClearExpired: autoClearExpired ?? this.autoClearExpired,
       showAddToShelfAlert: showAddToShelfAlert ?? this.showAddToShelfAlert,
       updateToVariant: updateToVariant ?? this.updateToVariant,

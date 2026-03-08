@@ -105,10 +105,10 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
             header: _sectionHeader('阅读行为'),
             hasLeading: false,
             children: [
-              _buildSwitchItem(
+              _buildOptionItem(
                 title: '屏幕常亮',
-                value: _settings.keepScreenOn,
-                onChanged: (v) => _update(_settings.copyWith(keepScreenOn: v)),
+                info: _keepLightLabel(_settings.keepLightSeconds),
+                onTap: _pickKeepLight,
               ),
               _buildOptionItem(
                 title: '屏幕方向',
@@ -132,6 +132,30 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
                 title: '自动阅读速度',
                 info: '${_settings.autoReadSpeed}s',
                 onTap: _pickAutoReadSpeed,
+              ),
+              _buildSwitchItem(
+                title: '自动换源',
+                value: _settings.autoChangeSource,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(autoChangeSource: v)),
+              ),
+              _buildSwitchItem(
+                title: '允许选择正文',
+                value: _settings.selectText,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(selectText: v)),
+              ),
+            ],
+          ),
+          AppListSection(
+            header: _sectionHeader('显示适配'),
+            hasLeading: false,
+            children: [
+              _buildSwitchItem(
+                title: '刘海屏留边',
+                value: _settings.paddingDisplayCutouts,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(paddingDisplayCutouts: v)),
               ),
             ],
           ),
@@ -226,5 +250,45 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
     );
     if (selected == null) return;
     _update(_settings.copyWith(screenOrientation: selected));
+  }
+
+  String _keepLightLabel(int seconds) {
+    switch (seconds) {
+      case ReadingSettings.keepLightFollowSystem:
+        return '跟随系统';
+      case ReadingSettings.keepLightOneMinute:
+        return '1分钟';
+      case ReadingSettings.keepLightFiveMinutes:
+        return '5分钟';
+      case ReadingSettings.keepLightTenMinutes:
+        return '10分钟';
+      case ReadingSettings.keepLightAlways:
+        return '常亮';
+      default:
+        return '跟随系统';
+    }
+  }
+
+  Future<void> _pickKeepLight() async {
+    final options = [
+      ReadingSettings.keepLightFollowSystem,
+      ReadingSettings.keepLightOneMinute,
+      ReadingSettings.keepLightFiveMinutes,
+      ReadingSettings.keepLightTenMinutes,
+      ReadingSettings.keepLightAlways,
+    ];
+    final selected = await showOptionPickerSheet<int>(
+      context: context,
+      title: '屏幕常亮',
+      currentValue: _settings.keepLightSeconds,
+      items: options
+          .map((v) => OptionPickerItem<int>(
+                value: v,
+                label: _keepLightLabel(v),
+              ))
+          .toList(growable: false),
+    );
+    if (selected == null) return;
+    _update(_settings.copyWith(keepLightSeconds: selected));
   }
 }

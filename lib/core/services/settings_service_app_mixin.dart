@@ -129,6 +129,35 @@ mixin SettingsServiceAppMixin on SettingsServiceContext {
     );
   }
 
+  Future<void> savePauseReadAloudWhilePhoneCalls(bool enabled) async {
+    if (MigrationExclusions.excludeTts) return;
+    await saveAppSettingsPatch(
+      (current) =>
+          current.copyWith(pauseReadAloudWhilePhoneCalls: enabled),
+    );
+  }
+
+  Future<void> saveReadAloudWakeLock(bool enabled) async {
+    if (MigrationExclusions.excludeTts) return;
+    await saveAppSettingsPatch(
+      (current) => current.copyWith(readAloudWakeLock: enabled),
+    );
+  }
+
+  Future<void> saveReadAloudByPage(bool enabled) async {
+    if (MigrationExclusions.excludeTts) return;
+    await saveAppSettingsPatch(
+      (current) => current.copyWith(readAloudByPage: enabled),
+    );
+  }
+
+  Future<void> saveStreamReadAloudAudio(bool enabled) async {
+    if (MigrationExclusions.excludeTts) return;
+    await saveAppSettingsPatch(
+      (current) => current.copyWith(streamReadAloudAudio: enabled),
+    );
+  }
+
   Future<void> saveAutoClearExpired(bool enabled) async {
     await saveAppSettingsPatch(
       (current) => current.copyWith(autoClearExpired: enabled),

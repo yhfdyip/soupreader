@@ -95,6 +95,8 @@ class ReadingSettings {
   final bool mouseWheelPage; // 鼠标滚轮翻页（对标 legado）
   final bool keyPageOnLongPress; // 按键长按翻页（对标 legado）
   final bool disableReturnKey; // 禁用返回键（对标 legado）
+  final bool autoChangeSource; // 章节加载失败自动换源（对标 legado autoChangeSource）
+  final bool selectText; // 允许选择正文文本（对标 legado selectText）
   final int screenOrientation; // 屏幕方向（0~4，对标 legado）
   final List<int> prevKeys; // 自定义上一页按键 keyId 列表（对标 legado prevKeys）
   final List<int> nextKeys; // 自定义下一页按键 keyId 列表（对标 legado nextKeys）
@@ -222,6 +224,8 @@ class ReadingSettings {
     this.mouseWheelPage = true,
     this.keyPageOnLongPress = false,
     this.disableReturnKey = false,
+    this.autoChangeSource = false,
+    this.selectText = false,
     this.screenOrientation = screenOrientationUnspecified,
     this.prevKeys = const <int>[],
     this.nextKeys = const <int>[],
@@ -713,6 +717,8 @@ class ReadingSettings {
       mouseWheelPage: _toBool(json['mouseWheelPage'], true),
       keyPageOnLongPress: _toBool(json['keyPageOnLongPress'], false),
       disableReturnKey: _toBool(json['disableReturnKey'], false),
+      autoChangeSource: _toBool(json['autoChangeSource'], false),
+      selectText: _toBool(json['selectText'], false),
       screenOrientation: _toInt(
         json['screenOrientation'],
         screenOrientationUnspecified,
@@ -861,6 +867,8 @@ class ReadingSettings {
       'mouseWheelPage': mouseWheelPage,
       'keyPageOnLongPress': keyPageOnLongPress,
       'disableReturnKey': disableReturnKey,
+      'autoChangeSource': autoChangeSource,
+      'selectText': selectText,
       'screenOrientation': screenOrientation,
       'prevKeys': prevKeys,
       'nextKeys': nextKeys,
@@ -1211,6 +1219,8 @@ class ReadingSettings {
     bool? mouseWheelPage,
     bool? keyPageOnLongPress,
     bool? disableReturnKey,
+    bool? autoChangeSource,
+    bool? selectText,
     int? screenOrientation,
     List<int>? prevKeys,
     List<int>? nextKeys,
@@ -1328,6 +1338,8 @@ class ReadingSettings {
       mouseWheelPage: mouseWheelPage ?? this.mouseWheelPage,
       keyPageOnLongPress: keyPageOnLongPress ?? this.keyPageOnLongPress,
       disableReturnKey: disableReturnKey ?? this.disableReturnKey,
+      autoChangeSource: autoChangeSource ?? this.autoChangeSource,
+      selectText: selectText ?? this.selectText,
       screenOrientation: screenOrientation ?? this.screenOrientation,
       prevKeys: prevKeys ?? this.prevKeys,
       nextKeys: nextKeys ?? this.nextKeys,

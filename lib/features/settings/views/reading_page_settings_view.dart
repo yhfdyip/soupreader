@@ -103,16 +103,27 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
             header: _sectionHeader('按键'),
             hasLeading: false,
             children: [
-              if (_supportsVolumeKeyPaging)
-                AppListTile(
-                  title: _tileTitle('音量键翻页'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.volumeKeyPage,
-                    activeTrackColor: _accent,
-                    onChanged: (v) =>
-                        _update(_settings.copyWith(volumeKeyPage: v)),
+              if (_supportsVolumeKeyPaging) ...
+                [
+                  AppListTile(
+                    title: _tileTitle('音量键翻页'),
+                    trailing: CupertinoSwitch(
+                      value: _settings.volumeKeyPage,
+                      activeTrackColor: _accent,
+                      onChanged: (v) =>
+                          _update(_settings.copyWith(volumeKeyPage: v)),
+                    ),
                   ),
-                ),
+                  AppListTile(
+                    title: _tileTitle('朗读时音量键翻页'),
+                    trailing: CupertinoSwitch(
+                      value: _settings.volumeKeyPageOnPlay,
+                      activeTrackColor: _accent,
+                      onChanged: (v) => _update(
+                          _settings.copyWith(volumeKeyPageOnPlay: v)),
+                    ),
+                  ),
+                ],
               AppListTile(
                 title: _tileTitle('鼠标滚轮翻页'),
                 trailing: CupertinoSwitch(

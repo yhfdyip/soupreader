@@ -266,6 +266,16 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                     _update(_settings.copyWith(paragraphSpacing: v)),
               ),
               AppListTile(
+                title: _tileTitle('共享排版布局'),
+                subtitle: _tileMeta('横竖屏共用同一排版参数'),
+                trailing: CupertinoSwitch(
+                  value: _settings.shareLayout,
+                  activeTrackColor: _accent,
+                  onChanged: (value) =>
+                      _update(_settings.copyWith(shareLayout: value)),
+                ),
+              ),
+              AppListTile(
                 title: _tileTitle('两端对齐'),
                 trailing: CupertinoSwitch(
                   value: _settings.textFullJustify,
