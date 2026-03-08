@@ -13,6 +13,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/cookie_store.dart';
@@ -777,8 +778,17 @@ class _SourceEditViewState extends State<SourceEditView> {
             _buildTextFieldTile('地址', _urlCtrl, placeholder: 'bookSourceUrl'),
             _buildTextFieldTile('分组', _groupCtrl,
                 placeholder: 'bookSourceGroup'),
-            _buildTextFieldTile('类型', _typeCtrl,
-                placeholder: 'bookSourceType（数字）'),
+            CupertinoListTile.notched(
+              title: const Text('类型'),
+              additionalInfo: Text(
+                _sourceTypeLabel(int.tryParse(_typeCtrl.text.trim()) ?? 0),
+                style: TextStyle(
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  fontSize: 14,
+                ),
+              ),
+              onTap: _pickSourceType,
+            ),
             _buildTextFieldTile(
               '自定义排序',
               _customOrderCtrl,
@@ -1492,6 +1502,34 @@ class _SourceEditViewState extends State<SourceEditView> {
     _validateJson();
     _loadLoginStateForSource(source.bookSourceUrl);
     unawaited(showAppToast(context, message: '已从 JSON 同步到表单'));
+  }
+
+  static const _sourceTypes = [
+    (value: 0, label: '文本'),
+    (value: 1, label: '音频'),
+    (value: 2, label: '图片'),
+    (value: 3, label: '文件'),
+  ];
+
+  String _sourceTypeLabel(int type) {
+    for (final t in _sourceTypes) {
+      if (t.value == type) return t.label;
+    }
+    return '文本';
+  }
+
+  Future<void> _pickSourceType() async {
+    final current = int.tryParse(_typeCtrl.text.trim()) ?? 0;
+    final selected = await showOptionPickerSheet<int>(
+      context: context,
+      title: '书源类型',
+      currentValue: current,
+      items: _sourceTypes
+          .map((t) => OptionPickerItem<int>(value: t.value, label: t.label))
+          .toList(growable: false),
+    );
+    if (selected == null) return;
+    setState(() => _typeCtrl.text = selected.toString());
   }
 
   Future<void> _save() async {
