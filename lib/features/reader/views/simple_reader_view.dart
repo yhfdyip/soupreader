@@ -57,7 +57,7 @@ import '../../search/views/search_book_info_view.dart';
 import '../../settings/views/app_help_dialog.dart';
 import '../../settings/views/app_log_dialog.dart';
 import '../../settings/views/exception_logs_view.dart';
-import '../../settings/views/global_reading_settings_view.dart';
+import '../../settings/views/reading_behavior_settings_hub_view.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
 import '../services/reader_bookmark_export_service.dart';
