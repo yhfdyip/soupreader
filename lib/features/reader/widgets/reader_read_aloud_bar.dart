@@ -16,6 +16,8 @@ class ReaderReadAloudBar extends StatelessWidget {
     required this.onNextParagraph,
     required this.onStop,
     required this.onSpeechRateChanged,
+    this.onPreviousChapter,
+    this.onNextChapter,
     this.bgColor,
     this.fgColor,
     this.accentColor,
@@ -28,6 +30,8 @@ class ReaderReadAloudBar extends StatelessWidget {
   final VoidCallback onNextParagraph;
   final VoidCallback onStop;
   final ValueChanged<int> onSpeechRateChanged;
+  final VoidCallback? onPreviousChapter;
+  final VoidCallback? onNextChapter;
   final Color? bgColor;
   final Color? fgColor;
   final Color? accentColor;
@@ -53,6 +57,14 @@ class ReaderReadAloudBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               child: Row(
                 children: [
+                  if (onPreviousChapter != null)
+                    _BarIconButton(
+                      icon: CupertinoIcons.chevron_left_2,
+                      color: fg.withValues(alpha: 0.7),
+                      size: 18,
+                      onTap: onPreviousChapter!,
+                      semanticLabel: '上一章',
+                    ),
                   _BarIconButton(
                     icon: CupertinoIcons.backward_end_fill,
                     color: fg,
@@ -74,6 +86,14 @@ class ReaderReadAloudBar extends StatelessWidget {
                     onTap: onNextParagraph,
                     semanticLabel: '下一段',
                   ),
+                  if (onNextChapter != null)
+                    _BarIconButton(
+                      icon: CupertinoIcons.chevron_right_2,
+                      color: fg.withValues(alpha: 0.7),
+                      size: 18,
+                      onTap: onNextChapter!,
+                      semanticLabel: '下一章',
+                    ),
                   const Spacer(),
                   _SpeechRateStepper(
                     rate: speechRate,

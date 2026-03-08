@@ -1387,8 +1387,7 @@ class _SourceSwitchCandidateSheetState
                                       ),
                                     ),
                                   ],
-                                  if (_loadWordCountEnabled &&
-                                      candidate.respondTimeMs >= 0) ...[
+                                  if (candidate.respondTimeMs >= 0) ...[
                                     const SizedBox(height: 2),
                                     Text(
                                       '响应时间：${candidate.respondTimeMs} ms',

@@ -4809,6 +4809,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                     // 顶部菜单
                     if (_showMenu)
                       ReaderTopMenu(
+                        onBack: () => unawaited(_handleReaderBack()),
                         bookTitle: widget.bookTitle,
                         chapterTitle: _currentTitle,
                         chapterUrl: _resolvedCurrentChapterUrlForTopMenu(),
@@ -4878,6 +4879,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         onReadAloudLongPress: _openReadAloudDialogFromMenu,
                         onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
                         onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
+                        onToggleAutoPage: _toggleAutoPageFromQuickAction,
+                        onSearchContent: _showContentSearchDialog,
+                        onToggleReplaceRule: _toggleReplaceRuleState,
+                        onToggleNightMode: _toggleDayNightThemeFromQuickAction,
+                        autoPageRunning: _autoPager.isRunning,
+                        replaceRuleEnabled: _useReplaceRule,
+                        isNightMode: _isUiDark,
                         showReadAloud: !MigrationExclusions.excludeTts,
                         readBarStyleFollowPage: _menuFollowPageTone,
                         readAloudRunning: _readAloudSnapshot.isRunning,
@@ -4919,6 +4927,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                             unawaited(_readAloudService.updateSpeechRate(rate));
                             unawaited(_httpTtsRuleStore.saveSpeechRate(rate));
                           },
+                          onPreviousChapter: _currentChapterIndex > 0
+                              ? () => unawaited(
+                                    _loadChapter(_currentChapterIndex - 1),
+                                  )
+                              : null,
+                          onNextChapter: _currentChapterIndex <
+                                  _effectiveReadableMaxChapterIndex()
+                              ? () => unawaited(
+                                    _loadChapter(_currentChapterIndex + 1),
+                                  )
+                              : null,
                         ),
                       ),
 

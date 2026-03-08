@@ -33,6 +33,7 @@ class ReaderTopMenu extends StatelessWidget {
   final VoidCallback? onSetCharset;
   final VoidCallback onShowSourceActions;
   final VoidCallback onShowMoreMenu;
+  final VoidCallback? onBack;
   final bool showChangeSourceAction;
   final bool showRefreshAction;
   final bool showDownloadAction;
@@ -64,6 +65,7 @@ class ReaderTopMenu extends StatelessWidget {
     this.onSetCharset,
     required this.onShowSourceActions,
     required this.onShowMoreMenu,
+    this.onBack,
     this.showChangeSourceAction = false,
     this.showRefreshAction = false,
     this.showDownloadAction = false,
@@ -122,7 +124,7 @@ class ReaderTopMenu extends StatelessWidget {
             Row(
               children: [
                 _buildBackButton(
-                  onTap: () => Navigator.pop(context),
+                  onTap: onBack ?? () => Navigator.pop(context),
                   color: style.primaryText,
                 ),
                 Expanded(

@@ -71,6 +71,8 @@ class _ReaderStyleQuickSheetState
               _buildDivider(),
               _buildFontSizeRow(),
               _buildLineHeightRow(),
+              _buildLetterSpacingRow(),
+              _buildParagraphSpacingRow(),
               _buildDivider(),
               _buildPageTurnRow(),
               _buildDivider(),
@@ -146,10 +148,10 @@ class _ReaderStyleQuickSheetState
     final isDark = _isDark;
     // 字体 chip
     final fontName = ReadingFontFamily.getFontName(_draft.fontFamilyIndex);
-    // 粗细
-    final boldLabels = {-1: '细体', 0: '正常', 1: '粗体'};
+    // 粗细（0:正常 1:粗体 2:细体，与 ReadingSettings.textBold 对齐）
+    const boldLabels = {0: '正常', 1: '粗体', 2: '细体'};
     final boldLabel = boldLabels[_draft.textBold] ?? '正常';
-    final nextBold = (_draft.textBold + 2) % 3 - 1; // -1,0,1 循环
+    final nextBold = (_draft.textBold + 1) % 3; // 0→1→2→0 循环
     // 缩进
     final indentOptions = ['', '　', '　　', '　　　'];
     final indentLabels = ['无缩进', '缩进1', '缩进2', '缩进3'];
@@ -242,7 +244,7 @@ class _ReaderStyleQuickSheetState
     final mutedColor = isDark
         ? CupertinoColors.white.withValues(alpha: 0.5)
         : CupertinoColors.secondaryLabel.resolveFrom(context);
-    const double minSize = 12, maxSize = 30, step = 1;
+    const double minSize = 8, maxSize = 50, step = 1;
     final sv = _draft.fontSize.isFinite
         ? _draft.fontSize.clamp(minSize, maxSize)
         : 18.0;
@@ -316,7 +318,7 @@ class _ReaderStyleQuickSheetState
         ? CupertinoColors.white.withValues(alpha: 0.5)
         : CupertinoColors.secondaryLabel.resolveFrom(context);
     final sv = _draft.lineHeight.isFinite
-        ? _draft.lineHeight.clamp(1.0, 2.2)
+        ? _draft.lineHeight.clamp(1.0, 3.0)
         : 1.8;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -334,7 +336,7 @@ class _ReaderStyleQuickSheetState
               child: CupertinoSlider(
                 value: sv.toDouble(),
                 min: 1.0,
-                max: 2.2,
+                max: 3.0,
                 activeColor: _accent,
                 onChanged: (v) =>
                     _apply(_draft.copyWith(lineHeight: v)),
@@ -343,6 +345,94 @@ class _ReaderStyleQuickSheetState
             SizedBox(
               width: 36,
               child: Text(sv.toStringAsFixed(1),
+                  textAlign: TextAlign.end,
+                  style: TextStyle(color: metaColor, fontSize: 13)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLetterSpacingRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final metaColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.5)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+    final sv = _draft.letterSpacing.isFinite
+        ? _draft.letterSpacing.clamp(-2.0, 5.0)
+        : 0.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            Text('字距',
+                style: TextStyle(
+                    color: labelColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: CupertinoSlider(
+                value: sv.toDouble(),
+                min: -2.0,
+                max: 5.0,
+                activeColor: _accent,
+                onChanged: (v) => _apply(_draft.copyWith(letterSpacing: v)),
+              ),
+            ),
+            SizedBox(
+              width: 40,
+              child: Text(sv.toStringAsFixed(1),
+                  textAlign: TextAlign.end,
+                  style: TextStyle(color: metaColor, fontSize: 13)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParagraphSpacingRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final metaColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.5)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+    final sv = _draft.paragraphSpacing.isFinite
+        ? _draft.paragraphSpacing.clamp(0.0, 50.0)
+        : 0.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            Text('段距',
+                style: TextStyle(
+                    color: labelColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: CupertinoSlider(
+                value: sv.toDouble(),
+                min: 0.0,
+                max: 50.0,
+                activeColor: _accent,
+                onChanged: (v) => _apply(_draft.copyWith(paragraphSpacing: v)),
+              ),
+            ),
+            SizedBox(
+              width: 40,
+              child: Text(sv.toStringAsFixed(0),
                   textAlign: TextAlign.end,
                   style: TextStyle(color: metaColor, fontSize: 13)),
             ),

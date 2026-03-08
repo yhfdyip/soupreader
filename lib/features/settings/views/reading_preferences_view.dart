@@ -231,8 +231,8 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
               _SliderTile(
                 title: '字号',
                 value: _settings.fontSize,
-                min: 10,
-                max: 40,
+                min: 8,
+                max: 50,
                 display: _settings.fontSize.toInt().toString(),
                 activeColor: _accent,
                 onChanged: (v) => _update(_settings.copyWith(fontSize: v)),
@@ -272,6 +272,15 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                   activeTrackColor: _accent,
                   onChanged: (value) =>
                       _update(_settings.copyWith(textFullJustify: value)),
+                ),
+              ),
+              AppListTile(
+                title: _tileTitle('底部对齐'),
+                trailing: CupertinoSwitch(
+                  value: _settings.textBottomJustify,
+                  activeTrackColor: _accent,
+                  onChanged: (value) =>
+                      _update(_settings.copyWith(textBottomJustify: value)),
                 ),
               ),
               AppListTile(

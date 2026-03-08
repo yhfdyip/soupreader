@@ -56,6 +56,26 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
   bool _isReversed = false;
   // 当前 Tab
   int _currentTab = 0;
+  final ScrollController _chapterScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _chapterScrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToCurrentChapter() {
+    final index = widget.currentChapterIndex;
+    if (index < 0 || index >= widget.chapters.length) return;
+    final displayIndex = _isReversed ? widget.chapters.length - 1 - index : index;
+    const itemHeight = 52.0;
+    final offset = (displayIndex * itemHeight - 80).clamp(0.0, double.infinity);
+    _chapterScrollController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
 
   bool get _isDark => widget.currentTheme.isDark;
 
@@ -173,6 +193,8 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
               child:
                   _currentTab == 0 ? _buildChapterList() : _buildBookmarkList(),
             ),
+            // 底部当前章节跳转栏（仅目录 Tab 显示）
+            if (_currentTab == 0) _buildCurrentChapterBar(),
           ],
         ),
       ),
@@ -184,6 +206,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
         _isReversed ? widget.chapters.reversed.toList() : widget.chapters;
 
     return ListView.builder(
+      controller: _chapterScrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: chapters.length,
       itemBuilder: (context, index) {
@@ -264,6 +287,55 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCurrentChapterBar() {
+    final index = widget.currentChapterIndex;
+    if (index < 0 || index >= widget.chapters.length) {
+      return const SizedBox.shrink();
+    }
+    final chapter = widget.chapters[index];
+    final separatorColor = CupertinoColors.separator.resolveFrom(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(height: 0.5, color: separatorColor),
+        CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          minimumSize: Size.zero,
+          onPressed: _scrollToCurrentChapter,
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.location_fill,
+                size: 14,
+                color: _accent,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  chapter.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                '${index + 1} / ${widget.chapters.length}',
+                style: TextStyle(
+                  color: _textNormal,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

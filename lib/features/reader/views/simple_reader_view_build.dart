@@ -2585,6 +2585,45 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     );
   }
 
+  Future<void> _handleReaderBack() async {
+    if (!mounted) return;
+    // legado: 非书架书籍退出时提示加入书架（仅 ephemeral 模式）
+    if (widget.isEphemeral) {
+      final appSettings = _settingsService.appSettings;
+      if (appSettings.showAddToShelfAlert) {
+        final addToShelf = await _promptAddToShelf();
+        if (!mounted) return;
+        if (addToShelf == true) {
+          // ephemeral 模式没有真正书架书籍，提示后直接退出
+          // 实际加入书架逻辑由调用方（discovery_explore_results_view）处理
+        }
+      }
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  Future<bool?> _promptAddToShelf() {
+    return showCupertinoBottomDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('加入书架'),
+        content: Text('\n是否将「${widget.bookTitle}」加入书架？'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('不加入'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('加入'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleBackFromSearchMenu() async {
     if (!_showSearchMenu) return;
     final snapshot = _searchProgressSnapshot;
@@ -3078,6 +3117,22 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
           icon: isNightMode ? CupertinoIcons.sun_max : CupertinoIcons.moon_fill,
           semanticLabel: isNightMode ? '切换日间模式' : '切换夜间模式',
           onTap: _toggleDayNightThemeFromQuickAction,
+        );
+      case ReaderLegacyQuickAction.addBookmark:
+        return _buildFloatingActionButton(
+          icon: CupertinoIcons.bookmark,
+          semanticLabel: '添加书签',
+          onTap: () => unawaited(_openAddBookmarkDialog()),
+        );
+      case ReaderLegacyQuickAction.readAloud:
+        final aloudRunning = _readAloudSnapshot.isRunning;
+        return _buildFloatingActionButton(
+          icon: aloudRunning
+              ? CupertinoIcons.speaker_slash_fill
+              : CupertinoIcons.speaker_2_fill,
+          semanticLabel: aloudRunning ? '停止朗读' : '开始朗读',
+          active: aloudRunning,
+          onTap: _openReadAloudFromMenu,
         );
     }
   }

@@ -1,7 +1,10 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -25,7 +28,9 @@ import '../../source/views/source_login_webview_view.dart';
 import '../models/rss_article.dart';
 import '../models/rss_star.dart';
 import '../models/rss_source.dart';
+import '../services/rss_article_load_more_helper.dart';
 import '../services/rss_article_style_helper.dart';
+import '../services/rss_article_sync_service.dart';
 import '../services/rss_sort_urls_helper.dart';
 import 'rss_read_record_view.dart';
 import 'rss_source_edit_view.dart';
@@ -185,17 +190,120 @@ class _RssArticlesPlaceholderViewState
     extends State<RssArticlesPlaceholderView> {
   late final RssSourceRepository _repo;
   late final RssArticleRepository _articleRepo;
+  late final RssArticleSyncService _syncService;
   int _sortReloadVersion = 0;
   int _fallbackArticleStyle = RssArticleStyleHelper.minStyle;
   String _sortFutureKey = '';
   Future<List<RssSortTab>>? _sortTabsFuture;
   final GlobalKey _moreMenuKey = GlobalKey();
 
+  // 文章列表状态
+  int _selectedSortIndex = 0;
+  List<RssArticle> _articles = const <RssArticle>[];
+  bool _isRefreshing = false;
+  bool _isLoadingMore = false;
+  String? _refreshError;
+  RssArticleSession? _session;
+  StreamSubscription<List<RssArticle>>? _articleStreamSub;
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
-    _repo = widget.repository ?? RssSourceRepository(DatabaseService());
-    _articleRepo = RssArticleRepository(DatabaseService());
+    final db = DatabaseService();
+    _repo = widget.repository ?? RssSourceRepository(db);
+    _articleRepo = RssArticleRepository(db);
+    _syncService = RssArticleSyncService(db: db, articleRepository: _articleRepo);
+  }
+
+  @override
+  void dispose() {
+    _articleStreamSub?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _subscribeArticles(String sourceUrl, String sortName) {
+    _articleStreamSub?.cancel();
+    _articleStreamSub = _articleRepo
+        .flowByOriginSort(sourceUrl, sortName)
+        .listen((articles) {
+      if (!mounted) return;
+      setState(() => _articles = articles);
+    });
+  }
+
+  Future<void> _onSortTabSelected(
+    int index,
+    List<RssSortTab> tabs,
+    RssSource? source,
+  ) async {
+    if (_selectedSortIndex == index && _session != null) return;
+    setState(() {
+      _selectedSortIndex = index;
+      _articles = const <RssArticle>[];
+      _session = null;
+      _refreshError = null;
+    });
+    final tab = tabs.isNotEmpty ? tabs[index] : null;
+    final sortName = tab?.name ?? '';
+    final sourceUrl = source?.sourceUrl.trim() ?? '';
+    if (sourceUrl.isNotEmpty) {
+      _subscribeArticles(sourceUrl, sortName);
+    }
+    if (source != null && tab != null) {
+      await _doRefresh(source: source, tab: tab);
+    }
+  }
+
+  Future<void> _doRefresh({
+    required RssSource source,
+    required RssSortTab tab,
+  }) async {
+    if (_isRefreshing) return;
+    setState(() {
+      _isRefreshing = true;
+      _refreshError = null;
+    });
+    try {
+      final result = await _syncService.refresh(
+        source: source,
+        sortName: tab.name,
+        sortUrl: tab.url,
+      );
+      if (!mounted) return;
+      setState(() {
+        _session = result.session;
+        _isRefreshing = false;
+        if (result.error != null) _refreshError = result.error;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRefreshing = false;
+        _refreshError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _doLoadMore(RssSource source) async {
+    final session = _session;
+    if (session == null || !session.hasMore || _isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final result = await _syncService.loadMore(
+        source: source,
+        session: session,
+      );
+      if (!mounted) return;
+      setState(() {
+        _session = result.session;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingMore = false);
+    }
   }
 
   String get _sourceUrlKey => widget.sourceUrl.trim();
@@ -629,58 +737,277 @@ class _RssArticlesPlaceholderViewState
         final source = _resolveCurrentSource(snapshot.data);
         final menuSource = _resolveMenuSource(source);
         final title = _resolvePageTitle(menuSource);
-        final sourceName =
-            menuSource?.sourceName.trim() ?? widget.sourceName.trim();
-        final sourceUrl =
-            menuSource?.sourceUrl.trim() ?? widget.sourceUrl.trim();
         _ensureSortTabsFuture(menuSource);
 
         return AppCupertinoPageScaffold(
           title: title,
           trailing: _buildTrailingAction(menuSource),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-            children: [
-              _PlaceholderCard(
-                title: 'RSS 文章列表（扩展阶段）',
-                message: '已接入订阅入口与打开链路，本页将在下一阶段迁移 legado 文章列表与分页逻辑。',
-              ),
-              const SizedBox(height: 12),
-              _InfoCard(
-                label: '源名称',
-                value: sourceName.isEmpty ? '未命名源' : sourceName,
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '源地址',
-                value: sourceUrl,
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '布局模式',
-                value: _buildLayoutStatus(menuSource),
-              ),
-              const SizedBox(height: 10),
-              FutureBuilder<List<RssSortTab>>(
-                future: _sortTabsFuture,
-                builder: (context, sortSnapshot) {
-                  final tabs = sortSnapshot.data ?? const <RssSortTab>[];
-                  final normalizedNames = tabs
-                      .map((tab) =>
-                          tab.name.trim().isEmpty ? '默认' : tab.name.trim())
-                      .toList(growable: false);
-                  return _SortPreviewCard(
-                    loading: sortSnapshot.connectionState ==
-                            ConnectionState.waiting &&
-                        !sortSnapshot.hasData,
-                    tabNames: normalizedNames,
-                  );
-                },
-              ),
-            ],
+          child: FutureBuilder<List<RssSortTab>>(
+            future: _sortTabsFuture,
+            builder: (context, sortSnapshot) {
+              final tabs = sortSnapshot.data ?? const <RssSortTab>[];
+              // 首次加载完 tabs 后自动触发刷新
+              if (sortSnapshot.connectionState == ConnectionState.done &&
+                  _session == null &&
+                  !_isRefreshing &&
+                  tabs.isNotEmpty &&
+                  menuSource != null) {
+                final idx = _selectedSortIndex.clamp(0, tabs.length - 1);
+                final tab = tabs[idx];
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && _session == null && !_isRefreshing) {
+                    _onSortTabSelected(idx, tabs, menuSource);
+                  }
+                });
+                // 初始化流订阅（避免重复）
+                final sourceUrl = menuSource.sourceUrl.trim();
+                if (_articleStreamSub == null && sourceUrl.isNotEmpty) {
+                  _subscribeArticles(sourceUrl, tab.name);
+                }
+              }
+
+              final isGridView = RssArticleStyleHelper.isGridStyle(
+                menuSource?.articleStyle ?? _fallbackArticleStyle,
+              );
+              final separatorColor =
+                  CupertinoColors.separator.resolveFrom(context);
+
+              return Column(
+                children: [
+                  // 分类 Tab 栏
+                  if (tabs.length > 1)
+                    _RssSortTabBar(
+                      tabs: tabs,
+                      selectedIndex:
+                          _selectedSortIndex.clamp(0, tabs.length - 1),
+                      onTap: (idx) =>
+                          _onSortTabSelected(idx, tabs, menuSource),
+                    ),
+                  if (tabs.length > 1)
+                    Container(height: 0.5, color: separatorColor),
+                  // 文章列表
+                  Expanded(
+                    child: _buildArticleBody(
+                      context: context,
+                      source: menuSource,
+                      tabs: tabs,
+                      isGridView: isGridView,
+                      isLoadingTabs: sortSnapshot.connectionState ==
+                          ConnectionState.waiting,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
+    );
+  }
+
+  Widget _buildArticleBody({
+    required BuildContext context,
+    required RssSource? source,
+    required List<RssSortTab> tabs,
+    required bool isGridView,
+    required bool isLoadingTabs,
+  }) {
+    if (isLoadingTabs && _articles.isEmpty) {
+      return const Center(child: CupertinoActivityIndicator());
+    }
+
+    final articles = _articles;
+    final hasMore = RssArticleLoadMoreHelper.shouldShowManualLoadMore(
+      isLoading: _isLoadingMore,
+      hasMore: _session?.hasMore ?? false,
+      articleCount: articles.length,
+    );
+
+    if (articles.isEmpty && !_isRefreshing) {
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          CupertinoSliverRefreshControl(
+            onRefresh: source != null && tabs.isNotEmpty
+                ? () => _doRefresh(
+                      source: source,
+                      tab: tabs[
+                          _selectedSortIndex.clamp(0, tabs.length - 1)],
+                    )
+                : null,
+          ),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: _refreshError != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _refreshError!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                          fontSize: 14,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      '暂无文章',
+                      style: TextStyle(
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (isGridView) {
+      return _buildGridList(
+        context: context,
+        articles: articles,
+        source: source,
+        tabs: tabs,
+        hasMore: hasMore,
+      );
+    }
+    return _buildArticleList(
+      context: context,
+      articles: articles,
+      source: source,
+      tabs: tabs,
+      hasMore: hasMore,
+    );
+  }
+
+  Widget _buildArticleList({
+    required BuildContext context,
+    required List<RssArticle> articles,
+    required RssSource? source,
+    required List<RssSortTab> tabs,
+    required bool hasMore,
+  }) {
+    return CustomScrollView(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: source != null && tabs.isNotEmpty
+              ? () => _doRefresh(
+                    source: source,
+                    tab: tabs[_selectedSortIndex.clamp(0, tabs.length - 1)],
+                  )
+              : null,
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (index == articles.length) {
+                  return hasMore
+                      ? _buildLoadMoreButton(source!)
+                      : _isLoadingMore
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Center(
+                                  child: CupertinoActivityIndicator()),
+                            )
+                          : const SizedBox.shrink();
+                }
+                final article = articles[index];
+                return _RssArticleListTile(
+                  article: article,
+                  onTap: () => _openArticle(article),
+                );
+              },
+              childCount: articles.length + 1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGridList({
+    required BuildContext context,
+    required List<RssArticle> articles,
+    required RssSource? source,
+    required List<RssSortTab> tabs,
+    required bool hasMore,
+  }) {
+    return CustomScrollView(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: source != null && tabs.isNotEmpty
+              ? () => _doRefresh(
+                    source: source,
+                    tab: tabs[_selectedSortIndex.clamp(0, tabs.length - 1)],
+                  )
+              : null,
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.72,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final article = articles[index];
+                return _RssArticleGridCard(
+                  article: article,
+                  onTap: () => _openArticle(article),
+                );
+              },
+              childCount: articles.length,
+            ),
+          ),
+        ),
+        if (hasMore)
+          SliverToBoxAdapter(
+            child: _buildLoadMoreButton(source!),
+          ),
+        if (_isLoadingMore)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CupertinoActivityIndicator()),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLoadMoreButton(RssSource source) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: CupertinoButton(
+        onPressed: () => _doLoadMore(source),
+        child: const Text('加载更多'),
+      ),
+    );
+  }
+
+  Future<void> _openArticle(RssArticle article) async {
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) => RssReadPlaceholderView(
+          title: article.title,
+          origin: article.origin,
+          link: article.link,
+          repository: _repo,
+        ),
+      ),
     );
   }
 }
@@ -1423,60 +1750,136 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
         return AppCupertinoPageScaffold(
           title: widget.title.isEmpty ? 'RSS 阅读' : widget.title,
           trailing: _buildTrailingAction(source),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-            children: [
-              const _PlaceholderCard(
-                title: 'RSS 阅读页（扩展阶段）',
-                message:
-                    'singleUrl 已按 legado 语义完成分支解析；当前序号补齐“刷新”“收藏”“分享”“朗读”“更多（登录/浏览器打开）”动作。',
-              ),
-              const SizedBox(height: 12),
-              _InfoCard(
-                label: 'origin',
-                value: widget.origin,
-              ),
-              if (_linkKey.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                _InfoCard(
-                  label: 'link',
-                  value: _linkKey,
-                ),
-              ],
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '登录入口',
-                value: _buildLoginStatus(source),
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '刷新状态',
-                value: _buildRefreshStatus(),
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '收藏状态',
-                value: _buildFavoriteStatus(),
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '朗读状态',
-                value: _buildReadAloudStatus(),
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '分享目标',
-                value: _buildShareStatus(),
-              ),
-              const SizedBox(height: 10),
-              _InfoCard(
-                label: '浏览器打开目标',
-                value: _buildBrowserOpenStatus(),
-              ),
-            ],
+          child: _RssReadContentView(
+            refreshVersion: _refreshVersion,
+            article: _rssArticle,
+            link: _linkKey,
+            origin: _originKey,
           ),
         );
       },
+    );
+  }
+}
+
+/// RSS 阅读内容视图：优先用 WebView 加载 link；无 link 时渲染 HTML 内容。
+class _RssReadContentView extends StatefulWidget {
+  const _RssReadContentView({
+    required this.refreshVersion,
+    required this.article,
+    required this.link,
+    required this.origin,
+  });
+
+  final int refreshVersion;
+  final RssArticle? article;
+  final String link;
+  final String origin;
+
+  @override
+  State<_RssReadContentView> createState() => _RssReadContentViewState();
+}
+
+class _RssReadContentViewState extends State<_RssReadContentView> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+  String? _lastLoadedKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (_) {
+          if (mounted) setState(() => _isLoading = true);
+        },
+        onPageFinished: (_) {
+          if (mounted) setState(() => _isLoading = false);
+        },
+        onWebResourceError: (_) {
+          if (mounted) setState(() => _isLoading = false);
+        },
+      ));
+    _loadContent();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RssReadContentView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final newKey =
+        '${widget.refreshVersion}::${widget.link}::${widget.article?.link}';
+    if (_lastLoadedKey != newKey) _loadContent();
+  }
+
+  void _loadContent() {
+    final key =
+        '${widget.refreshVersion}::${widget.link}::${widget.article?.link}';
+    _lastLoadedKey = key;
+    final link = widget.link.trim();
+    if (link.isNotEmpty) {
+      _controller.loadRequest(Uri.parse(link));
+      return;
+    }
+    final article = widget.article;
+    if (article == null) {
+      _controller.loadHtmlString('<html><body></body></html>');
+      return;
+    }
+    final content = (article.content?.trim().isNotEmpty == true
+            ? article.content!
+            : article.description) ??
+        '';
+    final html = _buildHtml(
+      title: article.title,
+      content: content,
+      baseUrl: widget.origin,
+    );
+    _controller.loadHtmlString(
+      html,
+      baseUrl: widget.origin.isNotEmpty ? widget.origin : null,
+    );
+  }
+
+  String _buildHtml({
+    required String title,
+    required String content,
+    required String baseUrl,
+  }) {
+    final escapedTitle = title
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    return '''
+<!DOCTYPE html><html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=yes">
+<style>
+body{font-family:-apple-system,sans-serif;font-size:16px;line-height:1.6;color:#1c1c1e;padding:16px;margin:0;word-wrap:break-word;}
+h1{font-size:20px;font-weight:700;margin-bottom:12px;}
+img{max-width:100%;height:auto;border-radius:6px;}
+a{color:#007aff;}
+@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#e5e5ea;}a{color:#0a84ff;}}
+</style></head><body>
+${title.isNotEmpty ? '<h1>$escapedTitle</h1>' : ''}
+$content
+</body></html>''';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        WebViewWidget(controller: _controller),
+        if (_isLoading)
+          const Positioned(
+            top: 12,
+            left: 0,
+            right: 0,
+            child: Center(child: CupertinoActivityIndicator()),
+          ),
+      ],
     );
   }
 }
@@ -1893,6 +2296,245 @@ class _RssFavoriteItemCard extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: const Icon(CupertinoIcons.news, size: 18),
+    );
+  }
+}
+
+/// RSS 分类 Tab 栏
+class _RssSortTabBar extends StatelessWidget {
+  const _RssSortTabBar({
+    required this.tabs,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final List<RssSortTab> tabs;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = CupertinoTheme.of(context).primaryColor;
+    final separatorColor = CupertinoColors.separator.resolveFrom(context);
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: tabs.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        itemBuilder: (context, index) {
+          final tab = tabs[index];
+          final selected = index == selectedIndex;
+          final label =
+              tab.name.trim().isEmpty ? '默认' : tab.name.trim();
+          return GestureDetector(
+            onTap: () => onTap(index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: selected
+                    ? activeColor.withValues(alpha: 0.12)
+                    : CupertinoColors.tertiarySystemGroupedBackground
+                        .resolveFrom(context),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selected
+                      ? activeColor.withValues(alpha: 0.4)
+                      : separatorColor.withValues(alpha: 0.6),
+                  width: 0.5,
+                ),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight:
+                      selected ? FontWeight.w600 : FontWeight.w400,
+                  color: selected
+                      ? activeColor
+                      : CupertinoColors.label.resolveFrom(context),
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// RSS 文章列表项（style 0/1，对应 legado item_rss_article_2.xml）
+class _RssArticleListTile extends StatelessWidget {
+  const _RssArticleListTile({
+    required this.article,
+    required this.onTap,
+  });
+
+  final RssArticle article;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondaryLabel =
+        CupertinoColors.secondaryLabel.resolveFrom(context);
+    final separatorColor = CupertinoColors.separator.resolveFrom(context);
+    final imageUrl = (article.image ?? '').trim();
+    final hasImage = imageUrl.isNotEmpty;
+    final isRead = article.read;
+    final titleColor = isRead
+        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+        : CupertinoColors.label.resolveFrom(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        article.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: titleColor,
+                          height: 1.35,
+                        ),
+                      ),
+                      if ((article.pubDate ?? '').isNotEmpty) ...
+                        [
+                          const SizedBox(height: 5),
+                          Text(
+                            article.pubDate!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: secondaryLabel,
+                            ),
+                          ),
+                        ],
+                    ],
+                  ),
+                ),
+                if (hasImage) ...
+                  [
+                    const SizedBox(width: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        width: 72,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ],
+              ],
+            ),
+          ),
+          Container(height: 0.5, color: separatorColor),
+        ],
+      ),
+    );
+  }
+}
+
+/// RSS 文章网格卡片（style 2，对应 legado item_rss_article_1.xml）
+class _RssArticleGridCard extends StatelessWidget {
+  const _RssArticleGridCard({
+    required this.article,
+    required this.onTap,
+  });
+
+  final RssArticle article;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondaryLabel =
+        CupertinoColors.secondaryLabel.resolveFrom(context);
+    final cardBg = CupertinoColors.secondarySystemGroupedBackground
+        .resolveFrom(context);
+    final imageUrl = (article.image ?? '').trim();
+    final hasImage = imageUrl.isNotEmpty;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          color: cardBg,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (hasImage)
+                Expanded(
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => Container(
+                      color: CupertinoColors.systemGrey5.resolveFrom(context),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: Container(
+                    color: CupertinoColors.systemGrey5.resolveFrom(context),
+                    child: const Icon(
+                      CupertinoIcons.photo,
+                      size: 32,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                child: Text(
+                  article.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              if ((article.pubDate ?? '').isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                  child: Text(
+                    article.pubDate!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: secondaryLabel,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -3,6 +3,8 @@ enum ReaderLegacyQuickAction {
   autoPage,
   replaceRule,
   toggleDayNightTheme,
+  addBookmark,
+  readAloud,
 }
 
 class ReaderLegacyQuickActionHelper {
@@ -13,5 +15,7 @@ class ReaderLegacyQuickActionHelper {
     ReaderLegacyQuickAction.autoPage,
     ReaderLegacyQuickAction.replaceRule,
     ReaderLegacyQuickAction.toggleDayNightTheme,
+    ReaderLegacyQuickAction.addBookmark,
+    ReaderLegacyQuickAction.readAloud,
   ];
 }

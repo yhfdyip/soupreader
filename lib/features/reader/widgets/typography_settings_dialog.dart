@@ -171,7 +171,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                       '内容上边距',
                       _settings.paddingTop,
                       0,
-                      60,
+                      120,
                       (val) =>
                           _updateSettings(_settings.copyWith(paddingTop: val)),
                       displayValue: '${_settings.paddingTop.toInt()}',
@@ -180,7 +180,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                       '内容左边距',
                       _settings.paddingLeft,
                       0,
-                      60,
+                      100,
                       (val) =>
                           _updateSettings(_settings.copyWith(paddingLeft: val)),
                       displayValue: '${_settings.paddingLeft.toInt()}',
@@ -189,7 +189,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                       '内容下边距',
                       _settings.paddingBottom,
                       0,
-                      60,
+                      100,
                       (val) => _updateSettings(
                         _settings.copyWith(paddingBottom: val),
                       ),
@@ -199,7 +199,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                       '内容右边距',
                       _settings.paddingRight,
                       0,
-                      60,
+                      100,
                       (val) => _updateSettings(
                           _settings.copyWith(paddingRight: val)),
                       displayValue: '${_settings.paddingRight.toInt()}',

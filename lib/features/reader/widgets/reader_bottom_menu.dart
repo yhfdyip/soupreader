@@ -24,10 +24,17 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final VoidCallback? onReadAloudLongPress;
   final VoidCallback onShowInterfaceSettings;
   final VoidCallback onShowBehaviorSettings;
+  final VoidCallback? onToggleAutoPage;
+  final VoidCallback? onSearchContent;
+  final VoidCallback? onToggleReplaceRule;
+  final VoidCallback? onToggleNightMode;
   final bool showReadAloud;
   final bool readBarStyleFollowPage;
   final bool readAloudRunning;
   final bool readAloudPaused;
+  final bool autoPageRunning;
+  final bool replaceRuleEnabled;
+  final bool isNightMode;
   final Animation<double>? menuFadeAnimation;
   final Animation<Offset>? menuSlideAnimation;
 
@@ -48,10 +55,17 @@ class ReaderBottomMenuNew extends StatefulWidget {
     this.onReadAloudLongPress,
     required this.onShowInterfaceSettings,
     required this.onShowBehaviorSettings,
+    this.onToggleAutoPage,
+    this.onSearchContent,
+    this.onToggleReplaceRule,
+    this.onToggleNightMode,
     this.showReadAloud = true,
     this.readBarStyleFollowPage = false,
     this.readAloudRunning = false,
     this.readAloudPaused = false,
+    this.autoPageRunning = false,
+    this.replaceRuleEnabled = false,
+    this.isNightMode = false,
     this.menuFadeAnimation,
     this.menuSlideAnimation,
   });
@@ -131,6 +145,18 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.onSearchContent != null ||
+                  widget.onToggleReplaceRule != null ||
+                  widget.onToggleNightMode != null) ...
+                [
+                  _buildQuickActionRow(
+                    foreground: style.primaryText,
+                    accent: _isDarkMode
+                        ? AppDesignTokens.brandSecondary
+                        : AppDesignTokens.brandPrimary,
+                  ),
+                  _buildDivider(style.dividerColor),
+                ],
               _buildChapterSlider(
                 foreground: style.primaryText,
                 mutedForeground: style.secondaryText,
@@ -178,6 +204,83 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     return Container(
       height: 0.5,
       color: color,
+    );
+  }
+
+  Widget _buildQuickActionRow({
+    required Color foreground,
+    required Color accent,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          if (widget.onSearchContent != null)
+            Expanded(
+              child: _buildQuickActionItem(
+                icon: CupertinoIcons.search,
+                label: '搜索',
+                foreground: foreground,
+                onTap: widget.onSearchContent!,
+              ),
+            ),
+          if (widget.onToggleReplaceRule != null)
+            Expanded(
+              child: _buildQuickActionItem(
+                icon: CupertinoIcons.wand_stars,
+                label: '替换',
+                foreground: foreground,
+                active: widget.replaceRuleEnabled,
+                activeColor: accent,
+                onTap: widget.onToggleReplaceRule!,
+              ),
+            ),
+          if (widget.onToggleNightMode != null)
+            Expanded(
+              child: _buildQuickActionItem(
+                icon: widget.isNightMode
+                    ? CupertinoIcons.moon_fill
+                    : CupertinoIcons.sun_max,
+                label: widget.isNightMode ? '夜间' : '白天',
+                foreground: foreground,
+                active: widget.isNightMode,
+                activeColor: accent,
+                onTap: widget.onToggleNightMode!,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionItem({
+    required IconData icon,
+    required String label,
+    required Color foreground,
+    required VoidCallback onTap,
+    bool active = false,
+    Color? activeColor,
+  }) {
+    final color = active ? (activeColor ?? foreground) : foreground;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: color,
+              fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -485,6 +588,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
 
+    final autoPageActive = widget.autoPageRunning;
+
     final tabs = <Widget>[
       _buildTabItem(
         foreground: foreground,
@@ -510,6 +615,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       ),
       _buildTabItem(
         foreground: foreground,
+        icon: autoPageActive
+            ? CupertinoIcons.timer_fill
+            : CupertinoIcons.timer,
+        label: '自动',
+        onTap: widget.onToggleAutoPage,
+        active: autoPageActive,
+        activeColor: accent,
+      ),
+      _buildTabItem(
+        foreground: foreground,
         icon: CupertinoIcons.slider_horizontal_3,
         label: '设置',
         onTap: widget.onShowBehaviorSettings,
@@ -528,7 +643,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     required Color foreground,
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     VoidCallback? onLongPress,
     bool active = false,
     Color? activeColor,

@@ -134,6 +134,18 @@ class BookshelfBookGroupStore {
     return created;
   }
 
+  Future<void> updateGroup(BookshelfBookGroup updated) async {
+    final groups = await getGroups();
+    final next = groups.map((g) => g.groupId == updated.groupId ? updated : g).toList();
+    await saveGroups(next);
+  }
+
+  Future<void> deleteGroup(int groupId) async {
+    final groups = await getGroups();
+    final next = groups.where((g) => g.groupId != groupId).toList();
+    await saveGroups(next);
+  }
+
   Future<void> saveGroups(List<BookshelfBookGroup> groups) async {
     final normalized = _sortGroups(groups);
     await _saveGroupsInternal(normalized);
