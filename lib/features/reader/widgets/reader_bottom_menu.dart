@@ -11,12 +11,9 @@ import 'reader_menu_surface_style.dart';
 class ReaderBottomMenuNew extends StatefulWidget {
   final int currentChapterIndex;
   final int totalChapters;
-  final int currentPageIndex;
-  final int totalPages;
   final ReadingSettings settings;
   final ReadingThemeColors currentTheme;
   final ValueChanged<int> onChapterChanged;
-  final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onSeekChapterProgress;
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback onShowChapterList;
@@ -33,7 +30,6 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final bool readAloudRunning;
   final bool readAloudPaused;
   final bool autoPageRunning;
-  final bool replaceRuleEnabled;
   final bool isNightMode;
   final Animation<double>? menuFadeAnimation;
   final Animation<Offset>? menuSlideAnimation;
@@ -42,12 +38,9 @@ class ReaderBottomMenuNew extends StatefulWidget {
     super.key,
     required this.currentChapterIndex,
     required this.totalChapters,
-    required this.currentPageIndex,
-    required this.totalPages,
     required this.settings,
     required this.currentTheme,
     required this.onChapterChanged,
-    required this.onPageChanged,
     required this.onSeekChapterProgress,
     required this.onSettingsChanged,
     required this.onShowChapterList,
@@ -64,7 +57,6 @@ class ReaderBottomMenuNew extends StatefulWidget {
     this.readAloudRunning = false,
     this.readAloudPaused = false,
     this.autoPageRunning = false,
-    this.replaceRuleEnabled = false,
     this.isNightMode = false,
     this.menuFadeAnimation,
     this.menuSlideAnimation,
@@ -220,7 +212,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             Expanded(
               child: _buildQuickActionItem(
                 icon: CupertinoIcons.search,
-                label: '搜索',
                 foreground: foreground,
                 onTap: widget.onSearchContent!,
               ),
@@ -231,7 +222,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 icon: widget.autoPageRunning
                     ? CupertinoIcons.timer_fill
                     : CupertinoIcons.timer,
-                label: '自动',
                 foreground: foreground,
                 active: widget.autoPageRunning,
                 activeColor: accent,
@@ -242,10 +232,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             Expanded(
               child: _buildQuickActionItem(
                 icon: CupertinoIcons.wand_stars,
-                label: '替换',
                 foreground: foreground,
-                active: widget.replaceRuleEnabled,
-                activeColor: accent,
                 onTap: widget.onToggleReplaceRule!,
               ),
             ),
@@ -255,7 +242,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 icon: widget.isNightMode
                     ? CupertinoIcons.moon_fill
                     : CupertinoIcons.sun_max,
-                label: widget.isNightMode ? '夜间' : '白天',
                 foreground: foreground,
                 active: widget.isNightMode,
                 activeColor: accent,
@@ -269,7 +255,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
 
   Widget _buildQuickActionItem({
     required IconData icon,
-    required String label,
     required Color foreground,
     required VoidCallback onTap,
     bool active = false,
@@ -280,21 +265,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       minimumSize: Size.zero,
       onPressed: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 22, color: color),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
+      child: Icon(icon, size: 22, color: color),
     );
   }
 
@@ -302,20 +273,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     required Color foreground,
     required Color mutedForeground,
   }) {
-    final chapterMode =
-        widget.settings.progressBarBehavior == ProgressBarBehavior.chapter;
     final maxChapter = (widget.totalChapters - 1).clamp(0, 9999);
-    final maxPage = (widget.totalPages - 1).clamp(0, 9999);
-    final canSlide = chapterMode ? maxChapter > 0 : maxPage > 0;
+    final canSlide = maxChapter > 0;
     // CupertinoSlider 在 min==max 时语义层会触发 0 除，导致 NaN 崩溃。
-    final sliderMax = canSlide
-        ? (chapterMode ? maxChapter.toDouble() : maxPage.toDouble())
-        : 1.0;
+    final sliderMax = canSlide ? maxChapter.toDouble() : 1.0;
     final rawSliderValue = _isDragging
         ? _safeFinite(_dragValue)
-        : _safeFinite(chapterMode
-            ? widget.currentChapterIndex.toDouble()
-            : widget.currentPageIndex.toDouble());
+        : _safeFinite(widget.currentChapterIndex.toDouble());
     final sliderValue = rawSliderValue.clamp(0.0, sliderMax).toDouble();
     final accent = _isDarkMode
         ? AppDesignTokens.brandSecondary
@@ -323,18 +287,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final canPrev = widget.currentChapterIndex > 0;
     final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
 
-    final progressLabel = chapterMode
-        ? '${widget.currentChapterIndex + 1} / ${widget.totalChapters}'
-        : '${widget.currentPageIndex + 1} / ${widget.totalPages}';
-    final modeLabel = chapterMode ? '章节' : '页面';
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 6, 0, 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _buildChapterNavButton(
-            icon: CupertinoIcons.chevron_left,
+            label: '上一章',
             enabled: canPrev,
             color: canPrev ? foreground : mutedForeground,
             onTap: canPrev
@@ -342,67 +301,35 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 : null,
           ),
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      modeLabel,
-                      style: TextStyle(
-                        color: mutedForeground,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    Text(
-                      progressLabel,
-                      style: TextStyle(
-                        color: mutedForeground,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(
-                  height: 28,
-                  child: CupertinoSlider(
-                    value: sliderValue,
-                    min: 0,
-                    max: sliderMax,
-                    activeColor: accent,
-                    thumbColor: _isDarkMode ? CupertinoColors.white : accent,
-                    onChanged: canSlide
-                        ? (value) {
-                            setState(() {
-                              _isDragging = true;
-                              _dragValue = value;
-                            });
-                          }
-                        : null,
-                    onChangeEnd: canSlide
-                        ? (value) {
-                            setState(() => _isDragging = false);
-                            if (chapterMode) {
-                              final targetChapter =
-                                  value.round().clamp(0, maxChapter).toInt();
-                              widget.onSeekChapterProgress(targetChapter);
-                            } else {
-                              final targetPage =
-                                  value.round().clamp(0, maxPage).toInt();
-                              widget.onPageChanged(targetPage);
-                            }
-                          }
-                        : null,
-                  ),
-                ),
-              ],
+            child: SizedBox(
+              height: 28,
+              child: CupertinoSlider(
+                value: sliderValue,
+                min: 0,
+                max: sliderMax,
+                activeColor: accent,
+                thumbColor: _isDarkMode ? CupertinoColors.white : accent,
+                onChanged: canSlide
+                    ? (value) {
+                        setState(() {
+                          _isDragging = true;
+                          _dragValue = value;
+                        });
+                      }
+                    : null,
+                onChangeEnd: canSlide
+                    ? (value) {
+                        setState(() => _isDragging = false);
+                        final targetChapter =
+                            value.round().clamp(0, maxChapter).toInt();
+                        widget.onSeekChapterProgress(targetChapter);
+                      }
+                    : null,
+              ),
             ),
           ),
           _buildChapterNavButton(
-            icon: CupertinoIcons.chevron_right,
+            label: '下一章',
             enabled: canNext,
             color: canNext ? foreground : mutedForeground,
             onTap: canNext
@@ -415,19 +342,22 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   }
 
   Widget _buildChapterNavButton({
-    required IconData icon,
+    required String label,
     required bool enabled,
     required Color color,
     required VoidCallback? onTap,
   }) {
     return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       minimumSize: Size.zero,
       onPressed: onTap,
-      child: Icon(
-        icon,
-        size: 20,
-        color: color,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
       ),
     );
   }

@@ -177,20 +177,22 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
-        // 正面阴影（drawCurrentPageShadow）近似：折叠线投影到底页，紧贴折叠轴
-        // 精确对标 legado mFrontShadowColors: 0x80111111->0x00111111
-        // 调暗 46.85%，宽度固定 25px（归一化 0.065）
-        // 注：legado 原施加在当前页正面，此处近似叠加在底页折叠轴附近
-        float frontShadowWidth = 25.0 / resolution.y;
-        float frontShadowT = clamp(-dist / frontShadowWidth, 0.0, 1.0);
+        // dist 在 uv 空间（x∈[0,aspect], y∈[0,1]），需转换为屏幕像素距离。
+        // mouseDir 在 uv 空间归一化，乘以各轴像素密度得到屏幕方向向量，
+        // 其长度即为 uv 单位距离对应的屏幕像素数。
+        vec2 screenDir = mouseDir * vec2(resolution.x / aspect, resolution.y);
+        float distScale = length(screenDir);
+        float distPx = -dist * distScale; // 折叠轴到当前像素的屏幕像素距离（正值朝当前页方向）
+
+        // 正面阴影（drawCurrentPageShadow）：紧贴折叠轴，宽度 25px
+        // 对标 legado mFrontShadowColors: 0x80111111->0x00111111
+        float frontShadowT = clamp(distPx / 25.0, 0.0, 1.0);
         float frontShadowAlpha = 0.4685 * (1.0 - frontShadowT);
         fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
-        // 底页阴影（drawNextPageShadow）：精确对标 legado mBackShadowColors
-        // 0xFF111111->0x00111111: alpha=1.0, RGB=0x11/255=0.0667
-        // srcOver 调暗效果：1 - ((1-1.0) + 1.0*0.0667) = 0.9333
-        // 宽度精确对标 legado mTouchToCornerDis/4（归一化）
-        float nextPageShadowWidth = (touchToCornerDis / 4.0) / resolution.y;
-        float nextShadowT = clamp(-dist / nextPageShadowWidth, 0.0, 1.0);
+
+        // 底页阴影（drawNextPageShadow）：对标 legado mBackShadowColors
+        // 0xFF111111->0x00111111，宽度 = mTouchToCornerDis/4 px
+        float nextShadowT = clamp(distPx / (touchToCornerDis / 4.0), 0.0, 1.0);
         float nextShadowAlpha = 0.9333 * (1.0 - nextShadowT);
         fragColor = vec4(
             fragColor.rgb * (1.0 - nextShadowAlpha),
