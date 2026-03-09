@@ -3204,7 +3204,9 @@ class _ScrollContentViewState extends State<_ScrollContentView> {
             return SingleChildScrollView(
               key: widget.scrollViewportKey,
               controller: widget.scrollController,
-              physics: const BouncingScrollPhysics(),
+              physics: const BouncingScrollPhysics(
+                decelerationRate: ScrollDecelerationRate.fast,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
