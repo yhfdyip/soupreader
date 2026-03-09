@@ -861,11 +861,24 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                           ),
                           CupertinoButton(
                             padding: const EdgeInsets.only(left: 4, right: 2),
-                            minimumSize: const Size(30, 30),
-                            onPressed: () => _showRuleItemMenu(rule),
-                            child: const Icon(
-                              CupertinoIcons.ellipsis,
+                            minimumSize: const Size(36, 36),
+                            onPressed: () => _editRule(rule),
+                            child: Icon(
+                              CupertinoIcons.pencil,
                               size: 18,
+                              color: CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                            ),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.only(left: 2, right: 2),
+                            minimumSize: const Size(36, 36),
+                            onPressed: () => _showRuleItemMenu(rule),
+                            child: Icon(
+                              CupertinoIcons.ellipsis_vertical,
+                              size: 18,
+                              color: CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
                             ),
                           ),
                         ],

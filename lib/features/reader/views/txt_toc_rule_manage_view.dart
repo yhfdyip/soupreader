@@ -140,6 +140,13 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     });
   }
 
+  Future<void> _toggleRuleEnabled(TxtTocRule rule, bool enabled) async {
+    try {
+      await _ruleStore.upsertRule(rule.copyWith(enabled: enabled));
+      await _reloadRules();
+    } catch (_) {}
+  }
+
   Future<void> _onReorderRules(int oldIndex, int newIndex) async {
     if (oldIndex == newIndex) return;
     final mutable = List<TxtTocRule>.from(_rules);
@@ -1178,6 +1185,9 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                     selected: false,
                                     dragIndex: index,
                                     onTap: () => _openRuleEditor(rule),
+                                    onEditTap: () => _openRuleEditor(rule),
+                                    onToggleEnabled: (v) =>
+                                        _toggleRuleEnabled(rule, v),
                                     onShowItemMenu: () =>
                                         _showRuleItemMenu(rule),
                                   ),
@@ -1201,6 +1211,9 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                   onTap: _selectionMode
                                       ? () => _toggleRuleSelection(rule.id)
                                       : () => _openRuleEditor(rule),
+                                  onEditTap: () => _openRuleEditor(rule),
+                                  onToggleEnabled: (v) =>
+                                      _toggleRuleEnabled(rule, v),
                                   onShowItemMenu: _selectionMode
                                       ? null
                                       : () => _showRuleItemMenu(rule),
@@ -1333,6 +1346,8 @@ class _TxtTocRuleListTile extends StatelessWidget {
     required this.onTap,
     required this.onShowItemMenu,
     this.dragIndex,
+    this.onEditTap,
+    this.onToggleEnabled,
   });
 
   final TxtTocRule rule;
@@ -1341,6 +1356,8 @@ class _TxtTocRuleListTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onShowItemMenu;
   final int? dragIndex;
+  final VoidCallback? onEditTap;
+  final ValueChanged<bool>? onToggleEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -1395,24 +1412,36 @@ class _TxtTocRuleListTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (!rule.enabled)
-                  Text(
-                    '已禁用',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.systemRed.resolveFrom(context),
+                if (!selectionMode) ...
+                  [
+                    CupertinoSwitch(
+                      value: rule.enabled,
+                      onChanged: onToggleEnabled,
                     ),
-                  ),
-                if (!selectionMode)
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(28, 28),
-                    onPressed: onShowItemMenu,
-                    child: const Icon(
-                      CupertinoIcons.line_horizontal_3,
-                      size: 18,
+                    CupertinoButton(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 4),
+                      minimumSize: const Size(36, 36),
+                      onPressed: onEditTap ?? onTap,
+                      child: Icon(
+                        CupertinoIcons.pencil,
+                        size: 18,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
                     ),
-                  ),
+                    CupertinoButton(
+                      padding: const EdgeInsets.only(left: 2, right: 2),
+                      minimumSize: const Size(36, 36),
+                      onPressed: onShowItemMenu,
+                      child: Icon(
+                        CupertinoIcons.ellipsis_vertical,
+                        size: 18,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ],
               ],
             ),
             const SizedBox(height: 6),

@@ -651,10 +651,7 @@ class _SourceListViewState extends State<SourceListView> {
                 ),
               ),
             ),
-          Slidable(
-            key: ValueKey<String>('source-item-${source.bookSourceUrl}'),
-            endActionPane: _buildSourceItemEndActionPane(source),
-            child: Container(
+          Container(
               key: _itemKeyForUrl(source.bookSourceUrl),
               color: CupertinoColors.systemBackground.resolveFrom(context),
               child: GestureDetector(
@@ -675,7 +672,7 @@ class _SourceListViewState extends State<SourceListView> {
                 onLongPressEnd: (_) => _endDragSelection(),
                 onLongPressCancel: _endDragSelection,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 10, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -799,11 +796,30 @@ class _SourceListViewState extends State<SourceListView> {
                           );
                         },
                       ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: const Size(36, 36),
+                        onPressed: () => _openEditor(source.bookSourceUrl),
+                        child: Icon(
+                          CupertinoIcons.pencil,
+                          size: 18,
+                          color: secondaryTextColor,
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.only(left: 2, right: 4),
+                        minimumSize: const Size(36, 36),
+                        onPressed: () => unawaited(_showSourceActions(source)),
+                        child: Icon(
+                          CupertinoIcons.ellipsis_vertical,
+                          size: 18,
+                          color: secondaryTextColor,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            ),
           ),
         ],
       );

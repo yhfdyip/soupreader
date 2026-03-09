@@ -727,9 +727,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         rightPadding: widget.settings.footerPaddingRight,
       );
       if (widget.settings.showFooterLine) {
-        final lineY = size.height -
-            bottomSafe -
-            _footerSlotHeight +
+        final lineY = y -
+            PagedReaderWidget._tipLineGap -
             (PagedReaderWidget._tipDividerThickness / 2);
         final paint = Paint()
           ..color = dividerColor

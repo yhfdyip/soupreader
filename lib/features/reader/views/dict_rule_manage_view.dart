@@ -167,6 +167,13 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
     }
   }
 
+  Future<void> _deleteRule(DictRule rule) async {
+    try {
+      await _ruleStore.deleteRulesByNames([rule.name]);
+      await _reloadRules();
+    } catch (_) {}
+  }
+
   Future<void> _onReorderRules(int oldIndex, int newIndex) async {
     if (oldIndex == newIndex) return;
     final mutable = List<DictRule>.from(_rules);
@@ -1001,30 +1008,80 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                               final subtitle = rule.urlRule.trim().isEmpty
                                   ? '未配置 URL 规则'
                                   : rule.urlRule.trim();
+                              final secLabel = CupertinoColors
+                                  .secondaryLabel
+                                  .resolveFrom(context);
                               return Padding(
                                 key: ValueKey(rule.name),
                                 padding: const EdgeInsets.only(bottom: 6),
-                                child: AppCard(
-                                  padding: EdgeInsets.zero,
-                                  child: CupertinoListTile.notched(
-                                    leading: ReorderableDragStartListener(
-                                      index: index,
-                                      child: const Icon(
-                                        CupertinoIcons.bars,
-                                        size: 18,
-                                        color: CupertinoColors.tertiaryLabel,
+                                child: Container(
+                                  color: CupertinoColors.systemBackground
+                                      .resolveFrom(context),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      ReorderableDragStartListener(
+                                        index: index,
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                              right: 8),
+                                          child: Icon(
+                                            CupertinoIcons.bars,
+                                            size: 18,
+                                            color: CupertinoColors.tertiaryLabel
+                                                .resolveFrom(context),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                    title: Text(title),
-                                    subtitle: Text(
-                                      subtitle,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    additionalInfo: rule.enabled
-                                        ? null
-                                        : const Text('禁用'),
-                                    onTap: () => _openRuleEditor(rule),
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      CupertinoSwitch(
+                                        value: rule.enabled,
+                                        onChanged: (v) async {
+                                          await _ruleStore.saveRule(
+                                            originalName: rule.name,
+                                            newRule:
+                                                rule.copyWith(enabled: v),
+                                          );
+                                          await _reloadRules();
+                                        },
+                                      ),
+                                      CupertinoButton(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 4),
+                                        minimumSize: const Size(36, 36),
+                                        onPressed: () =>
+                                            _openRuleEditor(rule),
+                                        child: Icon(
+                                          CupertinoIcons.pencil,
+                                          size: 18,
+                                          color: secLabel,
+                                        ),
+                                      ),
+                                      CupertinoButton(
+                                        padding: const EdgeInsets.only(
+                                            left: 2, right: 2),
+                                        minimumSize: const Size(36, 36),
+                                        onPressed: () =>
+                                            _deleteRule(rule),
+                                        child: Icon(
+                                          CupertinoIcons.delete,
+                                          size: 18,
+                                          color: CupertinoColors.destructiveRed
+                                              .resolveFrom(context),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );

@@ -256,12 +256,25 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                           onChanged: (value) => _updateEnabled(source, value),
                         ),
                         CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(28, 28),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          minimumSize: const Size(36, 36),
+                          onPressed: () => _openEditSource(source),
+                          child: Icon(
+                            CupertinoIcons.pencil,
+                            size: 18,
+                            color: CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
+                          ),
+                        ),
+                        CupertinoButton(
+                          padding: const EdgeInsets.only(left: 2, right: 2),
+                          minimumSize: const Size(36, 36),
                           onPressed: () => _showSourceActions(source),
-                          child: const Icon(
-                            CupertinoIcons.ellipsis_circle,
-                            size: 20,
+                          child: Icon(
+                            CupertinoIcons.ellipsis_vertical,
+                            size: 18,
+                            color: CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
                           ),
                         ),
                       ],
