@@ -136,14 +136,8 @@ void main() {
     }
     
     if (dist > radius) {
-        // 当前页正面由底层 Widget 渲染，Shader 输出透明让其透出
-        // baseAlpha：折叠轴边缘极窄硬过渡（宽度0.01，快速归零）
-        float baseAlpha = clamp(1.0 - (dist - radius) / 0.01, 0.0, 1.0);
-        // 正面阴影（drawCurrentPageShadow）：对标 legado mFrontShadowColors 0x80111111->0x00111111
-        // 宽度约 legado 25px（归一化约6%），折叠轴处最暗0.47，线性衰减至0
-        float frontShadowT = clamp((dist - radius) / 0.06, 0.0, 1.0);
-        float frontShadowAlpha = 0.47 * (1.0 - frontShadowT);
-        fragColor = vec4(0.0, 0.0, 0.0, max(baseAlpha, frontShadowAlpha));
+        // dist>radius：卷起页已完全卷走，透明，透出底层 bottomPicture（下一页）
+        fragColor = vec4(0.0, 0.0, 0.0, 0.0);
     } else if (dist >= 0.0) {
         // map to cylinder point
         float theta = asin(dist / radius);
@@ -151,9 +145,11 @@ void main() {
         vec2 p1 = curlAxisLinePoint + mouseDir * theta * radius;
 
         if (p2.x <= aspect && p2.y <= 1.0 && p2.x > 0.0 && p2.y > 0.0) {
+            // p2 在屏幕内：显示卷起页背面纹理
             uv = p2;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
         } else {
+            // p2 在屏幕外：显示卷起页正面纹理（p1）
             uv = p1;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
             if (p2.x <= aspect+shadowWidth && p2.y <= 1.0+shadowWidth && p2.x > 0.0-shadowWidth && p2.y > 0.0-shadowWidth) {
@@ -173,9 +169,14 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
+        // 正面阴影（drawCurrentPageShadow）：折叠线投影到底页上，紧贴折叠轴
+        // 对标 legado mFrontShadowColors: 0x80111111->0x00111111
+        // dist=0 折叠轴处最暗0.47，向底页方向快速衰减（宽度约radius/2）
+        float frontShadowT = clamp(-dist / (radius * 0.5), 0.0, 1.0);
+        float frontShadowAlpha = 0.25 * (1.0 - frontShadowT);
+        fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
         // 底页阴影（drawNextPageShadow）：折叠轴处最暗，向底页方向线性衰减
         // 对标 legado mBackShadowColors: 0xFF111111 -> 0x00111111
-        // 裁剪在 mPath0 内（已翻走区域），dist=0 折叠轴处最暗，向底页方向渐淡
         float nextShadowT = clamp(-dist / nextPageShadowWidth, 0.0, 1.0);
         float nextShadowAlpha = 0.90 * (1.0 - nextShadowT);
         fragColor = vec4(
