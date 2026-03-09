@@ -1942,9 +1942,17 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado: fillPage ===
   void _fillPage(_PageDirection direction) {
     if (direction == _PageDirection.next) {
-      _factory.moveToNext();
+      if (_isDoublePage) {
+        _factory.moveToNextDouble();
+      } else {
+        _factory.moveToNext();
+      }
     } else if (direction == _PageDirection.prev) {
-      _factory.moveToPrev();
+      if (_isDoublePage) {
+        _factory.moveToPrevDouble();
+      } else {
+        _factory.moveToPrev();
+      }
     }
   }
 
