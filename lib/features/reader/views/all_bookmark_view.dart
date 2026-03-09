@@ -330,16 +330,54 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
             : bookmark.chapterTitle.trim();
         final excerpt =
             bookmark.content.trim().isEmpty ? '（无）' : bookmark.content.trim();
-        return CupertinoListTile.notched(
-          title: Text(chapter),
-          subtitle: Text(
-            '${bookmark.bookName} · ${bookmark.bookAuthor}\n$excerpt',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          additionalInfo: Text(_formatTime(bookmark.createdTime)),
-          trailing: const CupertinoListTileChevron(),
+        final secondaryLabel =
+            CupertinoColors.secondaryLabel.resolveFrom(context);
+        final subtitleStyle = TextStyle(
+          fontSize: 12,
+          color: secondaryLabel,
+        );
+        return GestureDetector(
           onTap: () => unawaited(_openBookmarkDetail(bookmark)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chapter,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${bookmark.bookName} · ${bookmark.bookAuthor}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: subtitleStyle,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        excerpt,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: subtitleStyle,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _formatTime(bookmark.createdTime),
+                  style: TextStyle(fontSize: 11, color: secondaryLabel),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
