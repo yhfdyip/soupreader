@@ -2,8 +2,6 @@
 
 uniform vec2 resolution;
 uniform vec4 iMouse;
-uniform float touchToCornerDis; // 触摸点到角点距离（逻辑像素），对标 legado mTouchToCornerDis
-uniform float simNextShadowAlpha;    // 底页阴影最大不透明度
 uniform float simFolderShadowAlpha;  // 背面折叠阴影强度
 uniform float simRadiusUv;           // 翻页圆柱半径（uv 单位）
 uniform sampler2D image;
@@ -179,17 +177,6 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
-        // 底页阴影（drawNextPageShadow）：对标 legado mBackShadowColors
-        // 0xFF111111->0x00111111，宽度 = mTouchToCornerDis/4 px
-        vec2 mouseDirPx = mouseDir * vec2(resolution.x / aspect, resolution.y);
-        float distScale = length(mouseDirPx);
-        float distPx = -dist * distScale;
-        float nextShadowT = clamp(distPx / (touchToCornerDis / 4.0), 0.0, 1.0);
-        float nextShadowAlpha = simNextShadowAlpha * (1.0 - nextShadowT);
-        fragColor = vec4(
-            fragColor.rgb * (1.0 - nextShadowAlpha),
-            fragColor.a
-        );
     }
     
 

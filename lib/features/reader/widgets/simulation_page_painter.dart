@@ -37,11 +37,7 @@ class SimulationPagePainter extends CustomPainter {
   /// 角点Y
   final double cornerY;
 
-  /// 触摸点到角点距离（逻辑像素），对标 legado mTouchToCornerDis，用于动态底页阴影宽度
-  final double touchToCornerDis;
-
-  /// 仿真翻页阴影调试参数
-  final double simNextShadowAlpha;
+  /// 仿真翻页调试参数
   final double simFolderShadowAlpha;
   final double simRadiusUv;
 
@@ -54,8 +50,6 @@ class SimulationPagePainter extends CustomPainter {
     required this.backgroundColor,
     required this.cornerX,
     required this.cornerY,
-    required this.touchToCornerDis,
-    this.simNextShadowAlpha = 0.9333,
     this.simFolderShadowAlpha = 0.5522,
     this.simRadiusUv = 0.1,
     this.shaderProgram,
@@ -123,10 +117,8 @@ class SimulationPagePainter extends CustomPainter {
     shader.setFloat(3, touch.dy);
     shader.setFloat(4, cornerX); // Pass cornerX (logical)
     shader.setFloat(5, cornerY); // pass cornerY (logical)
-    shader.setFloat(6, touchToCornerDis); // mTouchToCornerDis for dynamic shadow width
-    shader.setFloat(7, simNextShadowAlpha);
-    shader.setFloat(8, simFolderShadowAlpha);
-    shader.setFloat(9, simRadiusUv);
+    shader.setFloat(6, simFolderShadowAlpha);
+    shader.setFloat(7, simRadiusUv);
 
     // Sampler: image
     shader.setImageSampler(0, curPageImage!);
@@ -143,8 +135,6 @@ class SimulationPagePainter extends CustomPainter {
         nextPagePicture != oldDelegate.nextPagePicture ||
         cornerX != oldDelegate.cornerX ||
         cornerY != oldDelegate.cornerY ||
-        touchToCornerDis != oldDelegate.touchToCornerDis ||
-        simNextShadowAlpha != oldDelegate.simNextShadowAlpha ||
         simFolderShadowAlpha != oldDelegate.simFolderShadowAlpha ||
         simRadiusUv != oldDelegate.simRadiusUv ||
         curPageImage != oldDelegate.curPageImage;

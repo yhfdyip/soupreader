@@ -124,7 +124,6 @@ class ReadingSettings {
   final bool doublePage; // 双页模式（对标 legado doublePageHorizontal）
 
   // === 仿真翻页调试参数 ===
-  final double simNextShadowAlpha; // 底页阴影最大不透明度，默认 0.9333
   final double simFolderShadowAlpha; // 背面折叠阴影强度，默认 0.5522
   final double simRadiusUv; // 翻页圆柱半径（uv 单位），默认 0.1
 
@@ -256,7 +255,6 @@ class ReadingSettings {
     this.textBottomJustify = true,
     this.doublePage = false,
     // 仿真翻页调试参数
-    this.simNextShadowAlpha = 0.9333,
     this.simFolderShadowAlpha = 0.5522,
     this.simRadiusUv = 0.1,
   });
@@ -759,7 +757,6 @@ class ReadingSettings {
       textBottomJustify: _toBool(json['textBottomJustify'], true),
       doublePage: _toBool(json['doublePage'], false),
       // 仿真翻页调试参数
-      simNextShadowAlpha: _toDouble(json['simNextShadowAlpha'], 0.9333),
       simFolderShadowAlpha: _toDouble(json['simFolderShadowAlpha'], 0.5522),
       simRadiusUv: _toDouble(json['simRadiusUv'], 0.1),
     ).sanitize();
@@ -910,7 +907,6 @@ class ReadingSettings {
       'textBottomJustify': textBottomJustify,
       'doublePage': doublePage,
       // 仿真翻页调试参数
-      'simNextShadowAlpha': simNextShadowAlpha,
       'simFolderShadowAlpha': simFolderShadowAlpha,
       'simRadiusUv': simRadiusUv,
     };
@@ -1173,12 +1169,6 @@ class ReadingSettings {
       textBottomJustify: textBottomJustify,
       doublePage: doublePage,
       // 仿真翻页调试参数
-      simNextShadowAlpha: _safeDouble(
-        simNextShadowAlpha,
-        min: 0.0,
-        max: 1.0,
-        fallback: 0.9333,
-      ),
       simFolderShadowAlpha: _safeDouble(
         simFolderShadowAlpha,
         min: 0.0,
@@ -1287,7 +1277,6 @@ class ReadingSettings {
     bool? textBottomJustify,
     bool? doublePage,
     // 仿真翻页调试参数
-    double? simNextShadowAlpha,
     double? simFolderShadowAlpha,
     double? simRadiusUv,
   }) {
@@ -1410,7 +1399,6 @@ class ReadingSettings {
       textBottomJustify: textBottomJustify ?? this.textBottomJustify,
       doublePage: doublePage ?? this.doublePage,
       // 仿真翻页调试参数
-      simNextShadowAlpha: simNextShadowAlpha ?? this.simNextShadowAlpha,
       simFolderShadowAlpha: simFolderShadowAlpha ?? this.simFolderShadowAlpha,
       simRadiusUv: simRadiusUv ?? this.simRadiusUv,
     ).sanitize();

@@ -284,15 +284,6 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                         hasLeading: false,
                         children: [
                           _buildSlider(
-                            '底页阴影强度',
-                            _s.simNextShadowAlpha,
-                            0.0,
-                            1.0,
-                            (v) => _u(_s.copyWith(
-                                simNextShadowAlpha: v)),
-                            format: (v) => v.toStringAsFixed(2),
-                          ),
-                          _buildSlider(
                             '背面折叠阴影',
                             _s.simFolderShadowAlpha,
                             0.0,
