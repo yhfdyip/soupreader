@@ -7,6 +7,7 @@ uniform sampler2D image;
 #define pi 3.14159265359
 #define radius 0.1
 #define shadowWidth 0.05
+#define frontShadowWidth 0.04
 #define TRANSPARENT vec4(0.0, 0.0, 0.0, 0.0)
 
 out vec4 fragColor;
@@ -169,6 +170,13 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
+        // 正面阴影：翻起页边缘投射到原页面上的阴影条（对标 legado drawCurrentPageShadow）
+        float frontShadowT = clamp(-dist / frontShadowWidth, 0.0, 1.0);
+        float frontShadowAlpha = 0.5 * pow(1.0 - frontShadowT, 1.5);
+        fragColor = vec4(
+            fragColor.rgb * (1.0 - frontShadowAlpha * 0.6),
+            fragColor.a
+        );
     }
     
 
