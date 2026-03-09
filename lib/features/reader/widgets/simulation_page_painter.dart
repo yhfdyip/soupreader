@@ -37,10 +37,6 @@ class SimulationPagePainter extends CustomPainter {
   /// 角点Y
   final double cornerY;
 
-  /// 仿真翻页调试参数
-  final double simFolderShadowAlpha;
-  final double simRadiusUv;
-
   SimulationPagePainter({
     required this.curPagePicture,
     required this.nextPagePicture,
@@ -50,8 +46,6 @@ class SimulationPagePainter extends CustomPainter {
     required this.backgroundColor,
     required this.cornerX,
     required this.cornerY,
-    this.simFolderShadowAlpha = 0.5522,
-    this.simRadiusUv = 0.1,
     this.shaderProgram,
     this.curPageImage,
     this.devicePixelRatio = 1.0,
@@ -117,8 +111,6 @@ class SimulationPagePainter extends CustomPainter {
     shader.setFloat(3, touch.dy);
     shader.setFloat(4, cornerX); // Pass cornerX (logical)
     shader.setFloat(5, cornerY); // pass cornerY (logical)
-    shader.setFloat(6, simFolderShadowAlpha);
-    shader.setFloat(7, simRadiusUv);
 
     // Sampler: image
     shader.setImageSampler(0, curPageImage!);
@@ -135,8 +127,6 @@ class SimulationPagePainter extends CustomPainter {
         nextPagePicture != oldDelegate.nextPagePicture ||
         cornerX != oldDelegate.cornerX ||
         cornerY != oldDelegate.cornerY ||
-        simFolderShadowAlpha != oldDelegate.simFolderShadowAlpha ||
-        simRadiusUv != oldDelegate.simRadiusUv ||
         curPageImage != oldDelegate.curPageImage;
   }
 }

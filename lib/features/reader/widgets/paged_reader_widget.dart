@@ -2468,8 +2468,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         backgroundColor: widget.backgroundColor,
         cornerX: effectiveCornerX,
         cornerY: _cornerY,
-        simFolderShadowAlpha: widget.settings.simFolderShadowAlpha,
-        simRadiusUv: widget.settings.simRadiusUv,
         shaderProgram: pageCurlProgram!,
         curPageImage: imageToCurl,
         devicePixelRatio: MediaQuery.devicePixelRatioOf(context),

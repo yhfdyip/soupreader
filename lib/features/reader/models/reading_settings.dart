@@ -123,9 +123,6 @@ class ReadingSettings {
   final bool textBottomJustify; // 底部对齐（对标 legado）
   final bool doublePage; // 双页模式（对标 legado doublePageHorizontal）
 
-  // === 仿真翻页调试参数 ===
-  final double simFolderShadowAlpha; // 背面折叠阴影强度，默认 0.5522
-  final double simRadiusUv; // 翻页圆柱半径（uv 单位），默认 0.1
 
   static const int chineseConverterOff = 0;
   static const int chineseConverterTraditionalToSimplified = 1;
@@ -254,9 +251,6 @@ class ReadingSettings {
     this.cleanChapterTitle = false,
     this.textBottomJustify = true,
     this.doublePage = false,
-    // 仿真翻页调试参数
-    this.simFolderShadowAlpha = 0.5522,
-    this.simRadiusUv = 0.1,
   });
 
   /// 兼容旧调用：`true` 等价于「简转繁」。
@@ -756,9 +750,6 @@ class ReadingSettings {
       cleanChapterTitle: _toBool(json['cleanChapterTitle'], false),
       textBottomJustify: _toBool(json['textBottomJustify'], true),
       doublePage: _toBool(json['doublePage'], false),
-      // 仿真翻页调试参数
-      simFolderShadowAlpha: _toDouble(json['simFolderShadowAlpha'], 0.5522),
-      simRadiusUv: _toDouble(json['simRadiusUv'], 0.1),
     ).sanitize();
   }
 
@@ -906,9 +897,6 @@ class ReadingSettings {
       'cleanChapterTitle': cleanChapterTitle,
       'textBottomJustify': textBottomJustify,
       'doublePage': doublePage,
-      // 仿真翻页调试参数
-      'simFolderShadowAlpha': simFolderShadowAlpha,
-      'simRadiusUv': simRadiusUv,
     };
   }
 
@@ -1168,19 +1156,6 @@ class ReadingSettings {
       cleanChapterTitle: cleanChapterTitle,
       textBottomJustify: textBottomJustify,
       doublePage: doublePage,
-      // 仿真翻页调试参数
-      simFolderShadowAlpha: _safeDouble(
-        simFolderShadowAlpha,
-        min: 0.0,
-        max: 1.0,
-        fallback: 0.5522,
-      ),
-      simRadiusUv: _safeDouble(
-        simRadiusUv,
-        min: 0.02,
-        max: 0.3,
-        fallback: 0.1,
-      ),
     );
   }
 
@@ -1276,9 +1251,6 @@ class ReadingSettings {
     bool? cleanChapterTitle,
     bool? textBottomJustify,
     bool? doublePage,
-    // 仿真翻页调试参数
-    double? simFolderShadowAlpha,
-    double? simRadiusUv,
   }) {
     final resolvedChineseConverterType = chineseConverterType ??
         (chineseTraditional == null
@@ -1398,9 +1370,6 @@ class ReadingSettings {
       cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
       textBottomJustify: textBottomJustify ?? this.textBottomJustify,
       doublePage: doublePage ?? this.doublePage,
-      // 仿真翻页调试参数
-      simFolderShadowAlpha: simFolderShadowAlpha ?? this.simFolderShadowAlpha,
-      simRadiusUv: simRadiusUv ?? this.simRadiusUv,
     ).sanitize();
   }
 }

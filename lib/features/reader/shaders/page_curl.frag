@@ -2,8 +2,8 @@
 
 uniform vec2 resolution;
 uniform vec4 iMouse;
-uniform float simFolderShadowAlpha;  // 背面折叠阴影强度
-uniform float simRadiusUv;           // 翻页圆柱半径（uv 单位）
+#define simFolderShadowAlpha 0.5522
+#define simRadiusUv 0.1
 uniform sampler2D image;
 
 #define pi 3.14159265359
