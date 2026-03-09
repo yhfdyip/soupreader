@@ -32,11 +32,35 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
   final TextEditingController _groupController = TextEditingController();
   final TextEditingController _commentController = TextEditingController();
   final TextEditingController _loginUrlController = TextEditingController();
+  final TextEditingController _loginUiController = TextEditingController();
+  final TextEditingController _loginCheckJsController = TextEditingController();
+  final TextEditingController _coverDecodeJsController = TextEditingController();
   final TextEditingController _sortUrlController = TextEditingController();
   final TextEditingController _customOrderController = TextEditingController();
+  final TextEditingController _headerController = TextEditingController();
+  final TextEditingController _variableCommentController = TextEditingController();
+  final TextEditingController _concurrentRateController = TextEditingController();
+  final TextEditingController _jsLibController = TextEditingController();
+  // 列表规则
+  final TextEditingController _ruleArticlesController = TextEditingController();
+  final TextEditingController _ruleNextPageController = TextEditingController();
+  final TextEditingController _ruleTitleController = TextEditingController();
+  final TextEditingController _rulePubDateController = TextEditingController();
+  final TextEditingController _ruleDescriptionController = TextEditingController();
+  final TextEditingController _ruleImageController = TextEditingController();
+  final TextEditingController _ruleLinkController = TextEditingController();
+  // WebView 规则
+  final TextEditingController _ruleContentController = TextEditingController();
+  final TextEditingController _injectJsController = TextEditingController();
+  final TextEditingController _contentWhitelistController = TextEditingController();
+  final TextEditingController _contentBlacklistController = TextEditingController();
+  final TextEditingController _shouldOverrideUrlLoadingController = TextEditingController();
 
   bool _enabled = true;
   bool _singleUrl = false;
+  bool _enabledCookieJar = true;
+  bool _enableJs = false;
+  bool _loadWithBaseUrl = false;
   bool _loading = true;
   bool _saving = false;
   String? _originalUrl;
@@ -58,8 +82,27 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
     _groupController.dispose();
     _commentController.dispose();
     _loginUrlController.dispose();
+    _loginUiController.dispose();
+    _loginCheckJsController.dispose();
+    _coverDecodeJsController.dispose();
     _sortUrlController.dispose();
     _customOrderController.dispose();
+    _headerController.dispose();
+    _variableCommentController.dispose();
+    _concurrentRateController.dispose();
+    _jsLibController.dispose();
+    _ruleArticlesController.dispose();
+    _ruleNextPageController.dispose();
+    _ruleTitleController.dispose();
+    _rulePubDateController.dispose();
+    _ruleDescriptionController.dispose();
+    _ruleImageController.dispose();
+    _ruleLinkController.dispose();
+    _ruleContentController.dispose();
+    _injectJsController.dispose();
+    _contentWhitelistController.dispose();
+    _contentBlacklistController.dispose();
+    _shouldOverrideUrlLoadingController.dispose();
     super.dispose();
   }
 
@@ -109,10 +152,33 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
     _groupController.text = source.sourceGroup ?? '';
     _commentController.text = source.sourceComment ?? '';
     _loginUrlController.text = source.loginUrl ?? '';
+    _loginUiController.text = source.loginUi ?? '';
+    _loginCheckJsController.text = source.loginCheckJs ?? '';
+    _coverDecodeJsController.text = source.coverDecodeJs ?? '';
     _sortUrlController.text = source.sortUrl ?? '';
     _customOrderController.text = source.customOrder.toString();
+    _headerController.text = source.header ?? '';
+    _variableCommentController.text = source.variableComment ?? '';
+    _concurrentRateController.text = source.concurrentRate ?? '';
+    _jsLibController.text = source.jsLib ?? '';
+    _ruleArticlesController.text = source.ruleArticles ?? '';
+    _ruleNextPageController.text = source.ruleNextPage ?? '';
+    _ruleTitleController.text = source.ruleTitle ?? '';
+    _rulePubDateController.text = source.rulePubDate ?? '';
+    _ruleDescriptionController.text = source.ruleDescription ?? '';
+    _ruleImageController.text = source.ruleImage ?? '';
+    _ruleLinkController.text = source.ruleLink ?? '';
+    _ruleContentController.text = source.ruleContent ?? '';
+    _injectJsController.text = source.injectJs ?? '';
+    _contentWhitelistController.text = source.contentWhitelist ?? '';
+    _contentBlacklistController.text = source.contentBlacklist ?? '';
+    _shouldOverrideUrlLoadingController.text =
+        source.shouldOverrideUrlLoading ?? '';
     _enabled = source.enabled;
     _singleUrl = source.singleUrl;
+    _enabledCookieJar = source.enabledCookieJar ?? true;
+    _enableJs = source.enableJs;
+    _loadWithBaseUrl = source.loadWithBaseUrl;
   }
 
   String? _nullableText(TextEditingController controller) {
@@ -137,9 +203,34 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
       'sourceComment': _nullableText(_commentController),
       'enabled': _enabled,
       'loginUrl': _nullableText(_loginUrlController),
+      'loginUi': _nullableText(_loginUiController),
+      'loginCheckJs': _nullableText(_loginCheckJsController),
+      'coverDecodeJs': _nullableText(_coverDecodeJsController),
       'sortUrl': _nullableText(_sortUrlController),
       'singleUrl': _singleUrl,
       'customOrder': customOrder,
+      'header': _nullableText(_headerController),
+      'variableComment': _nullableText(_variableCommentController),
+      'concurrentRate': _nullableText(_concurrentRateController),
+      'jsLib': _nullableText(_jsLibController),
+      'enabledCookieJar': _enabledCookieJar,
+      // 列表规则
+      'ruleArticles': _nullableText(_ruleArticlesController),
+      'ruleNextPage': _nullableText(_ruleNextPageController),
+      'ruleTitle': _nullableText(_ruleTitleController),
+      'rulePubDate': _nullableText(_rulePubDateController),
+      'ruleDescription': _nullableText(_ruleDescriptionController),
+      'ruleImage': _nullableText(_ruleImageController),
+      'ruleLink': _nullableText(_ruleLinkController),
+      // WebView 规则
+      'enableJs': _enableJs,
+      'loadWithBaseUrl': _loadWithBaseUrl,
+      'ruleContent': _nullableText(_ruleContentController),
+      'injectJs': _nullableText(_injectJsController),
+      'contentWhitelist': _nullableText(_contentWhitelistController),
+      'contentBlacklist': _nullableText(_contentBlacklistController),
+      'shouldOverrideUrlLoading':
+          _nullableText(_shouldOverrideUrlLoadingController),
     };
   }
 
@@ -245,18 +336,46 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
-          : RssSourceEditForm(
+          : RssSourceEditTabs(
               nameController: _nameController,
               urlController: _urlController,
               groupController: _groupController,
               commentController: _commentController,
               loginUrlController: _loginUrlController,
+              loginUiController: _loginUiController,
+              loginCheckJsController: _loginCheckJsController,
+              coverDecodeJsController: _coverDecodeJsController,
               sortUrlController: _sortUrlController,
               customOrderController: _customOrderController,
+              headerController: _headerController,
+              variableCommentController: _variableCommentController,
+              concurrentRateController: _concurrentRateController,
+              jsLibController: _jsLibController,
+              ruleArticlesController: _ruleArticlesController,
+              ruleNextPageController: _ruleNextPageController,
+              ruleTitleController: _ruleTitleController,
+              rulePubDateController: _rulePubDateController,
+              ruleDescriptionController: _ruleDescriptionController,
+              ruleImageController: _ruleImageController,
+              ruleLinkController: _ruleLinkController,
+              ruleContentController: _ruleContentController,
+              injectJsController: _injectJsController,
+              contentWhitelistController: _contentWhitelistController,
+              contentBlacklistController: _contentBlacklistController,
+              shouldOverrideUrlLoadingController:
+                  _shouldOverrideUrlLoadingController,
               enabled: _enabled,
               singleUrl: _singleUrl,
+              enabledCookieJar: _enabledCookieJar,
+              enableJs: _enableJs,
+              loadWithBaseUrl: _loadWithBaseUrl,
               onEnabledChanged: _onEnabledChanged,
               onSingleUrlChanged: _onSingleUrlChanged,
+              onEnabledCookieJarChanged: (v) =>
+                  setState(() => _enabledCookieJar = v),
+              onEnableJsChanged: (v) => setState(() => _enableJs = v),
+              onLoadWithBaseUrlChanged: (v) =>
+                  setState(() => _loadWithBaseUrl = v),
             ),
     );
   }
