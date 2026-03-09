@@ -491,6 +491,9 @@ extension _SimpleReaderBookmarkX on _SimpleReaderViewState {
           await _bookmarkRepo.removeBookmark(bookmark.id);
           _updateBookmarkStatus();
         },
+        onEditBookmark: (bookmark) async {
+          await _openEditBookmarkDialog(bookmark);
+        },
         isLocalTxtBook: _isCurrentBookLocalTxt(),
         initialUseReplace: _tocUiUseReplace,
         initialLoadWordCount: _tocUiLoadWordCount,
@@ -523,6 +526,58 @@ extension _SimpleReaderBookmarkX on _SimpleReaderViewState {
         resolveDisplayTitle: _resolveCatalogDisplayTitle,
       ),
     );
+  }
+
+  /// 编辑书签（对标 legado BookmarkDialog）
+  Future<void> _openEditBookmarkDialog(BookmarkEntity bookmark) async {
+    final controller = TextEditingController(text: bookmark.content);
+    final result = await showCupertinoBottomDialog<String>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(bookmark.chapterTitle, maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: '书签内容',
+            maxLines: 4,
+            minLines: 2,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              await _bookmarkRepo.removeBookmark(bookmark.id);
+              _updateBookmarkStatus();
+              if (ctx.mounted) Navigator.pop(ctx, 'deleted');
+            },
+            child: const Text('删除'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(ctx, 'saved'),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result != 'saved') return;
+    await _bookmarkRepo.addBookmark(
+      bookId: bookmark.bookId,
+      bookName: bookmark.bookName,
+      bookAuthor: bookmark.bookAuthor,
+      chapterIndex: bookmark.chapterIndex,
+      chapterTitle: bookmark.chapterTitle,
+      chapterPos: bookmark.chapterPos,
+      content: controller.text.trim(),
+    );
+    _updateBookmarkStatus();
   }
 
 }

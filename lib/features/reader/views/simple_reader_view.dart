@@ -16,6 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/migration_exclusions.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
+import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -58,8 +59,10 @@ import '../../settings/views/app_help_dialog.dart';
 import '../../settings/views/app_log_dialog.dart';
 import '../../settings/views/exception_logs_view.dart';
 import '../../settings/views/reading_behavior_settings_hub_view.dart';
+import '../../settings/views/reading_tip_settings_view.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
+import '../services/read_style_import_export_service.dart';
 import '../services/reader_bookmark_export_service.dart';
 import '../services/reader_charset_service.dart';
 import '../services/reader_key_paging_helper.dart';
@@ -156,7 +159,7 @@ class SimpleReaderView extends StatefulWidget {
 }
 
 class _SimpleReaderViewState extends State<SimpleReaderView>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final ChapterRepository _chapterRepo;
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
@@ -216,6 +219,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   final AutoPager _autoPager = AutoPager();
   final HttpTtsRuleStore _httpTtsRuleStore = HttpTtsRuleStore();
   bool _showAutoReadPanel = false;
+  // 记录自动阅读是否因菜单弹出而被暂停，关闭菜单时仅恢复此类暂停
+  bool _autoPagerPausedByMenu = false;
   ReadAloudService? _readAloudServiceOrNull;
   ReadAloudService get _readAloudService =>
       _readAloudServiceOrNull ??= ReadAloudService(
@@ -445,6 +450,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _menuAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
@@ -725,6 +731,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _menuAnimController.dispose();
     _searchMenuAnimController.dispose();
     _stopSourceSwitchCandidateSearch();
@@ -754,6 +761,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
     unawaited(_restoreSystemUiAndOrientation());
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 对标 legado onPause：切换到后台时停止自动阅读
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      if (_autoPager.isRunning || _autoPager.isPaused) {
+        _autoPagerPausedByMenu = false;
+        _autoPager.stop();
+        if (mounted && _showAutoReadPanel) {
+          setState(() => _showAutoReadPanel = false);
+        }
+        _screenOffTimerStart(force: true);
+      }
+    }
   }
 
   Future<void> _initReadAloudService() async {
@@ -831,6 +854,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       return;
     }
     if (visible) {
+      if (_autoPager.isRunning) {
+        _autoPager.pause();
+        _autoPagerPausedByMenu = true;
+      }
       setState(() {
         _showMenu = true;
         _showSearchMenu = false;
@@ -839,7 +866,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _menuAnimController.forward();
     } else {
       _menuAnimController.reverse().then((_) {
-        if (mounted) setState(() => _showMenu = false);
+        if (mounted) {
+          setState(() => _showMenu = false);
+          if (_autoPagerPausedByMenu && _autoPager.isPaused) {
+            _autoPagerPausedByMenu = false;
+            _autoPager.resume();
+          }
+        }
       });
     }
     _syncSystemUiForOverlay();
@@ -857,6 +890,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       return;
     }
     if (visible) {
+      if (_autoPager.isRunning) {
+        _autoPager.pause();
+        _autoPagerPausedByMenu = true;
+      }
       setState(() {
         _showSearchMenu = true;
         _showMenu = false;
@@ -865,7 +902,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _searchMenuAnimController.forward();
     } else {
       _searchMenuAnimController.reverse().then((_) {
-        if (mounted) setState(() => _showSearchMenu = false);
+        if (mounted) {
+          setState(() => _showSearchMenu = false);
+          if (_autoPagerPausedByMenu && _autoPager.isPaused) {
+            _autoPagerPausedByMenu = false;
+            _autoPager.resume();
+          }
+        }
       });
     }
     _syncSystemUiForOverlay();
@@ -2708,10 +2751,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         bottomOffset -
         _settings.paddingTop -
         _settings.paddingBottom;
-    final contentWidth = screenWidth -
+    final rawContentWidth = screenWidth -
         horizontalSafeInset -
         _settings.paddingLeft -
         _settings.paddingRight;
+    // 双页模式：每栏宽度减半（对标 legado visibleWidth = viewWidth / 2 - padding）
+    final contentWidth = _settings.doublePage
+        ? (rawContentWidth / 2).floorToDouble()
+        : rawContentWidth;
 
     // 防止宽度过小导致死循环或异常
     if (contentWidth < 50 || contentHeight < 100) return;
@@ -3230,15 +3277,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       return;
     }
     if (_pagedReaderController.isAttached) {
-      if (next) {
-        _pagedReaderController.turnNextPage();
-      } else {
-        _pagedReaderController.turnPrevPage();
+      final moved =
+          next ? _pagedReaderController.turnNextPage() : _pagedReaderController.turnPrevPage();
+      if (!moved && mounted) {
+        _showToast(next ? '已到最后一页' : '已到第一页');
       }
       return;
     }
-    final moved = next ? _pageFactory.moveToNext() : _pageFactory.moveToPrev();
-    if (!moved || !mounted) return;
+    final moved = _settings.doublePage
+        ? (next ? _pageFactory.moveToNextDouble() : _pageFactory.moveToPrevDouble())
+        : (next ? _pageFactory.moveToNext() : _pageFactory.moveToPrev());
+    if (!mounted) return;
+    if (!moved) {
+      _showToast(next ? '已到最后一页' : '已到第一页');
+      return;
+    }
     setState(() {});
   }
 
@@ -4719,6 +4772,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           return;
         }
         if (!_showMenu) {
+          // 对标 legado：返回键优先停止自动阅读
+          if (_autoPager.isRunning || _autoPager.isPaused) {
+            _autoPagerPausedByMenu = false;
+            _autoPager.stop();
+            if (mounted && _showAutoReadPanel) {
+              setState(() => _showAutoReadPanel = false);
+            }
+            _screenOffTimerStart(force: true);
+            return;
+          }
           if (_settings.disableReturnKey) {
             return;
           }
@@ -4931,6 +4994,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                           onNextParagraph: () =>
                               unawaited(_readAloudService.nextParagraph()),
                           onStop: () => unawaited(_readAloudService.stop()),
+                          onSetTimer: () => unawaited(_showReadAloudTimerPicker()),
+                          onOpenChapterList: _openChapterListFromAutoReadPanel,
                           onSpeechRateChanged: (rate) {
                             setState(() => _readAloudSpeechRate = rate);
                             unawaited(_readAloudService.updateSpeechRate(rate));
@@ -4947,6 +5012,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                                     _loadChapter(_currentChapterIndex + 1),
                                   )
                               : null,
+                        ),
+                      ),
+
+                    // 翻页模式自动阅读进度线（对标 legado AutoPager.onDraw）
+                    if (_autoPager.isRunning &&
+                        _settings.pageTurnMode != PageTurnMode.scroll)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: AutoPageProgressLine(
+                            autoPager: _autoPager,
+                            color: _uiAccent,
+                          ),
                         ),
                       ),
 
@@ -4968,6 +5045,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                           onOpenPageAnimSettings:
                               _openPageAnimConfigFromAutoReadPanel,
                           onStop: _stopAutoReadFromPanel,
+                          onPause: () => _screenOffTimerStart(force: true),
+                          onResume: () => _screenOffTimerStart(force: true),
                           onClose: () {
                             setState(() {
                               _showAutoReadPanel = false;

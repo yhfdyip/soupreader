@@ -177,6 +177,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
       clickActions: _clickActions,
       onImageSizeCacheUpdated: _handlePagedImageSizeCacheUpdated,
       onImageSizeResolved: _handlePagedImageSizeResolved,
+      onImageTap: _openImagePreview,
     );
   }
 
@@ -713,6 +714,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     }
 
     if (_autoPager.isRunning) {
+      _autoPagerPausedByMenu = false;
       _autoPager.stop();
       if (_showAutoReadPanel) {
         setState(() {
@@ -1071,8 +1073,81 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
         settings: _settings,
         themes: _activeReadStyles,
         onSettingsChanged: (next) => _updateSettings(next),
+        onOpenTipSettings: () {
+          Navigator.pop(context);
+          unawaited(_openTipSettingsFromReader());
+        },
+        onImportStyle: () {
+          Navigator.pop(context);
+          unawaited(_importReadStyleFromSheet());
+        },
+        onExportStyle: () {
+          Navigator.pop(context);
+          unawaited(_exportCurrentReadStyleFromSheet());
+        },
       ),
     );
+  }
+
+  Future<void> _importReadStyleFromSheet() async {
+    final bgDir = await _resolveReadStyleBackgroundDirectory();
+    final service = ReadStyleImportExportService(
+      bgDirectoryResolver: () async => bgDir,
+    );
+    final result = await service.importFromFile();
+    if (!mounted) return;
+    if (result.cancelled) return;
+    if (!result.success || result.style == null) {
+      _showToast(result.message ?? '导入失败');
+      return;
+    }
+    final styles = List<ReadStyleConfig>.from(_activeReadStyleConfigs)
+      ..add(result.style!.sanitize());
+    _updateSettings(_settings.copyWith(readStyleConfigs: styles));
+    if (result.warning != null) _showToast(result.warning!);
+    else _showToast('主题已导入');
+  }
+
+  Future<void> _exportCurrentReadStyleFromSheet() async {
+    final configs = _activeReadStyleConfigs;
+    final idx = _settings.themeIndex.clamp(0, configs.length - 1);
+    final style = configs[idx];
+    final bgDir = await _resolveReadStyleBackgroundDirectory();
+    final service = ReadStyleImportExportService(
+      bgDirectoryResolver: () async => bgDir,
+    );
+    final result = await service.exportStyle(style);
+    if (!mounted) return;
+    if (result.cancelled) return;
+    if (!result.success) {
+      _showToast(result.message ?? '导出失败');
+      return;
+    }
+    _showToast(result.message ?? '主题已导出');
+  }
+
+  Future<void> _openTipSettingsFromReader() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => const ReadingTipSettingsView(),
+      ),
+    );
+  }
+
+  void _openImagePreview(String src) {
+    final request = ReaderImageRequestParser.parse(src);
+    final imageProvider = const ReaderImageResolver(isWeb: kIsWeb)
+        .resolveProvider(request, headers: request.headers);
+    if (imageProvider == null) return;
+    _autoPager.pause();
+    Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _ImagePreviewPage(imageProvider: imageProvider),
+      ),
+    ).then((_) {
+      if (_autoPager.isPaused) _autoPager.resume();
+    });
   }
 
 
@@ -1229,12 +1304,8 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
   void _openReaderMenuFromAutoReadPanel() {
     if (_showMenu && !_showAutoReadPanel) return;
-    setState(() {
-      _showAutoReadPanel = false;
-      _showMenu = true;
-      _showSearchMenu = false;
-    });
-    _syncSystemUiForOverlay();
+    setState(() => _showAutoReadPanel = false);
+    _setReaderMenuVisible(true);
   }
 
   void _openChapterListFromAutoReadPanel() {
@@ -1247,35 +1318,6 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     _screenOffTimerStart(force: true);
   }
 
-  Future<void> _openPageAnimConfigFromAutoReadPanel() async {
-    _screenOffTimerStart(force: true);
-    final pageModes = PageTurnModeUi.values(current: _settings.pageTurnMode);
-    final selectedMode = await showOptionPickerSheet<PageTurnMode>(
-      context: context,
-      title: '翻页动画',
-      currentValue: _settings.pageTurnMode,
-      accentColor: _uiAccent,
-      items: pageModes
-          .map(
-            (mode) => OptionPickerItem<PageTurnMode>(
-              value: mode,
-              label: mode.name,
-              subtitle: PageTurnModeUi.isHidden(mode) ? '当前版本隐藏' : null,
-            ),
-          )
-          .toList(growable: false),
-    );
-    if (!mounted || selectedMode == null) return;
-    if (PageTurnModeUi.isHidden(selectedMode)) {
-      _showToast('仿真2模式已隐藏');
-      _screenOffTimerStart(force: true);
-      return;
-    }
-    if (selectedMode != _settings.pageTurnMode) {
-      _updateSettings(_settings.copyWith(pageTurnMode: selectedMode));
-    }
-    _screenOffTimerStart(force: true);
-  }
 
   ReadingSettings _effectiveSettingsWithBookPageAnim({
     required ReadingSettings base,
@@ -1373,6 +1415,27 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
   }
 
 
+  Future<void> _openPageAnimConfigFromAutoReadPanel() async {
+    _screenOffTimerStart(force: true);
+    final selected = await showOptionPickerSheet<int>(
+      context: context,
+      title: '翻页动画',
+      currentValue: _legacyBookPageAnimSelection(),
+      accentColor: _uiAccent,
+      items: _SimpleReaderViewState._legacyBookPageAnimOptions
+          .map(
+            (item) => OptionPickerItem<int>(
+              value: item.key,
+              label: item.value,
+            ),
+          )
+          .toList(growable: false),
+    );
+    if (!mounted || selected == null) return;
+    await _applyBookPageAnimFromMenu(selected);
+    _screenOffTimerStart(force: true);
+  }
+
   void _stopAutoReadFromPanel() {
     _screenOffTimerStart(force: true);
     if (mounted) {
@@ -1381,7 +1444,8 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
   }
 
   void _stopAutoPagerAtBoundary() {
-    if (!_autoPager.isRunning) return;
+    if (!_autoPager.isRunning && !_autoPager.isPaused) return;
+    _autoPagerPausedByMenu = false;
     _autoPager.stop();
     if (!mounted) return;
     if (_showAutoReadPanel) {
@@ -1412,7 +1476,9 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
     final moved = _pagedReaderController.isAttached
         ? _pagedReaderController.turnNextPage()
-        : _pageFactory.moveToNext();
+        : (_settings.doublePage
+            ? _pageFactory.moveToNextDouble()
+            : _pageFactory.moveToNext());
     if (!moved) {
       _stopAutoPagerAtBoundary();
     }
@@ -1439,6 +1505,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
       return;
     }
 
+    _autoPagerPausedByMenu = false;
     _autoPager.stop();
     if (mounted && _showAutoReadPanel) {
       setState(() {
@@ -1728,6 +1795,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     }
 
     if (_autoPager.isRunning) {
+      _autoPagerPausedByMenu = false;
       _autoPager.stop();
       if (_showAutoReadPanel) {
         setState(() {
@@ -1791,6 +1859,39 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
         content: _currentContent,
       ),
     );
+  }
+
+  /// 定时停止选择器，对标 legado ReadAloudDialog tvTimer 快速选择。
+  Future<void> _showReadAloudTimerPicker() async {
+    const times = [0, 5, 10, 15, 30, 60, 90, 180];
+    final current = _readAloudSnapshot.sleepTimerMinutes;
+    final selected = await showCupertinoBottomDialog<int>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('定时停止'),
+        actions: times.map((t) {
+          final label = t == 0 ? '取消定时' : '$t 分钟';
+          final isActive = t == current;
+          return CupertinoActionSheetAction(
+            isDefaultAction: isActive,
+            onPressed: () => Navigator.pop(ctx, t),
+            child: Text(label),
+          );
+        }).toList(growable: false),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    _readAloudService.setTimer(selected);
+    if (mounted) setState(() {});
+    if (selected > 0) {
+      _showToast('将在 $selected 分钟后停止朗读');
+    } else {
+      _showToast('已取消定时');
+    }
   }
 
   Future<void> _seekByChapterProgress(int targetChapterIndex) async {
@@ -3424,5 +3525,47 @@ class _ScrollContentViewState extends State<_ScrollContentView> {
             cfg.paddingRight)
         .clamp(1.0, double.infinity)
         .toDouble();
+  }
+}
+
+/// 全屏图片预览页，支持双指缩放和平移。
+class _ImagePreviewPage extends StatelessWidget {
+  final ImageProvider imageProvider;
+
+  const _ImagePreviewPage({required this.imageProvider});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.black,
+      navigationBar: CupertinoNavigationBar(
+        backgroundColor: CupertinoColors.black.withValues(alpha: 0.7),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Icon(
+            CupertinoIcons.xmark,
+            color: CupertinoColors.white,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 8.0,
+          child: Center(
+            child: Image(
+              image: imageProvider,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                CupertinoIcons.photo,
+                color: CupertinoColors.systemGrey,
+                size: 64,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

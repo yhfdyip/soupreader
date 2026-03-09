@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
@@ -184,34 +185,11 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
   }
 
   Future<void> _pickAutoReadSpeed() async {
-    final controller =
-        TextEditingController(text: _settings.autoReadSpeed.toString());
     final result = await showCupertinoBottomDialog<int>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('自动阅读速度'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            placeholder: '1 - 120（秒/页）',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('取消'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: const Text('确定'),
-            onPressed: () {
-              final raw = int.tryParse(controller.text.trim());
-              Navigator.pop(context, raw);
-            },
-          ),
-        ],
+      builder: (context) => _AutoReadSpeedPicker(
+        initialSpeed: _settings.autoReadSpeed,
+        accent: _accent,
       ),
     );
     if (result == null) return;
@@ -290,5 +268,110 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
     );
     if (selected == null) return;
     _update(_settings.copyWith(keepLightSeconds: selected));
+  }
+}
+
+/// 自动阅读速度选择器，对标 legado dialog_auto_read 的 SeekBar。
+class _AutoReadSpeedPicker extends StatefulWidget {
+  final int initialSpeed;
+  final Color accent;
+
+  const _AutoReadSpeedPicker({
+    required this.initialSpeed,
+    required this.accent,
+  });
+
+  @override
+  State<_AutoReadSpeedPicker> createState() => _AutoReadSpeedPickerState();
+}
+
+class _AutoReadSpeedPickerState extends State<_AutoReadSpeedPicker> {
+  late int _speed;
+
+  static const int _min = 1;
+  static const int _max = 120;
+
+  // 对数映射：slider=0 最慢（120s），slider=1 最快（1s）
+  double _speedToSlider(int speed) {
+    final normalized =
+        math.log(speed.toDouble()) / math.log(_max.toDouble());
+    return (1.0 - normalized).clamp(0.0, 1.0);
+  }
+
+  int _sliderToSpeed(double slider) {
+    final s = math.pow(_max.toDouble(), 1.0 - slider).round();
+    return s.clamp(_min, _max);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _speed = widget.initialSpeed.clamp(_min, _max);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark =
+        CupertinoTheme.of(context).brightness == Brightness.dark;
+    final textStrong = CupertinoColors.label.resolveFrom(context);
+    final textNormal =
+        CupertinoColors.secondaryLabel.resolveFrom(context);
+    return CupertinoAlertDialog(
+      title: const Text('自动阅读速度'),
+      content: Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '每页（屏）${_speed}s',
+              style: TextStyle(
+                fontSize: 13,
+                color: textStrong,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text('慢',
+                    style:
+                        TextStyle(fontSize: 11, color: textNormal)),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: CupertinoSlider(
+                    value: _speedToSlider(_speed),
+                    min: 0.0,
+                    max: 1.0,
+                    activeColor: widget.accent,
+                    thumbColor: isDark
+                        ? CupertinoColors.white
+                        : widget.accent,
+                    onChanged: (v) {
+                      setState(() => _speed = _sliderToSpeed(v));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text('快',
+                    style:
+                        TextStyle(fontSize: 11, color: textNormal)),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        CupertinoDialogAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+        CupertinoDialogAction(
+          isDefaultAction: true,
+          child: const Text('确定'),
+          onPressed: () => Navigator.pop(context, _speed),
+        ),
+      ],
+    );
   }
 }

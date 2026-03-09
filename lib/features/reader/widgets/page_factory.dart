@@ -211,6 +211,22 @@ class PageFactory {
     return _currentChapterIndex < _chapters.length - 1;
   }
 
+  /// 双页模式下移动到下一视觉页（跳2个逻辑页）
+  bool moveToNextDouble() {
+    final moved = moveToNext();
+    if (!moved) return false;
+    moveToNext(); // 第二步失败也无妨，至少翻了一页
+    return true;
+  }
+
+  /// 双页模式下移动到上一视觉页（跳2个逻辑页）
+  bool moveToPrevDouble() {
+    final moved = moveToPrev();
+    if (!moved) return false;
+    moveToPrev();
+    return true;
+  }
+
   /// 移动到下一页（自动跨章节）
   bool moveToNext() {
     if (_currentPageIndex < _currentChapterPages.length - 1) {
@@ -331,6 +347,32 @@ class PageFactory {
       return _currentChapterPages[_currentPageIndex + 1];
     } else if (_nextChapterPages.isNotEmpty) {
       return _nextChapterPages.first;
+    }
+    return '';
+  }
+
+  /// 下下页内容（双页模式右栏的下一页）
+  String get nextNextPage {
+    if (_currentPageIndex + 1 < _currentChapterPages.length - 1) {
+      return _currentChapterPages[_currentPageIndex + 2];
+    } else if (_currentPageIndex + 1 == _currentChapterPages.length - 1 &&
+        _nextChapterPages.isNotEmpty) {
+      return _nextChapterPages.first;
+    } else if (_currentPageIndex >= _currentChapterPages.length - 1 &&
+        _nextChapterPages.length > 1) {
+      return _nextChapterPages[1];
+    }
+    return '';
+  }
+
+  /// 上上页内容（双页模式左栏的前一页）
+  String get prevPrevPage {
+    if (_currentPageIndex > 1) {
+      return _currentChapterPages[_currentPageIndex - 2];
+    } else if (_currentPageIndex == 1 && _prevChapterPages.isNotEmpty) {
+      return _prevChapterPages.last;
+    } else if (_currentPageIndex == 0 && _prevChapterPages.length > 1) {
+      return _prevChapterPages[_prevChapterPages.length - 2];
     }
     return '';
   }

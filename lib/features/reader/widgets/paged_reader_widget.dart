@@ -75,6 +75,7 @@ class PagedReaderWidget extends StatefulWidget {
   final String legacyImageStyle;
   final VoidCallback? onImageSizeCacheUpdated;
   final void Function(String src, Size resolvedSize)? onImageSizeResolved;
+  final ValueChanged<String>? onImageTap;
   final bool showTipBars;
   final ValueChanged<PagedReaderLongPressSelection>? onTextLongPress;
   final PagedReaderController? controller;
@@ -141,6 +142,7 @@ class PagedReaderWidget extends StatefulWidget {
     this.legacyImageStyle = 'DEFAULT',
     this.onImageSizeCacheUpdated,
     this.onImageSizeResolved,
+    this.onImageTap,
     this.showTipBars = true,
     this.onTextLongPress,
     this.controller,
@@ -542,11 +544,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return _stableSystemPadding ?? mediaPadding;
   }
 
+  bool get _isDoublePage => widget.settings.doublePage;
+
+  static const double _doublePageGutter = 16.0;
+
   /// 使用 PictureRecorder 预渲染页面内容
   ui.Picture _recordPage(
     String content,
     Size size, {
     required PageRenderSlot slot,
+    String? rightContent,
   }) {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -564,47 +571,71 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     final pictureContent = _contentForPictureSnapshot(content);
     if (pictureContent.isNotEmpty) {
-      final contentWidth =
-          size.width - widget.padding.left - widget.padding.right;
+      final totalWidth = size.width - widget.padding.left - widget.padding.right;
+      final columnWidth = _isDoublePage
+          ? (totalWidth - _doublePageGutter) / 2
+          : totalWidth;
       final contentHeight = size.height -
           (topSafe + _topOffset + widget.padding.top) -
           (bottomSafe + _bottomOffset + widget.padding.bottom);
-      final titleData = _resolvePageTitleRenderData(
-        content: pictureContent,
-        renderPosition: renderPosition,
-      );
-      var bodyOriginY = topSafe + _topOffset + widget.padding.top;
-      var bodyHeight = contentHeight;
-      if (titleData.shouldRenderTitle) {
-        final consumed = _paintPageTitleOnCanvas(
-          canvas: canvas,
-          origin: Offset(widget.padding.left, bodyOriginY),
-          maxWidth: contentWidth,
-          maxHeight: bodyHeight,
-          title: titleData.title!,
+
+      void paintColumn(String col, double originX) {
+        final titleData = _resolvePageTitleRenderData(
+          content: col,
+          renderPosition: renderPosition,
         );
-        bodyOriginY += consumed;
-        bodyHeight -= consumed;
+        var bodyOriginY = topSafe + _topOffset + widget.padding.top;
+        var bodyHeight = contentHeight;
+        if (titleData.shouldRenderTitle) {
+          final consumed = _paintPageTitleOnCanvas(
+            canvas: canvas,
+            origin: Offset(originX, bodyOriginY),
+            maxWidth: columnWidth,
+            maxHeight: bodyHeight,
+            title: titleData.title!,
+          );
+          bodyOriginY += consumed;
+          bodyHeight -= consumed;
+        }
+        if (bodyHeight > 0) {
+          LegacyJustifyComposer.paintContentOnCanvas(
+            canvas: canvas,
+            origin: Offset(originX, bodyOriginY),
+            content: titleData.bodyContent,
+            style: widget.textStyle,
+            maxWidth: columnWidth,
+            justify: widget.settings.textFullJustify,
+            paragraphIndent: widget.settings.paragraphIndent,
+            applyParagraphIndent: false,
+            preserveEmptyLines: true,
+            maxHeight: bodyHeight,
+            bottomJustify: widget.settings.textBottomJustify,
+            highlightQuery: widget.searchHighlightQuery,
+            highlightBackgroundColor: widget.searchHighlightColor,
+            highlightTextColor: widget.searchHighlightTextColor,
+          );
+        }
       }
-      if (bodyHeight > 0) {
-        LegacyJustifyComposer.paintContentOnCanvas(
-          canvas: canvas,
-          origin: Offset(
-            widget.padding.left,
-            bodyOriginY,
-          ),
-          content: titleData.bodyContent,
-          style: widget.textStyle,
-          maxWidth: contentWidth,
-          justify: widget.settings.textFullJustify,
-          paragraphIndent: widget.settings.paragraphIndent,
-          applyParagraphIndent: false,
-          preserveEmptyLines: true,
-          maxHeight: bodyHeight,
-          bottomJustify: widget.settings.textBottomJustify,
-          highlightQuery: widget.searchHighlightQuery,
-          highlightBackgroundColor: widget.searchHighlightColor,
-          highlightTextColor: widget.searchHighlightTextColor,
+
+      paintColumn(pictureContent, widget.padding.left);
+
+      if (_isDoublePage) {
+        final rightOriginX =
+            widget.padding.left + columnWidth + _doublePageGutter;
+        final rightCol = rightContent != null
+            ? _contentForPictureSnapshot(rightContent)
+            : '';
+        if (rightCol.isNotEmpty) paintColumn(rightCol, rightOriginX);
+
+        // 双栏中间分隔线
+        final dividerX = widget.padding.left + columnWidth + _doublePageGutter / 2;
+        canvas.drawLine(
+          Offset(dividerX, topSafe + _topOffset + widget.padding.top),
+          Offset(dividerX,
+              size.height - bottomSafe - _bottomOffset - widget.padding.bottom),
+          Paint()
+            ..color = widget.textStyle.color!.withValues(alpha: 0.12)
+            ..strokeWidth = 0.5,
         );
       }
     }
@@ -1022,8 +1053,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _curPagePicture = null;
       return;
     }
-    _curPagePicture ??=
-        _recordPage(_factory.curPage, size, slot: PageRenderSlot.current);
+    _curPagePicture ??= _recordPage(
+      _factory.curPage,
+      size,
+      slot: PageRenderSlot.current,
+      rightContent: _isDoublePage ? _factory.nextPage : null,
+    );
   }
 
   void _ensureDirectionTargetPicture(
@@ -1036,16 +1071,24 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     if (direction == _PageDirection.prev && _factory.hasPrev()) {
       if (_shouldUsePicturePathForContent(_factory.prevPage)) {
-        _prevPagePicture ??=
-            _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
+        _prevPagePicture ??= _recordPage(
+          _factory.prevPage,
+          size,
+          slot: PageRenderSlot.prev,
+          rightContent: _isDoublePage ? _factory.curPage : null,
+        );
       } else {
         _prevPagePicture?.dispose();
         _prevPagePicture = null;
       }
     } else if (direction == _PageDirection.next && _factory.hasNext()) {
       if (_shouldUsePicturePathForContent(_factory.nextPage)) {
-        _nextPagePicture ??=
-            _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
+        _nextPagePicture ??= _recordPage(
+          _isDoublePage ? _factory.nextPage : _factory.nextPage,
+          size,
+          slot: PageRenderSlot.next,
+          rightContent: _isDoublePage ? _factory.nextNextPage : null,
+        );
       } else {
         _nextPagePicture?.dispose();
         _nextPagePicture = null;
@@ -1060,8 +1103,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 相邻页：预渲染上一页/下一页，避免拖拽时临时生成导致卡顿
     if (_factory.hasPrev()) {
       if (_shouldUsePicturePathForContent(_factory.prevPage)) {
-        _prevPagePicture ??=
-            _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
+        _prevPagePicture ??= _recordPage(
+          _factory.prevPage,
+          size,
+          slot: PageRenderSlot.prev,
+          rightContent: _isDoublePage ? _factory.curPage : null,
+        );
       } else {
         _prevPagePicture?.dispose();
         _prevPagePicture = null;
@@ -1073,8 +1120,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     if (_factory.hasNext()) {
       if (_shouldUsePicturePathForContent(_factory.nextPage)) {
-        _nextPagePicture ??=
-            _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
+        _nextPagePicture ??= _recordPage(
+          _factory.nextPage,
+          size,
+          slot: PageRenderSlot.next,
+          rightContent: _isDoublePage ? _factory.nextNextPage : null,
+        );
       } else {
         _nextPagePicture?.dispose();
         _nextPagePicture = null;
@@ -1209,24 +1260,36 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     if (_curPagePicture == null &&
         _shouldUsePicturePathForContent(_factory.curPage)) {
-      _curPagePicture =
-          _recordPage(_factory.curPage, size, slot: PageRenderSlot.current);
+      _curPagePicture = _recordPage(
+        _factory.curPage,
+        size,
+        slot: PageRenderSlot.current,
+        rightContent: _isDoublePage ? _factory.nextPage : null,
+      );
       return true;
     }
 
     if (_factory.hasPrev() &&
         _prevPagePicture == null &&
         _shouldUsePicturePathForContent(_factory.prevPage)) {
-      _prevPagePicture =
-          _recordPage(_factory.prevPage, size, slot: PageRenderSlot.prev);
+      _prevPagePicture = _recordPage(
+        _factory.prevPage,
+        size,
+        slot: PageRenderSlot.prev,
+        rightContent: _isDoublePage ? _factory.curPage : null,
+      );
       return true;
     }
 
     if (_factory.hasNext() &&
         _nextPagePicture == null &&
         _shouldUsePicturePathForContent(_factory.nextPage)) {
-      _nextPagePicture =
-          _recordPage(_factory.nextPage, size, slot: PageRenderSlot.next);
+      _nextPagePicture = _recordPage(
+        _factory.nextPage,
+        size,
+        slot: PageRenderSlot.next,
+        rightContent: _isDoublePage ? _factory.nextNextPage : null,
+      );
       return true;
     }
 
@@ -1377,7 +1440,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final action = _resolveClickAction(position);
     switch (action) {
       case ClickAction.showMenu:
-        widget.onTap?.call();
+        // 对标 legado：翻页动画进行中不响应菜单触发（MC 区域 !isAbortAnim 保护）
+        if (!_isInteractionRunning) widget.onTap?.call();
         break;
       case ClickAction.nextPage:
         if (widget.enableGestures) {
@@ -2901,18 +2965,27 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       ),
       child: image,
     );
-    if (imageStyle == _legacyImageStyleSingle) {
-      return SizedBox(
-        height: constrainedHeight,
-        child: Center(child: imageBox),
+    final onImageTap = widget.onImageTap;
+    Widget tappable(Widget child) {
+      if (onImageTap == null) return child;
+      return GestureDetector(
+        onTap: () => onImageTap(src),
+        child: child,
       );
     }
-    return Center(
+
+    if (imageStyle == _legacyImageStyleSingle) {
+      return tappable(SizedBox(
+        height: constrainedHeight,
+        child: Center(child: imageBox),
+      ));
+    }
+    return tappable(Center(
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: _spacingForImage(imageStyle)),
         child: imageBox,
       ),
-    );
+    ));
   }
 
   double _spacingForImage(String imageStyle) {

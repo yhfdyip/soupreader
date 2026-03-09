@@ -18,6 +18,8 @@ class ReaderReadAloudBar extends StatelessWidget {
     required this.onSpeechRateChanged,
     this.onPreviousChapter,
     this.onNextChapter,
+    this.onSetTimer,
+    this.onOpenChapterList,
     this.bgColor,
     this.fgColor,
     this.accentColor,
@@ -32,6 +34,8 @@ class ReaderReadAloudBar extends StatelessWidget {
   final ValueChanged<int> onSpeechRateChanged;
   final VoidCallback? onPreviousChapter;
   final VoidCallback? onNextChapter;
+  final VoidCallback? onSetTimer;
+  final VoidCallback? onOpenChapterList;
   final Color? bgColor;
   final Color? fgColor;
   final Color? accentColor;
@@ -57,6 +61,14 @@ class ReaderReadAloudBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               child: Row(
                 children: [
+                  if (onOpenChapterList != null)
+                    _BarIconButton(
+                      icon: CupertinoIcons.list_bullet,
+                      color: fg.withValues(alpha: 0.8),
+                      size: 17,
+                      onTap: onOpenChapterList!,
+                      semanticLabel: '目录',
+                    ),
                   if (onPreviousChapter != null)
                     _BarIconButton(
                       icon: CupertinoIcons.chevron_left_2,
@@ -101,7 +113,14 @@ class ReaderReadAloudBar extends StatelessWidget {
                     accentColor: accent,
                     onChanged: onSpeechRateChanged,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
+                  _TimerButton(
+                    snapshot: snapshot,
+                    color: fg,
+                    accentColor: accent,
+                    onTap: onSetTimer,
+                  ),
+                  const SizedBox(width: 4),
                   _BarIconButton(
                     icon: CupertinoIcons.stop_fill,
                     color: CupertinoColors.destructiveRed.resolveFrom(context),
@@ -223,6 +242,47 @@ class _StepButton extends StatelessWidget {
           fontSize: small ? 12 : 17,
           fontWeight: FontWeight.w700,
           color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// 定时停止按钮，对标 legado ReadAloudDialog seekTimer + tvTimer。
+class _TimerButton extends StatelessWidget {
+  const _TimerButton({
+    required this.snapshot,
+    required this.color,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final ReadAloudStatusSnapshot snapshot;
+  final Color color;
+  final Color accentColor;
+  final VoidCallback? onTap;
+
+  String get _label {
+    if (!snapshot.hasSleepTimer) return '定时';
+    final remain = snapshot.sleepTimerRemainSeconds;
+    final m = remain ~/ 60;
+    final s = remain % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = snapshot.hasSleepTimer;
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: Text(
+        _label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+          color: active ? accentColor : color,
         ),
       ),
     );

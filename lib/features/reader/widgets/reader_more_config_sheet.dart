@@ -225,6 +225,8 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                         _sw('刘海屏留边', _s.paddingDisplayCutouts,
                             (v) => _u(
                                 _s.copyWith(paddingDisplayCutouts: v))),
+                        _sw('双页模式', _s.doublePage,
+                            (v) => _u(_s.copyWith(doublePage: v))),
                         _op(
                             '进度条行为',
                             _s.progressBarBehavior ==

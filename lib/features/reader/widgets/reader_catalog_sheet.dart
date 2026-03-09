@@ -36,6 +36,7 @@ class ReaderCatalogSheet extends StatefulWidget {
   final ValueChanged<int> onChapterSelected;
   final ValueChanged<BookmarkEntity> onBookmarkSelected;
   final Future<void> Function(BookmarkEntity bookmark) onDeleteBookmark;
+  final Future<void> Function(BookmarkEntity bookmark)? onEditBookmark;
   final Map<int, String> initialDisplayTitlesByIndex;
   final Future<String> Function(Chapter chapter)? resolveDisplayTitle;
   final bool isLocalTxtBook;
@@ -65,6 +66,7 @@ class ReaderCatalogSheet extends StatefulWidget {
     required this.onChapterSelected,
     required this.onBookmarkSelected,
     required this.onDeleteBookmark,
+    this.onEditBookmark,
     this.initialDisplayTitlesByIndex = const <int, String>{},
     this.resolveDisplayTitle,
     this.isLocalTxtBook = false,
@@ -929,11 +931,15 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
               _bookmarks.removeWhere((b) => b.id == bookmark.id);
             });
           },
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
-            onPressed: () => widget.onBookmarkSelected(bookmark),
-            child: Padding(
+          child: GestureDetector(
+            onLongPress: widget.onEditBookmark != null
+                ? () => widget.onEditBookmark!(bookmark)
+                : null,
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              onPressed: () => widget.onBookmarkSelected(bookmark),
+              child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
@@ -984,6 +990,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                 ],
               ),
             ),
+          ),
           ),
         );
       },

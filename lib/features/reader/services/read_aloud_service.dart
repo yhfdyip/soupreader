@@ -20,6 +20,8 @@ class ReadAloudStatusSnapshot {
   final String chapterTitle;
   final int paragraphIndex;
   final int paragraphCount;
+  final int sleepTimerMinutes;
+  final int sleepTimerRemainSeconds;
 
   const ReadAloudStatusSnapshot({
     required this.state,
@@ -27,6 +29,8 @@ class ReadAloudStatusSnapshot {
     required this.chapterTitle,
     required this.paragraphIndex,
     required this.paragraphCount,
+    this.sleepTimerMinutes = 0,
+    this.sleepTimerRemainSeconds = 0,
   });
 
   const ReadAloudStatusSnapshot.stopped()
@@ -34,11 +38,14 @@ class ReadAloudStatusSnapshot {
         chapterIndex = -1,
         chapterTitle = '',
         paragraphIndex = -1,
-        paragraphCount = 0;
+        paragraphCount = 0,
+        sleepTimerMinutes = 0,
+        sleepTimerRemainSeconds = 0;
 
   bool get isRunning => state != ReadAloudState.stopped;
   bool get isPlaying => state == ReadAloudState.playing;
   bool get isPaused => state == ReadAloudState.paused;
+  bool get hasSleepTimer => sleepTimerMinutes > 0;
 }
 
 class ReadAloudActionResult {
@@ -138,6 +145,14 @@ class ReadAloudService {
 
   ReadAloudState _state = ReadAloudState.stopped;
   int _speechRate = 10;
+
+  // 定时停止（对标 legado seekTimer/timeMinute）
+  int _sleepTimerMinutes = 0; // 0 = 未设定
+  int _sleepTimerRemainSeconds = 0;
+  Timer? _sleepTimer;
+
+  int get sleepTimerMinutes => _sleepTimerMinutes;
+  int get sleepTimerRemainSeconds => _sleepTimerRemainSeconds;
   int _chapterIndex = -1;
   String _chapterTitle = '';
   List<String> _paragraphs = const <String>[];
@@ -151,6 +166,8 @@ class ReadAloudService {
       chapterTitle: _chapterTitle,
       paragraphIndex: paragraphIndex,
       paragraphCount: _paragraphs.length,
+      sleepTimerMinutes: _sleepTimerMinutes,
+      sleepTimerRemainSeconds: _sleepTimerRemainSeconds,
     );
   }
 
@@ -348,6 +365,30 @@ class ReadAloudService {
     return const ReadAloudActionResult(success: true, message: '朗读已停止');
   }
 
+  /// 设置定时停止（对标 legado ReadAloud.setTimer）
+  /// [minutes] = 0 表示取消定时
+  void setTimer(int minutes) {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerMinutes = minutes.clamp(0, 999);
+    _sleepTimerRemainSeconds = _sleepTimerMinutes * 60;
+    if (_sleepTimerMinutes > 0) {
+      _sleepTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+        if (_sleepTimerRemainSeconds > 0) {
+          _sleepTimerRemainSeconds--;
+          _notifyState();
+        }
+        if (_sleepTimerRemainSeconds <= 0) {
+          _sleepTimer?.cancel();
+          _sleepTimer = null;
+          _sleepTimerMinutes = 0;
+          await _stopInternal(notifyUser: true);
+        }
+      });
+    }
+    _notifyState();
+  }
+
   Future<void> updateSpeechRate(int rate) async {
     _speechRate = rate.clamp(1, 20);
     await _engine.updateSpeechRate(_speechRate);
@@ -385,6 +426,8 @@ class ReadAloudService {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
     await _stopInternal(notifyUser: false);
     await _engine.dispose();
   }

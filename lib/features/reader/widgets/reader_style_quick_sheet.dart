@@ -13,12 +13,18 @@ class ReaderStyleQuickSheet extends StatefulWidget {
   final ReadingSettings settings;
   final List<ReadingThemeColors> themes;
   final ValueChanged<ReadingSettings> onSettingsChanged;
+  final VoidCallback? onOpenTipSettings;
+  final VoidCallback? onImportStyle;
+  final VoidCallback? onExportStyle;
 
   const ReaderStyleQuickSheet({
     super.key,
     required this.settings,
     required this.themes,
     required this.onSettingsChanged,
+    this.onOpenTipSettings,
+    this.onImportStyle,
+    this.onExportStyle,
   });
 
   @override
@@ -69,6 +75,8 @@ class _ReaderStyleQuickSheetState
               _buildDivider(),
               _buildChipRow(),
               _buildDivider(),
+              _buildShareLayoutRow(),
+              _buildDivider(),
               _buildFontSizeRow(),
               _buildLineHeightRow(),
               _buildLetterSpacingRow(),
@@ -77,6 +85,10 @@ class _ReaderStyleQuickSheetState
               _buildPageTurnRow(),
               _buildDivider(),
               _buildThemeRow(),
+              if (widget.onOpenTipSettings != null) ...[
+                _buildDivider(),
+                _buildTipSettingsRow(),
+              ],
               const SizedBox(height: 8),
             ],
           ),
@@ -231,6 +243,48 @@ class _ReaderStyleQuickSheetState
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareLayoutRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final mutedColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.5)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            Text(
+              '共用排版',
+              style: TextStyle(
+                color: labelColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '日间/夜间使用同一套排版',
+              style: TextStyle(
+                color: mutedColor,
+                fontSize: 12,
+              ),
+            ),
+            const Spacer(),
+            CupertinoSwitch(
+              value: _draft.shareLayout,
+              activeTrackColor: _accent,
+              onChanged: (v) => _apply(_draft.copyWith(shareLayout: v)),
+            ),
+          ],
         ),
       ),
     );
@@ -521,6 +575,47 @@ class _ReaderStyleQuickSheetState
     );
   }
 
+  Widget _buildTipSettingsRow() {
+    final isDark = _isDark;
+    final labelColor = isDark
+        ? CupertinoColors.white
+        : CupertinoColors.label.resolveFrom(context);
+    final mutedColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.4)
+        : CupertinoColors.tertiaryLabel.resolveFrom(context);
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: widget.onOpenTipSettings,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Text(
+              '信息栏',
+              style: TextStyle(
+                color: labelColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '页眉/页脚显示内容',
+              style: TextStyle(color: mutedColor, fontSize: 12),
+            ),
+            const Spacer(),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: mutedColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildThemeRow() {
     final isDark = _isDark;
     final labelColor = isDark
@@ -536,11 +631,38 @@ class _ReaderStyleQuickSheetState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('背景主题',
-              style: TextStyle(
-                  color: labelColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400)),
+          Row(
+            children: [
+              Text('背景主题',
+                  style: TextStyle(
+                      color: labelColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400)),
+              const Spacer(),
+              if (widget.onImportStyle != null)
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  onPressed: widget.onImportStyle,
+                  child: Text('导入',
+                      style: TextStyle(
+                          color: _accent,
+                          fontSize: 13)),
+                ),
+              if (widget.onExportStyle != null)
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  onPressed: widget.onExportStyle,
+                  child: Text('导出',
+                      style: TextStyle(
+                          color: _accent,
+                          fontSize: 13)),
+                ),
+            ],
+          ),
           const SizedBox(height: 10),
           SizedBox(
             height: 52,

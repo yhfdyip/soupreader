@@ -147,7 +147,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             children: [
               if (widget.onSearchContent != null ||
                   widget.onToggleReplaceRule != null ||
-                  widget.onToggleNightMode != null) ...
+                  widget.onToggleNightMode != null ||
+                  widget.onToggleAutoPage != null) ...
                 [
                   _buildQuickActionRow(
                     foreground: style.primaryText,
@@ -224,6 +225,19 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 onTap: widget.onSearchContent!,
               ),
             ),
+          if (widget.onToggleAutoPage != null)
+            Expanded(
+              child: _buildQuickActionItem(
+                icon: widget.autoPageRunning
+                    ? CupertinoIcons.timer_fill
+                    : CupertinoIcons.timer,
+                label: '自动',
+                foreground: foreground,
+                active: widget.autoPageRunning,
+                activeColor: accent,
+                onTap: widget.onToggleAutoPage!,
+              ),
+            ),
           if (widget.onToggleReplaceRule != null)
             Expanded(
               child: _buildQuickActionItem(
@@ -263,18 +277,18 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   }) {
     final color = active ? (activeColor ?? foreground) : foreground;
     return CupertinoButton(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(vertical: 8),
       minimumSize: Size.zero,
       onPressed: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 2),
+          Icon(icon, size: 22, color: color),
+          const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               color: color,
               fontWeight: active ? FontWeight.w600 : FontWeight.w400,
             ),
@@ -338,18 +352,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                       modeLabel,
                       style: TextStyle(
                         color: mutedForeground,
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w400,
-                        letterSpacing: -0.1,
                       ),
                     ),
                     Text(
                       progressLabel,
                       style: TextStyle(
                         color: mutedForeground,
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w400,
-                        letterSpacing: -0.1,
                       ),
                     ),
                   ],
@@ -588,8 +600,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
 
-    final autoPageActive = widget.autoPageRunning;
-
     final tabs = <Widget>[
       _buildTabItem(
         foreground: foreground,
@@ -612,16 +622,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         icon: CupertinoIcons.textformat,
         label: '界面',
         onTap: widget.onShowInterfaceSettings,
-      ),
-      _buildTabItem(
-        foreground: foreground,
-        icon: autoPageActive
-            ? CupertinoIcons.timer_fill
-            : CupertinoIcons.timer,
-        label: '自动',
-        onTap: widget.onToggleAutoPage,
-        active: autoPageActive,
-        activeColor: accent,
       ),
       _buildTabItem(
         foreground: foreground,
@@ -659,7 +659,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         child: SizedBox(
           width: double.infinity,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -668,16 +668,15 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                   size: 24,
                   color: contentColor,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: contentColor,
                     fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                    letterSpacing: -0.2,
                   ),
                 ),
               ],

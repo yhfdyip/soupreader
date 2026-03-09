@@ -121,6 +121,7 @@ class ReadingSettings {
   final int chineseConverterType; // 简繁转换（0=关闭 1=繁转简 2=简转繁）
   final bool cleanChapterTitle; // 净化正文章节名称
   final bool textBottomJustify; // 底部对齐（对标 legado）
+  final bool doublePage; // 双页模式（对标 legado doublePageHorizontal）
 
   static const int chineseConverterOff = 0;
   static const int chineseConverterTraditionalToSimplified = 1;
@@ -248,6 +249,7 @@ class ReadingSettings {
     this.chineseConverterType = chineseConverterOff,
     this.cleanChapterTitle = false,
     this.textBottomJustify = true,
+    this.doublePage = false,
   });
 
   /// 兼容旧调用：`true` 等价于「简转繁」。
@@ -746,6 +748,7 @@ class ReadingSettings {
       chineseConverterType: chineseConverterType,
       cleanChapterTitle: _toBool(json['cleanChapterTitle'], false),
       textBottomJustify: _toBool(json['textBottomJustify'], true),
+      doublePage: _toBool(json['doublePage'], false),
     ).sanitize();
   }
 
@@ -892,6 +895,7 @@ class ReadingSettings {
       'chineseTraditional': chineseTraditional,
       'cleanChapterTitle': cleanChapterTitle,
       'textBottomJustify': textBottomJustify,
+      'doublePage': doublePage,
     };
   }
 
@@ -1150,6 +1154,7 @@ class ReadingSettings {
       ),
       cleanChapterTitle: cleanChapterTitle,
       textBottomJustify: textBottomJustify,
+      doublePage: doublePage,
     );
   }
 
@@ -1244,6 +1249,7 @@ class ReadingSettings {
     bool? chineseTraditional,
     bool? cleanChapterTitle,
     bool? textBottomJustify,
+    bool? doublePage,
   }) {
     final resolvedChineseConverterType = chineseConverterType ??
         (chineseTraditional == null
@@ -1362,6 +1368,7 @@ class ReadingSettings {
       chineseConverterType: resolvedChineseConverterType,
       cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
       textBottomJustify: textBottomJustify ?? this.textBottomJustify,
+      doublePage: doublePage ?? this.doublePage,
     ).sanitize();
   }
 }
