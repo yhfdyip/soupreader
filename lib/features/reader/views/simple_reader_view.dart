@@ -2813,6 +2813,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _catalogDisplayTitleCacheByChapterId.clear();
     }
 
+    final doublePageChanged =
+        oldSettings.doublePage != newSettings.doublePage;
     double? desiredChapterProgress;
     if (modeChanged) {
       if (oldMode == PageTurnMode.scroll) {
@@ -2825,6 +2827,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           totalPages: total,
         );
       }
+    } else if (doublePageChanged) {
+      final total = _pageFactory.totalPages;
+      desiredChapterProgress = ChapterProgressUtils.pageProgressFromIndex(
+        pageIndex: _pageFactory.currentPageIndex,
+        totalPages: total,
+      );
     }
     // 检查是否需要重新分页
     // 1. 从滚动模式切换到翻页模式
@@ -2864,6 +2872,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           // fontFamily 变化通常意味着需要全量刷新，但也需要重排
           oldSettings.themeIndex !=
               newSettings.themeIndex || // 主题变化可能影响字体? 暂时不用
+          oldSettings.doublePage != newSettings.doublePage ||
           contentTransformChanged) {
         needRepaginate = true;
       }
@@ -2940,6 +2949,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           return;
         }
 
+        final total = _pageFactory.totalPages;
+        if (total <= 0) return;
+        final target = ChapterProgressUtils.pageIndexFromProgress(
+          progress: progress,
+          totalPages: total,
+        );
+        if (target != _pageFactory.currentPageIndex) {
+          _pageFactory.jumpToPage(target);
+        }
+      });
+    } else if (doublePageChanged && desiredChapterProgress != null) {
+      final progress = desiredChapterProgress;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         final total = _pageFactory.totalPages;
         if (total <= 0) return;
         final target = ChapterProgressUtils.pageIndexFromProgress(
