@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show ReorderableListView, ReorderableDragStartListener;
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -137,6 +138,20 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
         ..clear()
         ..addAll(reverted);
     });
+  }
+
+  Future<void> _onReorderRules(int oldIndex, int newIndex) async {
+    if (oldIndex == newIndex) return;
+    final mutable = List<TxtTocRule>.from(_rules);
+    final moved = mutable.removeAt(oldIndex);
+    final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    mutable.insert(insertAt, moved);
+    setState(() => _rules = mutable);
+    try {
+      await _ruleStore.saveRules(mutable);
+    } catch (_) {
+      await _reloadRules();
+    }
   }
 
   Future<void> _openRuleEditor(TxtTocRule rule) async {
@@ -1144,27 +1159,54 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                 Expanded(
                   child: _rules.isEmpty
                       ? _empty()
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                          itemCount: _rules.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final rule = _rules[index];
-                            final selected = _selectedRuleIds.contains(rule.id);
-                            return _TxtTocRuleListTile(
-                              rule: rule,
-                              selectionMode: _selectionMode,
-                              selected: selected,
-                              onTap: _selectionMode
-                                  ? () => _toggleRuleSelection(rule.id)
-                                  : () => _openRuleEditor(rule),
-                              onShowItemMenu: _selectionMode
-                                  ? null
-                                  : () => _showRuleItemMenu(rule),
-                            );
-                          },
-                        ),
+                      : !_selectionMode
+                          ? ReorderableListView.builder(
+                              padding:
+                                  const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                              itemCount: _rules.length,
+                              buildDefaultDragHandles: false,
+                              onReorder: _onReorderRules,
+                              itemBuilder: (context, index) {
+                                final rule = _rules[index];
+                                return Padding(
+                                  key: ValueKey(rule.id),
+                                  padding:
+                                      const EdgeInsets.only(bottom: 8),
+                                  child: _TxtTocRuleListTile(
+                                    rule: rule,
+                                    selectionMode: false,
+                                    selected: false,
+                                    dragIndex: index,
+                                    onTap: () => _openRuleEditor(rule),
+                                    onShowItemMenu: () =>
+                                        _showRuleItemMenu(rule),
+                                  ),
+                                );
+                              },
+                            )
+                          : ListView.separated(
+                              padding:
+                                  const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                              itemCount: _rules.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final rule = _rules[index];
+                                final selected =
+                                    _selectedRuleIds.contains(rule.id);
+                                return _TxtTocRuleListTile(
+                                  rule: rule,
+                                  selectionMode: _selectionMode,
+                                  selected: selected,
+                                  onTap: _selectionMode
+                                      ? () => _toggleRuleSelection(rule.id)
+                                      : () => _openRuleEditor(rule),
+                                  onShowItemMenu: _selectionMode
+                                      ? null
+                                      : () => _showRuleItemMenu(rule),
+                                );
+                              },
+                            ),
                 ),
                 if (_selectionMode)
                   SafeArea(
@@ -1290,6 +1332,7 @@ class _TxtTocRuleListTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onShowItemMenu,
+    this.dragIndex,
   });
 
   final TxtTocRule rule;
@@ -1297,6 +1340,7 @@ class _TxtTocRuleListTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback? onShowItemMenu;
+  final int? dragIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -1329,6 +1373,18 @@ class _TxtTocRuleListTile extends StatelessWidget {
                         : CupertinoColors.secondaryLabel.resolveFrom(context),
                   ),
                   const SizedBox(width: 8),
+                ] else if (dragIndex != null) ...[
+                  ReorderableDragStartListener(
+                    index: dragIndex!,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Icon(
+                        CupertinoIcons.bars,
+                        size: 18,
+                        color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                      ),
+                    ),
+                  ),
                 ],
                 Expanded(
                   child: Text(

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show ReorderableListView, ReorderableDragStartListener;
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_blocking_progress.dart';
@@ -163,6 +164,23 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
         title: '字典规则',
         message: '保存失败：$error',
       );
+    }
+  }
+
+  Future<void> _onReorderRules(int oldIndex, int newIndex) async {
+    if (oldIndex == newIndex) return;
+    final mutable = List<DictRule>.from(_rules);
+    final moved = mutable.removeAt(oldIndex);
+    final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    mutable.insert(insertAt, moved);
+    final reordered = mutable.indexed
+        .map((e) => e.$2.copyWith(sortNumber: e.$1))
+        .toList(growable: false);
+    setState(() => _rules = reordered);
+    try {
+      await _ruleStore.saveRules(reordered);
+    } catch (_) {
+      await _reloadRules();
     }
   }
 
@@ -964,6 +982,53 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                             illustration: AppEmptyPlanetIllustration(size: 86),
                             title: '暂无规则',
                             message: '点击右上角添加，或从更多菜单本地导入、网络导入、二维码导入。',
+                          ),
+                        )
+                      else if (!_selectionMode)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            buildDefaultDragHandles: false,
+                            itemCount: _rules.length,
+                            onReorder: _onReorderRules,
+                            itemBuilder: (context, index) {
+                              final rule = _rules[index];
+                              final title = rule.name.trim().isEmpty
+                                  ? '未命名规则'
+                                  : rule.name.trim();
+                              final subtitle = rule.urlRule.trim().isEmpty
+                                  ? '未配置 URL 规则'
+                                  : rule.urlRule.trim();
+                              return Padding(
+                                key: ValueKey(rule.name),
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: AppCard(
+                                  padding: EdgeInsets.zero,
+                                  child: CupertinoListTile.notched(
+                                    leading: ReorderableDragStartListener(
+                                      index: index,
+                                      child: const Icon(
+                                        CupertinoIcons.bars,
+                                        size: 18,
+                                        color: CupertinoColors.tertiaryLabel,
+                                      ),
+                                    ),
+                                    title: Text(title),
+                                    subtitle: Text(
+                                      subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    additionalInfo: rule.enabled
+                                        ? null
+                                        : const Text('禁用'),
+                                    onTap: () => _openRuleEditor(rule),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         )
                       else
