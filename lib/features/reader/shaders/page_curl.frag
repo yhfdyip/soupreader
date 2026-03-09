@@ -3,8 +3,6 @@
 uniform vec2 resolution;
 uniform vec4 iMouse;
 uniform float touchToCornerDis; // 触摸点到角点距离（逻辑像素），对标 legado mTouchToCornerDis
-uniform float simFrontShadowWidthPx; // 正面阴影宽度（px）
-uniform float simFrontShadowAlpha;   // 正面阴影最大不透明度
 uniform float simNextShadowAlpha;    // 底页阴影最大不透明度
 uniform float simFolderShadowAlpha;  // 背面折叠阴影强度
 uniform float simRadiusUv;           // 翻页圆柱半径（uv 单位）
@@ -181,22 +179,11 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
-        // dist 在 uv 空间（x∈[0,aspect], y∈[0,1]），需转换为屏幕像素距离。
-        // mouseDir 在非均匀 uv 空间归一化，转换到像素空间后长度不为1。
-        // 正确做法：将 mouseDir 各分量乘以对应轴的像素/uv 比例，取长度作为缩放因子。
-        // uv.x 的 1 单位 = resolution.x/aspect 像素，uv.y 的 1 单位 = resolution.y 像素。
-        vec2 mouseDirPx = mouseDir * vec2(resolution.x / aspect, resolution.y);
-        float distScale = length(mouseDirPx);
-        float distPx = -dist * distScale; // 折叠轴到当前像素的屏幕像素距离（正值朝当前页方向）
-
-        // 正面阴影（drawCurrentPageShadow）：紧贴折叠轴，宽度 25px
-        // 对标 legado mFrontShadowColors: 0x80111111->0x00111111
-        float frontShadowT = clamp(distPx / simFrontShadowWidthPx, 0.0, 1.0);
-        float frontShadowAlpha = simFrontShadowAlpha * (1.0 - frontShadowT);
-        fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
-
         // 底页阴影（drawNextPageShadow）：对标 legado mBackShadowColors
         // 0xFF111111->0x00111111，宽度 = mTouchToCornerDis/4 px
+        vec2 mouseDirPx = mouseDir * vec2(resolution.x / aspect, resolution.y);
+        float distScale = length(mouseDirPx);
+        float distPx = -dist * distScale;
         float nextShadowT = clamp(distPx / (touchToCornerDis / 4.0), 0.0, 1.0);
         float nextShadowAlpha = simNextShadowAlpha * (1.0 - nextShadowT);
         fragColor = vec4(

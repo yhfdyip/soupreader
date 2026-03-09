@@ -2472,8 +2472,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         cornerX: effectiveCornerX,
         cornerY: _cornerY,
         touchToCornerDis: touchToCornerDis,
-        simFrontShadowWidthPx: widget.settings.simFrontShadowWidthPx,
-        simFrontShadowAlpha: widget.settings.simFrontShadowAlpha,
         simNextShadowAlpha: widget.settings.simNextShadowAlpha,
         simFolderShadowAlpha: widget.settings.simFolderShadowAlpha,
         simRadiusUv: widget.settings.simRadiusUv,
