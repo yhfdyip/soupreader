@@ -450,3 +450,56 @@ class _ScrollSegmentOffsetRange {
     required this.height,
   });
 }
+
+class _ScrollTipData {
+  final String title;
+  final String bookTitle;
+  final double bookProgress;
+  final double chapterProgress;
+  final int currentPage;
+  final int totalPages;
+  final String currentTime;
+
+  const _ScrollTipData({
+    required this.title,
+    required this.bookTitle,
+    required this.bookProgress,
+    required this.chapterProgress,
+    required this.currentPage,
+    required this.totalPages,
+    required this.currentTime,
+  });
+
+  const _ScrollTipData.empty()
+      : title = '',
+        bookTitle = '',
+        bookProgress = 0.0,
+        chapterProgress = 0.0,
+        currentPage = 1,
+        totalPages = 1,
+        currentTime = '';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is _ScrollTipData &&
+        other.title == title &&
+        other.bookTitle == bookTitle &&
+        other.bookProgress == bookProgress &&
+        other.chapterProgress == chapterProgress &&
+        other.currentPage == currentPage &&
+        other.totalPages == totalPages &&
+        other.currentTime == currentTime;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        title,
+        bookTitle,
+        bookProgress,
+        chapterProgress,
+        currentPage,
+        totalPages,
+        currentTime,
+      );
+}

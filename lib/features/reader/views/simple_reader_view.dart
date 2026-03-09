@@ -401,6 +401,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       <_ScrollSegmentOffsetRange>[];
   final GlobalKey _scrollViewportKey =
       GlobalKey(debugLabel: 'reader_scroll_viewport');
+  // Notifier：章节 tip 信息（供 Header/Footer 局部重建）
+  final _scrollTipNotifier = ValueNotifier<_ScrollTipData>(const _ScrollTipData.empty());
+  // Notifier：segment 列表版本号（供 scroll content 局部重建）
+  final _scrollSegmentsVersion = ValueNotifier<int>(0);
+
   bool _scrollAppending = false;
   bool _scrollPrepending = false;
   bool _syncingScrollVisibleChapter = false;
@@ -731,6 +736,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     unawaited(_saveProgress(forcePersistReadRecord: true));
     _scrollController.removeListener(_handleScrollControllerTick);
     _scrollController.dispose();
+    _scrollTipNotifier.dispose();
+    _scrollSegmentsVersion.dispose();
     _keyboardFocusNode.dispose();
     _autoPager.dispose();
     unawaited(_readAloudServiceOrNull?.dispose());
@@ -1386,16 +1393,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       orElse: () => segments.first,
     );
 
-    setState(() {
-      _scrollSegments
-        ..clear()
-        ..addAll(segments);
-      _currentChapterIndex = centerSegment.chapterIndex;
-      _currentTitle = centerSegment.title;
-      _currentContent = centerSegment.content;
-      _currentScrollChapterProgress = 0.0;
-      _invalidateScrollLayoutSnapshot();
-    });
+    _scrollSegments
+      ..clear()
+      ..addAll(segments);
+    _currentChapterIndex = centerSegment.chapterIndex;
+    _currentTitle = centerSegment.title;
+    _currentContent = centerSegment.content;
+    _currentScrollChapterProgress = 0.0;
+    _invalidateScrollLayoutSnapshot();
+    _scrollSegmentsVersion.value++;
+    _updateScrollTipNotifier();
 
     final savedProgress = _settingsService.getChapterPageProgress(
       widget.bookId,
@@ -1654,16 +1661,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           (chosenProgress - _currentScrollChapterProgress).abs() > 0.02;
       if (!chapterChanged && !progressChanged) return;
 
-      if (chapterChanged || saveProgress) {
-        setState(() {
-          _currentChapterIndex = chosen.chapterIndex;
-          _currentTitle = chosen.title;
-          _currentContent = chosen.content;
-          _currentScrollChapterProgress = chosenProgress;
-        });
-      } else {
-        _currentScrollChapterProgress = chosenProgress;
-      }
+      // 直接赋值，不触发主 State 重建
+      _currentChapterIndex = chosen.chapterIndex;
+      _currentTitle = chosen.title;
+      _currentContent = chosen.content;
+      _currentScrollChapterProgress = chosenProgress;
+
+      // 通知 Header/Footer 局部重建
+      _updateScrollTipNotifier();
+
       if (chapterChanged) {
         _updateBookmarkStatus();
       }
@@ -1678,6 +1684,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       }
     } finally {
       _syncingScrollVisibleChapter = false;
+    }
+  }
+
+  void _updateScrollTipNotifier() {
+    final totalPages = _resolveScrollTipTotalPages();
+    final currentPage = _resolveScrollTipCurrentPage(totalPages);
+    final newTip = _ScrollTipData(
+      title: _currentTitle,
+      bookTitle: widget.bookTitle,
+      bookProgress: _getBookProgress(),
+      chapterProgress: _getChapterProgress(),
+      currentPage: currentPage,
+      totalPages: totalPages,
+      currentTime: _getCurrentTime(),
+    );
+    if (_scrollTipNotifier.value != newTip) {
+      _scrollTipNotifier.value = newTip;
     }
   }
 
@@ -1697,9 +1720,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       final segment = await _loadScrollSegment(nextIndex);
       if (!mounted) return;
 
-      setState(() {
-        _scrollSegments.add(segment);
-      });
+      _scrollSegments.add(segment);
+      _scrollSegmentsVersion.value++;
       _schedulePostScrollFlowAdjustments();
     } finally {
       _scrollAppending = false;
@@ -1725,9 +1747,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       final segment = await _loadScrollSegment(prevIndex);
       if (!mounted) return;
 
-      setState(() {
-        _scrollSegments.insert(0, segment);
-      });
+      _scrollSegments.insert(0, segment);
+      _scrollSegmentsVersion.value++;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
@@ -1788,7 +1809,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
     if (changed && mounted) {
       _rebuildScrollSegmentOffsetRanges();
-      setState(() {});
+      _scrollSegmentsVersion.value++;
     }
   }
 
@@ -4711,10 +4732,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     // 获取屏幕尺寸，确保固定全屏布局
     final screenSize = MediaQuery.sizeOf(context);
     final isScrollMode = _settings.pageTurnMode == PageTurnMode.scroll;
-    final scrollTipTotalPages = _resolveScrollTipTotalPages();
-    final scrollTipCurrentPage = _resolveScrollTipCurrentPage(
-      scrollTipTotalPages,
-    );
 
     // 阅读模式时阻止 iOS 边缘滑动返回（菜单显示时允许返回）
     return PopScope(
@@ -4784,16 +4801,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         !_showAutoReadPanel &&
                         isScrollMode &&
                         _settings.shouldShowFooter())
-                      ReaderStatusBar(
-                        settings: _settings,
-                        currentTheme: _currentTheme,
-                        currentTime: _getCurrentTime(),
-                        title: _currentTitle,
-                        bookTitle: widget.bookTitle,
-                        bookProgress: _getBookProgress(),
-                        chapterProgress: _getChapterProgress(),
-                        currentPage: scrollTipCurrentPage,
-                        totalPages: scrollTipTotalPages,
+                      ValueListenableBuilder<_ScrollTipData>(
+                        valueListenable: _scrollTipNotifier,
+                        builder: (context, tip, _) => ReaderStatusBar(
+                          settings: _settings,
+                          currentTheme: _currentTheme,
+                          currentTime: tip.currentTime,
+                          title: tip.title,
+                          bookTitle: tip.bookTitle,
+                          bookProgress: tip.bookProgress,
+                          chapterProgress: tip.chapterProgress,
+                          currentPage: tip.currentPage,
+                          totalPages: tip.totalPages,
+                        ),
                       ),
 
                     // 顶部状态栏（滚动模式）
@@ -4804,16 +4824,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         _settings.shouldShowHeader(
                           showStatusBar: _settings.showStatusBar,
                         ))
-                      ReaderHeaderBar(
-                        settings: _settings,
-                        currentTheme: _currentTheme,
-                        currentTime: _getCurrentTime(),
-                        title: _currentTitle,
-                        bookTitle: widget.bookTitle,
-                        bookProgress: _getBookProgress(),
-                        chapterProgress: _getChapterProgress(),
-                        currentPage: scrollTipCurrentPage,
-                        totalPages: scrollTipTotalPages,
+                      ValueListenableBuilder<_ScrollTipData>(
+                        valueListenable: _scrollTipNotifier,
+                        builder: (context, tip, _) => ReaderHeaderBar(
+                          settings: _settings,
+                          currentTheme: _currentTheme,
+                          currentTime: tip.currentTime,
+                          title: tip.title,
+                          bookTitle: tip.bookTitle,
+                          bookProgress: tip.bookProgress,
+                          chapterProgress: tip.chapterProgress,
+                          currentPage: tip.currentPage,
+                          totalPages: tip.totalPages,
+                        ),
                       ),
 
                     // 顶部菜单
