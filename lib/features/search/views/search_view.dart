@@ -1000,7 +1000,19 @@ class _SearchViewState extends State<SearchView> {
                     ),
                   ),
                   CupertinoButton(
-                    padding: const EdgeInsets.only(left: 10, right: 2),
+                    padding: const EdgeInsets.only(left: 8, right: 4),
+                    minimumSize: const Size(0, 32),
+                    onPressed: _openScopePickerLikeLegado,
+                    child: Text(
+                      _resolveSearchScope().resolvedScope.display(),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: uiTokens.colors.accent,
+                      ),
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.only(left: 4, right: 2),
                     minimumSize: const Size(42, 32),
                     onPressed: () {
                       _searchFocusNode.unfocus();
