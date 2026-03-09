@@ -148,6 +148,12 @@ void main() {
             // p2 在屏幕内：显示卷起页背面纹理
             uv = p2;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
+            // 正面阴影（drawCurrentPageShadow）：折叠轴处最暗，向背面方向衰减
+            // 精确对标 legado mFrontShadowColors: alpha=0.5020, RGB=0x11
+            // srcOver 结果：调暗 0.4685，结果亮度 0.5315
+            float frontShadowT = clamp(dist / radius, 0.0, 1.0);
+            float frontShadowAlpha = 0.4685 * (1.0 - frontShadowT);
+            fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
         } else {
             // p2 在屏幕外：显示卷起页正面纹理（p1）
             uv = p1;
@@ -169,16 +175,12 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
-        // 正面阴影（drawCurrentPageShadow）：折叠线投影到底页上，紧贴折叠轴
-        // 对标 legado mFrontShadowColors: 0x80111111->0x00111111
-        // dist=0 折叠轴处最暗0.47，向底页方向快速衰减（宽度约radius/2）
-        float frontShadowT = clamp(-dist / (radius * 0.5), 0.0, 1.0);
-        float frontShadowAlpha = 0.25 * (1.0 - frontShadowT);
-        fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
-        // 底页阴影（drawNextPageShadow）：折叠轴处最暗，向底页方向线性衰减
-        // 对标 legado mBackShadowColors: 0xFF111111 -> 0x00111111
+        // 底页阴影（drawNextPageShadow）：精确对标 legado mBackShadowColors
+        // 0xFF111111->0x00111111: alpha=1.0, RGB=0x11/255=0.0667
+        // srcOver 调暗效果：1 - ((1-1.0) + 1.0*0.0667) = 0.9333
+        // dist=0 折叠轴处最暗(0.9333)，线性衰减至 nextPageShadowWidth 处归零
         float nextShadowT = clamp(-dist / nextPageShadowWidth, 0.0, 1.0);
-        float nextShadowAlpha = 0.90 * (1.0 - nextShadowT);
+        float nextShadowAlpha = 0.9333 * (1.0 - nextShadowT);
         fragColor = vec4(
             fragColor.rgb * (1.0 - nextShadowAlpha),
             fragColor.a
