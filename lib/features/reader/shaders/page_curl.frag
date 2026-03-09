@@ -13,9 +13,9 @@ out vec4 fragColor;
 
 float calShadow(vec2 targetPoint, float aspect){
     if (targetPoint.y>=1.0){
-        return max(pow(clamp((targetPoint.y-1.0)/shadowWidth, 0.0, 0.9), 0.2), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 0.9), 0.2));
+        return max(pow(clamp((targetPoint.y-1.0)/shadowWidth, 0.0, 1.0), 0.6), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 1.0), 0.6));
     } else {
-        return max(pow(clamp((0.0-targetPoint.y)/shadowWidth, 0.0, 0.9), 0.2), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 0.9), 0.2));
+        return max(pow(clamp((0.0-targetPoint.y)/shadowWidth, 0.0, 1.0), 0.6), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 1.0), 0.6));
     }
 }
 
@@ -136,7 +136,7 @@ void main() {
     }
     
     if (dist > radius) {
-        fragColor = vec4(0.0, 0.0, 0.0, (1.0 - pow(clamp((dist - radius)*pi, 0.0, 1.0), 0.2)));
+        fragColor = vec4(0.0, 0.0, 0.0, (1.0 - pow(clamp((dist - radius)*pi, 0.0, 1.0), 0.5)));
     } else if (dist >= 0.0) {
         // map to cylinder point
         float theta = asin(dist / radius);
