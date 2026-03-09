@@ -3,17 +3,19 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
+import '../../../app/widgets/app_sheet_header.dart';
 import '../models/reading_settings.dart';
 
 /// 阅读界面快速调整面板，对应底部菜单「界面」按钮。
 ///
 /// 参考 legado ReadStyleDialog，用 iOS 方式重新设计：
-/// chip 行（字体/粗细/缩进/简繁）+ 字号步进 + 行距滑杆 + 翻页模式 + 背景主题。
+/// chip 行（粗细/字体/缩进/简繁/边距/信息栏）+ 字号步进 + 字距/行距/段距滑杆 + 翻页模式 + 背景主题。
 class ReaderStyleQuickSheet extends StatefulWidget {
   final ReadingSettings settings;
   final List<ReadingThemeColors> themes;
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback? onOpenTipSettings;
+  final VoidCallback? onOpenPaddingSettings;
   final VoidCallback? onImportStyle;
   final VoidCallback? onExportStyle;
 
@@ -23,6 +25,7 @@ class ReaderStyleQuickSheet extends StatefulWidget {
     required this.themes,
     required this.onSettingsChanged,
     this.onOpenTipSettings,
+    this.onOpenPaddingSettings,
     this.onImportStyle,
     this.onExportStyle,
   });
@@ -70,81 +73,21 @@ class _ReaderStyleQuickSheetState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildGrabber(),
-              _buildHeader(),
-              _buildDivider(),
+              const AppSheetHeader(title: '界面'),
               _buildChipRow(),
               _buildDivider(),
-              _buildShareLayoutRow(),
-              _buildDivider(),
               _buildFontSizeRow(),
-              _buildLineHeightRow(),
               _buildLetterSpacingRow(),
+              _buildLineHeightRow(),
               _buildParagraphSpacingRow(),
               _buildDivider(),
               _buildPageTurnRow(),
               _buildDivider(),
               _buildThemeRow(),
-              if (widget.onOpenTipSettings != null) ...[
-                _buildDivider(),
-                _buildTipSettingsRow(),
-              ],
               const SizedBox(height: 8),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildGrabber() {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(top: 8, bottom: 6),
-        width: 36,
-        height: 4,
-        decoration: BoxDecoration(
-          color: CupertinoColors.separator.resolveFrom(context),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    final isDark = _isDark;
-    final textColor = isDark
-        ? CupertinoColors.white
-        : CupertinoColors.label.resolveFrom(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '界面',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            minimumSize: Size.zero,
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              '完成',
-              style: TextStyle(
-                color: _accent,
-                fontSize: 17,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -158,12 +101,12 @@ class _ReaderStyleQuickSheetState
 
   Widget _buildChipRow() {
     final isDark = _isDark;
-    // 字体 chip
-    final fontName = ReadingFontFamily.getFontName(_draft.fontFamilyIndex);
-    // 粗细（0:正常 1:粗体 2:细体，与 ReadingSettings.textBold 对齐）
+    // 粗细
     const boldLabels = {0: '正常', 1: '粗体', 2: '细体'};
     final boldLabel = boldLabels[_draft.textBold] ?? '正常';
-    final nextBold = (_draft.textBold + 1) % 3; // 0→1→2→0 循环
+    final nextBold = (_draft.textBold + 1) % 3;
+    // 字体
+    final fontName = ReadingFontFamily.getFontName(_draft.fontFamilyIndex);
     // 缩进
     final indentOptions = ['', '　', '　　', '　　　'];
     final indentLabels = ['无缩进', '缩进1', '缩进2', '缩进3'];
@@ -177,9 +120,15 @@ class _ReaderStyleQuickSheetState
     final nextConverter = (_draft.chineseConverterType + 1) % 3;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Row(
         children: [
+          _buildChip(
+            label: boldLabel,
+            onTap: () => _apply(_draft.copyWith(textBold: nextBold)),
+            isDark: isDark,
+          ),
+          const Spacer(),
           _buildChip(
             label: fontName,
             onTap: () {
@@ -187,12 +136,6 @@ class _ReaderStyleQuickSheetState
                   ReadingFontFamily.presets.length;
               _apply(_draft.copyWith(fontFamilyIndex: next));
             },
-            isDark: isDark,
-          ),
-          const Spacer(),
-          _buildChip(
-            label: boldLabel,
-            onTap: () => _apply(_draft.copyWith(textBold: nextBold)),
             isDark: isDark,
           ),
           const Spacer(),
@@ -208,6 +151,24 @@ class _ReaderStyleQuickSheetState
             label: converterLabel,
             onTap: () =>
                 _apply(_draft.copyWith(chineseConverterType: nextConverter)),
+            isDark: isDark,
+          ),
+          const Spacer(),
+          _buildChip(
+            label: '边距',
+            onTap: () {
+              Navigator.pop(context);
+              widget.onOpenPaddingSettings?.call();
+            },
+            isDark: isDark,
+          ),
+          const Spacer(),
+          _buildChip(
+            label: '信息栏',
+            onTap: () {
+              Navigator.pop(context);
+              widget.onOpenTipSettings?.call();
+            },
             isDark: isDark,
           ),
         ],
@@ -243,48 +204,6 @@ class _ReaderStyleQuickSheetState
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildShareLayoutRow() {
-    final isDark = _isDark;
-    final labelColor = isDark
-        ? CupertinoColors.white
-        : CupertinoColors.label.resolveFrom(context);
-    final mutedColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.5)
-        : CupertinoColors.secondaryLabel.resolveFrom(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: [
-            Text(
-              '共用排版',
-              style: TextStyle(
-                color: labelColor,
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '日间/夜间使用同一套排版',
-              style: TextStyle(
-                color: mutedColor,
-                fontSize: 12,
-              ),
-            ),
-            const Spacer(),
-            CupertinoSwitch(
-              value: _draft.shareLayout,
-              activeTrackColor: _accent,
-              onChanged: (v) => _apply(_draft.copyWith(shareLayout: v)),
-            ),
-          ],
         ),
       ),
     );
@@ -575,52 +494,14 @@ class _ReaderStyleQuickSheetState
     );
   }
 
-  Widget _buildTipSettingsRow() {
-    final isDark = _isDark;
-    final labelColor = isDark
-        ? CupertinoColors.white
-        : CupertinoColors.label.resolveFrom(context);
-    final mutedColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.4)
-        : CupertinoColors.tertiaryLabel.resolveFrom(context);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: widget.onOpenTipSettings,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Text(
-              '信息栏',
-              style: TextStyle(
-                color: labelColor,
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '页眉/页脚显示内容',
-              style: TextStyle(color: mutedColor, fontSize: 12),
-            ),
-            const Spacer(),
-            Icon(
-              CupertinoIcons.chevron_right,
-              size: 14,
-              color: mutedColor,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildThemeRow() {
     final isDark = _isDark;
     final labelColor = isDark
         ? CupertinoColors.white
         : CupertinoColors.label.resolveFrom(context);
+    final mutedColor = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.5)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
     final safeSelected =
         (_draft.themeIndex >= 0 && _draft.themeIndex < widget.themes.length)
             ? _draft.themeIndex
@@ -633,7 +514,7 @@ class _ReaderStyleQuickSheetState
         children: [
           Row(
             children: [
-              Text('背景主题',
+              Text('背景文字样式',
                   style: TextStyle(
                       color: labelColor,
                       fontSize: 13,
@@ -661,6 +542,16 @@ class _ReaderStyleQuickSheetState
                           color: _accent,
                           fontSize: 13)),
                 ),
+              Text('共用排版',
+                  style: TextStyle(
+                      color: mutedColor,
+                      fontSize: 13)),
+              const SizedBox(width: 4),
+              CupertinoSwitch(
+                value: _draft.shareLayout,
+                activeTrackColor: _accent,
+                onChanged: (v) => _apply(_draft.copyWith(shareLayout: v)),
+              ),
             ],
           ),
           const SizedBox(height: 10),

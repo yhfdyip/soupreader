@@ -1072,10 +1072,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (direction == _PageDirection.prev && _factory.hasPrev()) {
       if (_shouldUsePicturePathForContent(_factory.prevPage)) {
         _prevPagePicture ??= _recordPage(
-          _factory.prevPage,
+          _isDoublePage ? _factory.prevPrevPage : _factory.prevPage,
           size,
           slot: PageRenderSlot.prev,
-          rightContent: _isDoublePage ? _factory.curPage : null,
+          rightContent: _isDoublePage ? _factory.prevPage : null,
         );
       } else {
         _prevPagePicture?.dispose();
@@ -1084,10 +1084,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     } else if (direction == _PageDirection.next && _factory.hasNext()) {
       if (_shouldUsePicturePathForContent(_factory.nextPage)) {
         _nextPagePicture ??= _recordPage(
-          _isDoublePage ? _factory.nextPage : _factory.nextPage,
+          _isDoublePage ? _factory.nextNextPage : _factory.nextPage,
           size,
           slot: PageRenderSlot.next,
-          rightContent: _isDoublePage ? _factory.nextNextPage : null,
+          rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
         );
       } else {
         _nextPagePicture?.dispose();
@@ -1104,10 +1104,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (_factory.hasPrev()) {
       if (_shouldUsePicturePathForContent(_factory.prevPage)) {
         _prevPagePicture ??= _recordPage(
-          _factory.prevPage,
+          _isDoublePage ? _factory.prevPrevPage : _factory.prevPage,
           size,
           slot: PageRenderSlot.prev,
-          rightContent: _isDoublePage ? _factory.curPage : null,
+          rightContent: _isDoublePage ? _factory.prevPage : null,
         );
       } else {
         _prevPagePicture?.dispose();
@@ -1121,10 +1121,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (_factory.hasNext()) {
       if (_shouldUsePicturePathForContent(_factory.nextPage)) {
         _nextPagePicture ??= _recordPage(
-          _factory.nextPage,
+          _isDoublePage ? _factory.nextNextPage : _factory.nextPage,
           size,
           slot: PageRenderSlot.next,
-          rightContent: _isDoublePage ? _factory.nextNextPage : null,
+          rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
         );
       } else {
         _nextPagePicture?.dispose();
@@ -1273,10 +1273,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         _prevPagePicture == null &&
         _shouldUsePicturePathForContent(_factory.prevPage)) {
       _prevPagePicture = _recordPage(
-        _factory.prevPage,
+        _isDoublePage ? _factory.prevPrevPage : _factory.prevPage,
         size,
         slot: PageRenderSlot.prev,
-        rightContent: _isDoublePage ? _factory.curPage : null,
+        rightContent: _isDoublePage ? _factory.prevPage : null,
       );
       return true;
     }
@@ -1285,10 +1285,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         _nextPagePicture == null &&
         _shouldUsePicturePathForContent(_factory.nextPage)) {
       _nextPagePicture = _recordPage(
-        _factory.nextPage,
+        _isDoublePage ? _factory.nextNextPage : _factory.nextPage,
         size,
         slot: PageRenderSlot.next,
-        rightContent: _isDoublePage ? _factory.nextNextPage : null,
+        rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
       );
       return true;
     }

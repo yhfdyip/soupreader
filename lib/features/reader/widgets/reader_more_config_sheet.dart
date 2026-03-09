@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_header.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
@@ -101,16 +102,15 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
     _u(_s.copyWith(keepLightSeconds: r));
   }
 
-  Future<void> _pickProgressBar() async {
+  Future<void> _pickProgressBarBehavior() async {
     final r = await showOptionPickerSheet<ProgressBarBehavior>(
       context: context,
       title: '进度条行为',
       currentValue: _s.progressBarBehavior,
-      accentColor: _accent,
-      items: const [
-        OptionPickerItem(value: ProgressBarBehavior.page, label: '页面'),
-        OptionPickerItem(value: ProgressBarBehavior.chapter, label: '章节'),
-      ],
+      items: ProgressBarBehavior.values
+          .map((v) => OptionPickerItem<ProgressBarBehavior>(
+              value: v, label: v.label))
+          .toList(growable: false),
     );
     if (r == null) return;
     _u(_s.copyWith(progressBarBehavior: r));
@@ -153,12 +153,13 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
     return lbls[_s.keepLightSeconds] ?? '跟随系统';
   }
 
+  String get _progressBarLabel => _s.progressBarBehavior.label;
+
   @override
   Widget build(BuildContext context) {
     final bg = _isDark
         ? CupertinoColors.systemGroupedBackground.darkColor
         : CupertinoColors.systemGroupedBackground.color;
-    final sep = CupertinoColors.separator.resolveFrom(context);
     final h = MediaQuery.sizeOf(context).height;
 
     return ClipRRect(
@@ -171,40 +172,7 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 8, bottom: 4),
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: sep,
-                      borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text('阅读设置',
-                          style: TextStyle(
-                              color:
-                                  CupertinoColors.label.resolveFrom(context),
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                    CupertinoButton(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 10),
-                      minimumSize: Size.zero,
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('完成',
-                          style: TextStyle(color: _accent, fontSize: 17)),
-                    ),
-                  ],
-                ),
-              ),
-              Container(height: 0.5, color: sep),
+              const AppSheetHeader(title: '阅读设置'),
               SizedBox(
                 height: h * 0.62,
                 child: ListView(
@@ -227,13 +195,8 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                                 _s.copyWith(paddingDisplayCutouts: v))),
                         _sw('双页模式', _s.doublePage,
                             (v) => _u(_s.copyWith(doublePage: v))),
-                        _op(
-                            '进度条行为',
-                            _s.progressBarBehavior ==
-                                    ProgressBarBehavior.chapter
-                                ? '章节'
-                                : '页面',
-                            _pickProgressBar),
+                        _op('进度条行为', _progressBarLabel,
+                            _pickProgressBarBehavior),
                         _sw('显示亮度条', _s.showBrightnessView,
                             (v) => _u(
                                 _s.copyWith(showBrightnessView: v))),
@@ -309,6 +272,10 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                       children: [
                         _sw('净化章节标题', _s.cleanChapterTitle,
                             (v) => _u(_s.copyWith(cleanChapterTitle: v))),
+                        _sw('两端对齐', _s.textFullJustify,
+                            (v) => _u(_s.copyWith(textFullJustify: v))),
+                        _sw('底部对齐', _s.textBottomJustify,
+                            (v) => _u(_s.copyWith(textBottomJustify: v))),
                       ],
                     ),
                   ],

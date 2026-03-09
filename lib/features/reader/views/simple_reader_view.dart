@@ -66,7 +66,6 @@ import '../services/read_style_import_export_service.dart';
 import '../services/reader_bookmark_export_service.dart';
 import '../services/reader_charset_service.dart';
 import '../services/reader_key_paging_helper.dart';
-import '../services/reader_legacy_quick_action_helper.dart';
 import '../services/reader_image_request_parser.dart';
 import '../services/reader_image_resolver.dart';
 import '../services/reader_image_marker_codec.dart';
@@ -98,6 +97,7 @@ import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/reader_txt_toc_rule_dialog.dart';
 import '../widgets/reader_read_aloud_bar.dart';
 import '../widgets/reader_more_config_sheet.dart';
+import '../widgets/reader_padding_config_dialog.dart';
 import '../widgets/reader_style_quick_sheet.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_content_editor.dart';
@@ -199,7 +199,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   late final Animation<double> _menuFadeAnim;
   late final Animation<Offset> _topMenuSlideAnim;
   late final Animation<Offset> _bottomMenuSlideAnim;
-  late final Animation<Offset> _railSlideAnim;
 
   // 搜索菜单动画
   late final AnimationController _searchMenuAnimController;
@@ -470,14 +469,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     ));
     _bottomMenuSlideAnim = Tween<Offset>(
       begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _menuAnimController,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    ));
-    _railSlideAnim = Tween<Offset>(
-      begin: const Offset(1, 0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _menuAnimController,
@@ -4920,29 +4911,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         menuSlideAnimation: _topMenuSlideAnim,
                       ),
 
-                    // 右侧悬浮快捷栏（对标 legado 快捷动作区）
-                    if (_showMenu) _buildFloatingActionRail(),
-
                     // 底部菜单（章节进度 + 高频设置 + 导航）
                     if (_showMenu)
                       ReaderBottomMenuNew(
                         currentChapterIndex: _currentChapterIndex,
                         totalChapters: _effectiveReadableChapterCount(),
-                        currentPageIndex: _pageFactory.currentPageIndex,
-                        totalPages: _pageFactory.totalPages.clamp(1, 9999),
                         settings: _settings,
                         currentTheme: _currentTheme,
                         onChapterChanged: (index) => _loadChapter(index),
-                        onPageChanged: (pageIndex) {
-                          setState(() {
-                            while (_pageFactory.currentPageIndex < pageIndex) {
-                              if (!_pageFactory.moveToNext()) break;
-                            }
-                            while (_pageFactory.currentPageIndex > pageIndex) {
-                              if (!_pageFactory.moveToPrev()) break;
-                            }
-                          });
-                        },
                         onSeekChapterProgress: _seekByChapterProgress,
                         onSettingsChanged: (settings) =>
                             _updateSettings(settings),
@@ -4953,10 +4929,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
                         onToggleAutoPage: _toggleAutoPageFromQuickAction,
                         onSearchContent: _showContentSearchDialog,
-                        onToggleReplaceRule: _toggleReplaceRuleState,
+                        onToggleReplaceRule: _openReplaceRuleListFromMenu,
                         onToggleNightMode: _toggleDayNightThemeFromQuickAction,
                         autoPageRunning: _autoPager.isRunning,
-                        replaceRuleEnabled: _useReplaceRule,
                         isNightMode: _isUiDark,
                         showReadAloud: !MigrationExclusions.excludeTts,
                         readBarStyleFollowPage: _menuFollowPageTone,

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_header.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 
@@ -71,8 +72,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
         top: false,
         child: Column(
           children: [
-            _buildGrabber(),
-            _buildHeader(),
+            const AppSheetHeader(title: '排版设置'),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -215,59 +215,6 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
     );
   }
 
-  Widget _buildGrabber() {
-    final color = CupertinoColors.separator.resolveFrom(context);
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(top: 8, bottom: 2),
-        width: 36,
-        height: 4,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: _lineColor, width: 0.5),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '排版设置',
-              style: TextStyle(
-                color: _textStrong,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            minimumSize: Size.zero,
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              '完成',
-              style: TextStyle(
-                color: _accent,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   int _getIndentIndex() {
     final indent = _settings.paragraphIndent;

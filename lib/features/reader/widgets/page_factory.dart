@@ -365,6 +365,19 @@ class PageFactory {
     return '';
   }
 
+  /// 下下下页内容（双页模式：下一视觉页的右栏）
+  String get nextNextNextPage {
+    final i = _currentPageIndex + 3;
+    if (i < _currentChapterPages.length) {
+      return _currentChapterPages[i];
+    }
+    final overflow = i - _currentChapterPages.length;
+    if (_nextChapterPages.length > overflow) {
+      return _nextChapterPages[overflow];
+    }
+    return '';
+  }
+
   /// 上上页内容（双页模式左栏的前一页）
   String get prevPrevPage {
     if (_currentPageIndex > 1) {

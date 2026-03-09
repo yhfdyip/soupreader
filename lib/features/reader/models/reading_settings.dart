@@ -186,7 +186,7 @@ class ReadingSettings {
     this.readBarStyleFollowPage = false,
     this.expandTextMenu = false,
     this.layoutPresetVersion = layoutPresetVersionLegadoV2,
-    this.progressBarBehavior = ProgressBarBehavior.page,
+    this.progressBarBehavior = ProgressBarBehavior.chapter,
     this.confirmSkipChapter = true,
     // 新增字段默认值
     this.textBold = 0,

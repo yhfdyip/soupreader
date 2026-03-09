@@ -305,22 +305,10 @@ class ReaderTopMenu extends StatelessWidget {
       minimumSize: Size.zero,
       onPressed: onTap,
       child: SizedBox(
-        height: 36,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(CupertinoIcons.back, color: color, size: 22),
-            const SizedBox(width: 1),
-            Text(
-              '返回',
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
+        width: 44,
+        height: 44,
+        child: Center(
+          child: Icon(CupertinoIcons.back, color: color, size: 24),
         ),
       ),
     );

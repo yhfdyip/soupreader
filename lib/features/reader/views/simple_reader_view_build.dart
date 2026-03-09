@@ -1072,10 +1072,29 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
       builder: (context) => ReaderStyleQuickSheet(
         settings: _settings,
         themes: _activeReadStyles,
-        onSettingsChanged: (next) => _updateSettings(next),
+        onSettingsChanged: (next) {
+          if (next.pageTurnMode != _settings.pageTurnMode &&
+              _bookPageAnimOverride != null) {
+            _bookPageAnimOverride = null;
+            if (!widget.isEphemeral) {
+              unawaited(
+                _settingsService.saveBookPageAnim(widget.bookId, null),
+              );
+            }
+          }
+          _updateSettings(next);
+        },
         onOpenTipSettings: () {
           Navigator.pop(context);
           unawaited(_openTipSettingsFromReader());
+        },
+        onOpenPaddingSettings: () {
+          unawaited(showReaderPaddingConfigDialog(
+            context,
+            settings: _settings,
+            onSettingsChanged: _updateSettings,
+            isDarkMode: CupertinoTheme.of(context).brightness == Brightness.dark,
+          ));
         },
         onImportStyle: () {
           Navigator.pop(context);
@@ -1486,8 +1505,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
   Future<void> _toggleAutoPageFromQuickAction() async {
     _closeReaderMenuOverlay();
-    final isRunning = _autoPager.isRunning;
-    if (!isRunning) {
+    if (!_autoPager.isRunning && !_autoPager.isPaused) {
       if (_readAloudSnapshot.isRunning) {
         await _readAloudService.stop();
         if (!mounted) return;
@@ -1495,12 +1513,6 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
       _autoPager.start();
       _openAutoReadPanel();
       _showToast('自动阅读已开启');
-      _screenOffTimerStart(force: true);
-      return;
-    }
-
-    if (!_showAutoReadPanel) {
-      _openAutoReadPanel();
       _screenOffTimerStart(force: true);
       return;
     }
@@ -2927,132 +2939,6 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
                 color: onTap == null ? _uiTextSubtle : _uiTextStrong,
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFloatingActionRail() {
-    final topOffset = MediaQuery.paddingOf(context).top + 92;
-    final actionOrder = ReaderLegacyQuickActionHelper.legacyOrder;
-    return Positioned(
-      right: 8,
-      top: topOffset,
-      child: SlideTransition(
-        position: _railSlideAnim,
-        child: FadeTransition(
-          opacity: _menuFadeAnim,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.78 : 0.85),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _isUiDark
-                        ? CupertinoColors.white.withValues(alpha: 0.10)
-                        : CupertinoColors.black.withValues(alpha: 0.06),
-                    width: 0.5,
-                  ),
-                ),
-                child: Column(
-                  children:
-                      List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
-                    if (index.isOdd) {
-                      return const SizedBox(height: 2);
-                    }
-                    final action = actionOrder[index ~/ 2];
-                    return _buildLegacyQuickActionButton(action);
-                  }),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLegacyQuickActionButton(ReaderLegacyQuickAction action) {
-    switch (action) {
-      case ReaderLegacyQuickAction.searchContent:
-        return _buildFloatingActionButton(
-          icon: CupertinoIcons.search,
-          semanticLabel: '搜索正文',
-          onTap: _showContentSearchDialog,
-        );
-      case ReaderLegacyQuickAction.autoPage:
-        final running = _autoPager.isRunning;
-        return _buildFloatingActionButton(
-          icon: running ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
-          semanticLabel: running ? '停止自动翻页' : '自动翻页',
-          active: running,
-          onTap: () => unawaited(_toggleAutoPageFromQuickAction()),
-        );
-      case ReaderLegacyQuickAction.replaceRule:
-        return _buildFloatingActionButton(
-          icon: CupertinoIcons.arrow_2_squarepath,
-          semanticLabel: '替换规则',
-          onTap: () => unawaited(_openReplaceRuleListFromMenu()),
-        );
-      case ReaderLegacyQuickAction.toggleDayNightTheme:
-        final isNightMode = _currentReaderThemeMode == ReaderThemeMode.night;
-        return _buildFloatingActionButton(
-          icon: isNightMode ? CupertinoIcons.sun_max : CupertinoIcons.moon_fill,
-          semanticLabel: isNightMode ? '切换日间模式' : '切换夜间模式',
-          onTap: _toggleDayNightThemeFromQuickAction,
-        );
-      case ReaderLegacyQuickAction.addBookmark:
-        return _buildFloatingActionButton(
-          icon: CupertinoIcons.bookmark,
-          semanticLabel: '添加书签',
-          onTap: () => unawaited(_openAddBookmarkDialog()),
-        );
-      case ReaderLegacyQuickAction.readAloud:
-        final aloudRunning = _readAloudSnapshot.isRunning;
-        return _buildFloatingActionButton(
-          icon: aloudRunning
-              ? CupertinoIcons.speaker_slash_fill
-              : CupertinoIcons.speaker_2_fill,
-          semanticLabel: aloudRunning ? '停止朗读' : '开始朗读',
-          active: aloudRunning,
-          onTap: _openReadAloudFromMenu,
-        );
-    }
-  }
-
-  Widget _buildFloatingActionButton({
-    required IconData icon,
-    required String semanticLabel,
-    required VoidCallback onTap,
-    bool active = false,
-  }) {
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
-        onPressed: onTap,
-        child: AnimatedContainer(
-          duration: AppDesignTokens.motionQuick,
-          curve: Curves.easeOut,
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: active
-                ? _uiAccent.withValues(alpha: _isUiDark ? 0.22 : 0.15)
-                : CupertinoColors.black.withValues(alpha: 0.0),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: active ? _uiAccent : _uiTextStrong,
           ),
         ),
       ),
