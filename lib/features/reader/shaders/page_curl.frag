@@ -7,16 +7,15 @@ uniform sampler2D image;
 #define pi 3.14159265359
 #define radius 0.1
 #define shadowWidth 0.05
-#define frontShadowWidth 0.04
-#define TRANSPARENT vec4(0.0, 0.0, 0.0, 0.0)
+#define nextPageShadowWidth 0.18
 
 out vec4 fragColor;
 
 float calShadow(vec2 targetPoint, float aspect){
     if (targetPoint.y>=1.0){
-        return max(pow(clamp((targetPoint.y-1.0)/shadowWidth, 0.0, 1.0), 0.6), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 1.0), 0.6));
+        return max(pow(clamp((targetPoint.y-1.0)/shadowWidth, 0.0, 0.9), 0.2), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 0.9), 0.2));
     } else {
-        return max(pow(clamp((0.0-targetPoint.y)/shadowWidth, 0.0, 1.0), 0.6), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 1.0), 0.6));
+        return max(pow(clamp((0.0-targetPoint.y)/shadowWidth, 0.0, 0.9), 0.2), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 0.9), 0.2));
     }
 }
 
@@ -137,18 +136,25 @@ void main() {
     }
     
     if (dist > radius) {
-        fragColor = vec4(0.0, 0.0, 0.0, (1.0 - pow(clamp((dist - radius)*pi, 0.0, 1.0), 0.5)));
+        // 当前页正面由底层 Widget 渲染，Shader 输出透明让其透出
+        // 正面阴影（drawCurrentPageShadow）：折叠轴处最暗，向当前页方向线性衰减
+        // 对标 legado mFrontShadowColors: 0x80111111 -> 0x00111111
+        // dist=radius 折叠轴边缘最暗(0.47)，dist=radius+frontShadowWidth 渐淡至0
+        float frontShadowWidth = radius * 0.8;
+        float frontShadowT = clamp((dist - radius) / frontShadowWidth, 0.0, 1.0);
+        float frontShadowAlpha = 0.47 * (1.0 - frontShadowT);
+        float baseAlpha = (1.0 - pow(clamp((dist - radius)*pi, 0.0, 1.0), 0.2));
+        // 叠加正面阴影：在透明渐出之外额外施加调暗层
+        fragColor = vec4(0.0, 0.0, 0.0, max(baseAlpha, frontShadowAlpha));
     } else if (dist >= 0.0) {
         // map to cylinder point
         float theta = asin(dist / radius);
         vec2 p2 = curlAxisLinePoint + mouseDir * (pi - theta) * radius;
         vec2 p1 = curlAxisLinePoint + mouseDir * theta * radius;
-        
+
         if (p2.x <= aspect && p2.y <= 1.0 && p2.x > 0.0 && p2.y > 0.0) {
             uv = p2;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
-            // fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.0);
-            // fragColor.rgb *= pow(clamp((radius - dist) / radius, 0.0, 1.0), 0.2);
         } else {
             uv = p1;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
@@ -162,7 +168,6 @@ void main() {
         if (p.x <= aspect && p.y <= 1.0 && p.x > 0.0 && p.y > 0.0) {
             uv = p;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
-            // fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.0);
         } else {
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
             if (p.x <= aspect+shadowWidth && p.y <= 1.0+shadowWidth && p.x > 0.0-shadowWidth && p.y > 0.0-shadowWidth) {
@@ -170,11 +175,13 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
-        // 正面阴影：翻起页边缘投射到原页面上的阴影条（对标 legado drawCurrentPageShadow）
-        float frontShadowT = clamp(-dist / frontShadowWidth, 0.0, 1.0);
-        float frontShadowAlpha = 0.5 * pow(1.0 - frontShadowT, 1.5);
+        // 底页阴影（drawNextPageShadow）：折叠轴处最暗，向底页方向线性衰减
+        // 对标 legado mBackShadowColors: 0xFF111111 -> 0x00111111
+        // 裁剪在 mPath0 内（已翻走区域），dist=0 折叠轴处最暗，向底页方向渐淡
+        float nextShadowT = clamp(-dist / nextPageShadowWidth, 0.0, 1.0);
+        float nextShadowAlpha = 0.90 * (1.0 - nextShadowT);
         fragColor = vec4(
-            fragColor.rgb * (1.0 - frontShadowAlpha * 0.6),
+            fragColor.rgb * (1.0 - nextShadowAlpha),
             fragColor.a
         );
     }
