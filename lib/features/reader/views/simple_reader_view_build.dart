@@ -863,289 +863,80 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
   /// 滚动模式内容（跨章节连续滚动，对齐 legado）
   Widget _buildScrollContent() {
-    final scrollInsets = _resolveScrollContentInsets(MediaQuery.of(context));
-    if (_scrollSegments.isEmpty) {
-      return Padding(
-        padding: scrollInsets,
-        child: Center(
-          child: CupertinoActivityIndicator(),
-        ),
-      );
-    }
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final mediaViewPadding = MediaQuery.viewPaddingOf(context);
+    final scrollInsets =
+        _resolveScrollContentInsetsFromPadding(mediaPadding, mediaViewPadding);
 
-    return Padding(
-      padding: scrollInsets,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis != Axis.vertical) {
-            return false;
-          }
-
-          if (notification is ScrollStartNotification) {
-            _screenOffTimerStart();
-          }
-
-          if (notification is ScrollEndNotification && !_isRestoringProgress) {
-            _syncCurrentChapterFromScroll(saveProgress: true);
-            unawaited(_saveProgress());
-          }
-          return false;
-        },
-        child: SingleChildScrollView(
-          key: _scrollViewportKey,
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < _scrollSegments.length; i++)
-                _buildScrollSegmentBody(
-                  _scrollSegments[i],
-                  isTailSegment: i == _scrollSegments.length - 1,
-                ),
-            ],
-          ),
-        ),
+    return _ScrollContentView(
+      config: _ScrollContentConfig(
+        fontSize: _settings.fontSize,
+        lineHeight: _settings.lineHeight,
+        letterSpacing: _settings.letterSpacing,
+        paragraphSpacing: _settings.paragraphSpacing,
+        paragraphIndent: _settings.paragraphIndent,
+        textFullJustify: _settings.textFullJustify,
+        textColor: _currentTheme.text,
+        fontFamily: _currentFontFamily,
+        fontFamilyFallback: _currentFontFamilyFallback,
+        fontWeight: _currentFontWeight,
+        textDecoration: _currentTextDecoration,
+        titleMode: _settings.titleMode,
+        titleSize: _settings.titleSize,
+        titleTopSpacing: _settings.titleTopSpacing,
+        titleBottomSpacing: _settings.titleBottomSpacing,
+        titleTextAlign: _titleTextAlign,
+        paddingLeft: _settings.paddingLeft,
+        paddingRight: _settings.paddingRight,
+        paddingTop: _settings.paddingTop,
+        paddingBottom: _settings.paddingBottom,
+        paddingDisplayCutouts: _settings.paddingDisplayCutouts,
+        imageStyle: _normalizeLegacyImageStyle(_imageStyle),
+        searchHighlightQuery: _activeSearchHighlightQuery,
+        searchHighlightColor: _searchHighlightColor,
+        searchHighlightTextColor: _searchHighlightTextColor,
       ),
-    );
-  }
-
-  Widget _buildScrollSegmentBody(
-    _ScrollSegment segment, {
-    required bool isTailSegment,
-  }) {
-    final paragraphStyle = _scrollParagraphStyle();
-    final bodyWidth = _scrollBodyWidth();
-    final imageStyle = _normalizeLegacyImageStyle(_imageStyle);
-    final imageBlocks = _buildScrollImageRenderBlocks(
-      segment.content,
-      imageStyle: imageStyle,
-    );
-    final contentBody = imageBlocks == null
-        ? ScrollSegmentPaintView(
-            layout: _resolveScrollTextLayout(
-              seed: _ScrollSegmentSeed(
-                chapterId: segment.chapterId,
-                title: segment.title,
-                content: segment.content,
-              ),
-              maxWidth: bodyWidth,
-              style: paragraphStyle,
-            ),
-            style: paragraphStyle,
-            highlightQuery: _activeSearchHighlightQuery,
-            highlightColor: _searchHighlightColor,
-            highlightTextColor: _searchHighlightTextColor,
-          )
-        : _buildImageAwareScrollSegmentBody(
-            blocks: imageBlocks,
-            paragraphStyle: paragraphStyle,
-            imageStyle: imageStyle,
-            maxWidth: bodyWidth,
-          );
-
-    return KeyedSubtree(
-      key: _scrollSegmentKeyFor(segment.chapterIndex),
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: _settings.paddingLeft,
-          right: _settings.paddingRight,
-          top: _settings.paddingTop,
-          bottom: _settings.paddingBottom,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_settings.titleMode != 2) ...[
-              SizedBox(
-                height: _settings.titleTopSpacing > 0
-                    ? _settings.titleTopSpacing
-                    : 20,
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: Text(
-                  segment.title,
-                  textAlign: _titleTextAlign,
-                  style: TextStyle(
-                    fontSize: _settings.fontSize + _settings.titleSize,
-                    fontWeight: FontWeight.w600,
-                    color: _currentTheme.text,
-                    fontFamily: _currentFontFamily,
-                    fontFamilyFallback: _currentFontFamilyFallback,
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: _settings.titleBottomSpacing > 0
-                    ? _settings.titleBottomSpacing
-                    : _settings.paragraphSpacing * 1.5,
-              ),
-            ],
-            contentBody,
-            SizedBox(height: isTailSegment ? 80 : 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<_ReaderRenderBlock>? _buildScrollImageRenderBlocks(
-    String content, {
-    required String imageStyle,
-  }) {
-    if (imageStyle == _SimpleReaderViewState._legacyImageStyleText ||
-        !_SimpleReaderViewState._legacyImageTagRegex.hasMatch(content)) {
-      return null;
-    }
-    final blocks = <_ReaderRenderBlock>[];
-    var cursor = 0;
-    for (final match in _SimpleReaderViewState._legacyImageTagRegex.allMatches(content)) {
-      final before = content.substring(cursor, match.start);
-      if (before.trim().isNotEmpty) {
-        blocks.add(_ReaderRenderBlock.text(before));
-      }
-      final rawSrc = (match.group(1) ?? '').trim();
-      final src = _normalizeReaderImageSrc(rawSrc);
-      if (src.isNotEmpty) {
-        blocks.add(_ReaderRenderBlock.image(src));
-      }
-      cursor = match.end;
-    }
-    if (cursor < content.length) {
-      final trailing = content.substring(cursor);
-      if (trailing.trim().isNotEmpty) {
-        blocks.add(_ReaderRenderBlock.text(trailing));
-      }
-    }
-    if (!blocks.any((block) => block.isImage)) {
-      return null;
-    }
-    return blocks;
-  }
-
-  Widget _buildImageAwareScrollSegmentBody({
-    required List<_ReaderRenderBlock> blocks,
-    required TextStyle paragraphStyle,
-    required String imageStyle,
-    required double maxWidth,
-  }) {
-    final children = <Widget>[];
-    for (var i = 0; i < blocks.length; i++) {
-      final block = blocks[i];
-      if (block.isImage) {
-        children.add(
-          _buildScrollImageBlock(
-            src: block.imageSrc ?? '',
-            imageStyle: imageStyle,
-            maxWidth: maxWidth,
-          ),
-        );
-      } else if ((block.text ?? '').trim().isNotEmpty) {
-        children.add(
-          LegacyJustifiedTextBlock(
-            content: block.text ?? '',
-            style: paragraphStyle,
-            justify: _settings.textFullJustify,
-            paragraphIndent: _settings.paragraphIndent,
-            applyParagraphIndent: true,
-            preserveEmptyLines: true,
-          ),
-        );
-      }
-      if (i != blocks.length - 1) {
-        children.add(
-          SizedBox(
-            height: _settings.paragraphSpacing.clamp(4.0, 24.0).toDouble(),
-          ),
-        );
-      }
-    }
-    if (children.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    );
-  }
-
-  Widget _buildScrollImageBlock({
-    required String src,
-    required String imageStyle,
-    required double maxWidth,
-  }) {
-    final request = ReaderImageRequestParser.parse(src);
-    final displaySrc = request.url.trim().isEmpty ? src.trim() : request.url;
-    final imageProvider = _resolveReaderImageProvider(src);
-    if (imageProvider == null) {
-      return _buildImageLoadFallback(displaySrc);
-    }
-    final forceFullWidth = imageStyle == _SimpleReaderViewState._legacyImageStyleFull ||
-        imageStyle == _SimpleReaderViewState._legacyImageStyleSingle;
-    final image = Image(
-      image: imageProvider,
-      width: forceFullWidth ? maxWidth : null,
-      fit: forceFullWidth ? BoxFit.fitWidth : BoxFit.contain,
-      filterQuality: FilterQuality.medium,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return const SizedBox(
-          width: double.infinity,
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CupertinoActivityIndicator()),
-          ),
-        );
+      scrollInsets: scrollInsets,
+      segments: _scrollSegments,
+      segmentsVersion: _scrollSegmentsVersion,
+      scrollController: _scrollController,
+      scrollViewportKey: _scrollViewportKey,
+      onScrollStart: _screenOffTimerStart,
+      onScrollEnd: () {
+        if (!_isRestoringProgress) {
+          _syncCurrentChapterFromScroll(saveProgress: true);
+          unawaited(_saveProgress());
+        }
       },
-      errorBuilder: (_, __, ___) => _buildImageLoadFallback(displaySrc),
-    );
-    final imageBox = ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: maxWidth,
-      ),
-      child: image,
-    );
-    if (imageStyle == _SimpleReaderViewState._legacyImageStyleSingle) {
-      final viewportHeight = MediaQuery.sizeOf(context).height;
-      final singleHeight =
-          (viewportHeight - _settings.paddingTop - _settings.paddingBottom)
-              .clamp(220.0, 1200.0)
-              .toDouble();
-      return SizedBox(
-        height: singleHeight,
-        child: Center(child: imageBox),
-      );
-    }
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          vertical:
-              (_settings.paragraphSpacing / 2).clamp(6.0, 20.0).toDouble(),
-        ),
-        child: imageBox,
-      ),
+      resolveScrollTextLayout: _resolveScrollTextLayout,
+      resolveSegmentKey: _scrollSegmentKeyFor,
+      resolveImageProvider: _resolveReaderImageProvider,
+      normalizeImageSrc: _normalizeReaderImageSrc,
     );
   }
 
-  Widget _buildImageLoadFallback(String src) {
-    final display = src.trim();
-    final message = display.isEmpty ? '图片加载失败' : '图片加载失败：$display';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      alignment: Alignment.centerLeft,
-      child: Text(
-        message,
-        style: TextStyle(
-          fontSize: (_settings.fontSize - 2).clamp(10.0, 22.0).toDouble(),
-          color: _currentTheme.text.withValues(alpha: 0.7),
-          fontFamily: _currentFontFamily,
-          fontFamilyFallback: _currentFontFamilyFallback,
-        ),
-      ),
+  EdgeInsets _resolveScrollContentInsetsFromPadding(
+    EdgeInsets padding,
+    EdgeInsets viewPadding,
+  ) {
+    final leftInset =
+        _settings.paddingDisplayCutouts ? padding.left : 0.0;
+    final rightInset =
+        _settings.paddingDisplayCutouts ? padding.right : 0.0;
+    final topInset = _settings.showStatusBar
+        ? padding.top
+        : (_settings.paddingDisplayCutouts ? viewPadding.top : 0.0);
+    final bottomInset = _settings.hideNavigationBar
+        ? (_settings.paddingDisplayCutouts ? viewPadding.bottom : 0.0)
+        : padding.bottom;
+    return EdgeInsets.fromLTRB(
+      leftInset,
+      topInset + _resolveScrollHeaderSlotHeight(),
+      rightInset,
+      bottomInset + _resolveScrollFooterSlotHeight(),
     );
   }
+
 
   String _normalizeReaderImageSrc(String raw) {
     return _readerImageResolver.normalizeSrc(raw);
@@ -3168,4 +2959,468 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
   }
 
   /// 刷新当前章节
+}
+
+// ─── Scroll Content 独立 Widget ───────────────────────────────────────────────
+
+@immutable
+class _ScrollContentConfig {
+  const _ScrollContentConfig({
+    required this.fontSize,
+    required this.lineHeight,
+    required this.letterSpacing,
+    required this.paragraphSpacing,
+    required this.paragraphIndent,
+    required this.textFullJustify,
+    required this.textColor,
+    required this.fontFamily,
+    required this.fontFamilyFallback,
+    required this.fontWeight,
+    required this.textDecoration,
+    required this.titleMode,
+    required this.titleSize,
+    required this.titleTopSpacing,
+    required this.titleBottomSpacing,
+    required this.titleTextAlign,
+    required this.paddingLeft,
+    required this.paddingRight,
+    required this.paddingTop,
+    required this.paddingBottom,
+    required this.paddingDisplayCutouts,
+    required this.imageStyle,
+    required this.searchHighlightQuery,
+    required this.searchHighlightColor,
+    required this.searchHighlightTextColor,
+  });
+
+  final double fontSize;
+  final double lineHeight;
+  final double letterSpacing;
+  final double paragraphSpacing;
+  final String paragraphIndent;
+  final bool textFullJustify;
+  final Color textColor;
+  final String? fontFamily;
+  final List<String>? fontFamilyFallback;
+  final FontWeight fontWeight;
+  final TextDecoration? textDecoration;
+  final int titleMode;
+  final int titleSize;
+  final double titleTopSpacing;
+  final double titleBottomSpacing;
+  final TextAlign titleTextAlign;
+  final double paddingLeft;
+  final double paddingRight;
+  final double paddingTop;
+  final double paddingBottom;
+  final bool paddingDisplayCutouts;
+  final String imageStyle;
+  final String? searchHighlightQuery;
+  final Color? searchHighlightColor;
+  final Color? searchHighlightTextColor;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! _ScrollContentConfig) return false;
+    return fontSize == other.fontSize &&
+        lineHeight == other.lineHeight &&
+        letterSpacing == other.letterSpacing &&
+        paragraphSpacing == other.paragraphSpacing &&
+        paragraphIndent == other.paragraphIndent &&
+        textFullJustify == other.textFullJustify &&
+        textColor == other.textColor &&
+        fontFamily == other.fontFamily &&
+        _listEquals(fontFamilyFallback, other.fontFamilyFallback) &&
+        fontWeight == other.fontWeight &&
+        textDecoration == other.textDecoration &&
+        titleMode == other.titleMode &&
+        titleSize == other.titleSize &&
+        titleTopSpacing == other.titleTopSpacing &&
+        titleBottomSpacing == other.titleBottomSpacing &&
+        titleTextAlign == other.titleTextAlign &&
+        paddingLeft == other.paddingLeft &&
+        paddingRight == other.paddingRight &&
+        paddingTop == other.paddingTop &&
+        paddingBottom == other.paddingBottom &&
+        paddingDisplayCutouts == other.paddingDisplayCutouts &&
+        imageStyle == other.imageStyle &&
+        searchHighlightQuery == other.searchHighlightQuery &&
+        searchHighlightColor == other.searchHighlightColor &&
+        searchHighlightTextColor == other.searchHighlightTextColor;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        fontSize,
+        lineHeight,
+        letterSpacing,
+        paragraphSpacing,
+        paragraphIndent,
+        textFullJustify,
+        textColor,
+        fontFamily,
+        fontWeight,
+        textDecoration,
+        titleMode,
+        titleSize,
+        titleTopSpacing,
+        titleBottomSpacing,
+        titleTextAlign,
+        paddingLeft,
+        paddingRight,
+        paddingTop,
+        paddingBottom,
+        paddingDisplayCutouts,
+        imageStyle,
+        searchHighlightQuery,
+        searchHighlightColor,
+        searchHighlightTextColor,
+      ]);
+
+  static bool _listEquals<T>(List<T>? a, List<T>? b) {
+    if (a == null) return b == null;
+    if (b == null) return false;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  TextStyle get paragraphStyle => TextStyle(
+        fontSize: fontSize,
+        height: lineHeight,
+        letterSpacing: letterSpacing,
+        color: textColor,
+        fontFamily: fontFamily,
+        fontFamilyFallback: fontFamilyFallback,
+        fontWeight: fontWeight,
+        decoration: textDecoration,
+      );
+
+  TextStyle get titleStyle => TextStyle(
+        fontSize: fontSize + titleSize,
+        fontWeight: FontWeight.w600,
+        color: textColor,
+        fontFamily: fontFamily,
+        fontFamilyFallback: fontFamilyFallback,
+      );
+
+  TextStyle fallbackStyle(double size) => TextStyle(
+        fontSize: (size - 2).clamp(10.0, 22.0),
+        color: textColor.withValues(alpha: 0.7),
+        fontFamily: fontFamily,
+        fontFamilyFallback: fontFamilyFallback,
+      );
+}
+
+class _ScrollContentView extends StatefulWidget {
+  const _ScrollContentView({
+    required this.config,
+    required this.scrollInsets,
+    required this.segments,
+    required this.segmentsVersion,
+    required this.scrollController,
+    required this.scrollViewportKey,
+    required this.onScrollStart,
+    required this.onScrollEnd,
+    required this.resolveScrollTextLayout,
+    required this.resolveSegmentKey,
+    required this.resolveImageProvider,
+    required this.normalizeImageSrc,
+  });
+
+  final _ScrollContentConfig config;
+  final EdgeInsets scrollInsets;
+  final List<_ScrollSegment> segments;
+  final ValueNotifier<int> segmentsVersion;
+  final ScrollController scrollController;
+  final GlobalKey scrollViewportKey;
+  final VoidCallback onScrollStart;
+  final VoidCallback onScrollEnd;
+  final ScrollTextLayout Function({
+    required _ScrollSegmentSeed seed,
+    required double maxWidth,
+    required TextStyle style,
+  }) resolveScrollTextLayout;
+  final GlobalKey Function(int chapterIndex) resolveSegmentKey;
+  final ImageProvider<Object>? Function(String src) resolveImageProvider;
+  final String Function(String raw) normalizeImageSrc;
+
+  @override
+  State<_ScrollContentView> createState() => _ScrollContentViewState();
+}
+
+class _ScrollContentViewState extends State<_ScrollContentView> {
+  _ScrollContentConfig? _lastConfig;
+  EdgeInsets? _lastScrollInsets;
+  Widget? _cachedContent;
+
+  @override
+  void didUpdateWidget(_ScrollContentView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // config 或 insets 变化时清除缓存，下次 build 重建
+    if (widget.config != oldWidget.config ||
+        widget.scrollInsets != oldWidget.scrollInsets) {
+      _cachedContent = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // config 和 insets 均未变化时直接返回缓存，跳过 layout pass
+    if (_cachedContent != null &&
+        widget.config == _lastConfig &&
+        widget.scrollInsets == _lastScrollInsets) {
+      return _cachedContent!;
+    }
+    _lastConfig = widget.config;
+    _lastScrollInsets = widget.scrollInsets;
+    _cachedContent = _buildContent();
+    return _cachedContent!;
+  }
+
+  Widget _buildContent() {
+    return Padding(
+      padding: widget.scrollInsets,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis != Axis.vertical) return false;
+          if (notification is ScrollStartNotification) {
+            widget.onScrollStart();
+          }
+          if (notification is ScrollEndNotification) {
+            widget.onScrollEnd();
+          }
+          return false;
+        },
+        child: ValueListenableBuilder<int>(
+          valueListenable: widget.segmentsVersion,
+          builder: (context, _, __) {
+            if (widget.segments.isEmpty) {
+              return const Center(child: CupertinoActivityIndicator());
+            }
+            return SingleChildScrollView(
+              key: widget.scrollViewportKey,
+              controller: widget.scrollController,
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < widget.segments.length; i++)
+                    _buildSegmentBody(
+                      widget.segments[i],
+                      isTailSegment: i == widget.segments.length - 1,
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegmentBody(_ScrollSegment segment, {required bool isTailSegment}) {
+    final cfg = widget.config;
+    final bodyWidth = _resolveBodyWidth();
+    final imageBlocks = _buildImageRenderBlocks(segment.content);
+    final contentBody = imageBlocks == null
+        ? ScrollSegmentPaintView(
+            layout: widget.resolveScrollTextLayout(
+              seed: _ScrollSegmentSeed(
+                chapterId: segment.chapterId,
+                title: segment.title,
+                content: segment.content,
+              ),
+              maxWidth: bodyWidth,
+              style: cfg.paragraphStyle,
+            ),
+            style: cfg.paragraphStyle,
+            highlightQuery: cfg.searchHighlightQuery,
+            highlightColor: cfg.searchHighlightColor,
+            highlightTextColor: cfg.searchHighlightTextColor,
+          )
+        : _buildImageAwareBody(
+            blocks: imageBlocks,
+            bodyWidth: bodyWidth,
+          );
+
+    return KeyedSubtree(
+      key: widget.resolveSegmentKey(segment.chapterIndex),
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: cfg.paddingLeft,
+          right: cfg.paddingRight,
+          top: cfg.paddingTop,
+          bottom: cfg.paddingBottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (cfg.titleMode != 2) ...[
+              SizedBox(
+                height: cfg.titleTopSpacing > 0 ? cfg.titleTopSpacing : 20,
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: Text(
+                  segment.title,
+                  textAlign: cfg.titleTextAlign,
+                  style: cfg.titleStyle,
+                ),
+              ),
+              SizedBox(
+                height: cfg.titleBottomSpacing > 0
+                    ? cfg.titleBottomSpacing
+                    : cfg.paragraphSpacing * 1.5,
+              ),
+            ],
+            contentBody,
+            SizedBox(height: isTailSegment ? 80 : 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_ReaderRenderBlock>? _buildImageRenderBlocks(String content) {
+    final imageStyle = widget.config.imageStyle;
+    if (imageStyle == _SimpleReaderViewState._legacyImageStyleText ||
+        !_SimpleReaderViewState._legacyImageTagRegex.hasMatch(content)) {
+      return null;
+    }
+    final blocks = <_ReaderRenderBlock>[];
+    var cursor = 0;
+    for (final match
+        in _SimpleReaderViewState._legacyImageTagRegex.allMatches(content)) {
+      final before = content.substring(cursor, match.start);
+      if (before.trim().isNotEmpty) {
+        blocks.add(_ReaderRenderBlock.text(before));
+      }
+      final rawSrc = (match.group(1) ?? '').trim();
+      final src = widget.normalizeImageSrc(rawSrc);
+      if (src.isNotEmpty) {
+        blocks.add(_ReaderRenderBlock.image(src));
+      }
+      cursor = match.end;
+    }
+    if (cursor < content.length) {
+      final trailing = content.substring(cursor);
+      if (trailing.trim().isNotEmpty) {
+        blocks.add(_ReaderRenderBlock.text(trailing));
+      }
+    }
+    if (!blocks.any((b) => b.isImage)) return null;
+    return blocks;
+  }
+
+  Widget _buildImageAwareBody({
+    required List<_ReaderRenderBlock> blocks,
+    required double bodyWidth,
+  }) {
+    final cfg = widget.config;
+    final children = <Widget>[];
+    for (var i = 0; i < blocks.length; i++) {
+      final block = blocks[i];
+      if (block.isImage) {
+        children.add(_buildImageBlock(src: block.imageSrc ?? '', bodyWidth: bodyWidth));
+      } else if ((block.text ?? '').trim().isNotEmpty) {
+        children.add(
+          LegacyJustifiedTextBlock(
+            content: block.text ?? '',
+            style: cfg.paragraphStyle,
+            justify: cfg.textFullJustify,
+            paragraphIndent: cfg.paragraphIndent,
+            applyParagraphIndent: true,
+            preserveEmptyLines: true,
+          ),
+        );
+      }
+      if (i != blocks.length - 1) {
+        children.add(SizedBox(
+            height: cfg.paragraphSpacing.clamp(4.0, 24.0).toDouble()));
+      }
+    }
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: children);
+  }
+
+  Widget _buildImageBlock({required String src, required double bodyWidth}) {
+    final cfg = widget.config;
+    final request = ReaderImageRequestParser.parse(src);
+    final displaySrc =
+        request.url.trim().isEmpty ? src.trim() : request.url;
+    final imageProvider = widget.resolveImageProvider(src);
+    if (imageProvider == null) return _buildImageFallback(displaySrc);
+
+    final forceFullWidth =
+        cfg.imageStyle == _SimpleReaderViewState._legacyImageStyleFull ||
+            cfg.imageStyle == _SimpleReaderViewState._legacyImageStyleSingle;
+    final image = Image(
+      image: imageProvider,
+      width: forceFullWidth ? bodyWidth : null,
+      fit: forceFullWidth ? BoxFit.fitWidth : BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const SizedBox(
+          width: double.infinity,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CupertinoActivityIndicator()),
+          ),
+        );
+      },
+      errorBuilder: (_, __, ___) => _buildImageFallback(displaySrc),
+    );
+    final imageBox = ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: bodyWidth), child: image);
+
+    if (cfg.imageStyle == _SimpleReaderViewState._legacyImageStyleSingle) {
+      final viewportHeight = MediaQuery.sizeOf(context).height;
+      final singleHeight =
+          (viewportHeight - cfg.paddingTop - cfg.paddingBottom)
+              .clamp(220.0, 1200.0)
+              .toDouble();
+      return SizedBox(height: singleHeight, child: Center(child: imageBox));
+    }
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+            vertical:
+                (cfg.paragraphSpacing / 2).clamp(6.0, 20.0).toDouble()),
+        child: imageBox,
+      ),
+    );
+  }
+
+  Widget _buildImageFallback(String src) {
+    final display = src.trim();
+    final message = display.isEmpty ? '图片加载失败' : '图片加载失败：$display';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      alignment: Alignment.centerLeft,
+      child: Text(message, style: widget.config.fallbackStyle(widget.config.fontSize)),
+    );
+  }
+
+  double _resolveBodyWidth() {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) return 320.0;
+    final cfg = widget.config;
+    final screenSize = mediaQuery.size;
+    final safePadding = mediaQuery.padding;
+    final horizontalSafeInset =
+        cfg.paddingDisplayCutouts ? safePadding.left + safePadding.right : 0.0;
+    return (screenSize.width -
+            horizontalSafeInset -
+            cfg.paddingLeft -
+            cfg.paddingRight)
+        .clamp(1.0, double.infinity)
+        .toDouble();
+  }
 }

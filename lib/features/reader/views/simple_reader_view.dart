@@ -1175,15 +1175,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return 0.0;
   }
 
-  double _resolveScrollBottomSystemInset(MediaQueryData mediaQuery) {
-    if (_settings.hideNavigationBar) {
-      if (_settings.paddingDisplayCutouts) {
-        return mediaQuery.viewPadding.bottom;
-      }
-      return 0.0;
-    }
-    return mediaQuery.padding.bottom;
-  }
 
   double _resolveScrollHeaderSlotHeight() {
     if (!_settings.shouldShowHeader(showStatusBar: _settings.showStatusBar)) {
@@ -1201,21 +1192,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
     return PagedReaderWidget.resolveFooterSlotHeight(
       settings: _settings,
-    );
-  }
-
-  EdgeInsets _resolveScrollContentInsets(MediaQueryData mediaQuery) {
-    final leftInset =
-        _settings.paddingDisplayCutouts ? mediaQuery.padding.left : 0.0;
-    final rightInset =
-        _settings.paddingDisplayCutouts ? mediaQuery.padding.right : 0.0;
-    return EdgeInsets.fromLTRB(
-      leftInset,
-      _resolveScrollTopSystemInset(mediaQuery) +
-          _resolveScrollHeaderSlotHeight(),
-      rightInset,
-      _resolveScrollBottomSystemInset(mediaQuery) +
-          _resolveScrollFooterSlotHeight(),
     );
   }
 
