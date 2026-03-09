@@ -137,14 +137,12 @@ void main() {
     
     if (dist > radius) {
         // 当前页正面由底层 Widget 渲染，Shader 输出透明让其透出
-        // 正面阴影（drawCurrentPageShadow）：折叠轴处最暗，向当前页方向线性衰减
-        // 对标 legado mFrontShadowColors: 0x80111111 -> 0x00111111
-        // dist=radius 折叠轴边缘最暗(0.47)，dist=radius+frontShadowWidth 渐淡至0
-        float frontShadowWidth = radius * 0.8;
-        float frontShadowT = clamp((dist - radius) / frontShadowWidth, 0.0, 1.0);
+        // baseAlpha：折叠轴边缘极窄硬过渡（宽度0.01，快速归零）
+        float baseAlpha = clamp(1.0 - (dist - radius) / 0.01, 0.0, 1.0);
+        // 正面阴影（drawCurrentPageShadow）：对标 legado mFrontShadowColors 0x80111111->0x00111111
+        // 宽度约 legado 25px（归一化约6%），折叠轴处最暗0.47，线性衰减至0
+        float frontShadowT = clamp((dist - radius) / 0.06, 0.0, 1.0);
         float frontShadowAlpha = 0.47 * (1.0 - frontShadowT);
-        float baseAlpha = (1.0 - pow(clamp((dist - radius)*pi, 0.0, 1.0), 0.2));
-        // 叠加正面阴影：在透明渐出之外额外施加调暗层
         fragColor = vec4(0.0, 0.0, 0.0, max(baseAlpha, frontShadowAlpha));
     } else if (dist >= 0.0) {
         // map to cylinder point
