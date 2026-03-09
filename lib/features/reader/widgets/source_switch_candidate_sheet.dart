@@ -11,6 +11,7 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
   required BuildContext context,
   required String keyword,
   required List<ReaderSourceSwitchCandidate> candidates,
+  String currentSourceUrl = '',
   String changeSourceGroup = '',
   List<String> sourceGroups = const <String>[],
   String authorKeyword = '',
@@ -59,6 +60,7 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
     context: context,
     builder: (_) => SourceSwitchCandidateSheet(
       keyword: keyword,
+      currentSourceUrl: currentSourceUrl,
       candidates: candidates,
       changeSourceGroup: changeSourceGroup,
       sourceGroups: sourceGroups,
@@ -90,6 +92,7 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
 
 class SourceSwitchCandidateSheet extends StatefulWidget {
   final String keyword;
+  final String currentSourceUrl;
   final List<ReaderSourceSwitchCandidate> candidates;
   final String changeSourceGroup;
   final List<String> sourceGroups;
@@ -138,6 +141,7 @@ class SourceSwitchCandidateSheet extends StatefulWidget {
   const SourceSwitchCandidateSheet({
     super.key,
     required this.keyword,
+    this.currentSourceUrl = '',
     required this.candidates,
     this.changeSourceGroup = '',
     this.sourceGroups = const <String>[],
@@ -1307,6 +1311,8 @@ class _SourceSwitchCandidateSheetState
                       ),
                       itemBuilder: (itemContext, index) {
                         final candidate = filtered[index];
+                        final isCurrentSource = widget.currentSourceUrl.isNotEmpty &&
+                            candidate.source.bookSourceUrl == widget.currentSourceUrl;
                         final sourceName = candidate.source.bookSourceName;
                         final author = candidate.book.author.trim().isEmpty
                             ? '未知作者'
@@ -1331,9 +1337,11 @@ class _SourceSwitchCandidateSheetState
                             minimumSize: compactTapSquare,
                             onPressed: () =>
                                 Navigator.of(itemContext).pop(candidate),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Column(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
@@ -1399,7 +1407,19 @@ class _SourceSwitchCandidateSheetState
                                     ),
                                   ],
                                 ],
-                              ),
+                                  ),
+                                ),
+                                if (isCurrentSource)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Icon(
+                                      CupertinoIcons.checkmark_alt,
+                                      size: 18,
+                                      color: CupertinoColors.activeBlue
+                                          .resolveFrom(itemContext),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         );
