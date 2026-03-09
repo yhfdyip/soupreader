@@ -412,6 +412,57 @@ class PageFactory {
     }
   }
 
+  /// 双页模式：按逻辑页偏移量取 position（offset=1 为当前页的下一逻辑页，以此类推）
+  PageRenderPosition resolveRenderPositionByOffset(int offset) {
+    final targetIndex = _currentPageIndex + offset;
+    if (targetIndex >= 0 && targetIndex < _currentChapterPages.length) {
+      final safeChapter = _chapters.isEmpty
+          ? 0
+          : _currentChapterIndex.clamp(0, _chapters.length - 1);
+      return PageRenderPosition(
+        chapterIndex: safeChapter,
+        pageIndex: targetIndex,
+        totalPages: _currentChapterPages.length,
+        chapterTitle: currentChapterTitle,
+      );
+    }
+    if (targetIndex < 0 && _prevChapterPages.isNotEmpty) {
+      final chapterIndex = _chapters.isEmpty
+          ? 0
+          : (_currentChapterIndex - 1).clamp(0, _chapters.length - 1);
+      final title = _chapters.isNotEmpty
+          ? _chapters[chapterIndex].title
+          : currentChapterTitle;
+      final pageIndex = (_prevChapterPages.length + targetIndex)
+          .clamp(0, _prevChapterPages.length - 1);
+      return PageRenderPosition(
+        chapterIndex: chapterIndex,
+        pageIndex: pageIndex,
+        totalPages: _prevChapterPages.length,
+        chapterTitle: title,
+      );
+    }
+    if (targetIndex >= _currentChapterPages.length &&
+        _nextChapterPages.isNotEmpty) {
+      final chapterIndex = _chapters.isEmpty
+          ? 0
+          : (_currentChapterIndex + 1).clamp(0, _chapters.length - 1);
+      final title = _chapters.isNotEmpty
+          ? _chapters[chapterIndex].title
+          : currentChapterTitle;
+      final pageIndex =
+          (targetIndex - _currentChapterPages.length)
+              .clamp(0, _nextChapterPages.length - 1);
+      return PageRenderPosition(
+        chapterIndex: chapterIndex,
+        pageIndex: pageIndex,
+        totalPages: _nextChapterPages.length,
+        chapterTitle: title,
+      );
+    }
+    return _resolveCurrentRenderPosition();
+  }
+
   PageRenderPosition _resolveCurrentRenderPosition() {
     final total = _currentChapterPages.length;
     final safePage = total <= 0 ? 0 : _currentPageIndex.clamp(0, total - 1);

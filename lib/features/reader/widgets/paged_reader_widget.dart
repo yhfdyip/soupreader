@@ -554,6 +554,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     Size size, {
     required PageRenderSlot slot,
     String? rightContent,
+    PageRenderPosition? rightRenderPosition,
   }) {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -562,6 +563,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final topSafe = systemPadding.top;
     final bottomSafe = systemPadding.bottom;
     final renderPosition = _factory.resolveRenderPosition(slot);
+    final effectiveRightRenderPosition =
+        rightRenderPosition ?? renderPosition;
 
     // 绘制背景
     canvas.drawRect(
@@ -579,10 +582,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           (topSafe + _topOffset + widget.padding.top) -
           (bottomSafe + _bottomOffset + widget.padding.bottom);
 
-      void paintColumn(String col, double originX) {
+      void paintColumn(String col, double originX,
+          PageRenderPosition colRenderPosition) {
         final titleData = _resolvePageTitleRenderData(
           content: col,
-          renderPosition: renderPosition,
+          renderPosition: colRenderPosition,
         );
         var bodyOriginY = topSafe + _topOffset + widget.padding.top;
         var bodyHeight = contentHeight;
@@ -617,7 +621,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         }
       }
 
-      paintColumn(pictureContent, widget.padding.left);
+      paintColumn(pictureContent, widget.padding.left, renderPosition);
 
       if (_isDoublePage) {
         final rightOriginX =
@@ -625,7 +629,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         final rightCol = rightContent != null
             ? _contentForPictureSnapshot(rightContent)
             : '';
-        if (rightCol.isNotEmpty) paintColumn(rightCol, rightOriginX);
+        if (rightCol.isNotEmpty)
+          paintColumn(rightCol, rightOriginX, effectiveRightRenderPosition);
 
         // 双栏中间分隔线
         final dividerX = widget.padding.left + columnWidth + _doublePageGutter / 2;
@@ -1058,6 +1063,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       size,
       slot: PageRenderSlot.current,
       rightContent: _isDoublePage ? _factory.nextPage : null,
+      rightRenderPosition: _isDoublePage
+          ? _factory.resolveRenderPositionByOffset(1)
+          : null,
     );
   }
 
@@ -1076,6 +1084,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.prev,
           rightContent: _isDoublePage ? _factory.prevPage : null,
+          rightRenderPosition: _isDoublePage
+              ? _factory.resolveRenderPositionByOffset(-1)
+              : null,
         );
       } else {
         _prevPagePicture?.dispose();
@@ -1088,6 +1099,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.next,
           rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
+          rightRenderPosition: _isDoublePage
+              ? _factory.resolveRenderPositionByOffset(3)
+              : null,
         );
       } else {
         _nextPagePicture?.dispose();
@@ -1108,6 +1122,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.prev,
           rightContent: _isDoublePage ? _factory.prevPage : null,
+          rightRenderPosition: _isDoublePage
+              ? _factory.resolveRenderPositionByOffset(-1)
+              : null,
         );
       } else {
         _prevPagePicture?.dispose();
@@ -1125,7 +1142,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.next,
           rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
-        );
+          rightRenderPosition: _isDoublePage
+              ? _factory.resolveRenderPositionByOffset(3)
+              : null,
       } else {
         _nextPagePicture?.dispose();
         _nextPagePicture = null;
@@ -1265,6 +1284,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         slot: PageRenderSlot.current,
         rightContent: _isDoublePage ? _factory.nextPage : null,
+        rightRenderPosition: _isDoublePage
+            ? _factory.resolveRenderPositionByOffset(1)
+            : null,
       );
       return true;
     }
@@ -1277,6 +1299,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         slot: PageRenderSlot.prev,
         rightContent: _isDoublePage ? _factory.prevPage : null,
+        rightRenderPosition: _isDoublePage
+            ? _factory.resolveRenderPositionByOffset(-1)
+            : null,
       );
       return true;
     }
@@ -1289,6 +1314,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         slot: PageRenderSlot.next,
         rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
+        rightRenderPosition: _isDoublePage
+            ? _factory.resolveRenderPositionByOffset(3)
+            : null,
       );
       return true;
     }
