@@ -67,6 +67,13 @@ extension _SpeakEngineManageMenuActions on _SpeakEngineManageViewState {
     );
   }
 
+  Future<void> _deleteRule(HttpTtsRule rule) async {
+    try {
+      await _ruleStore.deleteRule(rule.id);
+      await _reloadRules();
+    } catch (_) {}
+  }
+
   Future<void> _addRule() async {
     if (_menuBusy) return;
     await _openRuleEditor(_buildNewRuleDraft());

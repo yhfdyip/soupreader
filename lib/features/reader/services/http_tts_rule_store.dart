@@ -86,6 +86,12 @@ class HttpTtsRuleStore {
     await _preferencesStore.setString(_prefsKey, raw);
   }
 
+  Future<void> deleteRule(int id) async {
+    final rules = await loadRules();
+    final filtered = rules.where((r) => r.id != id).toList(growable: false);
+    await saveRules(filtered);
+  }
+
   Future<void> upsertRule(HttpTtsRule rule) async {
     final mergedById = <int, HttpTtsRule>{
       for (final item in await loadRules()) item.id: item,

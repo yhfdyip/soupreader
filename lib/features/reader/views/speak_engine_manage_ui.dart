@@ -83,15 +83,30 @@ extension _SpeakEngineManageUi on _SpeakEngineManageViewState {
           : rule.isDefaultRule
               ? const Text('默认')
               : null,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(32, 32),
-        onPressed: () => _openRuleEditor(rule),
-        child: Icon(
-          CupertinoIcons.pencil,
-          size: 18,
-          color: CupertinoColors.secondaryLabel.resolveFrom(context),
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            minimumSize: const Size(36, 36),
+            onPressed: () => _openRuleEditor(rule),
+            child: Icon(
+              CupertinoIcons.pencil,
+              size: 18,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.only(left: 2, right: 2),
+            minimumSize: const Size(36, 36),
+            onPressed: () => _deleteRule(rule),
+            child: Icon(
+              CupertinoIcons.delete,
+              size: 18,
+              color: CupertinoColors.destructiveRed.resolveFrom(context),
+            ),
+          ),
+        ],
       ),
       showChevron: false,
       onTap: () => _selectEngine(rule.id),
