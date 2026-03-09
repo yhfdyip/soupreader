@@ -177,6 +177,14 @@ void main() {
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
+        // 正面阴影（drawCurrentPageShadow）近似：折叠线投影到底页，紧贴折叠轴
+        // 精确对标 legado mFrontShadowColors: 0x80111111->0x00111111
+        // 调暗 46.85%，宽度固定 25px（归一化 0.065）
+        // 注：legado 原施加在当前页正面，此处近似叠加在底页折叠轴附近
+        float frontShadowWidth = 25.0 / resolution.y;
+        float frontShadowT = clamp(-dist / frontShadowWidth, 0.0, 1.0);
+        float frontShadowAlpha = 0.4685 * (1.0 - frontShadowT);
+        fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
         // 底页阴影（drawNextPageShadow）：精确对标 legado mBackShadowColors
         // 0xFF111111->0x00111111: alpha=1.0, RGB=0x11/255=0.0667
         // srcOver 调暗效果：1 - ((1-1.0) + 1.0*0.0667) = 0.9333
