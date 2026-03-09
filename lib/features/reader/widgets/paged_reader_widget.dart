@@ -1145,6 +1145,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           rightRenderPosition: _isDoublePage
               ? _factory.resolveRenderPositionByOffset(3)
               : null,
+        );
       } else {
         _nextPagePicture?.dispose();
         _nextPagePicture = null;
