@@ -2,12 +2,12 @@
 
 uniform vec2 resolution;
 uniform vec4 iMouse;
+uniform float touchToCornerDis; // 触摸点到角点距离（逻辑像素），对标 legado mTouchToCornerDis
 uniform sampler2D image;
 
 #define pi 3.14159265359
 #define radius 0.1
 #define shadowWidth 0.05
-#define nextPageShadowWidth 0.18
 
 out vec4 fragColor;
 
@@ -151,7 +151,8 @@ void main() {
             // 正面阴影（drawCurrentPageShadow）：折叠轴处最暗，向背面方向衰减
             // 精确对标 legado mFrontShadowColors: alpha=0.5020, RGB=0x11
             // srcOver 结果：调暗 0.4685，结果亮度 0.5315
-            float frontShadowT = clamp(dist / radius, 0.0, 1.0);
+            // 宽度精确对标 legado 固定25px（归一化约0.065）
+            float frontShadowT = clamp(dist / 0.065, 0.0, 1.0);
             float frontShadowAlpha = 0.4685 * (1.0 - frontShadowT);
             fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
         } else {
@@ -178,7 +179,8 @@ void main() {
         // 底页阴影（drawNextPageShadow）：精确对标 legado mBackShadowColors
         // 0xFF111111->0x00111111: alpha=1.0, RGB=0x11/255=0.0667
         // srcOver 调暗效果：1 - ((1-1.0) + 1.0*0.0667) = 0.9333
-        // dist=0 折叠轴处最暗(0.9333)，线性衰减至 nextPageShadowWidth 处归零
+        // 宽度精确对标 legado mTouchToCornerDis/4（归一化）
+        float nextPageShadowWidth = (touchToCornerDis / 4.0) / resolution.y;
         float nextShadowT = clamp(-dist / nextPageShadowWidth, 0.0, 1.0);
         float nextShadowAlpha = 0.9333 * (1.0 - nextShadowT);
         fragColor = vec4(

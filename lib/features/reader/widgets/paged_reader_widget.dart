@@ -2353,6 +2353,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       simulationTouchX = 2 * _touchX - size.width;
     }
 
+    // 对标 legado mTouchToCornerDis = hypot(touchX-cornerX, touchY-cornerY)
+    final touchToCornerDis = (Offset(simulationTouchX, _touchY) -
+            Offset(effectiveCornerX, _cornerY))
+        .distance;
+
     return CustomPaint(
       size: size,
       painter: SimulationPagePainter(
@@ -2366,6 +2371,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         backgroundColor: widget.backgroundColor,
         cornerX: effectiveCornerX,
         cornerY: _cornerY,
+        touchToCornerDis: touchToCornerDis,
         shaderProgram: pageCurlProgram!,
         curPageImage: imageToCurl,
         devicePixelRatio: MediaQuery.devicePixelRatioOf(context),

@@ -37,6 +37,9 @@ class SimulationPagePainter extends CustomPainter {
   /// 角点Y
   final double cornerY;
 
+  /// 触摸点到角点距离（逻辑像素），对标 legado mTouchToCornerDis，用于动态底页阴影宽度
+  final double touchToCornerDis;
+
   SimulationPagePainter({
     required this.curPagePicture,
     required this.nextPagePicture,
@@ -46,6 +49,7 @@ class SimulationPagePainter extends CustomPainter {
     required this.backgroundColor,
     required this.cornerX,
     required this.cornerY,
+    required this.touchToCornerDis,
     this.shaderProgram,
     this.curPageImage,
     this.devicePixelRatio = 1.0,
@@ -111,6 +115,7 @@ class SimulationPagePainter extends CustomPainter {
     shader.setFloat(3, touch.dy);
     shader.setFloat(4, cornerX); // Pass cornerX (logical)
     shader.setFloat(5, cornerY); // pass cornerY (logical)
+    shader.setFloat(6, touchToCornerDis); // mTouchToCornerDis for dynamic shadow width
 
     // Sampler: image
     shader.setImageSampler(0, curPageImage!);
@@ -127,6 +132,7 @@ class SimulationPagePainter extends CustomPainter {
         nextPagePicture != oldDelegate.nextPagePicture ||
         cornerX != oldDelegate.cornerX ||
         cornerY != oldDelegate.cornerY ||
+        touchToCornerDis != oldDelegate.touchToCornerDis ||
         curPageImage != oldDelegate.curPageImage;
   }
 }
