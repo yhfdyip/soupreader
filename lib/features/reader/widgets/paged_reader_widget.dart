@@ -2533,7 +2533,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
       // 设置触摸点
       _setTouchPoint(focusX, adjustedY);
-      setState(() {});
+      (context as Element).markNeedsBuild();
     }
   }
 

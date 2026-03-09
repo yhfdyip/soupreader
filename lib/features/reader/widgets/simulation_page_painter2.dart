@@ -394,14 +394,13 @@ class SimulationPagePainter2 extends CustomPainter {
           ..isAntiAlias = false
           ..style = PaintingStyle.fill
           ..shader = ui.Gradient.linear(
-            shadowAreaRect.topCenter,
-            shadowAreaRect.bottomCenter,
+            shadowAreaRect.topLeft,
+            shadowAreaRect.topRight,
             const [
-              Color(0x00000000),
-              Color(0xAA000000),
+              Color(0xCC000000),
               Color(0x00000000),
             ],
-            [0.0, 0.5, 1.0],
+            [0.0, 1.0],
           ),
       );
     }

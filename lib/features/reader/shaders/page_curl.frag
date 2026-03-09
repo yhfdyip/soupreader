@@ -6,17 +6,21 @@ uniform sampler2D image;
 
 #define pi 3.14159265359
 #define radius 0.1
-#define shadowWidth 0.05
+#define shadowWidth 0.12
 #define TRANSPARENT vec4(0.0, 0.0, 0.0, 0.0)
 
 out vec4 fragColor;
 
 float calShadow(vec2 targetPoint, float aspect){
-    if (targetPoint.y>=1.0){
-        return max(pow(clamp((targetPoint.y-1.0)/shadowWidth, 0.0, 0.9), 0.2), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 0.9), 0.2));
+    float sx = clamp((targetPoint.x - aspect) / shadowWidth, 0.0, 1.0);
+    float sy;
+    if (targetPoint.y >= 1.0) {
+        sy = clamp((targetPoint.y - 1.0) / shadowWidth, 0.0, 1.0);
     } else {
-        return max(pow(clamp((0.0-targetPoint.y)/shadowWidth, 0.0, 0.9), 0.2), pow(clamp((targetPoint.x-aspect)/shadowWidth, 0.0, 0.9), 0.2));
+        sy = clamp((0.0 - targetPoint.y) / shadowWidth, 0.0, 1.0);
     }
+    float t = max(sx, sy);
+    return 1.0 - pow(t, 0.5);
 }
 
 vec2 rotate(vec2 v, float a) {
@@ -136,7 +140,8 @@ void main() {
     }
     
     if (dist > radius) {
-        fragColor = vec4(0.0, 0.0, 0.0, (1.0 - pow(clamp((dist - radius)*pi, 0.0, 1.0), 0.2)));
+        float fadeT = clamp((dist - radius) / (radius * 1.5), 0.0, 1.0);
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0 - pow(fadeT, 0.6));
     } else if (dist >= 0.0) {
         // map to cylinder point
         float theta = asin(dist / radius);

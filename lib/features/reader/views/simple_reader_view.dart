@@ -316,7 +316,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     r'''style\s*=\s*(?:"([^"]*)"|'([^']*)')''',
     caseSensitive: false,
   );
-  static const int _scrollUiSyncIntervalMs = 16;
+  static const int _scrollUiSyncIntervalMs = 100;
   static const int _scrollSaveProgressIntervalMs = 450;
   static const int _readRecordPersistIntervalMs = 5000;
   static const int _readRecordPersistMinChunkMs = 1000;
@@ -1541,14 +1541,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _scrollAnchorWithinViewport = withinViewport;
   }
 
+  bool _scrollTickCallbackPending = false;
+
   void _handleScrollControllerTick() {
     if (!mounted) return;
     if (_settings.pageTurnMode != PageTurnMode.scroll) return;
     if (!_scrollController.hasClients) return;
 
-    _scheduleScrollPreload();
-    if (!_programmaticScrollInFlight && _shouldSyncScrollUiNow()) {
-      _syncCurrentChapterFromScroll();
+    if (!_scrollTickCallbackPending) {
+      _scrollTickCallbackPending = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollTickCallbackPending = false;
+        if (!mounted) return;
+        _scheduleScrollPreload();
+        if (!_programmaticScrollInFlight && _shouldSyncScrollUiNow()) {
+          _syncCurrentChapterFromScroll();
+        }
+      });
     }
   }
 
