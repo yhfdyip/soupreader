@@ -40,6 +40,13 @@ class SimulationPagePainter extends CustomPainter {
   /// 触摸点到角点距离（逻辑像素），对标 legado mTouchToCornerDis，用于动态底页阴影宽度
   final double touchToCornerDis;
 
+  /// 仿真翻页阴影调试参数
+  final double simFrontShadowWidthPx;
+  final double simFrontShadowAlpha;
+  final double simNextShadowAlpha;
+  final double simFolderShadowAlpha;
+  final double simRadiusUv;
+
   SimulationPagePainter({
     required this.curPagePicture,
     required this.nextPagePicture,
@@ -50,6 +57,11 @@ class SimulationPagePainter extends CustomPainter {
     required this.cornerX,
     required this.cornerY,
     required this.touchToCornerDis,
+    this.simFrontShadowWidthPx = 25.0,
+    this.simFrontShadowAlpha = 0.4685,
+    this.simNextShadowAlpha = 0.9333,
+    this.simFolderShadowAlpha = 0.5522,
+    this.simRadiusUv = 0.1,
     this.shaderProgram,
     this.curPageImage,
     this.devicePixelRatio = 1.0,
@@ -116,6 +128,11 @@ class SimulationPagePainter extends CustomPainter {
     shader.setFloat(4, cornerX); // Pass cornerX (logical)
     shader.setFloat(5, cornerY); // pass cornerY (logical)
     shader.setFloat(6, touchToCornerDis); // mTouchToCornerDis for dynamic shadow width
+    shader.setFloat(7, simFrontShadowWidthPx);
+    shader.setFloat(8, simFrontShadowAlpha);
+    shader.setFloat(9, simNextShadowAlpha);
+    shader.setFloat(10, simFolderShadowAlpha);
+    shader.setFloat(11, simRadiusUv);
 
     // Sampler: image
     shader.setImageSampler(0, curPageImage!);
@@ -133,6 +150,11 @@ class SimulationPagePainter extends CustomPainter {
         cornerX != oldDelegate.cornerX ||
         cornerY != oldDelegate.cornerY ||
         touchToCornerDis != oldDelegate.touchToCornerDis ||
+        simFrontShadowWidthPx != oldDelegate.simFrontShadowWidthPx ||
+        simFrontShadowAlpha != oldDelegate.simFrontShadowAlpha ||
+        simNextShadowAlpha != oldDelegate.simNextShadowAlpha ||
+        simFolderShadowAlpha != oldDelegate.simFolderShadowAlpha ||
+        simRadiusUv != oldDelegate.simRadiusUv ||
         curPageImage != oldDelegate.curPageImage;
   }
 }

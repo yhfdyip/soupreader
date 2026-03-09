@@ -123,6 +123,13 @@ class ReadingSettings {
   final bool textBottomJustify; // 底部对齐（对标 legado）
   final bool doublePage; // 双页模式（对标 legado doublePageHorizontal）
 
+  // === 仿真翻页阴影调试参数 ===
+  final double simFrontShadowWidthPx; // 正面阴影宽度（px），默认 25
+  final double simFrontShadowAlpha; // 正面阴影最大不透明度，默认 0.4685
+  final double simNextShadowAlpha; // 底页阴影最大不透明度，默认 0.9333
+  final double simFolderShadowAlpha; // 背面折叠阴影强度，默认 0.5522
+  final double simRadiusUv; // 翻页圆柱半径（uv 单位），默认 0.1
+
   static const int chineseConverterOff = 0;
   static const int chineseConverterTraditionalToSimplified = 1;
   static const int chineseConverterSimplifiedToTraditional = 2;
@@ -250,6 +257,12 @@ class ReadingSettings {
     this.cleanChapterTitle = false,
     this.textBottomJustify = true,
     this.doublePage = false,
+    // 仿真翻页阴影调试参数
+    this.simFrontShadowWidthPx = 25.0,
+    this.simFrontShadowAlpha = 0.4685,
+    this.simNextShadowAlpha = 0.9333,
+    this.simFolderShadowAlpha = 0.5522,
+    this.simRadiusUv = 0.1,
   });
 
   /// 兼容旧调用：`true` 等价于「简转繁」。
@@ -749,6 +762,12 @@ class ReadingSettings {
       cleanChapterTitle: _toBool(json['cleanChapterTitle'], false),
       textBottomJustify: _toBool(json['textBottomJustify'], true),
       doublePage: _toBool(json['doublePage'], false),
+      // 仿真翻页阴影调试参数
+      simFrontShadowWidthPx: _toDouble(json['simFrontShadowWidthPx'], 25.0),
+      simFrontShadowAlpha: _toDouble(json['simFrontShadowAlpha'], 0.4685),
+      simNextShadowAlpha: _toDouble(json['simNextShadowAlpha'], 0.9333),
+      simFolderShadowAlpha: _toDouble(json['simFolderShadowAlpha'], 0.5522),
+      simRadiusUv: _toDouble(json['simRadiusUv'], 0.1),
     ).sanitize();
   }
 
@@ -896,6 +915,12 @@ class ReadingSettings {
       'cleanChapterTitle': cleanChapterTitle,
       'textBottomJustify': textBottomJustify,
       'doublePage': doublePage,
+      // 仿真翻页阴影调试参数
+      'simFrontShadowWidthPx': simFrontShadowWidthPx,
+      'simFrontShadowAlpha': simFrontShadowAlpha,
+      'simNextShadowAlpha': simNextShadowAlpha,
+      'simFolderShadowAlpha': simFolderShadowAlpha,
+      'simRadiusUv': simRadiusUv,
     };
   }
 
@@ -1155,6 +1180,37 @@ class ReadingSettings {
       cleanChapterTitle: cleanChapterTitle,
       textBottomJustify: textBottomJustify,
       doublePage: doublePage,
+      // 仿真翻页阴影调试参数
+      simFrontShadowWidthPx: _safeDouble(
+        simFrontShadowWidthPx,
+        min: 1.0,
+        max: 200.0,
+        fallback: 25.0,
+      ),
+      simFrontShadowAlpha: _safeDouble(
+        simFrontShadowAlpha,
+        min: 0.0,
+        max: 1.0,
+        fallback: 0.4685,
+      ),
+      simNextShadowAlpha: _safeDouble(
+        simNextShadowAlpha,
+        min: 0.0,
+        max: 1.0,
+        fallback: 0.9333,
+      ),
+      simFolderShadowAlpha: _safeDouble(
+        simFolderShadowAlpha,
+        min: 0.0,
+        max: 1.0,
+        fallback: 0.5522,
+      ),
+      simRadiusUv: _safeDouble(
+        simRadiusUv,
+        min: 0.02,
+        max: 0.3,
+        fallback: 0.1,
+      ),
     );
   }
 
@@ -1250,6 +1306,12 @@ class ReadingSettings {
     bool? cleanChapterTitle,
     bool? textBottomJustify,
     bool? doublePage,
+    // 仿真翻页阴影调试参数
+    double? simFrontShadowWidthPx,
+    double? simFrontShadowAlpha,
+    double? simNextShadowAlpha,
+    double? simFolderShadowAlpha,
+    double? simRadiusUv,
   }) {
     final resolvedChineseConverterType = chineseConverterType ??
         (chineseTraditional == null
@@ -1369,6 +1431,13 @@ class ReadingSettings {
       cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
       textBottomJustify: textBottomJustify ?? this.textBottomJustify,
       doublePage: doublePage ?? this.doublePage,
+      // 仿真翻页阴影调试参数
+      simFrontShadowWidthPx:
+          simFrontShadowWidthPx ?? this.simFrontShadowWidthPx,
+      simFrontShadowAlpha: simFrontShadowAlpha ?? this.simFrontShadowAlpha,
+      simNextShadowAlpha: simNextShadowAlpha ?? this.simNextShadowAlpha,
+      simFolderShadowAlpha: simFolderShadowAlpha ?? this.simFolderShadowAlpha,
+      simRadiusUv: simRadiusUv ?? this.simRadiusUv,
     ).sanitize();
   }
 }

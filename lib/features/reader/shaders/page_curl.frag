@@ -3,10 +3,14 @@
 uniform vec2 resolution;
 uniform vec4 iMouse;
 uniform float touchToCornerDis; // 触摸点到角点距离（逻辑像素），对标 legado mTouchToCornerDis
+uniform float simFrontShadowWidthPx; // 正面阴影宽度（px）
+uniform float simFrontShadowAlpha;   // 正面阴影最大不透明度
+uniform float simNextShadowAlpha;    // 底页阴影最大不透明度
+uniform float simFolderShadowAlpha;  // 背面折叠阴影强度
+uniform float simRadiusUv;           // 翻页圆柱半径（uv 单位）
 uniform sampler2D image;
 
 #define pi 3.14159265359
-#define radius 0.1
 #define shadowWidth 0.05
 
 out vec4 fragColor;
@@ -129,20 +133,20 @@ void main() {
     
     // 让翻页页脚能跟随触摸点
     float actualDist = distance(mouse, cornerFrom);
-    if (actualDist >= pi*radius) {
-        float params = (actualDist - pi*radius)/2.0;
+    if (actualDist >= pi*simRadiusUv) {
+        float params = (actualDist - pi*simRadiusUv)/2.0;
         curlAxisLinePoint += params * mouseDir;
         dist -= params;
     }
     
-    if (dist > radius) {
-        // dist>radius：卷起页已完全卷走，透明，透出底层 bottomPicture（下一页）
+    if (dist > simRadiusUv) {
+        // dist>simRadiusUv：卷起页已完全卷走，透明，透出底层 bottomPicture（下一页）
         fragColor = vec4(0.0, 0.0, 0.0, 0.0);
     } else if (dist >= 0.0) {
         // map to cylinder point
-        float theta = asin(dist / radius);
-        vec2 p2 = curlAxisLinePoint + mouseDir * (pi - theta) * radius;
-        vec2 p1 = curlAxisLinePoint + mouseDir * theta * radius;
+        float theta = asin(dist / simRadiusUv);
+        vec2 p2 = curlAxisLinePoint + mouseDir * (pi - theta) * simRadiusUv;
+        vec2 p1 = curlAxisLinePoint + mouseDir * theta * simRadiusUv;
 
         if (p2.x <= aspect && p2.y <= 1.0 && p2.x > 0.0 && p2.y > 0.0) {
             // p2 在屏幕内：显示卷起页背面纹理
@@ -150,11 +154,11 @@ void main() {
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
             // 背面折叠阴影（drawCurrentBackArea mFolderShadow）
             // 对标 legado mFolderShadowColors: 0x00333333->0xB0333333
-            // 折叠轴(dist=0)透明，柱面顶部(dist=radius)最暗 0.5522
+            // 折叠轴(dist=0)透明，柱面顶部(dist=simRadiusUv)最暗 0.5522
             // RGB=0x33/255=0.2, alpha=0xB0/255=0.6902
             // srcOver: factor=(1-0.6902)+0.6902*0.2=0.4478, darkening=0.5522
-            float folderShadowT = clamp(dist / radius, 0.0, 1.0);
-            float folderShadowAlpha = 0.5522 * folderShadowT;
+            float folderShadowT = clamp(dist / simRadiusUv, 0.0, 1.0);
+            float folderShadowAlpha = simFolderShadowAlpha * folderShadowT;
             fragColor = vec4(fragColor.rgb * (1.0 - folderShadowAlpha), fragColor.a);
         } else {
             // p2 在屏幕外：显示卷起页正面纹理（p1）
@@ -166,7 +170,7 @@ void main() {
             }
         }
     } else {
-        vec2 p = curlAxisLinePoint + mouseDir * (abs(dist) + pi * radius);
+        vec2 p = curlAxisLinePoint + mouseDir * (abs(dist) + pi * simRadiusUv);
         if (p.x <= aspect && p.y <= 1.0 && p.x > 0.0 && p.y > 0.0) {
             uv = p;
             fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
@@ -178,22 +182,23 @@ void main() {
             }
         }
         // dist 在 uv 空间（x∈[0,aspect], y∈[0,1]），需转换为屏幕像素距离。
-        // mouseDir 在 uv 空间归一化，乘以各轴像素密度得到屏幕方向向量，
-        // 其长度即为 uv 单位距离对应的屏幕像素数。
-        vec2 screenDir = mouseDir * vec2(resolution.x / aspect, resolution.y);
-        float distScale = length(screenDir);
+        // mouseDir 在非均匀 uv 空间归一化，转换到像素空间后长度不为1。
+        // 正确做法：将 mouseDir 各分量乘以对应轴的像素/uv 比例，取长度作为缩放因子。
+        // uv.x 的 1 单位 = resolution.x/aspect 像素，uv.y 的 1 单位 = resolution.y 像素。
+        vec2 mouseDirPx = mouseDir * vec2(resolution.x / aspect, resolution.y);
+        float distScale = length(mouseDirPx);
         float distPx = -dist * distScale; // 折叠轴到当前像素的屏幕像素距离（正值朝当前页方向）
 
         // 正面阴影（drawCurrentPageShadow）：紧贴折叠轴，宽度 25px
         // 对标 legado mFrontShadowColors: 0x80111111->0x00111111
-        float frontShadowT = clamp(distPx / 25.0, 0.0, 1.0);
-        float frontShadowAlpha = 0.4685 * (1.0 - frontShadowT);
+        float frontShadowT = clamp(distPx / simFrontShadowWidthPx, 0.0, 1.0);
+        float frontShadowAlpha = simFrontShadowAlpha * (1.0 - frontShadowT);
         fragColor = vec4(fragColor.rgb * (1.0 - frontShadowAlpha), fragColor.a);
 
         // 底页阴影（drawNextPageShadow）：对标 legado mBackShadowColors
         // 0xFF111111->0x00111111，宽度 = mTouchToCornerDis/4 px
         float nextShadowT = clamp(distPx / (touchToCornerDis / 4.0), 0.0, 1.0);
-        float nextShadowAlpha = 0.9333 * (1.0 - nextShadowT);
+        float nextShadowAlpha = simNextShadowAlpha * (1.0 - nextShadowT);
         fragColor = vec4(
             fragColor.rgb * (1.0 - nextShadowAlpha),
             fragColor.a

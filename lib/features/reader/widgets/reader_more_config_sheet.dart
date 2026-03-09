@@ -278,11 +278,115 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                             (v) => _u(_s.copyWith(textBottomJustify: v))),
                       ],
                     ),
+                    if (_s.pageTurnMode == PageTurnMode.simulation)
+                      AppListSection(
+                        header: _hdr('仿真翻页阴影调试'),
+                        hasLeading: false,
+                        children: [
+                          _buildSlider(
+                            '正面阴影宽度',
+                            _s.simFrontShadowWidthPx,
+                            5.0,
+                            120.0,
+                            (v) => _u(_s.copyWith(
+                                simFrontShadowWidthPx: v)),
+                            format: (v) =>
+                                '${v.toStringAsFixed(0)}px',
+                          ),
+                          _buildSlider(
+                            '正面阴影强度',
+                            _s.simFrontShadowAlpha,
+                            0.0,
+                            1.0,
+                            (v) => _u(_s.copyWith(
+                                simFrontShadowAlpha: v)),
+                            format: (v) => v.toStringAsFixed(2),
+                          ),
+                          _buildSlider(
+                            '底页阴影强度',
+                            _s.simNextShadowAlpha,
+                            0.0,
+                            1.0,
+                            (v) => _u(_s.copyWith(
+                                simNextShadowAlpha: v)),
+                            format: (v) => v.toStringAsFixed(2),
+                          ),
+                          _buildSlider(
+                            '背面折叠阴影',
+                            _s.simFolderShadowAlpha,
+                            0.0,
+                            1.0,
+                            (v) => _u(_s.copyWith(
+                                simFolderShadowAlpha: v)),
+                            format: (v) => v.toStringAsFixed(2),
+                          ),
+                          _buildSlider(
+                            '圆柱半径',
+                            _s.simRadiusUv,
+                            0.02,
+                            0.3,
+                            (v) => _u(_s.copyWith(simRadiusUv: v)),
+                            format: (v) => v.toStringAsFixed(3),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlider(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged, {
+    required String Function(double) format,
+  }) {
+    final safeValue = value.clamp(min, max).toDouble();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 80,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            Expanded(
+              child: CupertinoSlider(
+                value: safeValue,
+                min: min,
+                max: max,
+                activeColor: _accent,
+                onChanged: onChanged,
+              ),
+            ),
+            SizedBox(
+              width: 44,
+              child: Text(
+                format(safeValue),
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  color: CupertinoColors.secondaryLabel
+                      .resolveFrom(context),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
