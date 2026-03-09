@@ -220,6 +220,52 @@ class _CacheExportViewState extends State<CacheExportView> {
     await _startDownload(downloadAllChapters: true);
   }
 
+  Future<void> _downloadSingleBook(Book book) async {
+    if (_downloadRunning || book.isLocal) return;
+    setState(() {
+      _downloadRunning = true;
+      _progress = null;
+    });
+    try {
+      final summary =
+          await _downloadService.startDownloadFromCurrentChapter(
+        [book],
+        onProgress: _handleDownloadProgress,
+      );
+      _refreshBooksSnapshot();
+      if (!mounted) return;
+      await _showMessage(_buildSummaryMessage(summary));
+    } catch (error) {
+      if (!mounted) return;
+      await _showMessage('缓存失败：$error');
+    } finally {
+      if (!mounted) return;
+      setState(() => _downloadRunning = false);
+    }
+  }
+
+  Future<void> _exportSingleBook(Book book) async {
+    if (_exportRunning) return;
+    setState(() => _exportRunning = true);
+    try {
+      final exportDirectory = await _resolveExportDirectory();
+      if (exportDirectory == null) return;
+      final summary = await _exportService.exportAllToDirectory(
+        [book],
+        exportDirectory,
+        exportPictureFile: _exportPictureFile,
+      );
+      if (!mounted) return;
+      await _showMessage(_buildExportSummaryMessage(summary));
+    } catch (error) {
+      if (!mounted) return;
+      await _showMessage('导出失败：$error');
+    } finally {
+      if (!mounted) return;
+      setState(() => _exportRunning = false);
+    }
+  }
+
   Future<void> _startDownload({required bool downloadAllChapters}) async {
     if (_downloadRunning) {
       _downloadService.stop();
@@ -1073,35 +1119,65 @@ class _CacheExportViewState extends State<CacheExportView> {
     final totalCount =
         book.totalChapters > 0 ? book.totalChapters : cachedCount;
     final statusText = book.isLocal ? '本地书籍' : '已缓存 $cachedCount/$totalCount';
+    final secondaryLabel =
+        CupertinoColors.secondaryLabel.resolveFrom(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
         color: CupertinoColors.secondarySystemGroupedBackground
             .resolveFrom(context),
         borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            book.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '作者：${book.author.isEmpty ? '未知' : book.author}',
-            style: TextStyle(
-              fontSize: 13,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '作者：${book.author.isEmpty ? '未知' : book.author}',
+                  style: TextStyle(fontSize: 13, color: secondaryLabel),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$statusText · 当前章节 ${book.currentChapter + 1}',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            '$statusText · 当前章节 ${book.currentChapter + 1}',
-            style: const TextStyle(fontSize: 13),
+          // 缓存按钮（对齐 legado iv_download）
+          if (!book.isLocal)
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              minimumSize: const Size(36, 36),
+              onPressed: _downloadRunning ? null : () => _downloadSingleBook(book),
+              child: Icon(
+                CupertinoIcons.cloud_download,
+                size: 20,
+                color: _downloadRunning ? secondaryLabel : CupertinoColors.activeBlue.resolveFrom(context),
+              ),
+            ),
+          // 导出按钮（对齐 legado tv_export）
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            minimumSize: const Size(36, 36),
+            onPressed: _exportRunning ? null : () => _exportSingleBook(book),
+            child: Icon(
+              CupertinoIcons.square_arrow_up,
+              size: 20,
+              color: _exportRunning ? secondaryLabel : secondaryLabel,
+            ),
           ),
         ],
       ),
