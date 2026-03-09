@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 /// 仿真翻页绘制器2（贝塞尔曲线版，参考 flutter_novel）
 /// 使用 Canvas 绘制贝塞尔曲线实现翻页效果
@@ -263,7 +263,7 @@ class SimulationPagePainter2 extends CustomPainter {
   void _drawBottomPage(Canvas canvas, Size size) {
     canvas.save();
     canvas.clipPath(_bottomPagePath);
-    canvas.drawColor(const Color(0xFFFFFF00), BlendMode.clear);
+    canvas.drawColor(Colors.yellow, BlendMode.clear);
     canvas.drawPicture(nextPagePicture!);
     canvas.restore();
   }
@@ -293,7 +293,7 @@ class SimulationPagePainter2 extends CustomPainter {
     path.lineTo(shadowLine2ShadowCrossPoint.dx, shadowLine2ShadowCrossPoint.dy);
     path.close();
 
-    canvas.drawShadow(path, const Color(0xFF000000), 5, true);
+    canvas.drawShadow(path, Colors.black, 5, true);
   }
 
   /// 绘制翻页背面
@@ -394,13 +394,10 @@ class SimulationPagePainter2 extends CustomPainter {
           ..isAntiAlias = false
           ..style = PaintingStyle.fill
           ..shader = ui.Gradient.linear(
-            shadowAreaRect.topLeft,
-            shadowAreaRect.topRight,
-            const [
-              Color(0xCC000000),
-              Color(0x00000000),
-            ],
-            [0.0, 1.0],
+            shadowAreaRect.topCenter,
+            shadowAreaRect.bottomCenter,
+            [Colors.transparent, const Color(0xAA000000), Colors.transparent],
+            [0.0, 0.5, 1.0],
           ),
       );
     }
