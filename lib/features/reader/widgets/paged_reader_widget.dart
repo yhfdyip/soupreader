@@ -1559,6 +1559,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     setState(() {
       _activeSelection = selection;
     });
+    // 菜单在手指抬起时弹出（onLongPressEnd），对标 legado ACTION_UP 触发
   }
 
   void _onSelectionHandleStartDrag(Offset globalPosition) {
@@ -1720,16 +1721,45 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   /// 返回词边界 (start, end)，inclusive start, exclusive end。
+  /// 复用与 _extractWordAtIndex 相同的扩展逻辑，直接返回索引避免 indexOf 二次查找。
   (int, int) _extractWordBoundsAtIndex(String text, int index) {
     if (text.isEmpty) return (0, 0);
-    final safeIndex = index.clamp(0, text.length - 1);
-    final word = _extractWordAtIndex(text, safeIndex);
-    if (word.isEmpty) {
+    final normalized = text.trimRight();
+    if (normalized.isEmpty) return (0, 0);
+    var safeIndex = index.clamp(0, normalized.length - 1).toInt();
+    // 空白字符：找最近非空白
+    if (_isWhitespace(normalized[safeIndex])) {
+      final left = _findNearestNonWhitespace(text: normalized, start: safeIndex, step: -1);
+      final right = _findNearestNonWhitespace(text: normalized, start: safeIndex, step: 1);
+      if (left == null && right == null) return (safeIndex, (safeIndex + 1).clamp(0, text.length));
+      if (left == null) {
+        safeIndex = right!;
+      } else if (right == null) {
+        safeIndex = left;
+      } else {
+        safeIndex = (safeIndex - left).abs() <= (right - safeIndex).abs() ? left : right;
+      }
+    }
+    final current = normalized[safeIndex];
+    if (!_isWordLike(current)) {
       return (safeIndex, (safeIndex + 1).clamp(0, text.length));
     }
-    final start = text.indexOf(word, safeIndex > word.length ? safeIndex - word.length : 0);
-    if (start == -1) return (safeIndex, (safeIndex + 1).clamp(0, text.length));
-    return (start, (start + word.length).clamp(0, text.length));
+    final currentIsCjk = _isCjk(current);
+    var start = safeIndex;
+    while (start > 0) {
+      final previous = normalized[start - 1];
+      if (!_isWordLike(previous)) break;
+      if (currentIsCjk != _isCjk(previous)) break;
+      start -= 1;
+    }
+    var end = safeIndex + 1;
+    while (end < normalized.length) {
+      final next = normalized[end];
+      if (!_isWordLike(next)) break;
+      if (currentIsCjk != _isCjk(next)) break;
+      end += 1;
+    }
+    return (start, end.clamp(0, text.length));
   }
 
   /// 构建选区覆盖层 Widget。
@@ -2423,6 +2453,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       },
       onLongPressStart: (widget.enableGestures && !_isInteractionRunning)
           ? (details) => _onLongPressStart(details.globalPosition)
+          : null,
+      onLongPressEnd: (_activeSelection != null)
+          ? (_) => _selectionOverlayKey.currentState?.showMenu()
+          : null,
+      onLongPressMoveUpdate: (widget.selectTextEnabled && _activeSelection != null)
+          ? (details) => _onSelectionHandleEndDrag(details.globalPosition)
           : null,
       // 水平方向手势（仅在启用手势且为水平方向时）
       onHorizontalDragStart: (!isVertical && enableDrag) ? _onDragStart : null,
