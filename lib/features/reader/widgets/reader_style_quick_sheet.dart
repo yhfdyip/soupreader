@@ -120,57 +120,20 @@ class _ReaderStyleQuickSheetState
     final nextConverter = (_draft.chineseConverterType + 1) % 3;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          _buildChip(
-            label: boldLabel,
-            onTap: () => _apply(_draft.copyWith(textBold: nextBold)),
-            isDark: isDark,
-          ),
-          const Spacer(),
-          _buildChip(
-            label: fontName,
-            onTap: () {
-              final next = (_draft.fontFamilyIndex + 1) %
-                  ReadingFontFamily.presets.length;
-              _apply(_draft.copyWith(fontFamilyIndex: next));
-            },
-            isDark: isDark,
-          ),
-          const Spacer(),
-          _buildChip(
-            label: indentLabel,
-            onTap: () => _apply(
-              _draft.copyWith(paragraphIndent: indentOptions[nextIndent]),
-            ),
-            isDark: isDark,
-          ),
-          const Spacer(),
-          _buildChip(
-            label: converterLabel,
-            onTap: () =>
-                _apply(_draft.copyWith(chineseConverterType: nextConverter)),
-            isDark: isDark,
-          ),
-          const Spacer(),
-          _buildChip(
-            label: '边距',
-            onTap: () {
-              Navigator.pop(context);
-              widget.onOpenPaddingSettings?.call();
-            },
-            isDark: isDark,
-          ),
-          const Spacer(),
-          _buildChip(
-            label: '信息栏',
-            onTap: () {
-              Navigator.pop(context);
-              widget.onOpenTipSettings?.call();
-            },
-            isDark: isDark,
-          ),
+          Expanded(child: _buildChip(label: boldLabel, onTap: () => _apply(_draft.copyWith(textBold: nextBold)), isDark: isDark)),
+          const SizedBox(width: 8),
+          Expanded(child: _buildChip(label: fontName, onTap: () { final next = (_draft.fontFamilyIndex + 1) % ReadingFontFamily.presets.length; _apply(_draft.copyWith(fontFamilyIndex: next)); }, isDark: isDark)),
+          const SizedBox(width: 8),
+          Expanded(child: _buildChip(label: indentLabel, onTap: () => _apply(_draft.copyWith(paragraphIndent: indentOptions[nextIndent])), isDark: isDark)),
+          const SizedBox(width: 8),
+          Expanded(child: _buildChip(label: converterLabel, onTap: () => _apply(_draft.copyWith(chineseConverterType: nextConverter)), isDark: isDark)),
+          const SizedBox(width: 8),
+          Expanded(child: _buildChip(label: '边距', onTap: () { Navigator.pop(context); widget.onOpenPaddingSettings?.call(); }, isDark: isDark)),
+          const SizedBox(width: 8),
+          Expanded(child: _buildChip(label: '信息栏', onTap: () { Navigator.pop(context); widget.onOpenTipSettings?.call(); }, isDark: isDark)),
         ],
       ),
     );
@@ -192,16 +155,19 @@ class _ReaderStyleQuickSheetState
       minimumSize: Size.zero,
       onPressed: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        height: 34,
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
         ),
+        alignment: Alignment.center,
         child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: textColor,
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
         ),
