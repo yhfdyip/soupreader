@@ -1700,10 +1700,21 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!localY.isFinite || localY < 0) return null;
     final lines = _getSelectionLines();
     if (lines == null || lines.isEmpty) return null;
-    // 行命中
+    // 计算底部对齐 extraGap（与 paintContentOnCanvas 一致）
+    final contentHeight = size.height -
+        (topSafe + _topOffset + widget.padding.top) -
+        (_resolveStableSystemPadding().bottom + _bottomOffset + widget.padding.bottom);
+    final extraGap = LegacyJustifyComposer.computeBottomJustifyGap(
+      bottomJustify: widget.settings.textBottomJustify,
+      lines: lines,
+      maxHeight: contentHeight,
+    );
+    // 行命中（lineStartY 不含 extraGap，需补加）
     int lineIndex = lines.length - 1;
     for (var i = 0; i < lines.length; i++) {
-      if (localY <= lines[i].lineStartY + lines[i].height) {
+      final gapOffset = i > 0 ? extraGap * i : 0.0;
+      final lineTop = lines[i].lineStartY + gapOffset;
+      if (localY <= lineTop + lines[i].height) {
         lineIndex = i;
         break;
       }
@@ -1789,6 +1800,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
     final origin = Offset(widget.padding.left, bodyOriginY);
 
+    final contentHeight = size.height -
+        (systemPadding.top + _topOffset + widget.padding.top) -
+        (systemPadding.bottom + _bottomOffset + widget.padding.bottom);
     final rects = LegacyJustifyComposer.resolveSelectionRects(
       lines: lines,
       startLineIndex: sel.startLineIndex,
@@ -1798,6 +1812,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       style: widget.textStyle,
       maxWidth: columnWidth,
       origin: origin,
+      bottomJustify: widget.settings.textBottomJustify,
+      maxHeight: contentHeight,
     );
 
     if (rects.isEmpty) return const SizedBox.shrink();

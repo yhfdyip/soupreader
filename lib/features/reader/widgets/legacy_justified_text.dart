@@ -623,11 +623,20 @@ class LegacyJustifyComposer {
     required TextStyle style,
     required double maxWidth,
     required Offset origin,
+    bool bottomJustify = false,
+    double? maxHeight,
   }) {
     if (lines.isEmpty) return const <Rect>[];
     final safeStart = startLineIndex.clamp(0, lines.length - 1);
     final safeEnd = endLineIndex.clamp(0, lines.length - 1);
     if (safeStart > safeEnd) return const <Rect>[];
+
+    // 对标 paintContentOnCanvas：底部对齐时行间加 extraGap
+    final extraGap = computeBottomJustifyGap(
+      bottomJustify: bottomJustify,
+      lines: lines,
+      maxHeight: maxHeight,
+    );
 
     final rects = <Rect>[];
     for (var i = safeStart; i <= safeEnd; i++) {
@@ -644,7 +653,9 @@ class LegacyJustifyComposer {
       final x1 = _resolveCharX(line: line, charIndex: charEnd, style: style, maxWidth: maxWidth);
       if (x1 <= x0) continue;
 
-      final top = origin.dy + line.lineStartY;
+      // lineStartY 不含 extraGap，需补加（第 i 行前累计 i 个 extraGap，从 index=1 开始）
+      final gapOffset = i > 0 ? extraGap * i : 0.0;
+      final top = origin.dy + line.lineStartY + gapOffset;
       rects.add(Rect.fromLTWH(origin.dx + x0, top, x1 - x0, line.height));
     }
     return rects;
@@ -669,6 +680,21 @@ class LegacyJustifyComposer {
         )..layout(maxWidth: maxWidth);
         return p.width;
       }
+      // justify 行：累加所有 segment 宽度（不含最后 extraAfter）
+      var x = 0.0;
+      for (final segment in line.segments) {
+        for (var i = 0; i < segment.text.length; i++) {
+          final char = segment.text.substring(i, i + 1);
+          final p = TextPainter(
+            text: TextSpan(text: char, style: style),
+            textDirection: ui.TextDirection.ltr,
+            maxLines: 1,
+          )..layout(maxWidth: double.infinity);
+          x += p.width;
+        }
+        x += segment.extraAfter;
+      }
+      return x;
     }
     if (!line.justified || line.segments.length <= 1) {
       final prefix = text.substring(0, charIndex.clamp(0, text.length));
