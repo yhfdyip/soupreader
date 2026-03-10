@@ -2454,11 +2454,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       onLongPressStart: (widget.enableGestures && !_isInteractionRunning)
           ? (details) => _onLongPressStart(details.globalPosition)
           : null,
-      onLongPressEnd: (_activeSelection != null)
-          ? (_) => _selectionOverlayKey.currentState?.showMenu()
+      onLongPressEnd: widget.selectTextEnabled
+          ? (_) {
+              if (_activeSelection != null) {
+                _selectionOverlayKey.currentState?.showMenu();
+              }
+            }
           : null,
-      onLongPressMoveUpdate: (widget.selectTextEnabled && _activeSelection != null)
-          ? (details) => _onSelectionHandleEndDrag(details.globalPosition)
+      onLongPressMoveUpdate: widget.selectTextEnabled
+          ? (details) {
+              if (_activeSelection != null) {
+                _onSelectionHandleEndDrag(details.globalPosition);
+              }
+            }
           : null,
       // 水平方向手势（仅在启用手势且为水平方向时）
       onHorizontalDragStart: (!isVertical && enableDrag) ? _onDragStart : null,

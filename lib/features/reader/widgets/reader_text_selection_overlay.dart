@@ -67,7 +67,7 @@ class ReaderTextSelectionOverlayState
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onTapDown: (_) => widget.onDismiss(),
+            onTap: widget.onDismiss,
           ),
         ),
         // 高亮矩形
@@ -164,9 +164,12 @@ class ReaderTextSelectionOverlayState
 
     const menuWidth = 260.0;
     const menuHeight = 44.0;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final menuLeft = (centerX - menuWidth / 2).clamp(8.0, screenWidth - menuWidth - 8.0);
-    final menuTop = (topY - menuHeight).clamp(8.0, double.infinity);
+    final screenSize = MediaQuery.sizeOf(context);
+    final menuLeft = (centerX - menuWidth / 2).clamp(8.0, screenSize.width - menuWidth - 8.0);
+    // 优先显示在选区上方，空间不足时显示在选区下方
+    final topAbove = topY - menuHeight - 4;
+    final topBelow = lastRect.bottom + 8;
+    final menuTop = topAbove >= 8.0 ? topAbove : topBelow.clamp(8.0, screenSize.height - menuHeight - 8.0);
 
     return Positioned(
       left: menuLeft,
