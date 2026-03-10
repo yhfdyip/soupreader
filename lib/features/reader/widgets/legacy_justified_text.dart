@@ -88,20 +88,24 @@ class LegacyComposedLine {
   final List<LegacyComposedSegment> segments;
   final bool justified;
   final double height;
+  /// 行在页面内容区的起始 y 坐标（相对于 bodyOriginY），由 composeContentLines 填入
+  final double lineStartY;
 
   const LegacyComposedLine({
     required this.plainText,
     required this.segments,
     required this.justified,
     required this.height,
+    this.lineStartY = 0.0,
   });
 
-  factory LegacyComposedLine.empty({required double height}) {
+  factory LegacyComposedLine.empty({required double height, double lineStartY = 0.0}) {
     return LegacyComposedLine(
       plainText: '',
       segments: const <LegacyComposedSegment>[],
       justified: false,
       height: height,
+      lineStartY: lineStartY,
     );
   }
 
@@ -186,10 +190,12 @@ class LegacyJustifyComposer {
     final lineHeight =
         (style.fontSize ?? 16.0) * (style.height ?? 1.2).clamp(1.0, 2.5);
     final lines = <LegacyComposedLine>[];
+    var currentY = 0.0;
     for (final paragraph in paragraphs) {
       if (paragraph.trim().isEmpty) {
         if (preserveEmptyLines) {
-          lines.add(LegacyComposedLine.empty(height: lineHeight));
+          lines.add(LegacyComposedLine.empty(height: lineHeight, lineStartY: currentY));
+          currentY += lineHeight;
         }
         continue;
       }
@@ -201,7 +207,16 @@ class LegacyJustifyComposer {
         paragraphIndent: paragraphIndent,
         applyParagraphIndent: applyParagraphIndent,
       );
-      lines.addAll(composed.lines);
+      for (final line in composed.lines) {
+        lines.add(LegacyComposedLine(
+          plainText: line.plainText,
+          segments: line.segments,
+          justified: line.justified,
+          height: line.height,
+          lineStartY: currentY,
+        ));
+        currentY += line.height;
+      }
     }
     return lines;
   }
@@ -593,5 +608,94 @@ class LegacyJustifyComposer {
     )..layout();
     cache[key] = tp.width;
     return tp.width;
+  }
+
+  /// 计算选区内每行的高亮矩形（相对于 [origin] 的绝对坐标）。
+  ///
+  /// [startLineIndex]/[startCharIndex] 为选区起点，[endLineIndex]/[endCharIndex] 为终点。
+  /// 返回的 [Rect] 列表可直接用于 Canvas 绘制高亮。
+  static List<Rect> resolveSelectionRects({
+    required List<LegacyComposedLine> lines,
+    required int startLineIndex,
+    required int startCharIndex,
+    required int endLineIndex,
+    required int endCharIndex,
+    required TextStyle style,
+    required double maxWidth,
+    required Offset origin,
+  }) {
+    if (lines.isEmpty) return const <Rect>[];
+    final safeStart = startLineIndex.clamp(0, lines.length - 1);
+    final safeEnd = endLineIndex.clamp(0, lines.length - 1);
+    if (safeStart > safeEnd) return const <Rect>[];
+
+    final rects = <Rect>[];
+    for (var i = safeStart; i <= safeEnd; i++) {
+      final line = lines[i];
+      if (line.isVisualEmpty) continue;
+      final text = line.plainText;
+      if (text.isEmpty) continue;
+
+      final charStart = (i == safeStart) ? startCharIndex.clamp(0, text.length) : 0;
+      final charEnd = (i == safeEnd) ? endCharIndex.clamp(0, text.length) : text.length;
+      if (charStart >= charEnd) continue;
+
+      final x0 = _resolveCharX(line: line, charIndex: charStart, style: style, maxWidth: maxWidth);
+      final x1 = _resolveCharX(line: line, charIndex: charEnd, style: style, maxWidth: maxWidth);
+      if (x1 <= x0) continue;
+
+      final top = origin.dy + line.lineStartY;
+      rects.add(Rect.fromLTWH(origin.dx + x0, top, x1 - x0, line.height));
+    }
+    return rects;
+  }
+
+  /// 计算某行中第 [charIndex] 个字符的左边 x 坐标（相对于行起点 x=0）。
+  static double _resolveCharX({
+    required LegacyComposedLine line,
+    required int charIndex,
+    required TextStyle style,
+    required double maxWidth,
+  }) {
+    if (charIndex <= 0) return 0.0;
+    final text = line.plainText;
+    if (charIndex >= text.length) {
+      // 返回行尾 x
+      if (!line.justified || line.segments.length <= 1) {
+        final p = TextPainter(
+          text: TextSpan(text: text, style: style),
+          textDirection: ui.TextDirection.ltr,
+          maxLines: 1,
+        )..layout(maxWidth: maxWidth);
+        return p.width;
+      }
+    }
+    if (!line.justified || line.segments.length <= 1) {
+      final prefix = text.substring(0, charIndex.clamp(0, text.length));
+      final p = TextPainter(
+        text: TextSpan(text: prefix, style: style),
+        textDirection: ui.TextDirection.ltr,
+        maxLines: 1,
+      )..layout(maxWidth: double.infinity);
+      return p.width;
+    }
+    // justify 行：逐 segment 逐字符累加
+    var x = 0.0;
+    var cursor = 0;
+    for (final segment in line.segments) {
+      for (var i = 0; i < segment.text.length; i++) {
+        if (cursor >= charIndex) return x;
+        final char = segment.text.substring(i, i + 1);
+        final p = TextPainter(
+          text: TextSpan(text: char, style: style),
+          textDirection: ui.TextDirection.ltr,
+          maxLines: 1,
+        )..layout(maxWidth: double.infinity);
+        x += p.width;
+        cursor++;
+      }
+      if (cursor < charIndex) x += segment.extraAfter;
+    }
+    return x;
   }
 }

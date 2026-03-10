@@ -9,8 +9,10 @@ import 'package:battery_plus/battery_plus.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_image_request_parser.dart';
 import '../services/reader_image_resolver.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'legacy_justified_text.dart';
 import 'page_factory.dart';
+import 'reader_text_selection_overlay.dart';
 import 'simulation_page_painter.dart';
 import 'simulation_page_painter2.dart';
 
@@ -79,6 +81,15 @@ class PagedReaderWidget extends StatefulWidget {
   final bool showTipBars;
   final ValueChanged<PagedReaderLongPressSelection>? onTextLongPress;
   final PagedReaderController? controller;
+
+  // === 选文功能 ===
+  final bool selectTextEnabled;
+  final ValueChanged<String>? onCopySelectedText;
+  final ValueChanged<String>? onBookmarkSelectedText;
+  final ValueChanged<String>? onReadAloudSelectedText;
+  final ValueChanged<String>? onDictSelectedText;
+  final ValueChanged<String>? onSearchSelectedText;
+  final ValueChanged<String>? onShareSelectedText;
 
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
@@ -151,6 +162,14 @@ class PagedReaderWidget extends StatefulWidget {
     this.pageDirection = PageDirection.horizontal,
     this.pageTouchSlop = 0,
     this.enableGestures = true,
+    // 选文功能
+    this.selectTextEnabled = false,
+    this.onCopySelectedText,
+    this.onBookmarkSelectedText,
+    this.onReadAloudSelectedText,
+    this.onDictSelectedText,
+    this.onSearchSelectedText,
+    this.onShareSelectedText,
   });
 
   final bool enableGestures;
@@ -220,6 +239,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // 仿真翻页门闩：启动动画前必须等待关键帧资源就绪
   bool _isPreparingSimulationTurn = false;
+
+  // === 选文状态 ===
+  _TextSelection? _activeSelection;
+  List<LegacyComposedLine>? _selectionLines; // 当前页排版缓存
+  final GlobalKey<ReaderTextSelectionOverlayState> _selectionOverlayKey =
+      GlobalKey<ReaderTextSelectionOverlayState>();
   int _simulationPrepareToken = 0;
 
   // 电池状态
@@ -946,6 +971,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _invalidatePictures() {
+    // 清除选文缓存（页面内容变化时选区失效）
+    _activeSelection = null;
+    _selectionLines = null;
     // 取消未执行的预渲染回调（通过 epoch 失效化）
     _precacheEpoch++;
     _curPagePicture?.dispose();
@@ -1491,9 +1519,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!mounted) return;
     if (!widget.enableGestures) return;
     if (_isInteractionRunning) return;
+
+    // 选文模式
+    if (widget.selectTextEnabled && !_isDoublePage) {
+      _startTextSelection(globalPosition);
+      return;
+    }
+
     final callback = widget.onTextLongPress;
     if (callback == null) return;
-
     final text = _resolveLongPressSelectedText(globalPosition).trim();
     if (text.isEmpty) return;
     callback(
@@ -1501,6 +1535,300 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         text: text,
         globalPosition: globalPosition,
       ),
+    );
+  }
+
+  void _startTextSelection(Offset globalPosition) {
+    final result = _resolveSelectionHitResult(globalPosition);
+    if (result == null) return;
+    final (lineIndex, charIndex) = result;
+    final lines = _getSelectionLines();
+    if (lines == null || lineIndex >= lines.length) return;
+    final line = lines[lineIndex];
+    // 获取词边界作为初始选区
+    final wordBounds = _extractWordBoundsAtIndex(line.plainText, charIndex);
+    final selection = _TextSelection(
+      startLineIndex: lineIndex,
+      startCharIndex: wordBounds.$1,
+      endLineIndex: lineIndex,
+      endCharIndex: wordBounds.$2,
+      selectedText: line.plainText.substring(
+          wordBounds.$1.clamp(0, line.plainText.length),
+          wordBounds.$2.clamp(0, line.plainText.length)),
+    );
+    setState(() {
+      _activeSelection = selection;
+    });
+  }
+
+  void _onSelectionHandleStartDrag(Offset globalPosition) {
+    final result = _resolveSelectionHitResult(globalPosition);
+    if (result == null || _activeSelection == null) return;
+    final (lineIndex, charIndex) = result;
+    final sel = _activeSelection!;
+    // 确保 start <= end
+    if (lineIndex > sel.endLineIndex ||
+        (lineIndex == sel.endLineIndex && charIndex >= sel.endCharIndex)) {
+      return;
+    }
+    setState(() {
+      _activeSelection = _rebuildSelection(
+        startLineIndex: lineIndex,
+        startCharIndex: charIndex,
+        endLineIndex: sel.endLineIndex,
+        endCharIndex: sel.endCharIndex,
+      );
+    });
+  }
+
+  void _onSelectionHandleEndDrag(Offset globalPosition) {
+    final result = _resolveSelectionHitResult(globalPosition);
+    if (result == null || _activeSelection == null) return;
+    final (lineIndex, charIndex) = result;
+    final sel = _activeSelection!;
+    if (lineIndex < sel.startLineIndex ||
+        (lineIndex == sel.startLineIndex && charIndex <= sel.startCharIndex)) {
+      return;
+    }
+    setState(() {
+      _activeSelection = _rebuildSelection(
+        startLineIndex: sel.startLineIndex,
+        startCharIndex: sel.startCharIndex,
+        endLineIndex: lineIndex,
+        endCharIndex: charIndex,
+      );
+    });
+  }
+
+  void _onSelectionHandleDragEnd() {
+    _selectionOverlayKey.currentState?.showMenu();
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _activeSelection = null;
+      _selectionLines = null;
+    });
+  }
+
+  _TextSelection _rebuildSelection({
+    required int startLineIndex,
+    required int startCharIndex,
+    required int endLineIndex,
+    required int endCharIndex,
+  }) {
+    final lines = _getSelectionLines();
+    final buffer = StringBuffer();
+    if (lines != null) {
+      for (var i = startLineIndex; i <= endLineIndex && i < lines.length; i++) {
+        final line = lines[i];
+        final s = (i == startLineIndex) ? startCharIndex : 0;
+        final e = (i == endLineIndex) ? endCharIndex : line.plainText.length;
+        if (s < e && s >= 0 && e <= line.plainText.length) {
+          buffer.write(line.plainText.substring(s, e));
+        }
+        if (i < endLineIndex) buffer.write('\n');
+      }
+    }
+    return _TextSelection(
+      startLineIndex: startLineIndex,
+      startCharIndex: startCharIndex,
+      endLineIndex: endLineIndex,
+      endCharIndex: endCharIndex,
+      selectedText: buffer.toString(),
+    );
+  }
+
+  List<LegacyComposedLine>? _getSelectionLines() {
+    if (_selectionLines != null) return _selectionLines;
+    final content = _factory.curPage;
+    if (content.trim().isEmpty) return null;
+    final size = MediaQuery.sizeOf(context);
+    final totalWidth = size.width - widget.padding.left - widget.padding.right;
+    final columnWidth = _isDoublePage
+        ? (totalWidth - _doublePageGutter) / 2
+        : totalWidth;
+    if (columnWidth <= 0) return null;
+    final renderPosition =
+        _factory.resolveRenderPosition(PageRenderSlot.current);
+    final titleData = _resolvePageTitleRenderData(
+      content: content,
+      renderPosition: renderPosition,
+    );
+    final bodyText = _stripImageMarkersFromContent(titleData.bodyContent);
+    if (bodyText.trim().isEmpty) return null;
+    _selectionLines = LegacyJustifyComposer.composeContentLines(
+      content: bodyText,
+      style: widget.textStyle,
+      maxWidth: columnWidth,
+      justify: widget.settings.textFullJustify,
+      paragraphIndent: widget.settings.paragraphIndent,
+      applyParagraphIndent: false,
+      preserveEmptyLines: true,
+    );
+    return _selectionLines;
+  }
+
+  /// 将全局坐标映射到 (lineIndex, charIndex)，返回 null 表示未命中。
+  (int, int)? _resolveSelectionHitResult(Offset globalPosition) {
+    final content = _factory.curPage;
+    if (content.trim().isEmpty) return null;
+    final size = MediaQuery.sizeOf(context);
+    final totalWidth = size.width - widget.padding.left - widget.padding.right;
+    final columnWidth = _isDoublePage
+        ? (totalWidth - _doublePageGutter) / 2
+        : totalWidth;
+    if (columnWidth <= 0) return null;
+    final systemPadding = _resolveStableSystemPadding();
+    final topSafe = systemPadding.top;
+    final renderPosition =
+        _factory.resolveRenderPosition(PageRenderSlot.current);
+    final titleData = _resolvePageTitleRenderData(
+      content: content,
+      renderPosition: renderPosition,
+    );
+    var contentTop = topSafe + _topOffset + widget.padding.top;
+    if (titleData.shouldRenderTitle) {
+      contentTop += _pageTitleTopSpacing +
+          _titlePainterHeight(titleData.title!, columnWidth) +
+          _pageTitleBottomSpacing;
+    }
+    final bodyText = _stripImageMarkersFromContent(titleData.bodyContent);
+    if (bodyText.trim().isEmpty) return null;
+    final localY = globalPosition.dy - contentTop;
+    if (!localY.isFinite || localY < 0) return null;
+    final lines = _getSelectionLines();
+    if (lines == null || lines.isEmpty) return null;
+    // 行命中
+    int lineIndex = lines.length - 1;
+    for (var i = 0; i < lines.length; i++) {
+      if (localY <= lines[i].lineStartY + lines[i].height) {
+        lineIndex = i;
+        break;
+      }
+    }
+    final line = lines[lineIndex];
+    final localDx =
+        (globalPosition.dx - widget.padding.left).clamp(0.0, columnWidth);
+    final charIndex = _resolveCharacterIndexInLine(
+      line: line,
+      x: localDx,
+      style: widget.textStyle,
+      maxWidth: columnWidth,
+    );
+    return (lineIndex, charIndex);
+  }
+
+  /// 返回词边界 (start, end)，inclusive start, exclusive end。
+  (int, int) _extractWordBoundsAtIndex(String text, int index) {
+    if (text.isEmpty) return (0, 0);
+    final safeIndex = index.clamp(0, text.length - 1);
+    final word = _extractWordAtIndex(text, safeIndex);
+    if (word.isEmpty) {
+      return (safeIndex, (safeIndex + 1).clamp(0, text.length));
+    }
+    final start = text.indexOf(word, safeIndex > word.length ? safeIndex - word.length : 0);
+    if (start == -1) return (safeIndex, (safeIndex + 1).clamp(0, text.length));
+    return (start, (start + word.length).clamp(0, text.length));
+  }
+
+  /// 构建选区覆盖层 Widget。
+  Widget _buildSelectionOverlay(Size size) {
+    final sel = _activeSelection;
+    if (sel == null) return const SizedBox.shrink();
+    final lines = _getSelectionLines();
+    if (lines == null || lines.isEmpty) return const SizedBox.shrink();
+
+    final systemPadding = _resolveStableSystemPadding();
+    final topSafe = systemPadding.top;
+    final totalWidth = size.width - widget.padding.left - widget.padding.right;
+    final columnWidth = _isDoublePage
+        ? (totalWidth - _doublePageGutter) / 2
+        : totalWidth;
+    final renderPosition =
+        _factory.resolveRenderPosition(PageRenderSlot.current);
+    final titleData = _resolvePageTitleRenderData(
+      content: _factory.curPage,
+      renderPosition: renderPosition,
+    );
+    var bodyOriginY = topSafe + _topOffset + widget.padding.top;
+    if (titleData.shouldRenderTitle) {
+      bodyOriginY += _pageTitleTopSpacing +
+          _titlePainterHeight(titleData.title!, columnWidth) +
+          _pageTitleBottomSpacing;
+    }
+    final origin = Offset(widget.padding.left, bodyOriginY);
+
+    final rects = LegacyJustifyComposer.resolveSelectionRects(
+      lines: lines,
+      startLineIndex: sel.startLineIndex,
+      startCharIndex: sel.startCharIndex,
+      endLineIndex: sel.endLineIndex,
+      endCharIndex: sel.endCharIndex,
+      style: widget.textStyle,
+      maxWidth: columnWidth,
+      origin: origin,
+    );
+
+    if (rects.isEmpty) return const SizedBox.shrink();
+
+    final firstRect = rects.first;
+    final lastRect = rects.last;
+    final startHandlePos = Offset(firstRect.left, firstRect.top);
+    final endHandlePos = Offset(lastRect.right, lastRect.bottom);
+
+    final highlightColor = CupertinoColors.activeBlue.withValues(alpha: 0.3);
+    final handleColor = CupertinoColors.activeBlue;
+
+    return ReaderTextSelectionOverlay(
+      key: _selectionOverlayKey,
+      selectionRects: rects,
+      startHandlePos: startHandlePos,
+      endHandlePos: endHandlePos,
+      selectedText: sel.selectedText,
+      highlightColor: highlightColor,
+      handleColor: handleColor,
+      onDismiss: _clearSelection,
+      onStartHandleDragUpdate: _onSelectionHandleStartDrag,
+      onEndHandleDragUpdate: _onSelectionHandleEndDrag,
+      onHandleDragEnd: _onSelectionHandleDragEnd,
+      onCopy: widget.onCopySelectedText != null
+          ? () {
+              Clipboard.setData(ClipboardData(text: sel.selectedText));
+              widget.onCopySelectedText!(sel.selectedText);
+              _clearSelection();
+            }
+          : null,
+      onBookmark: widget.onBookmarkSelectedText != null
+          ? () {
+              widget.onBookmarkSelectedText!(sel.selectedText);
+              _clearSelection();
+            }
+          : null,
+      onReadAloud: widget.onReadAloudSelectedText != null
+          ? () {
+              widget.onReadAloudSelectedText!(sel.selectedText);
+              _clearSelection();
+            }
+          : null,
+      onDict: widget.onDictSelectedText != null
+          ? () {
+              widget.onDictSelectedText!(sel.selectedText);
+              _clearSelection();
+            }
+          : null,
+      onSearchContent: widget.onSearchSelectedText != null
+          ? () {
+              widget.onSearchSelectedText!(sel.selectedText);
+              _clearSelection();
+            }
+          : null,
+      onShare: widget.onShareSelectedText != null
+          ? () {
+              widget.onShareSelectedText!(sel.selectedText);
+              _clearSelection();
+            }
+          : null,
     );
   }
 
@@ -2083,9 +2411,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 只有启用手势时才允许滑动翻页
     final enableDrag = widget.enableGestures;
 
+    final size = MediaQuery.sizeOf(context);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapUp: (d) => _onTap(d.globalPosition),
+      onTapUp: (d) {
+        if (_activeSelection != null) {
+          _clearSelection();
+          return;
+        }
+        _onTap(d.globalPosition);
+      },
       onLongPressStart: (widget.enableGestures && !_isInteractionRunning)
           ? (details) => _onLongPressStart(details.globalPosition)
           : null,
@@ -2098,7 +2433,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       onVerticalDragStart: null,
       onVerticalDragUpdate: null,
       onVerticalDragEnd: null,
-      child: _buildAnimatedPages(),
+      child: Stack(
+        children: [
+          _buildAnimatedPages(),
+          if (_activeSelection != null) _buildSelectionOverlay(size),
+        ],
+      ),
     );
   }
 
@@ -3252,6 +3592,39 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   Widget _tipTextWidget(String? text, TextStyle style) {
     if (text == null || text.isEmpty) return const SizedBox.shrink();
     return Text(text, style: style);
+  }
+}
+
+/// 选文状态：记录选区的起止行和字符索引。
+class _TextSelection {
+  final int startLineIndex;
+  final int startCharIndex;
+  final int endLineIndex;
+  final int endCharIndex;
+  final String selectedText;
+
+  const _TextSelection({
+    required this.startLineIndex,
+    required this.startCharIndex,
+    required this.endLineIndex,
+    required this.endCharIndex,
+    required this.selectedText,
+  });
+
+  _TextSelection copyWith({
+    int? startLineIndex,
+    int? startCharIndex,
+    int? endLineIndex,
+    int? endCharIndex,
+    String? selectedText,
+  }) {
+    return _TextSelection(
+      startLineIndex: startLineIndex ?? this.startLineIndex,
+      startCharIndex: startCharIndex ?? this.startCharIndex,
+      endLineIndex: endLineIndex ?? this.endLineIndex,
+      endCharIndex: endCharIndex ?? this.endCharIndex,
+      selectedText: selectedText ?? this.selectedText,
+    );
   }
 }
 

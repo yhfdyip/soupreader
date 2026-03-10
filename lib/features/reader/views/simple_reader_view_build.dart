@@ -178,6 +178,14 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
       onImageSizeCacheUpdated: _handlePagedImageSizeCacheUpdated,
       onImageSizeResolved: _handlePagedImageSizeResolved,
       onImageTap: _openImagePreview,
+      // 选文功能
+      selectTextEnabled: _settings.selectText && !_settings.doublePage,
+      onCopySelectedText: _onCopySelectedText,
+      onBookmarkSelectedText: _onBookmarkSelectedText,
+      onReadAloudSelectedText: _onReadAloudSelectedText,
+      onDictSelectedText: _onDictSelectedText,
+      onSearchSelectedText: _onSearchSelectedText,
+      onShareSelectedText: _onShareSelectedText,
     );
   }
 
@@ -206,6 +214,32 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     _contentSelectMenuLongPressHandled = false;
     _contentSelectMenuLongPressResetTimer?.cancel();
     _contentSelectMenuLongPressResetTimer = null;
+  }
+
+  // === 选文功能回调 ===
+
+  void _onCopySelectedText(String text) {
+    _showToast('已复制');
+  }
+
+  Future<void> _onBookmarkSelectedText(String text) async {
+    await _openBookmarkEditorFromSelectedText(text);
+  }
+
+  Future<void> _onReadAloudSelectedText(String text) async {
+    await _handleSelectedTextReadAloud(text);
+  }
+
+  Future<void> _onDictSelectedText(String text) async {
+    await _openDictDialogFromSelectedText(text);
+  }
+
+  Future<void> _onSearchSelectedText(String text) async {
+    await _searchSelectedTextInContent(text);
+  }
+
+  Future<void> _onShareSelectedText(String text) async {
+    await _shareSelectedText(text);
   }
 
   Future<void> _showTextActionMenu({
