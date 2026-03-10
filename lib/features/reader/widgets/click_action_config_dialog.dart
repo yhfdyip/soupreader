@@ -176,22 +176,21 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
 
 
   Widget _buildGridPreview() {
-    return AspectRatio(
-      aspectRatio: 0.6, // 模拟手机屏幕比例
-      child: Container(
-        decoration: BoxDecoration(
-          color: _chipBg,
-          border: Border.all(color: _lineColor, width: 0.5),
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+    return Container(
+      decoration: BoxDecoration(
+        color: _chipBg,
+        border: Border.all(color: _lineColor, width: 0.5),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+      ),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 2.2,
         ),
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            childAspectRatio: 0.6,
-          ),
-          itemCount: 9,
-          itemBuilder: (context, index) {
+        itemCount: 9,
+        itemBuilder: (context, index) {
             final zone = ClickAction.zoneOrder[index];
             final action = _config[zone] ?? ClickAction.showMenu;
             final isSelected = _selectedZone == zone;
@@ -241,7 +240,6 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
             );
           },
         ),
-      ),
     );
   }
 
