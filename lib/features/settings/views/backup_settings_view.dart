@@ -859,8 +859,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                               .tabLabelTextStyle
                               .copyWith(
                                 fontSize: 12,
-                                color: CupertinoColors.systemGrey
-                                    .resolveFrom(dialogContext),
+                                color: CupertinoColors.systemGrey.resolveFrom(context),
                               ),
                         ),
                       ],

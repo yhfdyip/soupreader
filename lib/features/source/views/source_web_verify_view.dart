@@ -597,7 +597,7 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
   }
 
   Widget _buildFullScreenOverlayControls(BuildContext context) {
-    final bg = CupertinoColors.systemBackground
+    final bg = CupertinoColors.systemBackground.resolveFrom(context)
         .resolveFrom(context)
         .withValues(alpha: _fullScreenOverlayBgAlpha);
     final iconColor = CupertinoColors.label.resolveFrom(context);

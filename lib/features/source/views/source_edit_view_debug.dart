@@ -40,7 +40,7 @@ extension _SourceEditDebugX on _SourceEditViewState {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: CupertinoColors.secondarySystemGroupedBackground
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
             .resolveFrom(context),
         borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
@@ -168,12 +168,12 @@ extension _SourceEditDebugX on _SourceEditViewState {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemRed
+                      color: CupertinoColors.systemRed.resolveFrom(context)
                           .resolveFrom(context)
                           .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                       border: Border.all(
-                        color: CupertinoColors.systemRed
+                        color: CupertinoColors.systemRed.resolveFrom(context)
                             .resolveFrom(context)
                             .withValues(alpha: 0.35),
                         width: 0.5,
@@ -2155,6 +2155,11 @@ extension _SourceEditDebugX on _SourceEditViewState {
         controller: controller,
         placeholder: placeholder,
         maxLines: maxLines,
+        autocorrect: false,
+        enableSuggestions: false,
+        keyboardType: maxLines > 1
+            ? TextInputType.multiline
+            : TextInputType.url,
       ),
     );
   }

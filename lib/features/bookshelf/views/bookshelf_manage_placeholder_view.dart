@@ -45,7 +45,12 @@ import 'bookshelf_group_manage_placeholder_dialog.dart';
 ///
 /// 其余 `bookshelf_manage.xml / bookshelf_menage_sel.xml` 动作按后续序号推进。
 class BookshelfManagePlaceholderView extends StatefulWidget {
-  const BookshelfManagePlaceholderView({super.key});
+  const BookshelfManagePlaceholderView({
+    super.key,
+    this.initialGroupId,
+  });
+
+  final int? initialGroupId;
 
   @override
   State<BookshelfManagePlaceholderView> createState() =>
@@ -166,6 +171,10 @@ class _BookshelfManagePlaceholderViewState
     _openBookInfoByClickTitle = _settingsService.getOpenBookInfoByClickTitle();
 
     _allBooks = _sortBooksForManage(_bookRepository.getAllBooks());
+    final initialGroupId = widget.initialGroupId;
+    if (initialGroupId != null && initialGroupId != BookshelfBookGroup.idRoot) {
+      _selectedGroupId = initialGroupId;
+    }
     unawaited(_reloadBookGroupContext(showError: false));
     _bookSubscription = _bookRepository.watchAllBooks().listen((books) {
       if (!mounted) return;
@@ -215,7 +224,7 @@ class _BookshelfManagePlaceholderViewState
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
             child: _SelectionSummaryBar(
               selectedCount: selectedCount,
               totalCount: filteredBooks.length,
@@ -297,7 +306,7 @@ class _BookshelfManagePlaceholderViewState
             child: filteredBooks.isEmpty
                 ? _buildEmptyState()
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     itemCount: filteredBooks.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
@@ -1844,7 +1853,7 @@ class _BookshelfManageSourcePickerViewState
                     message: '请尝试其他关键字',
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
@@ -1882,7 +1891,7 @@ class _BookshelfManageSourcePickerViewState
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: CupertinoColors.secondaryLabel
+                                        color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                             .resolveFrom(context),
                                       ),
                                     ),

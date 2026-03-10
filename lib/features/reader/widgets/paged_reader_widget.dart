@@ -534,16 +534,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!widget.paddingDisplayCutouts) {
       return EdgeInsets.only(
         top: widget.showStatusBar ? systemPadding.top : 0.0,
-        bottom: widget.settings.hideNavigationBar ? 0.0 : systemPadding.bottom,
+        bottom: widget.settings.hideNavigationBar ? 0.0 : viewPadding.bottom,
       );
     }
     return EdgeInsets.only(
       left: viewPadding.left,
       top: widget.showStatusBar ? systemPadding.top : viewPadding.top,
       right: viewPadding.right,
-      bottom: widget.settings.hideNavigationBar
-          ? viewPadding.bottom
-          : systemPadding.bottom,
+      bottom: viewPadding.bottom,
     );
   }
 
@@ -1839,8 +1837,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final startHandlePos = Offset(firstRect.left, firstRect.bottom);
     final endHandlePos = Offset(lastRect.right, lastRect.bottom);
 
-    final highlightColor = CupertinoColors.activeBlue.withValues(alpha: 0.3);
-    final handleColor = CupertinoColors.activeBlue;
+    final highlightColor = CupertinoColors.activeBlue.resolveFrom(context).withValues(alpha: 0.3);
+    final handleColor = CupertinoColors.activeBlue.resolveFrom(context);
 
     return ReaderTextSelectionOverlay(
       key: _selectionOverlayKey,

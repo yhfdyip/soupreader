@@ -176,6 +176,10 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
 
 
   Widget _buildGridPreview() {
+    final screenSize = MediaQuery.sizeOf(context);
+    // 每格宽高比 = (屏幕宽/3) / (屏幕高/3) = 屏幕宽/屏幕高，
+    // 真实反映屏幕点击区域的实际比例。
+    final cellAspectRatio = screenSize.width / screenSize.height;
     return Container(
       decoration: BoxDecoration(
         color: _chipBg,
@@ -185,9 +189,9 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          childAspectRatio: 2.2,
+          childAspectRatio: cellAspectRatio,
         ),
         itemCount: 9,
         itemBuilder: (context, index) {

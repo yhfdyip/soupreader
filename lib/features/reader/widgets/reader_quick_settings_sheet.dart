@@ -662,8 +662,8 @@ class _InterfaceTab extends StatelessWidget {
                 return Container(
                   height: 0.5,
                   color: isDark
-                      ? CupertinoColors.separator.darkColor
-                      : CupertinoColors.separator.color,
+                      ? CupertinoColors.separator.resolveFrom(context).darkColor
+                      : CupertinoColors.separator.resolveFrom(context).color,
                 );
               }),
               const SizedBox(height: 4),
@@ -1269,8 +1269,8 @@ class _SwitchGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final dividerColor = isDark
-        ? CupertinoColors.separator.darkColor
-        : CupertinoColors.separator.color;
+        ? CupertinoColors.separator.resolveFrom(context).darkColor
+        : CupertinoColors.separator.resolveFrom(context).color;
     final activeTrackColor = ReaderSettingsTokens.accent(isDark: isDark);
     final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
 
@@ -1338,8 +1338,8 @@ class _SliderGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final dividerColor = isDark
-        ? CupertinoColors.separator.darkColor
-        : CupertinoColors.separator.color;
+        ? CupertinoColors.separator.resolveFrom(context).darkColor
+        : CupertinoColors.separator.resolveFrom(context).color;
 
     return Column(
       children: [

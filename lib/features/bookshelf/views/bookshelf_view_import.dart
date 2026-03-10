@@ -334,9 +334,9 @@ extension _BookshelfImportX on _BookshelfViewState {
                                             style: TextStyle(
                                               fontSize: 14,
                                               color: isSelected
-                                                  ? CupertinoColors.activeBlue
+                                                  ? CupertinoColors.activeBlue.resolveFrom(context)
                                                       .resolveFrom(context)
-                                                  : CupertinoColors.label
+                                                  : CupertinoColors.label.resolveFrom(context)
                                                       .resolveFrom(context),
                                             ),
                                           ),
@@ -347,8 +347,7 @@ extension _BookshelfImportX on _BookshelfViewState {
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: CupertinoColors.systemGrey
-                                                  .resolveFrom(context),
+                                              color: CupertinoColors.systemGrey.resolveFrom(context),
                                             ),
                                           ),
                                         ],
@@ -362,10 +361,9 @@ extension _BookshelfImportX on _BookshelfViewState {
                                           : CupertinoIcons.circle,
                                       size: 18,
                                       color: isSelected
-                                          ? CupertinoColors.activeBlue
+                                          ? CupertinoColors.activeBlue.resolveFrom(context)
                                               .resolveFrom(context)
-                                          : CupertinoColors.systemGrey
-                                              .resolveFrom(context),
+                                          : CupertinoColors.systemGrey.resolveFrom(context),
                                     ),
                                   ],
                                 ),
@@ -573,10 +571,23 @@ extension _BookshelfImportX on _BookshelfViewState {
     _loadBooks();
   }
 
-  Future<void> _openBookshelfManage() async {
+  Future<void> _openRemoteBook() async {
     await Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute<void>(
-        builder: (_) => const BookshelfManagePlaceholderView(),
+        builder: (_) => const RemoteBooksServersView(),
+      ),
+    );
+    if (!mounted) return;
+    _loadBooks();
+  }
+
+  Future<void> _openBookshelfManage() async {
+    final groupId = _selectedGroupId;
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => BookshelfManagePlaceholderView(
+          initialGroupId: groupId,
+        ),
       ),
     );
     if (!mounted) return;
@@ -585,9 +596,12 @@ extension _BookshelfImportX on _BookshelfViewState {
   }
 
   Future<void> _openCacheExport() async {
+    final groupId = _selectedGroupId;
     await Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute<void>(
-        builder: (_) => const CacheExportPlaceholderView(),
+        builder: (_) => CacheExportPlaceholderView(
+          initialGroupId: groupId,
+        ),
       ),
     );
   }

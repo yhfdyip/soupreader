@@ -246,61 +246,6 @@ extension _BookshelfManageX on _BookshelfViewState {
     }
   }
 
-  Widget _buildLayoutSwitchRow({
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-          CupertinoSwitch(
-            value: value,
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLayoutChoiceRow({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: onTap,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: selected
-                    ? CupertinoColors.activeBlue.resolveFrom(context)
-                    : CupertinoColors.label.resolveFrom(context),
-              ),
-            ),
-          ),
-          if (selected)
-            Icon(
-              CupertinoIcons.check_mark,
-              size: 16,
-              color: CupertinoColors.activeBlue.resolveFrom(context),
-            ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _applyLayoutConfig({
     required int groupStyle,
@@ -348,133 +293,220 @@ extension _BookshelfManageX on _BookshelfViewState {
     var layoutIndex = _normalizeLayoutIndex(settings.bookshelfLayoutIndex);
     var sortIndex = _normalizeSortIndex(settings.bookshelfSortIndex);
 
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
-      builder: (dialogContext) {
+      builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return CupertinoAlertDialog(
-              title: const Text('书架布局'),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: SingleChildScrollView(
+            final isDark =
+                CupertinoTheme.of(context).brightness == Brightness.dark;
+            final bg = isDark
+                ? CupertinoColors.systemGroupedBackground.resolveFrom(context).darkColor
+                : CupertinoColors.systemGroupedBackground.resolveFrom(context).color;
+            final h = MediaQuery.sizeOf(context).height;
+            final secondaryLabel =
+                CupertinoColors.secondaryLabel.resolveFrom(context);
+            final primaryColor = CupertinoTheme.of(context).primaryColor;
+
+            Widget hdr(String t) => Text(
+                  t,
+                  style: TextStyle(
+                    color: secondaryLabel,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+
+            Widget sw(String title, bool value, ValueChanged<bool> cb) =>
+                AppListTile(
+                  title: Text(
+                    title,
+                    style: TextStyle(
+                      color: CupertinoColors.label.resolveFrom(context),
+                      fontSize: 15,
+                    ),
+                  ),
+                  trailing: CupertinoSwitch(
+                    value: value,
+                    activeTrackColor: primaryColor,
+                    onChanged: cb,
+                  ),
+                  onTap: () => cb(!value),
+                  showChevron: false,
+                );
+
+            Widget choiceRow(String label, bool selected, VoidCallback onTap) =>
+                AppListTile(
+                  title: Text(
+                    label,
+                    style: TextStyle(
+                      color: CupertinoColors.label.resolveFrom(context),
+                      fontSize: 15,
+                    ),
+                  ),
+                  trailing: selected
+                      ? Icon(
+                          CupertinoIcons.check_mark,
+                          size: 17,
+                          color: primaryColor,
+                        )
+                      : null,
+                  onTap: onTap,
+                  showChevron: false,
+                );
+
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppDesignTokens.radiusSheet),
+              ),
+              child: Container(
+                color: bg,
+                child: SafeArea(
+                  top: false,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 12),
-                      const Text(
-                        '分组样式',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                      const SizedBox(height: 6),
+                      const AppSheetHeader(title: '书架布局'),
                       SizedBox(
-                        width: double.infinity,
-                        child: CupertinoSlidingSegmentedControl<int>(
-                          groupValue: groupStyle,
-                          padding: const EdgeInsets.all(3),
-                          children: const {
-                            0: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 7),
-                              child: Text('样式一', textAlign: TextAlign.center),
+                        height: h * 0.62,
+                        child: ListView(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          children: [
+                            AppListSection(
+                              header: hdr('分组样式'),
+                              hasLeading: false,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  child: CupertinoSlidingSegmentedControl<int>(
+                                    groupValue: groupStyle,
+                                    children: const {
+                                      0: Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 7),
+                                        child: Text('样式一', textAlign: TextAlign.center),
+                                      ),
+                                      1: Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 7),
+                                        child: Text('样式二', textAlign: TextAlign.center),
+                                      ),
+                                    },
+                                    onValueChanged: (value) {
+                                      if (value == null) return;
+                                      setDialogState(() => groupStyle = value);
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                            1: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 7),
-                              child: Text('样式二', textAlign: TextAlign.center),
+                            AppListSection(
+                              header: hdr('显示'),
+                              hasLeading: false,
+                              children: [
+                                sw('显示未读数量', showUnread,
+                                    (v) => setDialogState(() => showUnread = v)),
+                                sw('显示最新更新时间', showLastUpdateTime,
+                                    (v) => setDialogState(() => showLastUpdateTime = v)),
+                                sw('显示待更新计数', showWaitUpCount,
+                                    (v) => setDialogState(() => showWaitUpCount = v)),
+                                sw('显示快速滚动条', showFastScroller,
+                                    (v) => setDialogState(() => showFastScroller = v)),
+                              ],
                             ),
-                          },
-                          onValueChanged: (value) {
-                            if (value == null) return;
-                            setDialogState(() => groupStyle = value);
-                          },
+                            AppListSection(
+                              header: hdr('视图'),
+                              hasLeading: false,
+                              children: [
+                                for (var i = 0; i <= 4; i++)
+                                  choiceRow(
+                                    _layoutLabel(i),
+                                    layoutIndex == i,
+                                    () => setDialogState(() => layoutIndex = i),
+                                  ),
+                              ],
+                            ),
+                            AppListSection(
+                              header: hdr('排序'),
+                              hasLeading: false,
+                              children: [
+                                for (var i = 0; i <= 5; i++)
+                                  choiceRow(
+                                    _legacySortLabel(i),
+                                    sortIndex == i,
+                                    () => setDialogState(() => sortIndex = i),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      _buildLayoutSwitchRow(
-                        title: '显示未读数量',
-                        value: showUnread,
-                        onChanged: (value) {
-                          setDialogState(() => showUnread = value);
-                        },
-                      ),
-                      _buildLayoutSwitchRow(
-                        title: '显示最新更新时间',
-                        value: showLastUpdateTime,
-                        onChanged: (value) {
-                          setDialogState(() => showLastUpdateTime = value);
-                        },
-                      ),
-                      _buildLayoutSwitchRow(
-                        title: '显示待更新计数',
-                        value: showWaitUpCount,
-                        onChanged: (value) {
-                          setDialogState(() => showWaitUpCount = value);
-                        },
-                      ),
-                      _buildLayoutSwitchRow(
-                        title: '显示快速滚动条',
-                        value: showFastScroller,
-                        onChanged: (value) {
-                          setDialogState(() => showFastScroller = value);
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '视图',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                      for (var i = 0; i <= 4; i++)
-                        _buildLayoutChoiceRow(
-                          label: _layoutLabel(i),
-                          selected: layoutIndex == i,
-                          onTap: () {
-                            setDialogState(() => layoutIndex = i);
-                          },
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: CupertinoButton(
+                                color: CupertinoColors.systemFill.resolveFrom(context)
+                                    .resolveFrom(context),
+                                borderRadius: BorderRadius.circular(
+                                    AppDesignTokens.radiusControl),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                onPressed: () => Navigator.pop(sheetContext),
+                                child: Text(
+                                  '取消',
+                                  style: TextStyle(
+                                    color: CupertinoColors.label.resolveFrom(context)
+                                        .resolveFrom(context),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: CupertinoButton(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(
+                                    AppDesignTokens.radiusControl),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                onPressed: () async {
+                                  Navigator.pop(sheetContext);
+                                  await _applyLayoutConfig(
+                                    groupStyle: groupStyle,
+                                    showUnread: showUnread,
+                                    showLastUpdateTime: showLastUpdateTime,
+                                    showWaitUpCount: showWaitUpCount,
+                                    showFastScroller: showFastScroller,
+                                    layoutIndex: layoutIndex,
+                                    sortIndex: sortIndex,
+                                  );
+                                },
+                                child: const Text(
+                                  '确定',
+                                  style: TextStyle(
+                                    color: CupertinoColors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '排序',
-                        style: TextStyle(fontSize: 13),
                       ),
-                      for (var i = 0; i <= 5; i++)
-                        _buildLayoutChoiceRow(
-                          label: _legacySortLabel(i),
-                          selected: sortIndex == i,
-                          onTap: () {
-                            setDialogState(() => sortIndex = i);
-                          },
-                        ),
                     ],
                   ),
                 ),
               ),
-              actions: [
-                CupertinoDialogAction(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('取消'),
-                ),
-                CupertinoDialogAction(
-                  isDefaultAction: true,
-                  onPressed: () async {
-                    Navigator.pop(dialogContext);
-                    await _applyLayoutConfig(
-                      groupStyle: groupStyle,
-                      showUnread: showUnread,
-                      showLastUpdateTime: showLastUpdateTime,
-                      showWaitUpCount: showWaitUpCount,
-                      showFastScroller: showFastScroller,
-                      layoutIndex: layoutIndex,
-                      sortIndex: sortIndex,
-                    );
-                  },
-                  child: const Text('确定'),
-                ),
-              ],
             );
           },
         );
       },
     );
   }
-
   Future<void> _openAppLogDialog() async {
     await showAppLogDialog(context);
   }
@@ -500,6 +532,11 @@ extension _BookshelfManageX on _BookshelfViewState {
           value: _BookshelfMoreMenuAction.importLocal,
           icon: CupertinoIcons.folder,
           label: '添加本地',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.remoteBook,
+          icon: CupertinoIcons.cloud,
+          label: '远程书籍',
         ),
         AppPopoverMenuItem(
           value: _BookshelfMoreMenuAction.selectFolder,
@@ -565,6 +602,9 @@ extension _BookshelfManageX on _BookshelfViewState {
         break;
       case _BookshelfMoreMenuAction.importLocal:
         _importLocalBook();
+        break;
+      case _BookshelfMoreMenuAction.remoteBook:
+        _openRemoteBook();
         break;
       case _BookshelfMoreMenuAction.selectFolder:
         _selectImportFolder();

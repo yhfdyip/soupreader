@@ -663,7 +663,7 @@ class _RssArticlesPlaceholderViewState
                           note,
                           style: TextStyle(
                             fontSize: 12,
-                            color: CupertinoColors.secondaryLabel
+                            color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                 .resolveFrom(popupContext),
                           ),
                         ),
@@ -846,7 +846,7 @@ class _RssArticlesPlaceholderViewState
                         _refreshError!,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: CupertinoColors.secondaryLabel
+                          color: CupertinoColors.secondaryLabel.resolveFrom(context)
                               .resolveFrom(context),
                           fontSize: 14,
                         ),
@@ -855,7 +855,7 @@ class _RssArticlesPlaceholderViewState
                   : Text(
                       '暂无文章',
                       style: TextStyle(
-                        color: CupertinoColors.secondaryLabel
+                        color: CupertinoColors.secondaryLabel.resolveFrom(context)
                             .resolveFrom(context),
                       ),
                     ),
@@ -2193,7 +2193,7 @@ class _RssFavoritesPlaceholderViewState
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: CupertinoColors.secondaryLabel
+                            color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                 .resolveFrom(context),
                             fontSize: 12,
                           ),
@@ -2337,7 +2337,7 @@ class _RssSortTabBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected
                     ? activeColor.withValues(alpha: 0.12)
-                    : CupertinoColors.tertiarySystemGroupedBackground
+                    : CupertinoColors.tertiarySystemGroupedBackground.resolveFrom(context)
                         .resolveFrom(context),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
@@ -2464,7 +2464,7 @@ class _RssArticleGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final secondaryLabel =
         CupertinoColors.secondaryLabel.resolveFrom(context);
-    final cardBg = CupertinoColors.secondarySystemGroupedBackground
+    final cardBg = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
         .resolveFrom(context);
     final imageUrl = (article.image ?? '').trim();
     final hasImage = imageUrl.isNotEmpty;
@@ -2493,10 +2493,10 @@ class _RssArticleGridCard extends StatelessWidget {
                 Expanded(
                   child: Container(
                     color: CupertinoColors.systemGrey5.resolveFrom(context),
-                    child: const Icon(
+                    child: Icon(
                       CupertinoIcons.photo,
                       size: 32,
-                      color: CupertinoColors.systemGrey,
+                      color: CupertinoColors.systemGrey.resolveFrom(context),
                     ),
                   ),
                 ),

@@ -296,7 +296,7 @@ class _DiscoveryExploreResultsViewState
                     style: textStyle.copyWith(
                       fontSize: SourceUiTokens.itemMetaSize,
                       color: secondaryTextColor,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -346,6 +346,8 @@ class _DiscoveryExploreResultsViewState
     final primaryTextColor = CupertinoColors.label.resolveFrom(context);
     final secondaryTextColor =
         SourceUiTokens.resolveSecondaryTextColor(context);
+    final tertiaryTextColor =
+        CupertinoColors.tertiaryLabel.resolveFrom(context);
     final inShelfColor = CupertinoColors.activeBlue.resolveFrom(context);
     final inBookshelf = _addService.isInBookshelf(
       result,
@@ -410,8 +412,7 @@ class _DiscoveryExploreResultsViewState
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
                             fontSize: SourceUiTokens.itemSubMetaSize,
-                            color: CupertinoColors.tertiaryLabel
-                                .resolveFrom(context),
+                            color: tertiaryTextColor,
                           ),
                         ),
                       ],
@@ -423,8 +424,7 @@ class _DiscoveryExploreResultsViewState
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
                             fontSize: SourceUiTokens.itemSubMetaSize,
-                            color: CupertinoColors.tertiaryLabel
-                                .resolveFrom(context),
+                            color: tertiaryTextColor,
                           ),
                         ),
                       ],

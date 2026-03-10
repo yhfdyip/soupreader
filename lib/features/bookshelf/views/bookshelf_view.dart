@@ -12,6 +12,8 @@ import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_sheet_header.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
@@ -31,6 +33,7 @@ import '../../source/services/rule_parser_engine.dart';
 import 'cache_export_placeholder_view.dart';
 import 'bookshelf_manage_placeholder_view.dart';
 import 'bookshelf_group_manage_placeholder_dialog.dart';
+import 'remote_books_servers_view.dart';
 import '../services/book_add_service.dart';
 import '../services/bookshelf_book_group_store.dart';
 import '../services/bookshelf_booklist_import_service.dart';
@@ -52,6 +55,7 @@ enum _ImportFolderAction {
 enum _BookshelfMoreMenuAction {
   updateCatalog,
   importLocal,
+  remoteBook,
   selectFolder,
   scanFolder,
   importFileNameRule,
@@ -544,9 +548,21 @@ class _BookshelfViewState extends State<BookshelfView> {
     final source = List<Book>.from(_books);
     late final List<Book> grouped;
     if (_isStyle2Enabled) {
-      grouped = _selectedGroupId == BookshelfBookGroup.idRoot
-          ? source
-          : _filterBooksByGroup(source, _selectedGroupId);
+      if (_selectedGroupId == BookshelfBookGroup.idRoot) {
+        // 与 legado flowRoot() 对齐：根态只展示未归入任何自定义分组的网络书。
+        // 若「网络未分组」分组本身已显示（show=true），根态不再重复展示这些书。
+        final netNoneGroup = _bookGroups.where(
+          (g) => g.groupId == BookshelfBookGroup.idNetNone,
+        ).firstOrNull;
+        final netNoneShown = netNoneGroup?.show ?? false;
+        if (netNoneShown) {
+          grouped = const <Book>[];
+        } else {
+          grouped = _filterBooksByGroup(source, BookshelfBookGroup.idNetNone);
+        }
+      } else {
+        grouped = _filterBooksByGroup(source, _selectedGroupId);
+      }
     } else {
       final selectedStyle1Group = _selectedStyle1GroupOrNull();
       grouped = selectedStyle1Group == null

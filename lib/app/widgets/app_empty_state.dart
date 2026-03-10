@@ -31,7 +31,7 @@ class AppEmptyState extends StatelessWidget {
     final labelColor = CupertinoColors.label.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final trimmedMessage = (message ?? '').trim();
-    final panelColor = CupertinoColors.secondarySystemGroupedBackground
+    final panelColor = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
         .resolveFrom(context);
 
     return Center(
@@ -47,7 +47,7 @@ class AppEmptyState extends StatelessWidget {
               AppSquircleSurface(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 backgroundColor: panelColor,
-                borderColor: CupertinoColors.separator
+                borderColor: CupertinoColors.separator.resolveFrom(context)
                     .resolveFrom(context)
                     .withValues(alpha: 0.72),
                 radius: AppDesignTokens.radiusCard,

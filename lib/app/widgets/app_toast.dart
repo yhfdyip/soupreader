@@ -91,7 +91,7 @@ class _AppToastOverlayState extends State<_AppToastOverlay>
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground
+                    color: CupertinoColors.systemBackground.resolveFrom(context)
                         .resolveFrom(context)
                         .withValues(alpha: 0.82),
                     borderRadius:

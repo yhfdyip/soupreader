@@ -16,7 +16,12 @@ import '../services/cache_download_task_service.dart';
 
 /// 缓存/导出页（当前已收敛 `menu_download`、`menu_download_after`、`menu_download_all`、`menu_book_group`、`menu_export_all`、`menu_enable_replace`、`menu_enable_custom_export`、`menu_export_web_dav`、`menu_export_no_chapter_name`、`menu_export_pics_file`、`menu_parallel_export`、`menu_export_folder`、`menu_export_file_name`、`menu_export_type`、`menu_export_charset`）。
 class CacheExportView extends StatefulWidget {
-  const CacheExportView({super.key});
+  const CacheExportView({
+    super.key,
+    this.initialGroupId,
+  });
+
+  final int? initialGroupId;
 
   @override
   State<CacheExportView> createState() => _CacheExportViewState();
@@ -100,6 +105,14 @@ class _CacheExportViewState extends State<CacheExportView> {
       _parallelExportBook = _exportService.getParallelExportBook();
       _exportTypeIndex = _exportService.getExportTypeIndex();
       _exportCharset = _exportService.getExportCharset();
+      final initialGroupId = widget.initialGroupId;
+      if (initialGroupId != null) {
+        final matchesLegacy = _legacyBookGroups.any((g) => g.id == initialGroupId);
+        if (matchesLegacy) {
+          _selectedGroupId = initialGroupId;
+          _selectedGroupTitle = _resolveGroupTitle(initialGroupId);
+        }
+      }
       _refreshBooksSnapshot();
       _booksSubscription = _bookRepo.watchAllBooks().listen((books) {
         if (!mounted) return;
@@ -882,7 +895,7 @@ class _CacheExportViewState extends State<CacheExportView> {
                     textAlign: TextAlign.left,
                     style: TextStyle(
                       fontSize: 11,
-                      color: CupertinoColors.secondaryLabel
+                      color: CupertinoColors.secondaryLabel.resolveFrom(context)
                           .resolveFrom(dialogContext),
                     ),
                   ),
@@ -1061,12 +1074,12 @@ class _CacheExportViewState extends State<CacheExportView> {
       return const SizedBox.shrink();
     }
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: CupertinoColors.secondarySystemGroupedBackground
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1097,12 +1110,12 @@ class _CacheExportViewState extends State<CacheExportView> {
 
   Widget _buildMigrationHintCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: CupertinoColors.tertiarySystemGroupedBackground
+        color: CupertinoColors.tertiarySystemGroupedBackground.resolveFrom(context)
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Text(
         '缓存/导出（迁移中）',
@@ -1122,12 +1135,12 @@ class _CacheExportViewState extends State<CacheExportView> {
     final secondaryLabel =
         CupertinoColors.secondaryLabel.resolveFrom(context);
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
-        color: CupertinoColors.secondarySystemGroupedBackground
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1160,7 +1173,7 @@ class _CacheExportViewState extends State<CacheExportView> {
           if (!book.isLocal)
             CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 6),
-              minimumSize: const Size(36, 36),
+              minimumSize: const Size(44, 44),
               onPressed: _downloadRunning ? null : () => _downloadSingleBook(book),
               child: Icon(
                 CupertinoIcons.cloud_download,
@@ -1171,7 +1184,7 @@ class _CacheExportViewState extends State<CacheExportView> {
           // 导出按钮（对齐 legado tv_export）
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 6),
-            minimumSize: const Size(36, 36),
+            minimumSize: const Size(44, 44),
             onPressed: _exportRunning ? null : () => _exportSingleBook(book),
             child: Icon(
               CupertinoIcons.square_arrow_up,

@@ -437,8 +437,8 @@ class ReaderBottomMenu extends StatelessWidget {
           right: 16,
         ),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E).withValues(alpha: 0.95),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          color: CupertinoColors.systemGroupedBackground.resolveFrom(context).withValues(alpha: 0.95),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -534,10 +534,9 @@ class ReaderBottomMenu extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: settings.useSystemBrightness
                           ? AppDesignTokens.brandSecondary
-                          : CupertinoColors.systemGrey
-                              .resolveFrom(context)
+                          : CupertinoColors.systemGrey.resolveFrom(context)
                               .withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusSheet),
                     ),
                     child: Text(
                       '跟随系统',
@@ -636,7 +635,7 @@ class ReaderBottomMenu extends StatelessWidget {
             Text(
               label,
               style:
-                  const TextStyle(color: CupertinoColors.white, fontSize: 10),
+                  const TextStyle(color: CupertinoColors.white, fontSize: 11),
             ),
           ],
         ),

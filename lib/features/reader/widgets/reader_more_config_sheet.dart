@@ -54,6 +54,7 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                 fontSize: 15)),
         trailing: CupertinoSwitch(
             value: v, activeTrackColor: _accent, onChanged: cb),
+        onTap: () => cb(!v),
         showChevron: false,
       );
 
@@ -160,8 +161,8 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
   @override
   Widget build(BuildContext context) {
     final bg = _isDark
-        ? CupertinoColors.systemGroupedBackground.darkColor
-        : CupertinoColors.systemGroupedBackground.color;
+        ? CupertinoColors.systemGroupedBackground.resolveFrom(context).darkColor
+        : CupertinoColors.systemGroupedBackground.resolveFrom(context).color;
     final h = MediaQuery.sizeOf(context).height;
 
     return ClipRRect(
@@ -256,12 +257,12 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                         AppListTile(
                           title: Text('点击区域（9宫格）',
                               style: TextStyle(
-                                  color: CupertinoColors.label
+                                  color: CupertinoColors.label.resolveFrom(context)
                                       .resolveFrom(context),
                                   fontSize: 15)),
                           additionalInfo: Text('配置',
                               style: TextStyle(
-                                  color: CupertinoColors.secondaryLabel
+                                  color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                       .resolveFrom(context),
                                   fontSize: 13)),
                           onTap: () => showClickActionConfigDialog(

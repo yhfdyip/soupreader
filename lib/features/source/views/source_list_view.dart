@@ -3,19 +3,17 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 
-import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_toast.dart';
+import '../../../core/services/online_import_history_store.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-import '../../../app/widgets/source_group_badge.dart';
 import '../../../app/widgets/source_state_dot.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -168,6 +166,8 @@ class _SourceListViewState extends State<SourceListView> {
       SourceAvailabilityCheckTaskService.instance;
   final SourceImportExportService _importExportService =
       SourceImportExportService();
+  final OnlineImportHistoryStore _importHistoryStore =
+      OnlineImportHistoryStore();
   bool _checkTaskKeepScreenOn = false;
 
   final TextEditingController _urlController = TextEditingController();
@@ -175,8 +175,6 @@ class _SourceListViewState extends State<SourceListView> {
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _listScrollController = ScrollController();
   final GlobalKey _moreMenuKey = GlobalKey();
-  OverlayEntry? _toastEntry;
-  Timer? _toastTimer;
   late final Stream<List<BookSource>> _sourceStream;
 
   final Set<String> _selectedUrls = <String>{};
@@ -225,7 +223,6 @@ class _SourceListViewState extends State<SourceListView> {
   void dispose() {
     _checkTaskService.listenable.removeListener(_onCheckTaskChanged);
     _syncCheckKeepScreenOn(null, forceDisable: true);
-    _dismissToast();
     _urlController.dispose();
     _searchController
       ..removeListener(_onSearchQueryChanged)
@@ -340,7 +337,7 @@ class _SourceListViewState extends State<SourceListView> {
     });
     if (_searchController.text.trim().isEmpty && hasInvalidGroup) {
       setState(() => _searchController.text = '失效');
-      _showToastMessage('发现有失效书源，已为您自动筛选！');
+      unawaited(showAppToast(context, message: '发现有失效书源，已为您自动筛选！'));
     }
   }
 
@@ -635,13 +632,17 @@ class _SourceListViewState extends State<SourceListView> {
 
       final groupText = (source.bookSourceGroup ?? '').trim();
       final hasExplore = (source.exploreUrl ?? '').trim().isNotEmpty;
+      // 对齐 Legado：书源名+分组合并一行，格式 "名称 (分组)"
+      final displayName = groupText.isEmpty
+          ? source.bookSourceName
+          : "${source.bookSourceName} ($groupText)";
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (showHeader)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
                 _hostOf(source.bookSourceUrl),
                 style: TextStyle(
@@ -652,35 +653,39 @@ class _SourceListViewState extends State<SourceListView> {
               ),
             ),
           Container(
-              key: _itemKeyForUrl(source.bookSourceUrl),
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onLongPressStart: (_) {
-                  _startDragSelection(visible, index);
-                },
-                onLongPressMoveUpdate: (details) {
-                  _updateDragSelectionByGlobal(
-                    visible,
-                    details.globalPosition,
-                  );
-                  _autoScrollForDragSelection(
-                    visible,
-                    details.globalPosition,
-                  );
-                },
-                onLongPressEnd: (_) => _endDragSelection(),
-                onLongPressCancel: _endDragSelection,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10, right: 8),
-                        child: CupertinoButton(
+            key: _itemKeyForUrl(source.bookSourceUrl),
+            color: CupertinoColors.systemBackground.resolveFrom(context),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onLongPressStart: (_) {
+                _startDragSelection(visible, index);
+              },
+              onLongPressMoveUpdate: (details) {
+                _updateDragSelectionByGlobal(
+                  visible,
+                  details.globalPosition,
+                );
+                _autoScrollForDragSelection(
+                  visible,
+                  details.globalPosition,
+                );
+              },
+              onLongPressEnd: (_) => _endDragSelection(),
+              onLongPressCancel: _endDragSelection,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(24, 24),
+                          minimumSize: const Size(28, 44),
                           onPressed: () {
                             setState(
                                 () => _toggleSelection(source.bookSourceUrl));
@@ -689,137 +694,119 @@ class _SourceListViewState extends State<SourceListView> {
                             selected
                                 ? CupertinoIcons.check_mark_circled_solid
                                 : CupertinoIcons.circle,
+                            size: 22,
                             color: selected
                                 ? primaryActionColor
-                                : CupertinoColors.systemGrey
+                                : CupertinoColors.systemGrey3
                                     .resolveFrom(context),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: titleStyle,
+                          ),
+                        ),
+                        if (reorderEnabled)
+                          ReorderableDragStartListener(
+                            index: index,
+                            child: SizedBox(
+                              width: 32,
+                              height: 44,
+                              child: Icon(
+                                CupertinoIcons.line_horizontal_3,
+                                size: 18,
+                                color: secondaryTextColor,
+                              ),
+                            ),
+                          ),
+                        CupertinoSwitch(
+                          value: source.enabled,
+                          onChanged: (value) async {
+                            await _sourceRepo.updateSource(
+                              source.copyWith(enabled: value),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(36, 36),
+                          onPressed: () => _openEditor(source.bookSourceUrl),
+                          child: Icon(
+                            CupertinoIcons.pencil,
+                            size: 20,
+                            color: titleColor,
+                          ),
+                        ),
+                        Stack(
+                          clipBehavior: Clip.none,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        source.bookSourceName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: titleStyle,
-                                      ),
-                                      if (groupText.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        SourceGroupBadge(
-                                          text: groupText,
-                                          textColor: secondaryTextColor,
-                                        ),
-                                      ],
-                                    ],
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(36, 36),
+                              onPressed: () =>
+                                  unawaited(_showSourceActions(source)),
+                              child: Icon(
+                                CupertinoIcons.ellipsis_vertical,
+                                size: 20,
+                                color: titleColor,
+                              ),
+                            ),
+                            if (hasExplore)
+                              Positioned(
+                                top: 4,
+                                right: 2,
+                                child: SourceStateDot(
+                                  enabled: source.enabledExplore,
+                                  disabledColor:
+                                      SourceUiTokens.resolveDangerColor(
+                                          context),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    if (checkMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                checkMessage,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: SourceUiTokens.itemSubMetaSize,
+                                  color: _inlineCheckColor(
+                                    checkStatus ?? SourceCheckStatus.pending,
                                   ),
                                 ),
-                                if (hasExplore)
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: 6,
-                                      top: 6,
-                                    ),
-                                    child: SourceStateDot(
-                                      enabled: source.enabledExplore,
-                                      disabledColor:
-                                          SourceUiTokens.resolveDangerColor(
-                                              context),
-                                    ),
-                                  ),
-                              ],
+                              ),
                             ),
-                            if (checkMessage != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 3),
-                                child: Row(
-                                  children: [
-                                    if (checkItem?.status ==
-                                        SourceCheckStatus.running)
-                                      const Padding(
-                                        padding: EdgeInsets.only(right: 6),
-                                        child: SizedBox(
-                                          width: 11,
-                                          height: 11,
-                                          child: CupertinoActivityIndicator(
-                                            radius: 5.5,
-                                          ),
-                                        ),
-                                      ),
-                                    Expanded(
-                                      child: Text(
-                                        checkMessage,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize:
-                                              SourceUiTokens.itemSubMetaSize,
-                                          color: _inlineCheckColor(
-                                            checkStatus ??
-                                                SourceCheckStatus.pending,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                            if (checkItem?.status == SourceCheckStatus.running)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 6),
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CupertinoActivityIndicator(
+                                    radius: 7,
+                                  ),
                                 ),
                               ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      if (reorderEnabled)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6, right: 6),
-                          child: ReorderableDragStartListener(
-                            index: index,
-                            child: Icon(
-                              CupertinoIcons.line_horizontal_3,
-                              color: secondaryTextColor,
-                            ),
-                          ),
-                        ),
-                      CupertinoSwitch(
-                        value: source.enabled,
-                        onChanged: (value) async {
-                          await _sourceRepo.updateSource(
-                            source.copyWith(enabled: value),
-                          );
-                        },
-                      ),
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: const Size(36, 36),
-                        onPressed: () => _openEditor(source.bookSourceUrl),
-                        child: Icon(
-                          CupertinoIcons.pencil,
-                          size: 18,
-                          color: secondaryTextColor,
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: const EdgeInsets.only(left: 2, right: 4),
-                        minimumSize: const Size(36, 36),
-                        onPressed: () => unawaited(_showSourceActions(source)),
-                        child: Icon(
-                          CupertinoIcons.ellipsis_vertical,
-                          size: 18,
-                          color: secondaryTextColor,
-                        ),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
+            ),
           ),
         ],
       );
@@ -863,58 +850,6 @@ class _SourceListViewState extends State<SourceListView> {
         final source = visible[index];
         return buildItem(source, index);
       },
-    );
-  }
-
-  ActionPane _buildSourceItemEndActionPane(BookSource source) {
-    const highEmphasisAlpha = 0.9;
-    const mediumEmphasisAlpha = 0.82;
-    final primaryActionColor =
-        SourceUiTokens.resolvePrimaryActionColor(context);
-    final successColor = SourceUiTokens.resolveSuccessColor(context);
-    final dangerColor = SourceUiTokens.resolveDangerColor(context);
-    return ActionPane(
-      motion: const ScrollMotion(),
-      extentRatio: 0.62,
-      children: [
-        _buildSourceItemSlidableAction(
-          icon: CupertinoIcons.line_horizontal_3,
-          backgroundColor: primaryActionColor,
-          onTap: () => unawaited(_showSourceActions(source)),
-        ),
-        _buildSourceItemSlidableAction(
-          icon: CupertinoIcons.share,
-          backgroundColor: successColor.withValues(alpha: highEmphasisAlpha),
-          onTap: () => unawaited(_batchShareSelected([source])),
-        ),
-        _buildSourceItemSlidableAction(
-          icon: CupertinoIcons.pencil,
-          backgroundColor:
-              primaryActionColor.withValues(alpha: mediumEmphasisAlpha),
-          onTap: () => _openEditor(source.bookSourceUrl),
-        ),
-        _buildSourceItemSlidableAction(
-          icon: CupertinoIcons.delete,
-          backgroundColor: dangerColor,
-          onTap: () => unawaited(_confirmDeleteSource(source)),
-        ),
-      ],
-    );
-  }
-
-  SlidableAction _buildSourceItemSlidableAction({
-    required IconData icon,
-    required Color backgroundColor,
-    required VoidCallback onTap,
-  }) {
-    return SlidableAction(
-      onPressed: (actionContext) {
-        Slidable.of(actionContext)?.close();
-        onTap();
-      },
-      backgroundColor: backgroundColor,
-      foregroundColor: CupertinoColors.white,
-      icon: icon,
     );
   }
 
@@ -1698,7 +1633,7 @@ class _SourceListViewState extends State<SourceListView> {
     );
     if (startResult.type == SourceCheckStartType.runningOtherTask ||
         startResult.type == SourceCheckStartType.attachedExisting) {
-      _showToastMessage('已有书源在校验,等完成后再试');
+      unawaited(showAppToast(context, message: '已有书源在校验，等完成后再试'));
     }
   }
 
@@ -1927,7 +1862,7 @@ class _SourceListViewState extends State<SourceListView> {
   Future<void> _batchDeleteSelected(List<BookSource> allSources) async {
     final selected = _selectedSources(allSources);
     if (selected.isEmpty) {
-      _showMessage('当前未选择书源');
+      unawaited(showAppToast(context, message: '当前未选择书源'));
       return;
     }
 
@@ -1959,7 +1894,7 @@ class _SourceListViewState extends State<SourceListView> {
     setState(() {
       _selectedUrls.clear();
     });
-    _showMessage('已删除 ${selected.length} 条书源');
+    unawaited(showAppToast(context, message: '已删除 ${selected.length} 条书源'));
   }
 
   List<BookSource> _resolveExportShareSources(List<BookSource> visibleSources) {
@@ -1988,7 +1923,7 @@ class _SourceListViewState extends State<SourceListView> {
   Future<void> _batchExportSelected(List<BookSource> allSources) async {
     final sources = _resolveExportShareSources(allSources);
     if (sources.isEmpty) {
-      _showMessage('当前未选择书源');
+      unawaited(showAppToast(context, message: '当前未选择书源'));
       return;
     }
     final result = await _importExportService.exportToFile(
@@ -2567,7 +2502,7 @@ class _SourceListViewState extends State<SourceListView> {
   }) async {
     final source = _sourceRepo.getSourceByUrl(bookSourceUrl);
     if (source == null) {
-      _showMessage('书源不存在或已被删除');
+      unawaited(showAppToast(context, message: '书源不存在或已被删除'));
       return;
     }
     await Navigator.of(context).push(
@@ -2588,7 +2523,7 @@ class _SourceListViewState extends State<SourceListView> {
   Future<void> _openSourceLogin(String bookSourceUrl) async {
     final source = _sourceRepo.getSourceByUrl(bookSourceUrl);
     if (source == null) {
-      _showMessage('未找到书源');
+      unawaited(showAppToast(context, message: '未找到书源'));
       return;
     }
 
@@ -2606,13 +2541,13 @@ class _SourceListViewState extends State<SourceListView> {
       loginUrl: source.loginUrl ?? '',
     );
     if (resolvedUrl.isEmpty) {
-      _showMessage('当前书源未配置登录地址');
+      unawaited(showAppToast(context, message: '当前书源未配置登录地址'));
       return;
     }
     final uri = Uri.tryParse(resolvedUrl);
     final scheme = uri?.scheme.toLowerCase();
     if (scheme != 'http' && scheme != 'https') {
-      _showMessage('登录地址不是有效网页地址');
+      unawaited(showAppToast(context, message: '登录地址不是有效网页地址'));
       return;
     }
 
@@ -2692,7 +2627,7 @@ class _SourceListViewState extends State<SourceListView> {
 
   Future<void> _importFromUrl() async {
     _urlController.clear();
-    final history = _loadOnlineImportHistory();
+    final history = await _loadOnlineImportHistory();
     final url = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (context) {
@@ -2779,8 +2714,7 @@ class _SourceListViewState extends State<SourceListView> {
                               itemBuilder: (context, index) {
                                 final item = history[index];
                                 return AppCard(
-                                  backgroundColor: CupertinoColors.systemGrey6
-                                      .resolveFrom(context),
+                                  backgroundColor: CupertinoColors.systemGrey6.resolveFrom(context),
                                   padding:
                                       const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                   child: Row(
@@ -2814,8 +2748,7 @@ class _SourceListViewState extends State<SourceListView> {
                                         child: Icon(
                                           CupertinoIcons.delete,
                                           size: 18,
-                                          color: CupertinoColors.systemRed
-                                              .resolveFrom(context),
+                                          color: CupertinoColors.systemRed.resolveFrom(context),
                                         ),
                                       ),
                                     ],
@@ -2848,41 +2781,14 @@ class _SourceListViewState extends State<SourceListView> {
     await _commitImportResult(result);
   }
 
-  List<String> _loadOnlineImportHistory() {
-    final raw = _settingsGet(_prefImportOnlineHistory);
-    if (raw is List) {
-      return raw
-          .map((e) => e.toString().trim())
-          .where((e) => e.isNotEmpty)
-          .toSet()
-          .toList(growable: true);
-    }
-    if (raw is String) {
-      return raw
-          .split(RegExp(r'[\n,]'))
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toSet()
-          .toList(growable: true);
-    }
-    return <String>[];
-  }
+  Future<List<String>> _loadOnlineImportHistory() =>
+      _importHistoryStore.load(_prefImportOnlineHistory);
 
-  Future<void> _saveOnlineImportHistory(List<String> history) async {
-    final normalized = history
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList(growable: true);
-    await _settingsPut(_prefImportOnlineHistory, normalized);
-  }
+  Future<void> _saveOnlineImportHistory(List<String> history) =>
+      _importHistoryStore.save(_prefImportOnlineHistory, history);
 
-  Future<void> _pushImportHistory(String url) async {
-    final history = _loadOnlineImportHistory();
-    history.remove(url);
-    history.insert(0, url);
-    await _saveOnlineImportHistory(history);
-  }
+  Future<void> _pushImportHistory(String url) =>
+      _importHistoryStore.push(_prefImportOnlineHistory, url);
 
   String _importStateLabel(SourceImportCandidateState state) {
     return switch (state) {
@@ -3014,8 +2920,7 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5
-                                .resolveFrom(context),
+                            color: CupertinoColors.systemGrey5.resolveFrom(context),
                             onPressed: () {
                               setDialogState(() {
                                 if (selectedIndexes.length ==
@@ -3044,8 +2949,7 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5
-                                .resolveFrom(context),
+                            color: CupertinoColors.systemGrey5.resolveFrom(context),
                             onPressed: () {
                               setDialogState(() {
                                 final targetIndexes = <int>{
@@ -3074,8 +2978,7 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5
-                                .resolveFrom(context),
+                            color: CupertinoColors.systemGrey5.resolveFrom(context),
                             onPressed: () {
                               setDialogState(
                                 () {
@@ -3106,8 +3009,7 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5
-                                .resolveFrom(context),
+                            color: CupertinoColors.systemGrey5.resolveFrom(context),
                             onPressed: () async {
                               final input = await _showImportCustomGroupDialog(
                                 initialGroupName: customGroupName,
@@ -3181,8 +3083,7 @@ class _SourceListViewState extends State<SourceListView> {
                             '待导入：$selectedCount/$totalCount',
                             style: TextStyle(
                               fontSize: 12,
-                              color: CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
+                              color: CupertinoColors.secondaryLabel.resolveFrom(context),
                             ),
                           ),
                         ],
@@ -3228,8 +3129,7 @@ class _SourceListViewState extends State<SourceListView> {
                                       color: selected
                                           ? CupertinoTheme.of(context)
                                               .primaryColor
-                                          : CupertinoColors.systemGrey
-                                              .resolveFrom(context),
+                                          : CupertinoColors.systemGrey.resolveFrom(context),
                                       size: 20,
                                     ),
                                   ),
@@ -3485,7 +3385,7 @@ class _SourceListViewState extends State<SourceListView> {
                         children: [
                           Expanded(
                             child: Text(
-                              'edit',
+                              '编辑书源',
                               maxLines: 1,
                               textAlign: TextAlign.center,
                               overflow: TextOverflow.ellipsis,
@@ -3558,7 +3458,7 @@ class _SourceListViewState extends State<SourceListView> {
         localMap: _localSourceMap(),
       );
       if (candidates.isEmpty) {
-        _showMessage('没有可导入的书源');
+        unawaited(showAppToast(context, message: '没有可导入的书源'));
         return;
       }
 
@@ -3569,7 +3469,7 @@ class _SourceListViewState extends State<SourceListView> {
         policy: decision.policy,
       );
       if (plan.imported <= 0) {
-        _showMessage('未选择可导入书源');
+        unawaited(showAppToast(context, message: '未选择可导入书源'));
         return;
       }
 
@@ -3582,7 +3482,7 @@ class _SourceListViewState extends State<SourceListView> {
           _showMessage('未导入书源\n已拦截：$blockedPreview$extra');
           return;
         }
-        _showMessage('未选择可导入书源');
+        unawaited(showAppToast(context, message: '未选择可导入书源'));
         return;
       }
 
@@ -3801,7 +3701,7 @@ class _SourceListViewState extends State<SourceListView> {
               await Clipboard.setData(ClipboardData(text: path));
               if (!dialogContext.mounted) return;
               Navigator.pop(dialogContext);
-              _showToastMessage('已复制导出路径');
+              unawaited(showAppToast(context, message: '已复制导出路径'));
             },
             child: const Text('复制路径'),
           ),
@@ -3810,57 +3710,6 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
-  void _showToastMessage(String message) {
-    if (!mounted) return;
-    _dismissToast();
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
-    if (overlay == null) {
-      throw FlutterError('source.toast: root overlay not found');
-    }
-
-    final entry = OverlayEntry(
-      builder: (overlayContext) {
-        final background = CupertinoColors.systemBackground
-            .resolveFrom(overlayContext)
-            .withValues(alpha: 0.96);
-        final border = CupertinoColors.separator.resolveFrom(overlayContext);
-        final label = CupertinoColors.label.resolveFrom(overlayContext);
-        return IgnorePointer(
-          ignoring: true,
-          child: SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 28),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: background,
-                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
-                  border: Border.all(color: border, width: 0.5),
-                ),
-                child: Text(
-                  message,
-                  style: TextStyle(color: label, fontSize: 13),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    _toastEntry = entry;
-    overlay.insert(entry);
-    _toastTimer = Timer(const Duration(milliseconds: 1100), _dismissToast);
-  }
-
-  void _dismissToast() {
-    _toastTimer?.cancel();
-    _toastTimer = null;
-    _toastEntry?.remove();
-    _toastEntry = null;
-  }
 }
 
 typedef _SourceSortModeLabelBuilder = String Function(_SourceSortMode mode);

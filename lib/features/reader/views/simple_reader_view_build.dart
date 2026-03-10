@@ -572,7 +572,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
     await _loadChapter(
       _clampChapterIndexToReadableRange(_currentChapterIndex),
-      restoreOffset: _settings.pageTurnMode == PageTurnMode.scroll,
+      restoreOffset: true,
     );
   }
 
@@ -964,7 +964,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
         : (_settings.paddingDisplayCutouts ? viewPadding.top : 0.0);
     final bottomInset = _settings.hideNavigationBar
         ? (_settings.paddingDisplayCutouts ? viewPadding.bottom : 0.0)
-        : padding.bottom;
+        : viewPadding.bottom;
     return EdgeInsets.fromLTRB(
       leftInset,
       topInset + _resolveScrollHeaderSlotHeight(),
@@ -1564,16 +1564,17 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
 
   Future<void> _openReplaceRuleListFromMenu() async {
     _closeReaderMenuOverlay();
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
+    final changed = await Navigator.of(context).push<bool>(
+      CupertinoPageRoute<bool>(
         builder: (_) => const ReplaceRuleListView(),
       ),
     );
     if (!mounted) return;
+    if (changed != true) return;
     _replaceStageCache.clear();
     await _loadChapter(
       _currentChapterIndex,
-      restoreOffset: _settings.pageTurnMode == PageTurnMode.scroll,
+      restoreOffset: true,
     );
   }
 
@@ -1725,7 +1726,7 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     if (_chapters.isNotEmpty) {
       await _loadChapter(
         _clampChapterIndexToReadableRange(_currentChapterIndex),
-        restoreOffset: _settings.pageTurnMode == PageTurnMode.scroll,
+        restoreOffset: true,
       );
     }
   }
@@ -3477,9 +3478,9 @@ class _ImagePreviewPage extends StatelessWidget {
             child: Image(
               image: imageProvider,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
+              errorBuilder: (_, __, ___) => Icon(
                 CupertinoIcons.photo,
-                color: CupertinoColors.systemGrey,
+                color: CupertinoColors.systemGrey.resolveFrom(context),
                 size: 64,
               ),
             ),

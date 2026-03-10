@@ -60,8 +60,7 @@ class SourceGroupBadge extends StatelessWidget {
               alpha: isDark ? _kDarkBackgroundAlpha : _kLightBackgroundAlpha,
             );
     final text = textColor ?? SourceUiTokens.resolveSecondaryTextColor(context);
-    final border = CupertinoColors.separator
-        .resolveFrom(context)
+    final border = CupertinoColors.separator.resolveFrom(context)
         .withValues(alpha: _kBorderAlpha);
     return _SourceGroupBadgeStyle(
       background: background,

@@ -110,7 +110,7 @@ class ReaderContentEditorPageState extends State<ReaderContentEditorPage> {
                   margin: const EdgeInsets.only(bottom: 28),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground
+                    color: CupertinoColors.systemBackground.resolveFrom(context)
                         .resolveFrom(context)
                         .withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(12),
@@ -233,8 +233,7 @@ class ReaderContentEditorPageState extends State<ReaderContentEditorPage> {
                             ),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: CupertinoColors.systemGrey4
-                                  .resolveFrom(context),
+                              color: CupertinoColors.systemGrey4.resolveFrom(context),
                               width: 0.8,
                             ),
                           ),
@@ -259,7 +258,7 @@ class ReaderContentEditorPageState extends State<ReaderContentEditorPage> {
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBackground
+                      color: CupertinoColors.systemBackground.resolveFrom(context)
                           .resolveFrom(context)
                           .withValues(alpha: 0.78),
                     ),

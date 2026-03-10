@@ -793,9 +793,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                             horizontal: 10,
                             vertical: 6,
                           ),
-                          color: CupertinoColors.systemGrey5.resolveFrom(
-                            context,
-                          ),
+                          color: CupertinoColors.systemGrey5.resolveFrom(context),
                           onPressed: () {
                             setDialogState(() {
                               if (allSelected) {
@@ -947,8 +945,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                   final item = history[index];
                                   return Container(
                                     decoration: BoxDecoration(
-                                      color: CupertinoColors.systemGrey6
-                                          .resolveFrom(context),
+                                      color: CupertinoColors.systemGrey6.resolveFrom(context),
                                       borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                                     ),
                                     padding:
@@ -984,7 +981,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                           child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed
+                                            color: CupertinoColors.systemRed.resolveFrom(context)
                                                 .resolveFrom(context),
                                           ),
                                         ),
@@ -1227,12 +1224,11 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                     child: Container(
                       padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
                       decoration: BoxDecoration(
-                        color: CupertinoColors.systemGroupedBackground
+                        color: CupertinoColors.systemGroupedBackground.resolveFrom(context)
                             .resolveFrom(context),
                         border: Border(
                           top: BorderSide(
-                            color: CupertinoColors.systemGrey4
-                                .resolveFrom(context),
+                            color: CupertinoColors.systemGrey4.resolveFrom(context),
                             width: 0.5,
                           ),
                         ),
@@ -1295,7 +1291,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: hasSelection && !_menuBusy
-                                          ? CupertinoColors.systemRed
+                                          ? CupertinoColors.systemRed.resolveFrom(context)
                                               .resolveFrom(context)
                                           : disabledColor,
                                     ),
@@ -1426,7 +1422,7 @@ class _TxtTocRuleListTile extends StatelessWidget {
                       child: Icon(
                         CupertinoIcons.pencil,
                         size: 18,
-                        color: CupertinoColors.secondaryLabel
+                        color: CupertinoColors.secondaryLabel.resolveFrom(context)
                             .resolveFrom(context),
                       ),
                     ),
@@ -1437,7 +1433,7 @@ class _TxtTocRuleListTile extends StatelessWidget {
                       child: Icon(
                         CupertinoIcons.ellipsis_vertical,
                         size: 18,
-                        color: CupertinoColors.secondaryLabel
+                        color: CupertinoColors.secondaryLabel.resolveFrom(context)
                             .resolveFrom(context),
                       ),
                     ),

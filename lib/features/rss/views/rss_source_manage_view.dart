@@ -166,7 +166,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: CupertinoColors.secondaryLabel
+                          color: CupertinoColors.secondaryLabel.resolveFrom(context)
                               .resolveFrom(context),
                           fontSize: 12,
                         ),
@@ -237,7 +237,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                         size: 22,
                         color: selected
                             ? CupertinoColors.activeBlue.resolveFrom(context)
-                            : CupertinoColors.secondaryLabel
+                            : CupertinoColors.secondaryLabel.resolveFrom(context)
                                 .resolveFrom(context),
                       ),
                     ),
@@ -262,7 +262,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                           child: Icon(
                             CupertinoIcons.pencil,
                             size: 18,
-                            color: CupertinoColors.secondaryLabel
+                            color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                 .resolveFrom(context),
                           ),
                         ),
@@ -273,7 +273,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                           child: Icon(
                             CupertinoIcons.ellipsis_vertical,
                             size: 18,
-                            color: CupertinoColors.secondaryLabel
+                            color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                 .resolveFrom(context),
                           ),
                         ),
@@ -1211,8 +1211,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                                 itemBuilder: (context, index) {
                                   final item = history[index];
                                   return AppCard(
-                                    backgroundColor: CupertinoColors.systemGrey6
-                                        .resolveFrom(context),
+                                    backgroundColor: CupertinoColors.systemGrey6.resolveFrom(context),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                     child: Row(
@@ -1246,7 +1245,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                                           child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed
+                                            color: CupertinoColors.systemRed.resolveFrom(context)
                                                 .resolveFrom(context),
                                           ),
                                         ),
@@ -1413,8 +1412,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                                 horizontal: 10,
                                 vertical: 6,
                               ),
-                              color: CupertinoColors.systemGrey5
-                                  .resolveFrom(context),
+                              color: CupertinoColors.systemGrey5.resolveFrom(context),
                               onPressed: () {
                                 setDialogState(() {
                                   final next = RssSourceImportSelectionHelper
@@ -1433,7 +1431,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                             Text(
                               '$selectedCount / $totalCount',
                               style: TextStyle(
-                                color: CupertinoColors.secondaryLabel
+                                color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                     .resolveFrom(context),
                                 fontSize: 12,
                               ),
@@ -1511,13 +1509,11 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                               },
                               child: AppCard(
                                 backgroundColor:
-                                    CupertinoColors.systemGrey6.resolveFrom(
-                                  context,
-                                ),
+                                    CupertinoColors.systemGrey6.resolveFrom(context),
                                 borderColor: selected
-                                    ? CupertinoColors.activeBlue
+                                    ? CupertinoColors.activeBlue.resolveFrom(context)
                                         .resolveFrom(context)
-                                    : CupertinoColors.separator
+                                    : CupertinoColors.separator.resolveFrom(context)
                                         .resolveFrom(context),
                                 borderWidth: 0.6,
                                 padding:
@@ -1531,9 +1527,9 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                                           : CupertinoIcons.circle,
                                       size: 20,
                                       color: selected
-                                          ? CupertinoColors.activeBlue
+                                          ? CupertinoColors.activeBlue.resolveFrom(context)
                                               .resolveFrom(context)
-                                          : CupertinoColors.secondaryLabel
+                                          : CupertinoColors.secondaryLabel.resolveFrom(context)
                                               .resolveFrom(context),
                                     ),
                                     const SizedBox(width: 8),

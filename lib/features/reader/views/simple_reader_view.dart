@@ -378,6 +378,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   // 章节加载锁（用于翻页模式）
   bool _isLoadingChapter = false;
+  bool _isAutoChangingSource = false;
   bool _offlineCacheRunning = false;
   bool _isRestoringProgress = false;
   bool _isHydratingChapterFromPageFactory = false;
@@ -858,6 +859,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _menuAnimController.reverse().then((_) {
         if (mounted) {
           setState(() => _showMenu = false);
+          _syncSystemUiForOverlay();
           if (_autoPagerPausedByMenu && _autoPager.isPaused) {
             _autoPagerPausedByMenu = false;
             _autoPager.resume();
@@ -894,6 +896,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _searchMenuAnimController.reverse().then((_) {
         if (mounted) {
           setState(() => _showSearchMenu = false);
+          _syncSystemUiForOverlay();
           if (_autoPagerPausedByMenu && _autoPager.isPaused) {
             _autoPagerPausedByMenu = false;
             _autoPager.resume();
@@ -2488,6 +2491,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         _chapters[index] =
             chapter.copyWith(content: content, isDownloaded: true);
       }
+    } catch (e) {
+      if (_settings.autoChangeSource && !_isAutoChangingSource) {
+        unawaited(_autoChangeSource());
+      }
+      rethrow;
     } finally {
       stopwatch.stop();
       if (stopwatch.elapsedMilliseconds > 0) {
@@ -2714,7 +2722,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         : (_settings.paddingDisplayCutouts ? viewPadding.top : 0.0);
     final bottomSafeInset = _settings.hideNavigationBar
         ? (_settings.paddingDisplayCutouts ? viewPadding.bottom : 0.0)
-        : safeArea.bottom;
+        : viewPadding.bottom;
     final horizontalSafeInset =
         _settings.paddingDisplayCutouts ? safeArea.left + safeArea.right : 0.0;
 

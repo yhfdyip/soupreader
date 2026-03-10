@@ -185,9 +185,7 @@ extension _SpeakEngineManageImportActions on _SpeakEngineManageViewState {
                             horizontal: 10,
                             vertical: 6,
                           ),
-                          color: CupertinoColors.systemGrey5.resolveFrom(
-                            context,
-                          ),
+                          color: CupertinoColors.systemGrey5.resolveFrom(context),
                           onPressed: () {
                             setDialogState(() {
                               if (allSelected) {

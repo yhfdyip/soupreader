@@ -58,9 +58,7 @@ class _SourceSortSheetState extends State<_SourceSortSheet> {
     final sheetBg =
         CupertinoColors.systemGroupedBackground.resolveFrom(context);
     final titleColor = CupertinoColors.label.resolveFrom(context);
-    final handleColor = CupertinoColors.systemGrey3
-        .resolveFrom(context)
-        .withValues(alpha: 0.72);
+    final handleColor = CupertinoColors.separator.resolveFrom(context);
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = math.max(mediaQuery.padding.bottom, 8.0);
 
@@ -201,9 +199,7 @@ class _SourceGroupFilterSheet extends StatelessWidget {
     final sheetBg =
         CupertinoColors.systemGroupedBackground.resolveFrom(context);
     final titleColor = CupertinoColors.label.resolveFrom(context);
-    final handleColor = CupertinoColors.systemGrey3
-        .resolveFrom(context)
-        .withValues(alpha: 0.72);
+    final handleColor = CupertinoColors.separator.resolveFrom(context);
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = math.max(mediaQuery.padding.bottom, 8.0);
 

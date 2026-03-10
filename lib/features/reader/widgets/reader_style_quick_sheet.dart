@@ -60,8 +60,8 @@ class _ReaderStyleQuickSheetState
   Widget build(BuildContext context) {
     final isDark = _isDark;
     final sheetBg = isDark
-        ? CupertinoColors.systemGroupedBackground.darkColor
-        : CupertinoColors.systemGroupedBackground.color;
+        ? CupertinoColors.systemGroupedBackground.resolveFrom(context).darkColor
+        : CupertinoColors.systemGroupedBackground.resolveFrom(context).color;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(
         top: Radius.circular(AppDesignTokens.radiusSheet),

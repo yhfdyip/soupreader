@@ -16,7 +16,7 @@ class DiscoverySearchHeader extends StatelessWidget {
     this.activeFilterChip,
   });
 
-  static const double _shellRadius = 20;
+  // _shellRadius removed: now uses SourceUiTokens.radiusCard
   static const double _shellTopPadding = 10;
   static const double _shellHorizontalPadding = 10;
   static const double _shellBottomPadding = 8;
@@ -73,7 +73,7 @@ class DiscoverySearchHeader extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: shell.background,
-        borderRadius: BorderRadius.circular(_shellRadius),
+        borderRadius: BorderRadius.circular(SourceUiTokens.radiusCard),
         boxShadow: [
           BoxShadow(
             color: shell.shadow,

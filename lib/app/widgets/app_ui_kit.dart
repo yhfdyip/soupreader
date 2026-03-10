@@ -122,18 +122,13 @@ class AppListTile extends StatelessWidget {
           )
         : title;
 
-    // CupertinoListTile.notched 在 onTap=null 时整行不接收触摸，
-    // 导致 trailing 中的 Switch/Button 也无法响应。
-    // 当有 trailing 且无 onTap 时，传入空回调使触摸可穿透到 trailing。
-    final resolvedOnTap = _resolveOnTap() ??
-        (resolvedTrailing != null ? () {} : null);
     return CupertinoListTile.notched(
       title: resolvedTitle,
       subtitle: subtitle,
       additionalInfo: additionalInfo,
       leading: resolvedLeading,
       trailing: resolvedTrailing,
-      onTap: resolvedOnTap,
+      onTap: _resolveOnTap(),
     );
   }
 

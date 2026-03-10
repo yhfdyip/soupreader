@@ -95,7 +95,7 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: CupertinoColors.secondarySystemGroupedBackground
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
             .resolveFrom(context),
         borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
@@ -124,9 +124,7 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: CupertinoColors.systemGrey5.resolveFrom(
-                            context,
-                          ),
+                          color: CupertinoColors.systemGrey5.resolveFrom(context),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         padding: const EdgeInsets.symmetric(

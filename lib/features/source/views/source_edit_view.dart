@@ -519,6 +519,12 @@ class _SourceEditViewState extends State<SourceEditView> {
       ),
       child: Column(
         children: [
+          // 对齐 Legado activity_book_source_edit.xml：顶部横向滚动控制栏
+          _buildTopControlBar(),
+          Container(
+            height: 0.5,
+            color: CupertinoColors.separator.resolveFrom(context),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: tabControl,
@@ -536,6 +542,78 @@ class _SourceEditViewState extends State<SourceEditView> {
           ),
         ],
       ),
+    );
+  }
+
+
+  // 对齐 Legado activity_book_source_edit.xml 顶部横向滚动控制栏
+  // 书源类型选择 + 启用/发现/Cookie 快捷开关，始终可见
+  Widget _buildTopControlBar() {
+    final labelStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+      fontSize: 14,
+    );
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Text('书源类型', style: labelStyle),
+          const SizedBox(width: 4),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            color: CupertinoColors.secondarySystemFill.resolveFrom(context),
+            borderRadius: BorderRadius.circular(8),
+            minimumSize: Size.zero,
+            onPressed: _pickSourceType,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _sourceTypeLabel(
+                      int.tryParse(_typeCtrl.text.trim()) ?? 0),
+                  style: labelStyle,
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  CupertinoIcons.chevron_down,
+                  size: 12,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          _buildTopSwitch('启用', _enabled,
+              (v) => setState(() => _enabled = v)),
+          const SizedBox(width: 12),
+          _buildTopSwitch('发现', _enabledExplore,
+              (v) => setState(() => _enabledExplore = v)),
+          const SizedBox(width: 12),
+          _buildTopSwitch('Cookie', _enabledCookieJar,
+              (v) => setState(() => _enabledCookieJar = v)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopSwitch(
+    String label,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
+    final labelStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+      fontSize: 14,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: labelStyle),
+        const SizedBox(width: 6),
+        CupertinoSwitch(
+          value: value,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 
@@ -795,20 +873,7 @@ class _SourceEditViewState extends State<SourceEditView> {
               placeholder: 'customOrder（数字）',
             ),
             _buildTextFieldTile('权重', _weightCtrl, placeholder: 'weight（数字）'),
-            CupertinoListTile.notched(
-              title: const Text('启用'),
-              trailing: CupertinoSwitch(
-                value: _enabled,
-                onChanged: (v) => setState(() => _enabled = v),
-              ),
-            ),
-            CupertinoListTile.notched(
-              title: const Text('启用发现'),
-              trailing: CupertinoSwitch(
-                value: _enabledExplore,
-                onChanged: (v) => setState(() => _enabledExplore = v),
-              ),
-            ),
+
           ],
         ),
         AppListSection(
@@ -819,14 +884,7 @@ class _SourceEditViewState extends State<SourceEditView> {
               _respondTimeCtrl,
               placeholder: 'respondTime（毫秒）',
             ),
-            CupertinoListTile.notched(
-              title: const Text('CookieJar'),
-              subtitle: const Text('enabledCookieJar'),
-              trailing: CupertinoSwitch(
-                value: _enabledCookieJar,
-                onChanged: (v) => setState(() => _enabledCookieJar = v),
-              ),
-            ),
+
             _buildTextFieldTile(
               '并发速率',
               _concurrentRateCtrl,

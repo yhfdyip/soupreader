@@ -295,8 +295,7 @@ extension _ReplaceRuleImportX on _ReplaceRuleListViewState {
                                 itemBuilder: (context, index) {
                                   final item = history[index];
                                   return AppCard(
-                                    backgroundColor: CupertinoColors.systemGrey6
-                                        .resolveFrom(context),
+                                    backgroundColor: CupertinoColors.systemGrey6.resolveFrom(context),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                     child: Row(
@@ -330,7 +329,7 @@ extension _ReplaceRuleImportX on _ReplaceRuleListViewState {
                                           child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed
+                                            color: CupertinoColors.systemRed.resolveFrom(context)
                                                 .resolveFrom(context),
                                           ),
                                         ),
@@ -550,9 +549,7 @@ extension _ReplaceRuleImportX on _ReplaceRuleListViewState {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(
-                              context,
-                            ),
+                            color: CupertinoColors.systemGrey5.resolveFrom(context),
                             onPressed: () {
                               setDialogState(() {
                                 if (allSelected) {
@@ -576,9 +573,7 @@ extension _ReplaceRuleImportX on _ReplaceRuleListViewState {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(
-                              context,
-                            ),
+                            color: CupertinoColors.systemGrey5.resolveFrom(context),
                             onPressed: () async {
                               final input = await _showImportCustomGroupDialog(
                                 initialGroupName: customGroupName,

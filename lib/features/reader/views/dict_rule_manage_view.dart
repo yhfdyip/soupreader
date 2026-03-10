@@ -631,8 +631,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                 itemBuilder: (context, index) {
                                   final item = history[index];
                                   return AppCard(
-                                    backgroundColor: CupertinoColors.systemGrey6
-                                        .resolveFrom(context),
+                                    backgroundColor: CupertinoColors.systemGrey6.resolveFrom(context),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                     child: Row(
@@ -666,7 +665,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                           child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed
+                                            color: CupertinoColors.systemRed.resolveFrom(context)
                                                 .resolveFrom(context),
                                           ),
                                         ),
@@ -815,9 +814,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                             horizontal: 10,
                             vertical: 6,
                           ),
-                          color: CupertinoColors.systemGrey5.resolveFrom(
-                            context,
-                          ),
+                          color: CupertinoColors.systemGrey5.resolveFrom(context),
                           onPressed: () {
                             setDialogState(() {
                               if (allSelected) {
@@ -1015,7 +1012,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                 key: ValueKey(rule.name),
                                 padding: const EdgeInsets.only(bottom: 6),
                                 child: Container(
-                                  color: CupertinoColors.systemBackground
+                                  color: CupertinoColors.systemBackground.resolveFrom(context)
                                       .resolveFrom(context),
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 8),
@@ -1029,7 +1026,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                           child: Icon(
                                             CupertinoIcons.bars,
                                             size: 18,
-                                            color: CupertinoColors.tertiaryLabel
+                                            color: CupertinoColors.tertiaryLabel.resolveFrom(context)
                                                 .resolveFrom(context),
                                           ),
                                         ),
@@ -1116,9 +1113,9 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                               .check_mark_circled_solid
                                           : CupertinoIcons.circle,
                                       color: selected
-                                          ? CupertinoColors.activeBlue
+                                          ? CupertinoColors.activeBlue.resolveFrom(context)
                                               .resolveFrom(context)
-                                          : CupertinoColors.secondaryLabel
+                                          : CupertinoColors.secondaryLabel.resolveFrom(context)
                                               .resolveFrom(context),
                                       size: 20,
                                     )
@@ -1132,8 +1129,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                             }
                             return DecoratedBox(
                               decoration: BoxDecoration(
-                                color: CupertinoColors.systemGrey6
-                                    .resolveFrom(context),
+                                color: CupertinoColors.systemGrey6.resolveFrom(context),
                               ),
                               child: tile,
                             );
@@ -1148,12 +1144,11 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                     child: Container(
                       padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
                       decoration: BoxDecoration(
-                        color: CupertinoColors.systemGroupedBackground
+                        color: CupertinoColors.systemGroupedBackground.resolveFrom(context)
                             .resolveFrom(context),
                         border: Border(
                           top: BorderSide(
-                            color: CupertinoColors.systemGrey4
-                                .resolveFrom(context),
+                            color: CupertinoColors.systemGrey4.resolveFrom(context),
                             width: 0.5,
                           ),
                         ),
@@ -1216,7 +1211,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: hasSelection && !_menuBusy
-                                          ? CupertinoColors.systemRed
+                                          ? CupertinoColors.systemRed.resolveFrom(context)
                                               .resolveFrom(context)
                                           : disabledColor,
                                     ),

@@ -54,7 +54,6 @@ class SourceUiTokens {
   }
 
   static Color resolveCardBackgroundColor(BuildContext context) {
-    return CupertinoColors.secondarySystemGroupedBackground
-        .resolveFrom(context);
+    return CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
   }
 }

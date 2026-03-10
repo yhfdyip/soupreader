@@ -65,6 +65,8 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   String _activeGroupQuery = _groupFilterAll;
   String _searchQuery = '';
+  bool _changed = false;
+  bool _dataInited = false;
   bool _importingLocal = false;
   bool _importingOnline = false;
   bool _importingQr = false;
@@ -106,6 +108,10 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     super.dispose();
   }
 
+  void _markChanged() {
+    if (!_changed) setState(() => _changed = true);
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<ReplaceRule>>(
@@ -114,6 +120,8 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         final allRules = List<ReplaceRule>.from(
           snapshot.data ?? _repo.getAllRules(),
         )..sort((a, b) => a.order.compareTo(b.order));
+        if (_dataInited && snapshot.hasData) _markChanged();
+        _dataInited = true;
         _syncSelectionWithRules(allRules);
 
         final groups = _buildGroups(allRules);
@@ -133,7 +141,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         final enabledColor = CupertinoColors.activeBlue.resolveFrom(context);
         final disabledColor = CupertinoColors.systemGrey.resolveFrom(context);
 
-        return AppCupertinoPageScaffold(
+        return PopScope<bool>(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) Navigator.of(context).pop(_changed);
+          },
+          child: AppCupertinoPageScaffold(
           title: '文本替换规则',
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -198,9 +211,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                       ),
                       border: Border(
                         top: BorderSide(
-                          color: CupertinoColors.systemGrey4.resolveFrom(
-                            context,
-                          ),
+                          color: CupertinoColors.systemGrey4.resolveFrom(context),
                           width: 0.5,
                         ),
                       ),
@@ -266,7 +277,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: hasSelection && !_menuBusy
-                                        ? CupertinoColors.systemRed
+                                        ? CupertinoColors.systemRed.resolveFrom(context)
                                             .resolveFrom(context)
                                         : disabledColor,
                                   ),
@@ -297,7 +308,8 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                 ),
             ],
           ),
-        );
+        ),
+      );
       },
     );
   }
@@ -585,7 +597,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                 ),
                 Container(
                   height: 0.5,
-                  color: CupertinoColors.systemGrey4.resolveFrom(sheetContext),
+                  color: CupertinoColors.systemGrey4.resolveFrom(context),
                 ),
                 Expanded(
                   child: StreamBuilder<List<ReplaceRule>>(
@@ -847,7 +859,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                             : CupertinoIcons.circle,
                         color: selected
                             ? CupertinoColors.activeBlue.resolveFrom(context)
-                            : CupertinoColors.secondaryLabel
+                            : CupertinoColors.secondaryLabel.resolveFrom(context)
                                 .resolveFrom(context),
                         size: 20,
                       )
@@ -866,7 +878,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                             child: Icon(
                               CupertinoIcons.pencil,
                               size: 18,
-                              color: CupertinoColors.secondaryLabel
+                              color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                   .resolveFrom(context),
                             ),
                           ),
@@ -877,7 +889,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                             child: Icon(
                               CupertinoIcons.ellipsis_vertical,
                               size: 18,
-                              color: CupertinoColors.secondaryLabel
+                              color: CupertinoColors.secondaryLabel.resolveFrom(context)
                                   .resolveFrom(context),
                             ),
                           ),

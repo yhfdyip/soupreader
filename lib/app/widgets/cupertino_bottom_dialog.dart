@@ -9,6 +9,9 @@ const Color _kDialogBarrierDynamicColor = CupertinoDynamicColor.withBrightness(
   darkColor: Color(0x73000000),
 );
 
+/// 下滑速度阈值（px/s），超过此值触发关闭。
+const double _kDismissVelocityThreshold = 600.0;
+
 Future<T?> showCupertinoBottomSheetDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -26,9 +29,33 @@ Future<T?> showCupertinoBottomSheetDialog<T>({
     barrierColor: resolvedBarrierColor,
     builder: (popupContext) => CupertinoTheme(
       data: themeData,
-      child: builder(popupContext),
+      child: _SwipeDownToDismiss(child: builder(popupContext)),
     ),
   );
+}
+
+/// 包装 bottom sheet 内容，支持下滑快速关闭。
+///
+/// 使用 [HitTestBehavior.translucent]，内部滚动组件不受影响。
+/// 当下滑速度超过阈值时调用 [Navigator.pop]。
+class _SwipeDownToDismiss extends StatelessWidget {
+  final Widget child;
+
+  const _SwipeDownToDismiss({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity > _kDismissVelocityThreshold) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: child,
+    );
+  }
 }
 
 Future<T?> showCupertinoBottomDialog<T>({

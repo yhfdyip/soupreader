@@ -257,7 +257,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       decoration: BoxDecoration(
-        color: CupertinoColors.secondarySystemGroupedBackground
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
             .resolveFrom(context),
         borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
@@ -283,7 +283,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemGroupedBackground
+          color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
               .resolveFrom(context),
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
         ),

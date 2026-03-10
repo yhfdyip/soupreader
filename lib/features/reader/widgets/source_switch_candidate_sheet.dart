@@ -1349,7 +1349,7 @@ class _SourceSwitchCandidateSheetState
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
-                                      color: CupertinoColors.label
+                                      color: CupertinoColors.label.resolveFrom(context)
                                           .resolveFrom(itemContext),
                                     ),
                                     maxLines: 1,
@@ -1360,10 +1360,7 @@ class _SourceSwitchCandidateSheetState
                                     author,
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: CupertinoColors.systemGrey
-                                          .resolveFrom(
-                                        itemContext,
-                                      ),
+                                      color: CupertinoColors.systemGrey.resolveFrom(context),
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -1374,8 +1371,7 @@ class _SourceSwitchCandidateSheetState
                                       latestChapter,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: CupertinoColors.systemGrey2
-                                            .resolveFrom(itemContext),
+                                        color: CupertinoColors.systemGrey2.resolveFrom(context),
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1390,8 +1386,7 @@ class _SourceSwitchCandidateSheetState
                                       candidate.chapterWordCountText.trim(),
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: CupertinoColors.systemGrey2
-                                            .resolveFrom(itemContext),
+                                        color: CupertinoColors.systemGrey2.resolveFrom(context),
                                       ),
                                     ),
                                   ],
@@ -1401,8 +1396,7 @@ class _SourceSwitchCandidateSheetState
                                       '响应时间：${candidate.respondTimeMs} ms',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: CupertinoColors.systemGrey2
-                                            .resolveFrom(itemContext),
+                                        color: CupertinoColors.systemGrey2.resolveFrom(context),
                                       ),
                                     ),
                                   ],
@@ -1415,7 +1409,7 @@ class _SourceSwitchCandidateSheetState
                                     child: Icon(
                                       CupertinoIcons.checkmark_alt,
                                       size: 18,
-                                      color: CupertinoColors.activeBlue
+                                      color: CupertinoColors.activeBlue.resolveFrom(context)
                                           .resolveFrom(itemContext),
                                     ),
                                   ),

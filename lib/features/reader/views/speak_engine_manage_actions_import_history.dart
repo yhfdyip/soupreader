@@ -97,8 +97,7 @@ extension _SpeakEngineManageImportHistoryActions
                                   final item = history[index];
                                   return Container(
                                     decoration: BoxDecoration(
-                                      color: CupertinoColors.systemGrey6
-                                          .resolveFrom(context),
+                                      color: CupertinoColors.systemGrey6.resolveFrom(context),
                                       borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                                     ),
                                     padding:
@@ -134,7 +133,7 @@ extension _SpeakEngineManageImportHistoryActions
                                           child: Icon(
                                             CupertinoIcons.delete,
                                             size: 18,
-                                            color: CupertinoColors.systemRed
+                                            color: CupertinoColors.systemRed.resolveFrom(context)
                                                 .resolveFrom(context),
                                           ),
                                         ),

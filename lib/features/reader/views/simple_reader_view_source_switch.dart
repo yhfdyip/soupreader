@@ -2641,4 +2641,53 @@ extension _SimpleReaderSourceSwitchX on _SimpleReaderViewState {
 
 
   /// 以 legado 同义语义添加书签：打开编辑弹窗，确认后落库。
+
+  /// 章节加载失败时自动换源（对标 legado autoChangeSource）。
+  ///
+  /// 静默搜索所有启用书源，取第一个匹配结果直接切换，无需用户交互。
+  Future<void> _autoChangeSource() async {
+    if (_isAutoChangingSource) return;
+    if (!mounted) return;
+    setState(() => _isAutoChangingSource = true);
+    try {
+      final currentBook = _buildCurrentBookForSourceSwitch();
+      if (currentBook.title.trim().isEmpty) return;
+      final enabledSourceCount =
+          _sourceRepo.getAllSources().where((s) => s.enabled).length;
+      if (enabledSourceCount <= 0) return;
+
+      _showToast('正在自动换源...');
+
+      final token = CancelToken();
+      _sourceSwitchCandidateSearchCancelToken = token;
+      List<ReaderSourceSwitchCandidate> candidates;
+      try {
+        candidates = await _loadSourceSwitchCandidates(
+          currentBook: currentBook,
+          loadInfoEnabled: false,
+          loadWordCountEnabled: false,
+          loadTocEnabled: false,
+          sourceDelaySeconds: 0,
+          cancelToken: token,
+        );
+      } finally {
+        if (identical(_sourceSwitchCandidateSearchCancelToken, token)) {
+          _sourceSwitchCandidateSearchCancelToken = null;
+        }
+      }
+
+      if (!mounted) return;
+      if (candidates.isEmpty) {
+        _showToast('自动换源失败：未找到匹配书源');
+        return;
+      }
+
+      await _switchToSourceCandidate(candidates.first);
+      if (mounted) _showToast('已自动换源：${candidates.first.source.bookSourceName}');
+    } catch (e) {
+      if (mounted) _showToast('自动换源失败');
+    } finally {
+      if (mounted) setState(() => _isAutoChangingSource = false);
+    }
+  }
 }

@@ -44,15 +44,17 @@ class SourceConsistentCard extends StatelessWidget {
     return _SourceCardStyle(
       background: background,
       shadow: shadow,
+      borderColor: borderColor ?? CupertinoColors.transparent,
     );
   }
 
   Widget _buildSurface(_SourceCardStyle style) {
+    final hasBorder = style.borderColor != CupertinoColors.transparent;
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: style.background,
-      borderColor: CupertinoColors.transparent,
-      borderWidth: 0,
+      borderColor: style.borderColor,
+      borderWidth: hasBorder ? AppDesignTokens.hairlineBorderWidth : 0,
       radius: SourceUiTokens.radiusCard,
       blurBackground: false,
       shadows: <BoxShadow>[
@@ -77,8 +79,10 @@ class _SourceCardStyle {
   const _SourceCardStyle({
     required this.background,
     required this.shadow,
+    required this.borderColor,
   });
 
   final Color background;
   final Color shadow;
+  final Color borderColor;
 }

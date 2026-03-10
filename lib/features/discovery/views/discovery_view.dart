@@ -1212,21 +1212,16 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         : isEnabled
             ? enabledBackground
             : normalBackground;
-    final borderColor = isError
-        ? uiTokens.colors.destructive.withValues(alpha: 0.4)
-        : uiTokens.colors.separator.withValues(alpha: isEnabled ? 0.6 : 0.45);
     final textColor = isError
         ? uiTokens.colors.destructive
         : isEnabled
             ? uiTokens.colors.foreground
             : uiTokens.colors.tertiaryLabel;
-    final clickableBorderColor =
-        uiTokens.colors.accent.withValues(alpha: isEnabled ? 0.34 : 0.0);
     final resolvedBorderColor = isError
-        ? borderColor
+        ? uiTokens.colors.destructive.withValues(alpha: 0.4)
         : isEnabled
-            ? clickableBorderColor
-            : borderColor;
+            ? uiTokens.colors.accent.withValues(alpha: 0.34)
+            : uiTokens.colors.separator.withValues(alpha: 0.45);
 
     return _buildKindPill(
       onTap: isEnabled ? () => _openExploreKind(source, kind) : null,

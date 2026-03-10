@@ -249,7 +249,7 @@ extension _BookshelfBuildX on _BookshelfViewState {
               child: Container(
                 decoration: BoxDecoration(
                   color: AppUiTokens.resolve(context).colors.card,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                 ),
                 child: AppCoverImage(
                   urlOrPath: group.cover,
@@ -257,20 +257,23 @@ extension _BookshelfBuildX on _BookshelfViewState {
                   author: '',
                   width: double.infinity,
                   height: double.infinity,
-                  borderRadius: 8,
+                  borderRadius: AppDesignTokens.radiusControl,
                 ),
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              group.groupName,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.25,
-                fontWeight: FontWeight.w600,
+            SizedBox(
+              height: 12 * 1.25 * 2,
+              child: Text(
+                group.groupName,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.25,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -309,7 +312,7 @@ extension _BookshelfBuildX on _BookshelfViewState {
                         author: book.author,
                         width: double.infinity,
                         height: double.infinity,
-                        borderRadius: 8,
+                        borderRadius: AppDesignTokens.radiusControl,
                       ),
                     ),
                   ),
@@ -324,15 +327,18 @@ extension _BookshelfBuildX on _BookshelfViewState {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              book.title,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.25,
-                fontWeight: FontWeight.w500,
+            SizedBox(
+              height: 12 * 1.25 * 2,
+              child: Text(
+                book.title,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.25,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -420,7 +426,7 @@ extension _BookshelfBuildX on _BookshelfViewState {
                       author: book.author,
                       width: 66,
                       height: 90,
-                      borderRadius: 8,
+                      borderRadius: AppDesignTokens.radiusControl,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -570,7 +576,7 @@ extension _BookshelfBuildX on _BookshelfViewState {
               author: '',
               width: 66,
               height: 90,
-              borderRadius: 8,
+              borderRadius: AppDesignTokens.radiusControl,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -759,7 +765,7 @@ class _BookshelfGridLoadingBadge extends StatelessWidget {
       width: 22,
       height: 22,
       decoration: BoxDecoration(
-        color: CupertinoColors.black.withValues(alpha: 0.6),
+        color: CupertinoColors.label.resolveFrom(context).withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(11),
       ),
       alignment: Alignment.center,
@@ -789,7 +795,7 @@ class _BookshelfGridUnreadBadge extends StatelessWidget {
         label,
         style: const TextStyle(
           color: CupertinoColors.white,
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
           height: 1.1,
         ),

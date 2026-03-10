@@ -125,7 +125,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
       builder: (dialogContext) => Container(
         height: 300,
         color: CupertinoDynamicColor.resolve(
-          CupertinoColors.systemBackground,
+          CupertinoColors.systemBackground.resolveFrom(context),
           dialogContext,
         ),
         child: SafeArea(

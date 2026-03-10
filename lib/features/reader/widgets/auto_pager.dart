@@ -229,8 +229,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      CupertinoColors.systemGroupedBackground
-          .resolveFrom(context)
+      CupertinoColors.systemGroupedBackground.resolveFrom(context)
           .withValues(alpha: 0.98);
 
   Color get _textStrong => CupertinoColors.label.resolveFrom(context);
@@ -323,7 +322,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _Grabber(color: _textNormal),
+            _Grabber(color: CupertinoColors.separator.resolveFrom(context)),
             const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

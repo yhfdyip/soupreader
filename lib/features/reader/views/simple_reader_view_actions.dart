@@ -47,7 +47,7 @@ extension _SimpleReaderActionsX on _SimpleReaderViewState {
                   margin: const EdgeInsets.only(bottom: 28),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground
+                    color: CupertinoColors.systemBackground.resolveFrom(context)
                         .resolveFrom(context)
                         .withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(12),
@@ -1217,7 +1217,7 @@ extension _SimpleReaderActionsX on _SimpleReaderViewState {
         return Container(
           height: 300,
           color: CupertinoDynamicColor.resolve(
-            CupertinoColors.systemBackground,
+            CupertinoColors.systemBackground.resolveFrom(context),
             sheetContext,
           ),
           child: Column(
