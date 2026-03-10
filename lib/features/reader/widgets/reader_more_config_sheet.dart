@@ -31,7 +31,8 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
   late ReadingSettings _s;
 
   bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
-  bool get _volumeSupported => defaultTargetPlatform != TargetPlatform.iOS;
+  bool get _isIOS => defaultTargetPlatform == TargetPlatform.iOS;
+  bool get _volumeSupported => !_isIOS;
   Color get _accent =>
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
@@ -188,11 +189,13 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                         _op('屏幕常亮', _keepLightLabel, _pickKeepLight),
                         _sw('隐藏状态栏', !_s.showStatusBar,
                             (v) => _u(_s.copyWith(showStatusBar: !v))),
-                        _sw('隐藏导航栏', _s.hideNavigationBar,
-                            (v) => _u(_s.copyWith(hideNavigationBar: v))),
-                        _sw('刘海屏留边', _s.paddingDisplayCutouts,
-                            (v) => _u(
-                                _s.copyWith(paddingDisplayCutouts: v))),
+                        if (!_isIOS) ...[
+                          _sw('隐藏导航栏', _s.hideNavigationBar,
+                              (v) => _u(_s.copyWith(hideNavigationBar: v))),
+                          _sw('刘海屏留边', _s.paddingDisplayCutouts,
+                              (v) => _u(
+                                  _s.copyWith(paddingDisplayCutouts: v))),
+                        ],
                         _sw('双页模式', _s.doublePage,
                             (v) => _u(_s.copyWith(doublePage: v))),
                         _op('进度条行为', _progressBarLabel,
