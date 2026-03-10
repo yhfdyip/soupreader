@@ -310,6 +310,7 @@ class RssSourceEditForm extends StatelessWidget {
 /// 包含3个Tab的RSS源编辑页面（对齐legado3-Tab结构：源设置/列表规则/WebView）
 class RssSourceEditTabs extends StatefulWidget {
   const RssSourceEditTabs({
+    super.key,
     required this.nameController,
     required this.urlController,
     required this.groupController,

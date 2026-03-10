@@ -692,9 +692,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final statusColor = _tipTextColor;
     final dividerColor = _tipDividerColor;
     final headerStyle =
-        widget.textStyle.copyWith(fontSize: 12, color: statusColor);
+        widget.textStyle.copyWith(fontSize: 12, height: 1.0, color: statusColor);
     final footerStyle =
-        widget.textStyle.copyWith(fontSize: 11, color: statusColor);
+        widget.textStyle.copyWith(fontSize: 11, height: 1.0, color: statusColor);
 
     if (_showHeader) {
       final y = topSafe +
@@ -3534,10 +3534,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final renderPosition = _factory.resolveRenderPosition(slot);
     final headerStyle = widget.textStyle.copyWith(
       fontSize: PagedReaderWidget._tipHeaderFontSize,
+      height: 1.0,
       color: statusColor,
     );
     final footerStyle = widget.textStyle.copyWith(
       fontSize: PagedReaderWidget._tipFooterFontSize,
+      height: 1.0,
       color: statusColor,
     );
 

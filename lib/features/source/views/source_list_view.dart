@@ -622,7 +622,6 @@ class _SourceListViewState extends State<SourceListView> {
 
     Widget buildItem(BookSource source, int index) {
       final selected = _selectedUrls.contains(source.bookSourceUrl);
-      final checkItem = _findCheckItem(source.bookSourceUrl);
       final checkStatus = _inlineCheckStatus(source);
       final checkMessage = _inlineCheckMessage(source);
       final showHeader = _groupSourcesByDomain &&
@@ -789,7 +788,9 @@ class _SourceListViewState extends State<SourceListView> {
                                 ),
                               ),
                             ),
-                            if (checkItem?.status == SourceCheckStatus.running)
+                            if (_checkTaskService.snapshot?.running == true &&
+                                (checkStatus == SourceCheckStatus.pending ||
+                                 checkStatus == SourceCheckStatus.running))
                               const Padding(
                                 padding: EdgeInsets.only(left: 6),
                                 child: SizedBox(

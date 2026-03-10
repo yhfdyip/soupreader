@@ -1002,9 +1002,6 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                               final title = rule.name.trim().isEmpty
                                   ? '未命名规则'
                                   : rule.name.trim();
-                              final subtitle = rule.urlRule.trim().isEmpty
-                                  ? '未配置 URL 规则'
-                                  : rule.urlRule.trim();
                               final secLabel = CupertinoColors
                                   .secondaryLabel
                                   .resolveFrom(context);

@@ -1976,6 +1976,15 @@ extension _SimpleReaderBuildX on _SimpleReaderViewState {
     await _loadChapter(targetChapterIndex);
   }
 
+  // 对齐 Legado progressBarBehavior="page"：松手直接跳页，无需确认
+  void _seekByPageProgress(int targetPageIndex) {
+    final totalPages = _pageFactory.totalPages;
+    if (totalPages <= 0) return;
+    final clamped = targetPageIndex.clamp(0, totalPages - 1);
+    if (clamped == _pageFactory.currentPageIndex) return;
+    _pageFactory.jumpToPage(clamped);
+  }
+
   void _showReaderActionsMenu() {
     _closeReaderMenuOverlay();
     final isLocal = _isCurrentBookLocal();

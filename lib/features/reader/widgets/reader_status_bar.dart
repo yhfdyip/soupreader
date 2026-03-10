@@ -93,40 +93,45 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
       bottom: 0,
       left: 0,
       right: 0,
-      child: IgnorePointer(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: widget.settings.footerPaddingLeft,
-            right: widget.settings.footerPaddingRight,
-            top: widget.settings.footerPaddingTop,
-            bottom: bottomInset +
-                widget.settings.footerPaddingBottom +
-                _legacyFooterTipEdgeInset,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.settings.showFooterLine)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Container(
-                    height: 0.5,
-                    color: _lineColor,
-                  ),
-                ),
-              Row(
-                children: [
-                  _buildFooterContent(widget.settings.footerLeftContent),
-                  Expanded(
-                    child: Center(
-                      child: _buildFooterContent(
-                          widget.settings.footerCenterContent),
+      child: MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.noScaling,
+        ),
+        child: IgnorePointer(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: widget.settings.footerPaddingLeft,
+              right: widget.settings.footerPaddingRight,
+              top: widget.settings.footerPaddingTop,
+              bottom: bottomInset +
+                  widget.settings.footerPaddingBottom +
+                  _legacyFooterTipEdgeInset,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.settings.showFooterLine)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Container(
+                      height: 0.5,
+                      color: _lineColor,
                     ),
                   ),
-                  _buildFooterContent(widget.settings.footerRightContent),
-                ],
-              ),
-            ],
+                Row(
+                  children: [
+                    _buildFooterContent(widget.settings.footerLeftContent),
+                    Expanded(
+                      child: Center(
+                        child: _buildFooterContent(
+                            widget.settings.footerCenterContent),
+                      ),
+                    ),
+                    _buildFooterContent(widget.settings.footerRightContent),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -235,6 +240,7 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
   TextStyle get _textStyle => TextStyle(
         color: _textColor,
         fontSize: 11,
+        height: 1.0,
       );
 }
 
@@ -321,40 +327,45 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
       top: 0,
       left: 0,
       right: 0,
-      child: IgnorePointer(
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: topInset +
-                widget.settings.headerPaddingTop +
-                _legacyHeaderTipEdgeInset,
-            bottom: widget.settings.headerPaddingBottom,
-            left: widget.settings.headerPaddingLeft,
-            right: widget.settings.headerPaddingRight,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  _buildHeaderContent(widget.settings.headerLeftContent),
-                  Expanded(
-                    child: Center(
-                      child: _buildHeaderContent(
-                          widget.settings.headerCenterContent),
+      child: MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.noScaling,
+        ),
+        child: IgnorePointer(
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: topInset +
+                  widget.settings.headerPaddingTop +
+                  _legacyHeaderTipEdgeInset,
+              bottom: widget.settings.headerPaddingBottom,
+              left: widget.settings.headerPaddingLeft,
+              right: widget.settings.headerPaddingRight,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    _buildHeaderContent(widget.settings.headerLeftContent),
+                    Expanded(
+                      child: Center(
+                        child: _buildHeaderContent(
+                            widget.settings.headerCenterContent),
+                      ),
+                    ),
+                    _buildHeaderContent(widget.settings.headerRightContent),
+                  ],
+                ),
+                if (widget.settings.showHeaderLine)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Container(
+                      height: 0.5,
+                      color: _lineColor,
                     ),
                   ),
-                  _buildHeaderContent(widget.settings.headerRightContent),
-                ],
-              ),
-              if (widget.settings.showHeaderLine)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Container(
-                    height: 0.5,
-                    color: _lineColor,
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -463,5 +474,6 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
   TextStyle get _textStyle => TextStyle(
         color: _textColor,
         fontSize: 12,
+        height: 1.0,
       );
 }

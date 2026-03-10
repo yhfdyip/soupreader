@@ -1156,6 +1156,8 @@ class ReadingSettings {
       cleanChapterTitle: cleanChapterTitle,
       textBottomJustify: textBottomJustify,
       doublePage: doublePage,
+      autoChangeSource: autoChangeSource,
+      selectText: selectText,
     );
   }
 

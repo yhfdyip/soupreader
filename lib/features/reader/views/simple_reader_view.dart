@@ -4946,10 +4946,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                       ReaderBottomMenuNew(
                         currentChapterIndex: _currentChapterIndex,
                         totalChapters: _effectiveReadableChapterCount(),
+                        currentPageIndex: _pageFactory.currentPageIndex,
+                        totalPages: _pageFactory.totalPages.clamp(1, 999999),
                         settings: _settings,
                         currentTheme: _currentTheme,
                         onChapterChanged: (index) => _loadChapter(index),
                         onSeekChapterProgress: _seekByChapterProgress,
+                        onSeekPageProgress: _seekByPageProgress,
                         onSettingsChanged: (settings) =>
                             _updateSettings(settings),
                         onShowChapterList: _openChapterListFromMenu,

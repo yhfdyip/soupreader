@@ -539,17 +539,6 @@ class _RssArticlesPlaceholderViewState
     });
   }
 
-  int _resolveArticleStyle(RssSource? source) {
-    final style = source?.articleStyle ?? _fallbackArticleStyle;
-    return RssArticleStyleHelper.normalize(style);
-  }
-
-  String _buildLayoutStatus(RssSource? source) {
-    final style = _resolveArticleStyle(source);
-    final layout = RssArticleStyleHelper.isGridStyle(style) ? '网格布局' : '列表布局';
-    return 'articleStyle=$style（$layout）';
-  }
-
   Future<void> _switchLayout(RssSource source) async {
     final sourceUrl = source.sourceUrl.trim();
     if (sourceUrl.isEmpty) return;
@@ -1035,7 +1024,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
   late final RssArticleRepository _articleRepo;
   late final RssStarRepository _starRepo;
   int _refreshVersion = 0;
-  DateTime? _lastRefreshAt;
   RssArticle? _rssArticle;
   RssStar? _rssStar;
   int _favoriteLoadVersion = 0;
@@ -1092,22 +1080,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
   bool get _canShowFavoriteAction => _rssArticle != null;
   bool get _isInFavorites => _rssStar != null;
 
-  String _buildLoginStatus(RssSource? source) {
-    return _canOpenLogin(source) ? '可见（loginUrl 已配置）' : '隐藏（loginUrl 为空或源未命中）';
-  }
-
-  String _buildFavoriteStatus() {
-    if (!_canShowFavoriteAction) {
-      return '隐藏（当前页面未命中文章）';
-    }
-    if (_isInFavorites) {
-      final group = _rssStar!.group.trim();
-      final normalizedGroup = group.isEmpty ? '默认分组' : group;
-      return '已收藏（$normalizedGroup）';
-    }
-    return '未收藏';
-  }
-
   String? _resolveShareTarget() {
     final currentLink = _linkKey;
     if (currentLink.isNotEmpty) {
@@ -1118,10 +1090,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
       return articleLink;
     }
     return null;
-  }
-
-  String _buildShareStatus() {
-    return _resolveShareTarget() ?? '不可用（Null url）';
   }
 
   String? _resolveBrowserOpenTarget() {
@@ -1138,10 +1106,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
       return origin;
     }
     return null;
-  }
-
-  String _buildBrowserOpenStatus() {
-    return _resolveBrowserOpenTarget() ?? '不可用（url null）';
   }
 
   String _normalizeReadAloudText(String raw) {
@@ -1178,17 +1142,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
       }
     }
     return '';
-  }
-
-  String _buildReadAloudStatus() {
-    if (_readAloudPlaying) {
-      return '朗读中（点击顶栏朗读按钮可停止）';
-    }
-    final text = _resolveReadAloudText();
-    if (text.isEmpty) {
-      return '未朗读（当前无可朗读文本）';
-    }
-    return '未朗读（可用文本 ${text.length} 字）';
   }
 
   void _showToast(String message) {
@@ -1240,7 +1193,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
     if (!mounted) return;
     setState(() {
       _refreshVersion += 1;
-      _lastRefreshAt = DateTime.now();
     });
   }
 
@@ -1609,15 +1561,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
         },
       );
     }
-  }
-
-  String _buildRefreshStatus() {
-    final at = _lastRefreshAt;
-    if (at == null) return '尚未刷新';
-    final hour = at.hour.toString().padLeft(2, '0');
-    final minute = at.minute.toString().padLeft(2, '0');
-    final second = at.second.toString().padLeft(2, '0');
-    return '最近刷新 $hour:$minute:$second（第 $_refreshVersion 次）';
   }
 
   String _readMenuActionText(_RssReadMenuAction action) {
@@ -2529,139 +2472,6 @@ class _RssArticleGridCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PlaceholderCard extends StatelessWidget {
-  const _PlaceholderCard({
-    required this.title,
-    required this.message,
-  });
-
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
-          context,
-        ),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: TextStyle(
-              fontSize: 13,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SortPreviewCard extends StatelessWidget {
-  const _SortPreviewCard({
-    required this.loading,
-    required this.tabNames,
-  });
-
-  final bool loading;
-  final List<String> tabNames;
-
-  @override
-  Widget build(BuildContext context) {
-    final subtitle = loading
-        ? '加载中...'
-        : tabNames.isEmpty
-            ? '暂无分类'
-            : tabNames.join(' / ');
-    final tabVisibility = tabNames.length <= 1 ? '隐藏（≤1）' : '显示（>1）';
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '分类预览',
-            style: TextStyle(
-              fontSize: 12,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '分类数量：${tabNames.length}（Tab 栏$tabVisibility）',
-            style: const TextStyle(fontSize: 13),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-        ],
       ),
     );
   }

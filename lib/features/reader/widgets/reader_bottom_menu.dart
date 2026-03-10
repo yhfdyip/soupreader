@@ -11,10 +11,13 @@ import 'reader_menu_surface_style.dart';
 class ReaderBottomMenuNew extends StatefulWidget {
   final int currentChapterIndex;
   final int totalChapters;
+  final int currentPageIndex;
+  final int totalPages;
   final ReadingSettings settings;
   final ReadingThemeColors currentTheme;
   final ValueChanged<int> onChapterChanged;
   final ValueChanged<int> onSeekChapterProgress;
+  final ValueChanged<int> onSeekPageProgress;
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback onShowChapterList;
   final VoidCallback onShowReadAloud;
@@ -38,10 +41,13 @@ class ReaderBottomMenuNew extends StatefulWidget {
     super.key,
     required this.currentChapterIndex,
     required this.totalChapters,
+    required this.currentPageIndex,
+    required this.totalPages,
     required this.settings,
     required this.currentTheme,
     required this.onChapterChanged,
     required this.onSeekChapterProgress,
+    required this.onSeekPageProgress,
     required this.onSettingsChanged,
     required this.onShowChapterList,
     required this.onShowReadAloud,
@@ -269,72 +275,155 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     );
   }
 
+  // 对齐 Legado seekReadPage：支持 page/chapter 两种模式
   Widget _buildChapterSlider({
     required Color foreground,
     required Color mutedForeground,
   }) {
+    final isPageMode =
+        widget.settings.progressBarBehavior == ProgressBarBehavior.page;
+    final accent = _isDarkMode
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+
+    if (isPageMode) {
+      final maxPage = (widget.totalPages - 1).clamp(0, 999999);
+      final canSlide = maxPage > 0;
+      final sliderMax = canSlide ? maxPage.toDouble() : 1.0;
+      final rawValue = _isDragging
+          ? _safeFinite(_dragValue)
+          : _safeFinite(widget.currentPageIndex.toDouble());
+      final sliderValue = rawValue.clamp(0.0, sliderMax).toDouble();
+      final canPrev = widget.currentChapterIndex > 0;
+      final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(0, 6, 0, 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildChapterNavButton(
+                  label: '上一章',
+                  enabled: canPrev,
+                  color: canPrev ? foreground : mutedForeground,
+                  onTap: canPrev
+                      ? () => widget
+                          .onChapterChanged(widget.currentChapterIndex - 1)
+                      : null,
+                ),
+                Expanded(
+                  child: SizedBox(
+                    height: 28,
+                    child: CupertinoSlider(
+                      value: sliderValue,
+                      min: 0,
+                      max: sliderMax,
+                      activeColor: accent,
+                      thumbColor: _isDarkMode ? CupertinoColors.white : accent,
+                      onChanged: canSlide
+                          ? (value) => setState(() {
+                                _isDragging = true;
+                                _dragValue = value;
+                              })
+                          : null,
+                      onChangeEnd: canSlide
+                          ? (value) {
+                              setState(() => _isDragging = false);
+                              widget.onSeekPageProgress(
+                                  value.round().clamp(0, maxPage).toInt());
+                            }
+                          : null,
+                    ),
+                  ),
+                ),
+                _buildChapterNavButton(
+                  label: '下一章',
+                  enabled: canNext,
+                  color: canNext ? foreground : mutedForeground,
+                  onTap: canNext
+                      ? () => widget
+                          .onChapterChanged(widget.currentChapterIndex + 1)
+                      : null,
+                ),
+              ],
+            ),
+            Text(
+              '\${widget.currentPageIndex + 1} / \${widget.totalPages}',
+              style: TextStyle(color: mutedForeground, fontSize: 10),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // chapter 模式
     final maxChapter = (widget.totalChapters - 1).clamp(0, 9999);
     final canSlide = maxChapter > 0;
-    // CupertinoSlider 在 min==max 时语义层会触发 0 除，导致 NaN 崩溃。
     final sliderMax = canSlide ? maxChapter.toDouble() : 1.0;
     final rawSliderValue = _isDragging
         ? _safeFinite(_dragValue)
         : _safeFinite(widget.currentChapterIndex.toDouble());
     final sliderValue = rawSliderValue.clamp(0.0, sliderMax).toDouble();
-    final accent = _isDarkMode
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
     final canPrev = widget.currentChapterIndex > 0;
     final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 6, 0, 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildChapterNavButton(
-            label: '上一章',
-            enabled: canPrev,
-            color: canPrev ? foreground : mutedForeground,
-            onTap: canPrev
-                ? () => widget.onChapterChanged(widget.currentChapterIndex - 1)
-                : null,
-          ),
-          Expanded(
-            child: SizedBox(
-              height: 28,
-              child: CupertinoSlider(
-                value: sliderValue,
-                min: 0,
-                max: sliderMax,
-                activeColor: accent,
-                thumbColor: _isDarkMode ? CupertinoColors.white : accent,
-                onChanged: canSlide
-                    ? (value) {
-                        setState(() {
-                          _isDragging = true;
-                          _dragValue = value;
-                        });
-                      }
-                    : null,
-                onChangeEnd: canSlide
-                    ? (value) {
-                        setState(() => _isDragging = false);
-                        final targetChapter =
-                            value.round().clamp(0, maxChapter).toInt();
-                        widget.onSeekChapterProgress(targetChapter);
-                      }
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildChapterNavButton(
+                label: '上一章',
+                enabled: canPrev,
+                color: canPrev ? foreground : mutedForeground,
+                onTap: canPrev
+                    ? () =>
+                        widget.onChapterChanged(widget.currentChapterIndex - 1)
                     : null,
               ),
-            ),
+              Expanded(
+                child: SizedBox(
+                  height: 28,
+                  child: CupertinoSlider(
+                    value: sliderValue,
+                    min: 0,
+                    max: sliderMax,
+                    activeColor: accent,
+                    thumbColor: _isDarkMode ? CupertinoColors.white : accent,
+                    onChanged: canSlide
+                        ? (value) => setState(() {
+                              _isDragging = true;
+                              _dragValue = value;
+                            })
+                        : null,
+                    onChangeEnd: canSlide
+                        ? (value) {
+                            setState(() => _isDragging = false);
+                            widget.onSeekChapterProgress(
+                                value.round().clamp(0, maxChapter).toInt());
+                          }
+                        : null,
+                  ),
+                ),
+              ),
+              _buildChapterNavButton(
+                label: '下一章',
+                enabled: canNext,
+                color: canNext ? foreground : mutedForeground,
+                onTap: canNext
+                    ? () =>
+                        widget.onChapterChanged(widget.currentChapterIndex + 1)
+                    : null,
+              ),
+            ],
           ),
-          _buildChapterNavButton(
-            label: '下一章',
-            enabled: canNext,
-            color: canNext ? foreground : mutedForeground,
-            onTap: canNext
-                ? () => widget.onChapterChanged(widget.currentChapterIndex + 1)
-                : null,
+          Text(
+            '\${widget.currentChapterIndex + 1} / \${widget.totalChapters}',
+            style: TextStyle(color: mutedForeground, fontSize: 10),
           ),
         ],
       ),
