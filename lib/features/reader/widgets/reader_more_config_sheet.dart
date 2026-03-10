@@ -231,10 +231,12 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                                 (v) => _u(
                                     _s.copyWith(volumeKeyPageOnPlay: v))),
                           ],
-                        _sw('鼠标滚轮翻页', _s.mouseWheelPage,
-                            (v) => _u(_s.copyWith(mouseWheelPage: v))),
-                        _sw('长按按键翻页', _s.keyPageOnLongPress,
-                            (v) => _u(_s.copyWith(keyPageOnLongPress: v))),
+                        if (!_isIOS) ...[
+                          _sw('鼠标滚轮翻页', _s.mouseWheelPage,
+                              (v) => _u(_s.copyWith(mouseWheelPage: v))),
+                          _sw('长按按键翻页', _s.keyPageOnLongPress,
+                              (v) => _u(_s.copyWith(keyPageOnLongPress: v))),
+                        ],
                       ],
                     ),
                     AppListSection(
