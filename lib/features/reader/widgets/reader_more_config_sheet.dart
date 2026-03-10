@@ -54,6 +54,8 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                 fontSize: 15)),
         trailing: CupertinoSwitch(
             value: v, activeTrackColor: _accent, onChanged: cb),
+        onTap: () => cb(!v),
+        showChevron: false,
       );
 
   Widget _op(String t, String i, VoidCallback cb) => AppListTile(
