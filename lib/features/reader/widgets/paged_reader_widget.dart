@@ -1820,7 +1820,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     final firstRect = rects.first;
     final lastRect = rects.last;
-    final startHandlePos = Offset(firstRect.left, firstRect.top);
+    // 手柄圆点紧贴行底部（对标系统文本选择）
+    final startHandlePos = Offset(firstRect.left, firstRect.bottom);
     final endHandlePos = Offset(lastRect.right, lastRect.bottom);
 
     final highlightColor = CupertinoColors.activeBlue.withValues(alpha: 0.3);

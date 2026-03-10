@@ -106,6 +106,7 @@ class ReaderTextSelectionOverlayState
       height: _handleHitSize,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onTap: () {}, // 消耗点击事件，防止触发底层 onDismiss
         onPanUpdate: (details) {
           if (isStart) {
             widget.onStartHandleDragUpdate(details.globalPosition);
