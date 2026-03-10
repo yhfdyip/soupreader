@@ -243,8 +243,9 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
                       header: _hdr('操作'),
                       hasLeading: false,
                       children: [
-                        _sw('禁用返回键', _s.disableReturnKey,
-                            (v) => _u(_s.copyWith(disableReturnKey: v))),
+                        if (!_isIOS)
+                          _sw('禁用返回键', _s.disableReturnKey,
+                              (v) => _u(_s.copyWith(disableReturnKey: v))),
                         _sw('展开文本菜单', _s.expandTextMenu,
                             (v) => _u(_s.copyWith(expandTextMenu: v))),
                         _sw('自动换源', _s.autoChangeSource,
