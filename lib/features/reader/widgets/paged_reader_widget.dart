@@ -1567,18 +1567,25 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (result == null || _activeSelection == null) return;
     final (lineIndex, charIndex) = result;
     final sel = _activeSelection!;
-    // 确保 start <= end
-    if (lineIndex > sel.endLineIndex ||
-        (lineIndex == sel.endLineIndex && charIndex >= sel.endCharIndex)) {
-      return;
-    }
+    final isAfterEnd = lineIndex > sel.endLineIndex ||
+        (lineIndex == sel.endLineIndex && charIndex >= sel.endCharIndex);
     setState(() {
-      _activeSelection = _rebuildSelection(
-        startLineIndex: lineIndex,
-        startCharIndex: charIndex,
-        endLineIndex: sel.endLineIndex,
-        endCharIndex: sel.endCharIndex,
-      );
+      if (isAfterEnd) {
+        // 起始手柄拖过结束位置：交换，原结束变起始
+        _activeSelection = _rebuildSelection(
+          startLineIndex: sel.endLineIndex,
+          startCharIndex: sel.endCharIndex,
+          endLineIndex: lineIndex,
+          endCharIndex: charIndex,
+        );
+      } else {
+        _activeSelection = _rebuildSelection(
+          startLineIndex: lineIndex,
+          startCharIndex: charIndex,
+          endLineIndex: sel.endLineIndex,
+          endCharIndex: sel.endCharIndex,
+        );
+      }
     });
   }
 
@@ -1587,17 +1594,25 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (result == null || _activeSelection == null) return;
     final (lineIndex, charIndex) = result;
     final sel = _activeSelection!;
-    if (lineIndex < sel.startLineIndex ||
-        (lineIndex == sel.startLineIndex && charIndex <= sel.startCharIndex)) {
-      return;
-    }
+    final isBeforeStart = lineIndex < sel.startLineIndex ||
+        (lineIndex == sel.startLineIndex && charIndex <= sel.startCharIndex);
     setState(() {
-      _activeSelection = _rebuildSelection(
-        startLineIndex: sel.startLineIndex,
-        startCharIndex: sel.startCharIndex,
-        endLineIndex: lineIndex,
-        endCharIndex: charIndex,
-      );
+      if (isBeforeStart) {
+        // 结束手柄拖过起始位置：交换，原起始变结束
+        _activeSelection = _rebuildSelection(
+          startLineIndex: lineIndex,
+          startCharIndex: charIndex,
+          endLineIndex: sel.startLineIndex,
+          endCharIndex: sel.startCharIndex,
+        );
+      } else {
+        _activeSelection = _rebuildSelection(
+          startLineIndex: sel.startLineIndex,
+          startCharIndex: sel.startCharIndex,
+          endLineIndex: lineIndex,
+          endCharIndex: charIndex,
+        );
+      }
     });
   }
 
@@ -1703,7 +1718,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 计算底部对齐 extraGap（与 paintContentOnCanvas 一致）
     final contentHeight = size.height -
         (topSafe + _topOffset + widget.padding.top) -
-        (_resolveStableSystemPadding().bottom + _bottomOffset + widget.padding.bottom);
+        (systemPadding.bottom + _bottomOffset + widget.padding.bottom);
     final extraGap = LegacyJustifyComposer.computeBottomJustifyGap(
       bottomJustify: widget.settings.textBottomJustify,
       lines: lines,
