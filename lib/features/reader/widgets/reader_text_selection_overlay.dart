@@ -212,21 +212,22 @@ class _SelectionMenu extends StatelessWidget {
         ? CupertinoColors.white
         : CupertinoColors.label.resolveFrom(context);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: CupertinoColors.black.withValues(alpha: 0.18),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
           color: bg,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: CupertinoColors.black.withValues(alpha: 0.18),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
         child: Row(
           children: items.asMap().entries.map((entry) {
             final item = entry.value;
@@ -258,6 +259,7 @@ class _SelectionMenu extends StatelessWidget {
               ),
             );
           }).toList(),
+        ),
         ),
       ),
     );
