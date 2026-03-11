@@ -8,8 +8,6 @@ import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
 import 'app_squircle_surface.dart';
 
-part 'app_popover_menu_parts.dart';
-
 const double _screenEdgePadding = 10.0;
 const double _popoverVerticalGap = 8.0;
 
@@ -127,7 +125,7 @@ Future<T?> showAppPopoverMenu<T>({
               left: layout.position.left,
               top: layout.position.top,
               width: width,
-              child: _PopoverSurface(
+              child: AppPopoverSurface(
                 backgroundColor: bg,
                 borderColor: borderColor,
                 radius: resolvedRadius,
@@ -142,7 +140,7 @@ Future<T?> showAppPopoverMenu<T>({
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final item = items[index];
-                        return _PopoverMenuRow(
+                        return AppPopoverMenuRow(
                           height: itemHeight,
                           icon: item.icon,
                           label: item.label,
@@ -277,4 +275,121 @@ _PopoverLayout _resolveLayout({
     position: _PopoverPosition(left: left, top: top),
     maxHeight: maxHeight,
   );
+}
+
+class AppPopoverSurface extends StatelessWidget {
+  final Widget child;
+  final Color backgroundColor;
+  final Color borderColor;
+  final double radius;
+
+  const AppPopoverSurface({
+    required this.child,
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = AppUiTokens.resolve(context).isDark;
+    final shadowColor =
+        (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
+            .withValues(alpha: isDark ? 0.28 : 0.12);
+    return AppSquircleSurface(
+      padding: EdgeInsets.zero,
+      backgroundColor: backgroundColor,
+      borderColor: borderColor,
+      borderWidth: AppDesignTokens.hairlineBorderWidth,
+      radius: radius,
+      blurBackground: true,
+      shadows: <BoxShadow>[
+        BoxShadow(
+          color: shadowColor,
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+          spreadRadius: -8,
+        ),
+      ],
+      child: child,
+    );
+  }
+}
+
+class AppPopoverMenuRow extends StatelessWidget {
+  static const double _kIconLeadingInset = 40;
+
+  final double height;
+  final IconData icon;
+  final String label;
+  final bool enabled;
+  final bool showDivider;
+  final Color dividerColor;
+  final Color iconColor;
+  final Color textColor;
+  final VoidCallback? onTap;
+
+  const AppPopoverMenuRow({
+    required this.height,
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.showDivider,
+    required this.dividerColor,
+    required this.iconColor,
+    required this.textColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final uiTokens = AppUiTokens.resolve(context);
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: uiTokens.sizes.compactTapSquare,
+            onPressed: onTap,
+            child: SizedBox(
+              height: height,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 18, color: iconColor),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (showDivider)
+            Padding(
+              padding:
+                  const EdgeInsetsDirectional.only(start: _kIconLeadingInset),
+              child: SizedBox(
+                height: AppDesignTokens.hairlineBorderWidth,
+                child: ColoredBox(color: dividerColor),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
