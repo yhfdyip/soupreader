@@ -51,11 +51,16 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
           maxHeight: maxHeight,
         );
         final children = <Widget>[];
+        var usedHeight = 0.0;
         for (var i = 0; i < lines.length; i++) {
+          final line = lines[i];
+          if (maxHeight != null && usedHeight + line.height > maxHeight) break;
           if (i > 0 && extraGap > 0.01) {
             children.add(SizedBox(height: extraGap));
+            usedHeight += extraGap;
           }
-          children.add(lines[i].toWidget(style: style, maxWidth: maxWidth));
+          children.add(line.toWidget(style: style, maxWidth: maxWidth));
+          usedHeight += line.height;
         }
 
         return ClipRect(
