@@ -58,10 +58,12 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
           children.add(lines[i].toWidget(style: style, maxWidth: maxWidth));
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: children,
+        return ClipRect(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: children,
+          ),
         );
       },
     );
