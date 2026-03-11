@@ -59,10 +59,10 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
   late final TextEditingController _loginCheckJsCtrl;
   late final TextEditingController _headersCtrl;
 
-  bool _logining = false;
+  bool _loggingIn = false;
   bool _saving = false;
 
-  bool get _menuBusy => _logining || _saving;
+  bool get _menuBusy => _loggingIn || _saving;
 
   void _setSaving(bool value) {
     if (!mounted) return;
@@ -71,10 +71,10 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
     });
   }
 
-  void _setLogining(bool value) {
+  void _setLoggingIn(bool value) {
     if (!mounted) return;
     setState(() {
-      _logining = value;
+      _loggingIn = value;
     });
   }
 
@@ -125,7 +125,7 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
           ),
           AppNavBarButton(
             onPressed: _menuBusy ? null : _showMoreMenu,
-            child: _logining
+            child: _loggingIn
                 ? const CupertinoActivityIndicator(radius: 9)
                 : const Icon(CupertinoIcons.ellipsis),
             minimumSize: const Size(30, 30),
@@ -379,7 +379,7 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
         return;
       }
 
-      _setLogining(true);
+      _setLoggingIn(true);
       try {
         await _ruleStore.upsertRule(draftRule);
         widget.onRuleSaved?.call(draftRule);
@@ -418,7 +418,7 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
       } catch (error) {
         await _showMessage('登录失败：$error');
       } finally {
-        _setLogining(false);
+        _setLoggingIn(false);
       }
     }
 }

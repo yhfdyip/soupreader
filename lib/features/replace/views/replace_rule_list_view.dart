@@ -276,7 +276,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                                     fontSize: 13,
                                     color: hasSelection && !_menuBusy
                                         ? CupertinoColors.systemRed.resolveFrom(context)
-                                            .resolveFrom(context)
                                         : disabledColor,
                                   ),
                                 ),

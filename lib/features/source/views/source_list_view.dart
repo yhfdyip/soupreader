@@ -348,15 +348,29 @@ class _SourceListViewState extends State<SourceListView> {
     return null;
   }
 
-  SourceCheckStatus? _inlineCheckStatus(BookSource source) {
-    final item = _findCheckItem(source.bookSourceUrl);
+  Map<String, SourceCheckItem> _buildCheckItemIndex() {
+    final snapshot = _checkTaskService.snapshot;
+    if (snapshot == null) return const {};
+    return {for (final item in snapshot.items) item.source.bookSourceUrl: item};
+  }
+
+  SourceCheckStatus? _inlineCheckStatus(
+    BookSource source, {
+    Map<String, SourceCheckItem>? checkIndex,
+  }) {
+    final item =
+        checkIndex?[source.bookSourceUrl] ?? _findCheckItem(source.bookSourceUrl);
     if (item != null) return item.status;
     final cached = _checkTaskService.lastResultFor(source.bookSourceUrl);
     return cached?.status;
   }
 
-  String? _inlineCheckMessage(BookSource source) {
-    final item = _findCheckItem(source.bookSourceUrl);
+  String? _inlineCheckMessage(
+    BookSource source, {
+    Map<String, SourceCheckItem>? checkIndex,
+  }) {
+    final item =
+        checkIndex?[source.bookSourceUrl] ?? _findCheckItem(source.bookSourceUrl);
     final cached = _checkTaskService.lastResultFor(source.bookSourceUrl);
     final status = item?.status ?? cached?.status;
     if (status == null) return null;
@@ -618,10 +632,12 @@ class _SourceListViewState extends State<SourceListView> {
           color: titleColor,
         );
 
+    final checkIndex = _buildCheckItemIndex();
+
     Widget buildItem(BookSource source, int index) {
       final selected = _selectedUrls.contains(source.bookSourceUrl);
-      final checkStatus = _inlineCheckStatus(source);
-      final checkMessage = _inlineCheckMessage(source);
+      final checkStatus = _inlineCheckStatus(source, checkIndex: checkIndex);
+      final checkMessage = _inlineCheckMessage(source, checkIndex: checkIndex);
       final showHeader = _groupSourcesByDomain &&
           (index == 0 ||
               _hostOf(visible[index - 1].bookSourceUrl) !=

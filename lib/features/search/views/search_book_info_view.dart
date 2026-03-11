@@ -470,19 +470,23 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
     final targetName = _activeResult.name.trim();
     final targetAuthor = _activeResult.author.trim();
-    if (targetName.isNotEmpty && targetAuthor.isNotEmpty) {
-      for (final item in _bookRepo.getAllBooks()) {
-        if (item.title.trim() == targetName &&
-            item.author.trim() == targetAuthor) {
-          return item;
-        }
-      }
+    final targetBookUrl = _activeResult.bookUrl.trim();
+
+    if (targetName.isEmpty && targetAuthor.isEmpty && targetBookUrl.isEmpty) {
+      return null;
     }
 
-    final targetBookUrl = _activeResult.bookUrl.trim();
-    if (targetBookUrl.isEmpty) return null;
     for (final item in _bookRepo.getAllBooks()) {
-      if ((item.bookUrl ?? '').trim() == targetBookUrl) return item;
+      if (targetName.isNotEmpty &&
+          targetAuthor.isNotEmpty &&
+          item.title.trim() == targetName &&
+          item.author.trim() == targetAuthor) {
+        return item;
+      }
+      if (targetBookUrl.isNotEmpty &&
+          (item.bookUrl ?? '').trim() == targetBookUrl) {
+        return item;
+      }
     }
     return null;
   }
