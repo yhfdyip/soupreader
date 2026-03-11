@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/reading_settings.dart';
 import 'reader_color_picker_dialog.dart';
@@ -596,6 +597,7 @@ class _ReaderStyleEditSheetState extends State<ReaderStyleEditSheet> {
   }
 
   Future<void> _pickBgFile() async {
+    if (kIsWeb) return;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: false,
@@ -611,8 +613,9 @@ class _ReaderStyleEditSheetState extends State<ReaderStyleEditSheet> {
   }
 
   Widget _buildFilePickerRow(Color labelColor, Color mutedColor) {
-    final hasFile =
-        _draft.bgStr.isNotEmpty && File(_draft.bgStr).existsSync();
+    final hasFile = !kIsWeb &&
+        _draft.bgStr.isNotEmpty &&
+        File(_draft.bgStr).existsSync();
     final fileName = hasFile
         ? _draft.bgStr.split('/').last
         : '未选择图片';
