@@ -552,16 +552,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final shouldRefresh = _stableSystemPadding == null ||
         _stablePaddingOrientation != orientation ||
         _stableShowHeader != _hasHeaderSlot ||
-        _stableShowFooter != _hasFooterSlot;
+        _stableShowFooter != _hasFooterSlot ||
+        _stableSystemPadding != mediaPadding;
     if (shouldRefresh) {
       if (_isInteractionRunning && _stableSystemPadding != null) {
         _pendingSystemPaddingRefresh = true;
         _debugTrace('defer_padding_refresh_during_interaction');
       } else {
+        final paddingChanged = _stableSystemPadding != null &&
+            _stableSystemPadding != mediaPadding;
         _applyStableSystemPadding(
           padding: mediaPadding,
           orientation: orientation,
         );
+        if (paddingChanged && _needsPictureCache) {
+          _invalidatePictures();
+        }
       }
     }
     return _stableSystemPadding ?? mediaPadding;
@@ -2956,6 +2962,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado HorizontalPageDelegate.onTouch ===
   void _onDragStart(DragStartDetails details) {
     if (!widget.enableGestures) return;
+    // 对标 legado ACTION_DOWN：有活跃选区时，拖拽起始仅清除选区，不触发翻页
+    if (_activeSelection != null) {
+      _clearSelection();
+      return;
+    }
     _gestureInProgress = true;
     _cancelPendingSimulationPreparation();
     // 允许中断正在进行的动画，实现连续翻页

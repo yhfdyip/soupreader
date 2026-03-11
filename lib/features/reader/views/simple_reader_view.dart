@@ -214,6 +214,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   bool _showAutoReadPanel = false;
   // 记录自动阅读是否因菜单弹出而被暂停，关闭菜单时仅恢复此类暂停
   bool _autoPagerPausedByMenu = false;
+  EdgeInsets? _lastViewPadding;
   ReadAloudService? _readAloudServiceOrNull;
   ReadAloudService get _readAloudService =>
       _readAloudServiceOrNull ??= ReadAloudService(
@@ -713,6 +714,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         _isInitialized = true;
       });
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    if (_lastViewPadding != null && _lastViewPadding != viewPadding) {
+      if (_settings.pageTurnMode != PageTurnMode.scroll) {
+        _paginateContentLogicOnly();
+      }
+    }
+    _lastViewPadding = viewPadding;
   }
 
   @override
@@ -2875,6 +2888,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           oldSettings.themeIndex !=
               newSettings.themeIndex || // 主题变化可能影响字体? 暂时不用
           oldSettings.doublePage != newSettings.doublePage ||
+          oldSettings.showStatusBar != newSettings.showStatusBar ||
+          oldSettings.hideNavigationBar != newSettings.hideNavigationBar ||
+          oldSettings.headerMode != newSettings.headerMode ||
+          oldSettings.footerMode != newSettings.footerMode ||
+          oldSettings.paddingDisplayCutouts != newSettings.paddingDisplayCutouts ||
           contentTransformChanged) {
         needRepaginate = true;
       }
