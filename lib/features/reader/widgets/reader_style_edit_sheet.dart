@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../models/reading_settings.dart';
@@ -106,6 +109,10 @@ class _ReaderStyleEditSheetState extends State<ReaderStyleEditSheet> {
                       if (_draft.bgType == ReadStyleConfig.bgTypeAsset) ...[
                         _buildDivider(separatorColor),
                         _buildAssetPicker(separatorColor),
+                      ],
+                      if (_draft.bgType == ReadStyleConfig.bgTypeFile) ...[
+                        _buildDivider(separatorColor),
+                        _buildFilePickerRow(labelColor, mutedColor),
                       ],
                       _buildDivider(separatorColor),
                       _buildAlphaRow(labelColor, mutedColor),
@@ -268,6 +275,7 @@ class _ReaderStyleEditSheetState extends State<ReaderStyleEditSheet> {
     final types = [
       (ReadStyleConfig.bgTypeColor, '纯色'),
       (ReadStyleConfig.bgTypeAsset, '内置图片'),
+      (ReadStyleConfig.bgTypeFile, '自定义图片'),
     ];
     final chipBg = isDark
         ? CupertinoColors.white.withValues(alpha: 0.1)
@@ -569,6 +577,12 @@ class _ReaderStyleEditSheetState extends State<ReaderStyleEditSheet> {
         bgStr: '#${_hexRgb(_draft.backgroundColor)}',
         bgAlpha: 100,
       ));
+    } else if (type == ReadStyleConfig.bgTypeFile) {
+      _update(_draft.copyWith(
+        bgType: ReadStyleConfig.bgTypeFile,
+        bgStr: _draft.bgType == ReadStyleConfig.bgTypeFile ? _draft.bgStr : '',
+        bgAlpha: _draft.bgAlpha == 100 ? 80 : _draft.bgAlpha,
+      ));
     } else {
       final defaultAsset = kBundledBgAssets.isNotEmpty
           ? kBundledBgAssets.first
@@ -579,6 +593,56 @@ class _ReaderStyleEditSheetState extends State<ReaderStyleEditSheet> {
         bgAlpha: _draft.bgAlpha == 100 ? 80 : _draft.bgAlpha,
       ));
     }
+  }
+
+  Future<void> _pickBgFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (!mounted) return;
+    final path = result?.files.firstOrNull?.path;
+    if (path == null || path.isEmpty) return;
+    _update(_draft.copyWith(
+      bgType: ReadStyleConfig.bgTypeFile,
+      bgStr: path,
+      bgAlpha: _draft.bgAlpha == 100 ? 80 : _draft.bgAlpha,
+    ));
+  }
+
+  Widget _buildFilePickerRow(Color labelColor, Color mutedColor) {
+    final hasFile =
+        _draft.bgStr.isNotEmpty && File(_draft.bgStr).existsSync();
+    final fileName = hasFile
+        ? _draft.bgStr.split('/').last
+        : '未选择图片';
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onPressed: _pickBgFile,
+      child: Row(
+        children: [
+          Text(
+            '选择图片',
+            style: TextStyle(color: labelColor, fontSize: 15),
+          ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              fileName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: mutedColor, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            CupertinoIcons.chevron_right,
+            size: 16,
+            color: mutedColor,
+          ),
+        ],
+      ),
+    );
   }
 
   void _showPresetPicker() {
