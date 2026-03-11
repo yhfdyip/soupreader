@@ -7406,7 +7406,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     required String query,
   }) {
     return ReaderSearchNavigationHelper.resolvePageIndexByOccurrence(
-      pages: _pageFactory.currentPages,
+      pages: _pageFactory.currentPages.map((p) => p.text).toList(),
       query: query,
       occurrenceIndex: occurrenceIndex,
       chapterTitle: _currentTitle,
@@ -7416,7 +7416,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   int? _resolveSearchHitPageIndexByOffset(int contentOffset) {
     return ReaderSearchNavigationHelper.resolvePageIndexByOffset(
-      pages: _pageFactory.currentPages,
+      pages: _pageFactory.currentPages.map((p) => p.text).toList(),
       contentOffset: contentOffset,
     );
   }
