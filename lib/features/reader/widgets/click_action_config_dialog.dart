@@ -127,10 +127,12 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
     final gridWidth = screenSize.width - 32;
     final gridHeight = (gridWidth * screenSize.height / screenSize.width)
         .clamp(0.0, screenSize.height * 0.28);
-    final cellAspectRatio = gridWidth / gridHeight;
+    final cellWidth = gridWidth / 3;
+    final cellHeight = gridHeight / 3;
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       child: Container(
+        width: gridWidth,
         height: gridHeight,
         decoration: BoxDecoration(
           color: gridBg,
@@ -138,15 +140,20 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
           border: Border.all(
               color: sep, width: AppDesignTokens.hairlineBorderWidth),
         ),
-        child: GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            childAspectRatio: cellAspectRatio,
-          ),
-          itemCount: 9,
-          itemBuilder: (context, index) => _buildCell(context, ui, index, sep),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (row) {
+            return Row(
+              children: List.generate(3, (col) {
+                final index = row * 3 + col;
+                return SizedBox(
+                  width: cellWidth,
+                  height: cellHeight,
+                  child: _buildCell(context, ui, index, sep),
+                );
+              }),
+            );
+          }),
         ),
       ),
     );
