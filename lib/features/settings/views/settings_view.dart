@@ -238,7 +238,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_bookSourceManage'),
                     leadingIcon: CupertinoIcons.book,
                     title: const Text('书源管理'),
-                    subtitle: const Text('新建、导入、编辑或管理书源'),
                     onTap: () => _open(
                       context,
                       const SourceListView(),
@@ -248,7 +247,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_txtTocRuleManage'),
                     leadingIcon: CupertinoIcons.doc_text,
                     title: const Text('TXT目录规则'),
-                    subtitle: const Text('配置 TXT 目录规则'),
                     onTap: () => _open(
                       context,
                       const TxtTocRuleManageView(),
@@ -258,7 +256,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_replaceManage'),
                     leadingIcon: CupertinoIcons.wand_stars,
                     title: const Text('替换净化'),
-                    subtitle: const Text('配置替换净化规则'),
                     onTap: () => _open(
                       context,
                       const ReplaceRuleListView(),
@@ -268,7 +265,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_dictRuleManage'),
                     leadingIcon: CupertinoIcons.dot_radiowaves_right,
                     title: const Text('字典规则'),
-                    subtitle: const Text('配置字典规则'),
                     onTap: () => _open(
                       context,
                       const DictRuleManageView(),
@@ -278,7 +274,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_themeMode'),
                     leadingIcon: CupertinoIcons.circle_lefthalf_fill,
                     title: const Text('主题模式'),
-                    subtitle: const Text('选择主题模式'),
                     additionalInfo: Text(_themeModeSummary),
                     onTap: _pickThemeMode,
                   ),
@@ -296,13 +291,12 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
               AppListSection(
-                header: const Text('设置'),
+                header: _SectionHeader('设置'),
                 children: [
                   AppListTile(
                     key: const Key('my_menu_web_dav_setting'),
                     leadingIcon: CupertinoIcons.cloud_upload,
                     title: const Text('备份与恢复'),
-                    subtitle: const Text('WebDav 设置/导入旧版本数据'),
                     onTap: () => _open(
                       context,
                       const BackupSettingsView(),
@@ -312,7 +306,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_theme_setting'),
                     leadingIcon: CupertinoIcons.paintbrush,
                     title: const Text('主题设置'),
-                    subtitle: const Text('与界面/颜色相关的一些设置'),
                     onTap: () => _open(
                       context,
                       const ThemeSettingsView(),
@@ -322,7 +315,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_setting'),
                     leadingIcon: CupertinoIcons.gear,
                     title: const Text('其它设置'),
-                    subtitle: const Text('与功能相关的一些设置'),
                     onTap: () => _open(
                       context,
                       const OtherSettingsView(),
@@ -331,13 +323,12 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
               AppListSection(
-                header: const Text('其他'),
+                header: _SectionHeader('其他'),
                 children: [
                   AppListTile(
                     key: const Key('my_menu_bookmark'),
                     leadingIcon: CupertinoIcons.bookmark,
                     title: const Text('书签'),
-                    subtitle: const Text('所有书签'),
                     onTap: () => _open(
                       context,
                       const AllBookmarkView(),
@@ -347,7 +338,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_readRecord'),
                     leadingIcon: CupertinoIcons.clock,
                     title: const Text('阅读记录'),
-                    subtitle: const Text('阅读时间记录'),
                     onTap: () => _open(
                       context,
                       const ReadingHistoryView(),
@@ -357,7 +347,6 @@ class _SettingsViewState extends State<SettingsView> {
                     key: const Key('my_menu_fileManage'),
                     leadingIcon: CupertinoIcons.folder,
                     title: const Text('文件管理'),
-                    subtitle: const Text('管理私有文件夹的文件'),
                     onTap: () => _open(
                       context,
                       const FileManageView(),
@@ -399,6 +388,25 @@ class _SettingsViewState extends State<SettingsView> {
   Future<void> _open(BuildContext context, Widget page) async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(builder: (_) => page),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: CupertinoColors.secondaryLabel.resolveFrom(context),
+        letterSpacing: 0.1,
+      ),
     );
   }
 }
