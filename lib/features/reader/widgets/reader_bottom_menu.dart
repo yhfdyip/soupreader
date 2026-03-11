@@ -350,7 +350,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               ],
             ),
             Text(
-              '\${widget.currentPageIndex + 1} / \${widget.totalPages}',
+              '${widget.currentPageIndex + 1} / ${widget.totalPages}',
               style: TextStyle(color: mutedForeground, fontSize: 10),
             ),
           ],
@@ -422,7 +422,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             ],
           ),
           Text(
-            '\${widget.currentChapterIndex + 1} / \${widget.totalChapters}',
+            '${widget.currentChapterIndex + 1} / ${widget.totalChapters}',
             style: TextStyle(color: mutedForeground, fontSize: 10),
           ),
         ],
