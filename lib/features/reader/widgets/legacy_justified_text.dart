@@ -58,7 +58,7 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
         var usedHeight = 0.0;
         for (var i = 0; i < lines.length; i++) {
           final line = lines[i];
-          if (maxHeight != null && usedHeight + line.height > maxHeight) break;
+          if (maxHeight != null && usedHeight + line.renderHeight > maxHeight) break;
           if (i > 0 && extraGap > 0.01) {
             children.add(SizedBox(height: extraGap));
             usedHeight += extraGap;
@@ -98,7 +98,11 @@ class LegacyComposedLine {
   final String plainText;
   final List<LegacyComposedSegment> segments;
   final bool justified;
+  /// 步进高度（含行距间隙），用于累加 currentY
   final double height;
+  /// 渲染高度（字体基准高度，不含行距间隙），用于截断判断。
+  /// 对标 legado: lineBottom - lineTop = textHeight（不含行距）
+  final double renderHeight;
   /// 行在页面内容区的起始 y 坐标（相对于 bodyOriginY），由 composeContentLines 填入
   final double lineStartY;
 
@@ -107,15 +111,17 @@ class LegacyComposedLine {
     required this.segments,
     required this.justified,
     required this.height,
+    double? renderHeight,
     this.lineStartY = 0.0,
-  });
+  }) : renderHeight = renderHeight ?? height;
 
-  factory LegacyComposedLine.empty({required double height, double lineStartY = 0.0}) {
+  factory LegacyComposedLine.empty({required double height, double? renderHeight, double lineStartY = 0.0}) {
     return LegacyComposedLine(
       plainText: '',
       segments: const <LegacyComposedSegment>[],
       justified: false,
       height: height,
+      renderHeight: renderHeight ?? height,
       lineStartY: lineStartY,
     );
   }
@@ -198,14 +204,19 @@ class LegacyJustifyComposer {
     required bool preserveEmptyLines,
   }) {
     final paragraphs = content.split('\n');
+    final fontSize = style.fontSize ?? 16.0;
     final lineHeight =
-        (style.fontSize ?? 16.0) * (style.height ?? 1.2).clamp(1.0, 2.5);
+        fontSize * (style.height ?? 1.2).clamp(1.0, 2.5);
     final lines = <LegacyComposedLine>[];
     var currentY = 0.0;
     for (final paragraph in paragraphs) {
       if (paragraph.trim().isEmpty) {
         if (preserveEmptyLines) {
-          lines.add(LegacyComposedLine.empty(height: lineHeight, lineStartY: currentY));
+          lines.add(LegacyComposedLine.empty(
+            height: lineHeight,
+            renderHeight: fontSize,
+            lineStartY: currentY,
+          ));
           currentY += lineHeight;
         }
         continue;
@@ -224,6 +235,7 @@ class LegacyJustifyComposer {
           segments: line.segments,
           justified: line.justified,
           height: line.height,
+          renderHeight: fontSize,
           lineStartY: currentY,
         ));
         currentY += line.height;
@@ -283,6 +295,8 @@ class LegacyJustifyComposer {
     final lines = <LegacyComposedLine>[];
     var offset = 0;
     final indentLen = paragraphIndent.length;
+    // 字体基准高度（不含行距间隙），对标 legado textHeight
+    final fontSizeForRender = style.fontSize ?? 16.0;
 
     for (var i = 0; i < lineMetrics.length; i++) {
       final metric = lineMetrics[i];
@@ -315,6 +329,7 @@ class LegacyJustifyComposer {
             ],
             justified: false,
             height: metric.height,
+            renderHeight: fontSizeForRender,
           ),
         );
         continue;
@@ -342,6 +357,7 @@ class LegacyJustifyComposer {
             ],
             justified: false,
             height: metric.height,
+            renderHeight: fontSizeForRender,
           ),
         );
         continue;
@@ -357,6 +373,7 @@ class LegacyJustifyComposer {
             ],
             justified: false,
             height: metric.height,
+            renderHeight: fontSizeForRender,
           ),
         );
         continue;
@@ -396,6 +413,7 @@ class LegacyJustifyComposer {
           segments: segments,
           justified: true,
           height: metric.height,
+          renderHeight: fontSizeForRender,
         ),
       );
     }
@@ -447,7 +465,7 @@ class LegacyJustifyComposer {
         y += extraGap;
       }
       final line = renderLines[lineIndex];
-      if (y - origin.dy > maxHeight) break;
+      if (y - origin.dy + line.renderHeight > maxHeight) break;
       if (line.segments.isEmpty || line.isVisualEmpty) {
         y += line.height;
         continue;

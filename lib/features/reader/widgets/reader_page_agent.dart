@@ -124,7 +124,8 @@ class ReaderPageAgent {
       if (paraText.isEmpty) {
         // 仅用于标题后的空行
         double emptyLineHeight = fontSize * lineHeight;
-        if (currentY + emptyLineHeight > maxPageHeight) {
+        // 对标 legado：分页判断用字体基准高度
+        if (currentY + fontSize > maxPageHeight) {
           commitPage();
         }
         currentPageContent.write('\n');
@@ -204,12 +205,18 @@ class ReaderPageAgent {
 
       List<ui.LineMetrics> lines = textPainter.computeLineMetrics();
       int boundaryOffset = 0;
+      // 字体基准高度（不含行距间隙），对标 legado textHeight = descent-ascent+leading
+      // 分页判断用基准高度，确保最后一行不因行距尾巴溢出
+      final curFontSize = isTitle
+          ? (titleFontSize ?? (fontSize + 4))
+          : fontSize;
 
       for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
         final line = lines[lineIndex];
-        final lineH = line.height;
-
-        if (currentY + lineH > maxPageHeight) {
+        final lineH = line.height; // 含行距，用于累加
+        // 对标 legado: prepareNextPageIfNeed(durY + textHeight)
+        // 分页判断只用字体基准高度，不含行距间隙
+        if (currentY + curFontSize > maxPageHeight) {
           commitPage();
         }
 
@@ -252,6 +259,7 @@ class ReaderPageAgent {
                 segments: composedLine.segments,
                 justified: composedLine.justified,
                 height: lineH,
+                renderHeight: curFontSize,
                 lineStartY: currentY,
               ));
             }
@@ -261,6 +269,7 @@ class ReaderPageAgent {
               segments: [LegacyComposedSegment(text: lineText, extraAfter: 0)],
               justified: false,
               height: lineH,
+              renderHeight: curFontSize,
               lineStartY: currentY,
             ));
           }
