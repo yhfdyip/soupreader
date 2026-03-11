@@ -2140,7 +2140,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   int _resolveClickAction(Offset position) {
-    final size = MediaQuery.sizeOf(context);
+    final size = (context.findRenderObject() as RenderBox?)?.size
+        ?? MediaQuery.sizeOf(context);
     final col = (position.dx / size.width * 3).floor().clamp(0, 2);
     final row = (position.dy / size.height * 3).floor().clamp(0, 2);
     const zones = [
@@ -2476,10 +2477,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           _clearSelection();
           return;
         }
-        _onTap(d.globalPosition);
+        _onTap(d.localPosition);
       },
       onLongPressStart: (widget.enableGestures && !_isInteractionRunning)
-          ? (details) => _onLongPressStart(details.globalPosition)
+          ? (details) => _onLongPressStart(details.localPosition)
           : null,
       onLongPressEnd: widget.selectTextEnabled
           ? (_) {
