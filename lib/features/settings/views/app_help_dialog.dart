@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
-import '../../../app/widgets/app_glass_sheet_panel.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 Future<void> showAppHelpDialog(
@@ -90,7 +90,7 @@ class _HelpDialogBody extends StatelessWidget {
     final separator = ui.colors.separator.withValues(alpha: 0.78);
     final text = markdownText.trim();
 
-    return AppGlassSheetPanel(
+    return AppSheetPanel(
       contentPadding: EdgeInsets.zero,
       radius: ui.radii.sheet,
       child: SafeArea(

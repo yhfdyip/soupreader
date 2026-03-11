@@ -5,7 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../../../app/theme/ui_tokens.dart';
-import '../../../app/widgets/app_glass_sheet_panel.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../models/dict_rule.dart';
 import '../services/dict_rule_store.dart';
 
@@ -264,7 +264,7 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
       child: SizedBox(
         width: width,
         height: height,
-        child: AppGlassSheetPanel(
+        child: AppSheetPanel(
           contentPadding: EdgeInsets.zero,
           radius: ui.radii.sheet,
           child: SafeArea(

@@ -592,8 +592,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final topSafe = systemPadding.top;
     final bottomSafe = systemPadding.bottom;
     final renderPosition = _factory.resolveRenderPosition(slot);
-    final effectiveRightRenderPosition =
-        rightRenderPosition ?? renderPosition;
+    final effectiveRightRenderPosition = rightRenderPosition ?? renderPosition;
 
     // 绘制背景
     canvas.drawRect(
@@ -603,16 +602,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     final pictureContent = _contentForPictureSnapshot(content);
     if (pictureContent.isNotEmpty) {
-      final totalWidth = size.width - widget.padding.left - widget.padding.right;
-      final columnWidth = _isDoublePage
-          ? (totalWidth - _doublePageGutter) / 2
-          : totalWidth;
+      final totalWidth =
+          size.width - widget.padding.left - widget.padding.right;
+      final columnWidth =
+          _isDoublePage ? (totalWidth - _doublePageGutter) / 2 : totalWidth;
       final contentHeight = size.height -
           (topSafe + _topOffset + widget.padding.top) -
           (bottomSafe + _bottomOffset + widget.padding.bottom);
 
-      void paintColumn(String col, double originX,
-          PageRenderPosition colRenderPosition) {
+      void paintColumn(
+          String col, double originX, PageRenderPosition colRenderPosition) {
         final titleData = _resolvePageTitleRenderData(
           content: col,
           renderPosition: colRenderPosition,
@@ -662,7 +661,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           paintColumn(rightCol, rightOriginX, effectiveRightRenderPosition);
 
         // 双栏中间分隔线
-        final dividerX = widget.padding.left + columnWidth + _doublePageGutter / 2;
+        final dividerX =
+            widget.padding.left + columnWidth + _doublePageGutter / 2;
         canvas.drawLine(
           Offset(dividerX, topSafe + _topOffset + widget.padding.top),
           Offset(dividerX,
@@ -697,10 +697,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }) {
     final statusColor = _tipTextColor;
     final dividerColor = _tipDividerColor;
-    final headerStyle =
-        widget.textStyle.copyWith(fontSize: 12, height: 1.0, color: statusColor);
-    final footerStyle =
-        widget.textStyle.copyWith(fontSize: 11, height: 1.0, color: statusColor);
+    final headerStyle = widget.textStyle
+        .copyWith(fontSize: 12, height: 1.0, color: statusColor);
+    final footerStyle = widget.textStyle
+        .copyWith(fontSize: 11, height: 1.0, color: statusColor);
 
     if (_showHeader) {
       final y = topSafe +
@@ -749,28 +749,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (_showFooter) {
-      final sample = _tipTextForFooter(
-            widget.settings.footerLeftContent,
-            renderPosition: renderPosition,
-          ) ??
-          _tipTextForFooter(
-            widget.settings.footerCenterContent,
-            renderPosition: renderPosition,
-          ) ??
-          _tipTextForFooter(
-            widget.settings.footerRightContent,
-            renderPosition: renderPosition,
-          ) ??
-          '';
-      final samplePainter = TextPainter(
-        text: TextSpan(text: sample, style: footerStyle),
-        textDirection: ui.TextDirection.ltr,
-      )..layout();
-      final y = size.height -
-          bottomSafe -
-          PagedReaderWidget._tipFooterEdgeInset -
-          widget.settings.footerPaddingBottom -
-          samplePainter.height;
+      final footerSlotTop =
+          size.height - bottomSafe - widget.padding.bottom - _bottomOffset;
+      final dividerHeight = widget.settings.showFooterLine
+          ? PagedReaderWidget._tipLineGap +
+              PagedReaderWidget._tipDividerThickness
+          : 0.0;
+      final y = footerSlotTop +
+          PagedReaderWidget._tipFooterEdgeInset +
+          widget.settings.footerPaddingTop +
+          dividerHeight;
       _paintTipRow(
         canvas,
         size,
@@ -1095,9 +1083,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       size,
       slot: PageRenderSlot.current,
       rightContent: _isDoublePage ? _factory.nextPage : null,
-      rightRenderPosition: _isDoublePage
-          ? _factory.resolveRenderPositionByOffset(1)
-          : null,
+      rightRenderPosition:
+          _isDoublePage ? _factory.resolveRenderPositionByOffset(1) : null,
     );
   }
 
@@ -1116,9 +1103,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.prev,
           rightContent: _isDoublePage ? _factory.prevPage : null,
-          rightRenderPosition: _isDoublePage
-              ? _factory.resolveRenderPositionByOffset(-1)
-              : null,
+          rightRenderPosition:
+              _isDoublePage ? _factory.resolveRenderPositionByOffset(-1) : null,
         );
       } else {
         _prevPagePicture?.dispose();
@@ -1131,9 +1117,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.next,
           rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
-          rightRenderPosition: _isDoublePage
-              ? _factory.resolveRenderPositionByOffset(3)
-              : null,
+          rightRenderPosition:
+              _isDoublePage ? _factory.resolveRenderPositionByOffset(3) : null,
         );
       } else {
         _nextPagePicture?.dispose();
@@ -1154,9 +1139,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.prev,
           rightContent: _isDoublePage ? _factory.prevPage : null,
-          rightRenderPosition: _isDoublePage
-              ? _factory.resolveRenderPositionByOffset(-1)
-              : null,
+          rightRenderPosition:
+              _isDoublePage ? _factory.resolveRenderPositionByOffset(-1) : null,
         );
       } else {
         _prevPagePicture?.dispose();
@@ -1174,9 +1158,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           size,
           slot: PageRenderSlot.next,
           rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
-          rightRenderPosition: _isDoublePage
-              ? _factory.resolveRenderPositionByOffset(3)
-              : null,
+          rightRenderPosition:
+              _isDoublePage ? _factory.resolveRenderPositionByOffset(3) : null,
         );
       } else {
         _nextPagePicture?.dispose();
@@ -1317,9 +1300,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         slot: PageRenderSlot.current,
         rightContent: _isDoublePage ? _factory.nextPage : null,
-        rightRenderPosition: _isDoublePage
-            ? _factory.resolveRenderPositionByOffset(1)
-            : null,
+        rightRenderPosition:
+            _isDoublePage ? _factory.resolveRenderPositionByOffset(1) : null,
       );
       return true;
     }
@@ -1332,9 +1314,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         slot: PageRenderSlot.prev,
         rightContent: _isDoublePage ? _factory.prevPage : null,
-        rightRenderPosition: _isDoublePage
-            ? _factory.resolveRenderPositionByOffset(-1)
-            : null,
+        rightRenderPosition:
+            _isDoublePage ? _factory.resolveRenderPositionByOffset(-1) : null,
       );
       return true;
     }
@@ -1347,9 +1328,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         size,
         slot: PageRenderSlot.next,
         rightContent: _isDoublePage ? _factory.nextNextNextPage : null,
-        rightRenderPosition: _isDoublePage
-            ? _factory.resolveRenderPositionByOffset(3)
-            : null,
+        rightRenderPosition:
+            _isDoublePage ? _factory.resolveRenderPositionByOffset(3) : null,
       );
       return true;
     }
@@ -1665,9 +1645,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (content.trim().isEmpty) return null;
     final size = MediaQuery.sizeOf(context);
     final totalWidth = size.width - widget.padding.left - widget.padding.right;
-    final columnWidth = _isDoublePage
-        ? (totalWidth - _doublePageGutter) / 2
-        : totalWidth;
+    final columnWidth =
+        _isDoublePage ? (totalWidth - _doublePageGutter) / 2 : totalWidth;
     if (columnWidth <= 0) return null;
     final renderPosition =
         _factory.resolveRenderPosition(PageRenderSlot.current);
@@ -1695,9 +1674,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (content.trim().isEmpty) return null;
     final size = MediaQuery.sizeOf(context);
     final totalWidth = size.width - widget.padding.left - widget.padding.right;
-    final columnWidth = _isDoublePage
-        ? (totalWidth - _doublePageGutter) / 2
-        : totalWidth;
+    final columnWidth =
+        _isDoublePage ? (totalWidth - _doublePageGutter) / 2 : totalWidth;
     if (columnWidth <= 0) return null;
     final systemPadding = _resolveStableSystemPadding();
     final topSafe = systemPadding.top;
@@ -1759,15 +1737,20 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     var safeIndex = index.clamp(0, normalized.length - 1).toInt();
     // 空白字符：找最近非空白
     if (_isWhitespace(normalized[safeIndex])) {
-      final left = _findNearestNonWhitespace(text: normalized, start: safeIndex, step: -1);
-      final right = _findNearestNonWhitespace(text: normalized, start: safeIndex, step: 1);
-      if (left == null && right == null) return (safeIndex, (safeIndex + 1).clamp(0, text.length));
+      final left = _findNearestNonWhitespace(
+          text: normalized, start: safeIndex, step: -1);
+      final right = _findNearestNonWhitespace(
+          text: normalized, start: safeIndex, step: 1);
+      if (left == null && right == null)
+        return (safeIndex, (safeIndex + 1).clamp(0, text.length));
       if (left == null) {
         safeIndex = right!;
       } else if (right == null) {
         safeIndex = left;
       } else {
-        safeIndex = (safeIndex - left).abs() <= (right - safeIndex).abs() ? left : right;
+        safeIndex = (safeIndex - left).abs() <= (right - safeIndex).abs()
+            ? left
+            : right;
       }
     }
     final current = normalized[safeIndex];
@@ -1802,9 +1785,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final systemPadding = _resolveStableSystemPadding();
     final topSafe = systemPadding.top;
     final totalWidth = size.width - widget.padding.left - widget.padding.right;
-    final columnWidth = _isDoublePage
-        ? (totalWidth - _doublePageGutter) / 2
-        : totalWidth;
+    final columnWidth =
+        _isDoublePage ? (totalWidth - _doublePageGutter) / 2 : totalWidth;
     final renderPosition =
         _factory.resolveRenderPosition(PageRenderSlot.current);
     final titleData = _resolvePageTitleRenderData(
@@ -1843,7 +1825,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final startHandlePos = Offset(firstRect.left, firstRect.bottom);
     final endHandlePos = Offset(lastRect.right, lastRect.bottom);
 
-    final highlightColor = CupertinoColors.activeBlue.resolveFrom(context).withValues(alpha: 0.3);
+    final highlightColor =
+        CupertinoColors.activeBlue.resolveFrom(context).withValues(alpha: 0.3);
     final handleColor = CupertinoColors.activeBlue.resolveFrom(context);
 
     return ReaderTextSelectionOverlay(
@@ -2474,8 +2457,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // - 滚动模式不使用 PagedReaderWidget（见 SimpleReaderView），因此这里直接兜底为水平。
     // - 这样即使历史配置里残留 `pageDirection=vertical`，也不会把 slide/cover/none/simulation 变成垂直翻页。
     final isVertical = false;
-    // 只有启用手势时才允许滑动翻页
-    final enableDrag = widget.enableGestures;
+    // 只有启用手势且无活跃选区时才允许滑动翻页
+    final enableDrag = widget.enableGestures && _activeSelection == null;
 
     final size = MediaQuery.sizeOf(context);
     return GestureDetector(
@@ -2873,7 +2856,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       // => VirtualTouchX = 2 * _touchX - size.width
       simulationTouchX = 2 * _touchX - size.width;
     }
-
 
     return CustomPaint(
       size: size,
@@ -3470,7 +3452,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       ),
     );
   }
-
 
   void _trackPagedImageIntrinsicSize({
     required String src,

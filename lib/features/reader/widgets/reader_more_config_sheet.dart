@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/app_sheet_header.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -52,8 +53,8 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
             style: TextStyle(
                 color: CupertinoColors.label.resolveFrom(context),
                 fontSize: 15)),
-        trailing: CupertinoSwitch(
-            value: v, activeTrackColor: _accent, onChanged: cb),
+        trailing:
+            CupertinoSwitch(value: v, activeTrackColor: _accent, onChanged: cb),
         onTap: () => cb(!v),
         showChevron: false,
       );
@@ -111,8 +112,8 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
       title: '进度条行为',
       currentValue: _s.progressBarBehavior,
       items: ProgressBarBehavior.values
-          .map((v) => OptionPickerItem<ProgressBarBehavior>(
-              value: v, label: v.label))
+          .map((v) =>
+              OptionPickerItem<ProgressBarBehavior>(value: v, label: v.label))
           .toList(growable: false),
     );
     if (r == null) return;
@@ -120,8 +121,7 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
   }
 
   Future<void> _pickTouchSlop() async {
-    final ctrl =
-        TextEditingController(text: _s.pageTouchSlop.toString());
+    final ctrl = TextEditingController(text: _s.pageTouchSlop.toString());
     final r = await showCupertinoBottomDialog<int>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
@@ -136,8 +136,7 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
         ),
         actions: [
           CupertinoDialogAction(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           CupertinoDialogAction(
               isDefaultAction: true,
               onPressed: () =>
@@ -160,140 +159,127 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = _isDark
-        ? CupertinoColors.systemGroupedBackground.resolveFrom(context).darkColor
-        : CupertinoColors.systemGroupedBackground.resolveFrom(context).color;
     final h = MediaQuery.sizeOf(context).height;
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppDesignTokens.radiusSheet)),
-      child: Container(
-        color: bg,
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const AppSheetHeader(title: '阅读设置'),
-              SizedBox(
-                height: h * 0.62,
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  children: [
-                    AppListSection(
-                      header: _hdr('显示'),
-                      hasLeading: false,
-                      children: [
-                        _op('屏幕方向',
-                            ReaderScreenOrientation.label(_s.screenOrientation),
-                            _pickOrientation),
-                        _op('屏幕常亮', _keepLightLabel, _pickKeepLight),
-                        _sw('隐藏状态栏', !_s.showStatusBar,
-                            (v) => _u(_s.copyWith(showStatusBar: !v))),
-                        if (!_isIOS) ...[
-                          _sw('隐藏导航栏', _s.hideNavigationBar,
-                              (v) => _u(_s.copyWith(hideNavigationBar: v))),
-                          _sw('刘海屏留边', _s.paddingDisplayCutouts,
-                              (v) => _u(
-                                  _s.copyWith(paddingDisplayCutouts: v))),
-                        ],
-                        _sw('双页模式', _s.doublePage,
-                            (v) => _u(_s.copyWith(doublePage: v))),
-                        _op('进度条行为', _progressBarLabel,
-                            _pickProgressBarBehavior),
-                        _sw('显示亮度条', _s.showBrightnessView,
-                            (v) => _u(
-                                _s.copyWith(showBrightnessView: v))),
-                        _sw('显示标题附加信息', _s.showReadTitleAddition,
-                            (v) => _u(
-                                _s.copyWith(showReadTitleAddition: v))),
-                        _sw('菜单栏样式跟随页面', _s.readBarStyleFollowPage,
-                            (v) => _u(
-                                _s.copyWith(readBarStyleFollowPage: v))),
+    return AppSheetPanel(
+      contentPadding: EdgeInsets.zero,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppSheetHeader(title: '阅读设置'),
+            SizedBox(
+              height: h * 0.62,
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 12),
+                children: [
+                  AppListSection(
+                    header: _hdr('显示'),
+                    hasLeading: false,
+                    children: [
+                      _op(
+                          '屏幕方向',
+                          ReaderScreenOrientation.label(_s.screenOrientation),
+                          _pickOrientation),
+                      _op('屏幕常亮', _keepLightLabel, _pickKeepLight),
+                      _sw('隐藏状态栏', !_s.showStatusBar,
+                          (v) => _u(_s.copyWith(showStatusBar: !v))),
+                      if (!_isIOS) ...[
+                        _sw('隐藏导航栏', _s.hideNavigationBar,
+                            (v) => _u(_s.copyWith(hideNavigationBar: v))),
+                        _sw('刘海屏留边', _s.paddingDisplayCutouts,
+                            (v) => _u(_s.copyWith(paddingDisplayCutouts: v))),
                       ],
-                    ),
-                    AppListSection(
-                      header: _hdr('翻页与按键'),
-                      hasLeading: false,
-                      children: [
-                        _op(
-                            '翻页触发阈值',
-                            _s.pageTouchSlop == 0
-                                ? '系统默认'
-                                : '${_s.pageTouchSlop} dp',
-                            _pickTouchSlop),
-                        _sw('滚动翻页无动画', _s.noAnimScrollPage,
-                            (v) => _u(_s.copyWith(noAnimScrollPage: v))),
-                        if (_volumeSupported) ...
-                          [
-                            _sw('音量键翻页', _s.volumeKeyPage,
-                                (v) => _u(_s.copyWith(volumeKeyPage: v))),
-                            _sw('朗读时音量键翻页', _s.volumeKeyPageOnPlay,
-                                (v) => _u(
-                                    _s.copyWith(volumeKeyPageOnPlay: v))),
-                          ],
-                        if (!_isIOS) ...[
-                          _sw('鼠标滚轮翻页', _s.mouseWheelPage,
-                              (v) => _u(_s.copyWith(mouseWheelPage: v))),
-                          _sw('长按按键翻页', _s.keyPageOnLongPress,
-                              (v) => _u(_s.copyWith(keyPageOnLongPress: v))),
-                        ],
+                      _sw('双页模式', _s.doublePage,
+                          (v) => _u(_s.copyWith(doublePage: v))),
+                      _op('进度条行为', _progressBarLabel, _pickProgressBarBehavior),
+                      _sw('显示亮度条', _s.showBrightnessView,
+                          (v) => _u(_s.copyWith(showBrightnessView: v))),
+                      _sw('显示标题附加信息', _s.showReadTitleAddition,
+                          (v) => _u(_s.copyWith(showReadTitleAddition: v))),
+                      _sw('菜单栏样式跟随页面', _s.readBarStyleFollowPage,
+                          (v) => _u(_s.copyWith(readBarStyleFollowPage: v))),
+                    ],
+                  ),
+                  AppListSection(
+                    header: _hdr('翻页与按键'),
+                    hasLeading: false,
+                    children: [
+                      _op(
+                          '翻页触发阈值',
+                          _s.pageTouchSlop == 0
+                              ? '系统默认'
+                              : '${_s.pageTouchSlop} dp',
+                          _pickTouchSlop),
+                      _sw('滚动翻页无动画', _s.noAnimScrollPage,
+                          (v) => _u(_s.copyWith(noAnimScrollPage: v))),
+                      if (_volumeSupported) ...[
+                        _sw('音量键翻页', _s.volumeKeyPage,
+                            (v) => _u(_s.copyWith(volumeKeyPage: v))),
+                        _sw('朗读时音量键翻页', _s.volumeKeyPageOnPlay,
+                            (v) => _u(_s.copyWith(volumeKeyPageOnPlay: v))),
                       ],
-                    ),
-                    AppListSection(
-                      header: _hdr('操作'),
-                      hasLeading: false,
-                      children: [
-                        if (!_isIOS)
-                          _sw('禁用返回键', _s.disableReturnKey,
-                              (v) => _u(_s.copyWith(disableReturnKey: v))),
-                        _sw('展开文本菜单', _s.expandTextMenu,
-                            (v) => _u(_s.copyWith(expandTextMenu: v))),
-                        _sw('自动换源', _s.autoChangeSource,
-                            (v) => _u(_s.copyWith(autoChangeSource: v))),
-                        _sw('允许选择正文', _s.selectText,
-                            (v) => _u(_s.copyWith(selectText: v))),
-                        AppListTile(
-                          title: Text('点击区域（9宫格）',
-                              style: TextStyle(
-                                  color: CupertinoColors.label.resolveFrom(context)
-                                      .resolveFrom(context),
-                                  fontSize: 15)),
-                          additionalInfo: Text('配置',
-                              style: TextStyle(
-                                  color: CupertinoColors.secondaryLabel.resolveFrom(context)
-                                      .resolveFrom(context),
-                                  fontSize: 13)),
-                          onTap: () => showClickActionConfigDialog(
-                            context,
-                            currentConfig: _s.clickActions,
-                            onSave: (c) =>
-                                _u(_s.copyWith(clickActions: c)),
-                          ),
+                      if (!_isIOS) ...[
+                        _sw('鼠标滚轮翻页', _s.mouseWheelPage,
+                            (v) => _u(_s.copyWith(mouseWheelPage: v))),
+                        _sw('长按按键翻页', _s.keyPageOnLongPress,
+                            (v) => _u(_s.copyWith(keyPageOnLongPress: v))),
+                      ],
+                    ],
+                  ),
+                  AppListSection(
+                    header: _hdr('操作'),
+                    hasLeading: false,
+                    children: [
+                      if (!_isIOS)
+                        _sw('禁用返回键', _s.disableReturnKey,
+                            (v) => _u(_s.copyWith(disableReturnKey: v))),
+                      _sw('展开文本菜单', _s.expandTextMenu,
+                          (v) => _u(_s.copyWith(expandTextMenu: v))),
+                      _sw('自动换源', _s.autoChangeSource,
+                          (v) => _u(_s.copyWith(autoChangeSource: v))),
+                      _sw('允许选择正文', _s.selectText,
+                          (v) => _u(_s.copyWith(selectText: v))),
+                      AppListTile(
+                        title: Text('点击区域（9宫格）',
+                            style: TextStyle(
+                                color: CupertinoColors.label
+                                    .resolveFrom(context)
+                                    .resolveFrom(context),
+                                fontSize: 15)),
+                        additionalInfo: Text('配置',
+                            style: TextStyle(
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context)
+                                    .resolveFrom(context),
+                                fontSize: 13)),
+                        onTap: () => showClickActionConfigDialog(
+                          context,
+                          currentConfig: _s.clickActions,
+                          onSave: (c) => _u(_s.copyWith(clickActions: c)),
                         ),
-                      ],
-                    ),
-                    AppListSection(
-                      header: _hdr('文本处理'),
-                      hasLeading: false,
-                      children: [
-                        _sw('净化章节标题', _s.cleanChapterTitle,
-                            (v) => _u(_s.copyWith(cleanChapterTitle: v))),
-                        _sw('两端对齐', _s.textFullJustify,
-                            (v) => _u(_s.copyWith(textFullJustify: v))),
-                        _sw('底部对齐', _s.textBottomJustify,
-                            (v) => _u(_s.copyWith(textBottomJustify: v))),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                  AppListSection(
+                    header: _hdr('文本处理'),
+                    hasLeading: false,
+                    children: [
+                      _sw('净化章节标题', _s.cleanChapterTitle,
+                          (v) => _u(_s.copyWith(cleanChapterTitle: v))),
+                      _sw('两端对齐', _s.textFullJustify,
+                          (v) => _u(_s.copyWith(textFullJustify: v))),
+                      _sw('底部对齐', _s.textBottomJustify,
+                          (v) => _u(_s.copyWith(textBottomJustify: v))),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
-

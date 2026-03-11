@@ -6196,6 +6196,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       builder: (context) => ReaderStyleQuickSheet(
         settings: _settings,
         themes: _activeReadStyles,
+        styleConfigs: _activeReadStyleConfigs,
         onSettingsChanged: (next) {
           if (next.pageTurnMode != _settings.pageTurnMode &&
               _bookPageAnimOverride != null) {

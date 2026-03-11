@@ -5,6 +5,7 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/widgets/app_sheet_header.dart';
 import '../models/reading_settings.dart';
+import 'reader_style_edit_sheet.dart';
 
 /// 阅读界面快速调整面板，对应底部菜单「界面」按钮。
 ///
@@ -13,6 +14,7 @@ import '../models/reading_settings.dart';
 class ReaderStyleQuickSheet extends StatefulWidget {
   final ReadingSettings settings;
   final List<ReadingThemeColors> themes;
+  final List<ReadStyleConfig> styleConfigs;
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback? onOpenTipSettings;
   final VoidCallback? onOpenPaddingSettings;
@@ -23,6 +25,7 @@ class ReaderStyleQuickSheet extends StatefulWidget {
     super.key,
     required this.settings,
     required this.themes,
+    required this.styleConfigs,
     required this.onSettingsChanged,
     this.onOpenTipSettings,
     this.onOpenPaddingSettings,
@@ -473,6 +476,9 @@ class _ReaderStyleQuickSheetState
             ? _draft.themeIndex
             : 0;
     final borderNormal = CupertinoColors.separator.resolveFrom(context);
+    final configs = widget.styleConfigs;
+    // 总格子数 = 样式数 + 1个「+」格
+    final cellCount = widget.themes.length + 1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
@@ -526,16 +532,21 @@ class _ReaderStyleQuickSheetState
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              itemCount: widget.themes.length,
+              itemCount: cellCount,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, i) {
+                // 最后一格为「+」新增按钮
+                if (i == widget.themes.length) {
+                  return _buildAddCell(isDark, borderNormal);
+                }
                 final selected = i == safeSelected;
                 final t = widget.themes[i];
-                return CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  onPressed: () =>
-                      _apply(_draft.copyWith(themeIndex: i)),
+                final config = i < configs.length ? configs[i] : null;
+                return GestureDetector(
+                  onTap: () => _apply(_draft.copyWith(themeIndex: i)),
+                  onLongPress: config != null
+                      ? () => _openEditSheet(i, config, configs)
+                      : null,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     width: 68,
@@ -601,6 +612,91 @@ class _ReaderStyleQuickSheetState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAddCell(bool isDark, Color borderNormal) {
+    final bg = isDark
+        ? CupertinoColors.white.withValues(alpha: 0.08)
+        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: _addNewStyle,
+      child: Container(
+        width: 68,
+        height: 52,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderNormal, width: 0.5),
+        ),
+        child: Icon(
+          CupertinoIcons.add,
+          color: isDark
+              ? CupertinoColors.white.withValues(alpha: 0.5)
+              : CupertinoColors.secondaryLabel.resolveFrom(context),
+          size: 22,
+        ),
+      ),
+    );
+  }
+
+  void _addNewStyle() {
+    final configs = widget.styleConfigs;
+    final newConfig = const ReadStyleConfig(
+      name: '新样式',
+      backgroundColor: 0xFFFFFFFF,
+      textColor: 0xFF333333,
+      bgType: ReadStyleConfig.bgTypeColor,
+      bgStr: '#FFFFFF',
+      bgAlpha: 100,
+    );
+    final newIndex = configs.length;
+    final newConfigs = List<ReadStyleConfig>.from(configs)..add(newConfig);
+    _apply(_draft.copyWith(
+      readStyleConfigs: newConfigs,
+      themeIndex: newIndex,
+    ));
+    // 打开编辑面板
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _openEditSheet(newIndex, newConfig, newConfigs);
+    });
+  }
+
+  void _openEditSheet(
+    int index,
+    ReadStyleConfig config,
+    List<ReadStyleConfig> configs,
+  ) {
+    final canDelete = configs.length > ReadStyleConfig.minEditableCount;
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => ReaderStyleEditSheet(
+        config: config,
+        canDelete: canDelete,
+        onChanged: (updated) {
+          final newConfigs = List<ReadStyleConfig>.from(configs);
+          if (index < newConfigs.length) {
+            newConfigs[index] = updated;
+          }
+          _apply(_draft.copyWith(readStyleConfigs: newConfigs));
+        },
+        onDelete: () {
+          final newConfigs = List<ReadStyleConfig>.from(configs);
+          if (index < newConfigs.length) {
+            newConfigs.removeAt(index);
+          }
+          final newIndex = _draft.themeIndex >= newConfigs.length
+              ? newConfigs.length - 1
+              : _draft.themeIndex;
+          _apply(_draft.copyWith(
+            readStyleConfigs: newConfigs,
+            themeIndex: newIndex.clamp(0, newConfigs.length - 1),
+          ));
+        },
       ),
     );
   }

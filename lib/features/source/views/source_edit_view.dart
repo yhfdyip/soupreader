@@ -210,6 +210,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   String? _debugError;
   final List<_DebugLine> _debugLines = <_DebugLine>[];
   final List<_DebugLine> _debugLinesAll = <_DebugLine>[];
+  final ScrollController _basicTabScrollController = ScrollController();
+  final ScrollController _rulesTabScrollController = ScrollController();
   final ScrollController _debugTabScrollController = ScrollController();
   bool _debugAutoFollowLogs = true;
   bool _debugAutoScrollQueued = false;
@@ -472,6 +474,8 @@ class _SourceEditViewState extends State<SourceEditView> {
     _debugKeyCtrl.dispose();
     _debugKeyFocusNode.removeListener(_onDebugKeyFocusChanged);
     _debugKeyFocusNode.dispose();
+    _basicTabScrollController.dispose();
+    _rulesTabScrollController.dispose();
     _debugTabScrollController.removeListener(_onDebugTabScrolled);
     _debugTabScrollController.dispose();
     super.dispose();
@@ -479,20 +483,25 @@ class _SourceEditViewState extends State<SourceEditView> {
 
   @override
   Widget build(BuildContext context) {
+    final segStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      letterSpacing: -0.2,
+    );
+    Widget seg(String t) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text(t, textAlign: TextAlign.center, style: segStyle),
+        );
     final tabControl = SizedBox(
       width: double.infinity,
       child: CupertinoSlidingSegmentedControl<int>(
         groupValue: _tab,
         padding: const EdgeInsets.all(3),
-        children: const {
-          0: Padding(
-              padding: EdgeInsets.symmetric(vertical: 7), child: Text('基础', textAlign: TextAlign.center)),
-          1: Padding(
-              padding: EdgeInsets.symmetric(vertical: 7), child: Text('规则', textAlign: TextAlign.center)),
-          2: Padding(
-              padding: EdgeInsets.symmetric(vertical: 7), child: Text('JSON', textAlign: TextAlign.center)),
-          3: Padding(
-              padding: EdgeInsets.symmetric(vertical: 7), child: Text('调试', textAlign: TextAlign.center)),
+        children: {
+          0: seg('基础'),
+          1: seg('规则'),
+          2: seg('JSON'),
+          3: seg('调试'),
         },
         onValueChanged: (v) {
           if (v == null) return;
@@ -548,37 +557,46 @@ class _SourceEditViewState extends State<SourceEditView> {
   // 对齐 Legado activity_book_source_edit.xml 顶部横向滚动控制栏
   // 书源类型选择 + 启用/发现/Cookie 快捷开关，始终可见
   Widget _buildTopControlBar() {
-    final labelStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+    final ui = AppUiTokens.resolve(context);
+    final baseStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final labelStyle = baseStyle.copyWith(
       fontSize: 14,
+      letterSpacing: -0.2,
     );
+    final typeBg = CupertinoColors.tertiarySystemFill.resolveFrom(context);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
-          Text('书源类型', style: labelStyle),
-          const SizedBox(width: 4),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            color: CupertinoColors.secondarySystemFill.resolveFrom(context),
-            borderRadius: BorderRadius.circular(8),
-            minimumSize: Size.zero,
-            onPressed: _pickSourceType,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _sourceTypeLabel(
-                      int.tryParse(_typeCtrl.text.trim()) ?? 0),
-                  style: labelStyle,
+          Text('书源类型', style: labelStyle.copyWith(color: ui.colors.secondaryLabel)),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: _pickSourceType,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: typeBg,
+                borderRadius: BorderRadius.circular(ui.radii.control),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _sourceTypeLabel(
+                          int.tryParse(_typeCtrl.text.trim()) ?? 0),
+                      style: labelStyle,
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      CupertinoIcons.chevron_down,
+                      size: 11,
+                      color: ui.colors.tertiaryLabel,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                Icon(
-                  CupertinoIcons.chevron_down,
-                  size: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ],
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -600,17 +618,22 @@ class _SourceEditViewState extends State<SourceEditView> {
     bool value,
     ValueChanged<bool> onChanged,
   ) {
+    final ui = AppUiTokens.resolve(context);
     final labelStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
       fontSize: 14,
+      letterSpacing: -0.2,
     );
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: labelStyle),
-        const SizedBox(width: 6),
-        CupertinoSwitch(
-          value: value,
-          onChanged: onChanged,
+        Text(label, style: labelStyle.copyWith(color: ui.colors.secondaryLabel)),
+        const SizedBox(width: 5),
+        Transform.scale(
+          scale: 0.78,
+          child: CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+          ),
         ),
       ],
     );
@@ -621,6 +644,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         _previewChapterUrl != null && _previewChapterUrl!.trim().isNotEmpty;
 
     return AppListView(
+      controller: _rulesTabScrollController,
       children: [
         AppListSection(
           header: const Text('搜索规则（ruleSearch）'),
@@ -847,6 +871,7 @@ class _SourceEditViewState extends State<SourceEditView> {
 
   Widget _buildBasicTab() {
     return AppListView(
+      controller: _basicTabScrollController,
       children: [
         AppListSection(
           header: const Text('基础信息'),
@@ -1072,17 +1097,21 @@ class _SourceEditViewState extends State<SourceEditView> {
             children: [
               Expanded(
                 child: CupertinoButton.filled(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                   onPressed: _formatJson,
-                  child: const Text('格式化'),
+                  child: const Text('格式化',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: CupertinoButton(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                   onPressed: _validateJson,
-                  child: const Text('校验'),
+                  child: const Text('校验',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
                 ),
               ),
             ],
@@ -3837,17 +3866,41 @@ class _SourceEditViewState extends State<SourceEditView> {
     String? placeholder,
     int maxLines = 1,
   }) {
+    final ui = AppUiTokens.resolve(context);
+    final bg = CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    final baseStyle = CupertinoTheme.of(context).textTheme.textStyle;
     return CupertinoListTile.notched(
       title: Text(title),
-      subtitle: CupertinoTextField(
-        controller: controller,
-        placeholder: placeholder,
-        maxLines: maxLines,
-        autocorrect: false,
-        enableSuggestions: false,
-        keyboardType: maxLines > 1
-            ? TextInputType.multiline
-            : TextInputType.url,
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 2),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(ui.radii.control),
+          ),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: placeholder,
+            maxLines: maxLines,
+            autocorrect: false,
+            enableSuggestions: false,
+            keyboardType: maxLines > 1
+                ? TextInputType.multiline
+                : TextInputType.url,
+            decoration: null,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            style: baseStyle.copyWith(
+              fontSize: 13,
+              color: ui.colors.label,
+              letterSpacing: -0.2,
+            ),
+            placeholderStyle: baseStyle.copyWith(
+              fontSize: 13,
+              color: ui.colors.tertiaryLabel,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ),
       ),
     );
   }

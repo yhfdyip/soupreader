@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
-import '../../../app/widgets/app_glass_sheet_panel.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
@@ -890,7 +890,7 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
       child: SizedBox(
         width: width,
         height: height,
-        child: AppGlassSheetPanel(
+        child: AppSheetPanel(
           contentPadding: EdgeInsets.zero,
           radius: ui.radii.sheet,
           child: SafeArea(

@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_card.dart';
-import '../../../app/widgets/app_glass_sheet_panel.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 
@@ -37,7 +37,7 @@ class _AppLogDialog extends StatelessWidget {
       child: SizedBox(
         width: width,
         height: height,
-        child: AppGlassSheetPanel(
+        child: AppSheetPanel(
           contentPadding: EdgeInsets.zero,
           radius: ui.radii.sheet,
           child: SafeArea(
@@ -182,7 +182,7 @@ class _AppLogStackTraceDialog extends StatelessWidget {
       child: SizedBox(
         width: width,
         height: height,
-        child: AppGlassSheetPanel(
+        child: AppSheetPanel(
           contentPadding: EdgeInsets.zero,
           radius: ui.radii.sheet,
           child: SafeArea(

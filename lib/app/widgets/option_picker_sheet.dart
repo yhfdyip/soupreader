@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
-import 'app_glass_sheet_panel.dart';
+import 'app_sheet_panel.dart';
 import 'app_ui_kit.dart';
 import 'cupertino_bottom_dialog.dart';
 
@@ -92,7 +92,7 @@ class _OptionPickerSheet<T> extends StatelessWidget {
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: sheetMaxHeight),
-        child: AppGlassSheetPanel(
+        child: AppSheetPanel(
           contentPadding: EdgeInsets.fromLTRB(10, _panelTopPadding, 10, bottomInset),
           radius: ui.radii.sheet,
           child: OptionPickerBody<T>(

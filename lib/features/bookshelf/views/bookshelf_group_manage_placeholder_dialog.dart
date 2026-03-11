@@ -203,12 +203,12 @@ class _BookshelfGroupManagePlaceholderDialogState
     }
   }
 
-  Future<_GroupEditDraft?> _showEditGroupDialog(
+  Future<BookshelfGroupEditDraft?> _showEditGroupDialog(
     BookshelfBookGroup? existing,
   ) {
-    return showCupertinoBottomDialog<_GroupEditDraft>(
+    return showCupertinoBottomDialog<BookshelfGroupEditDraft>(
       context: context,
-      builder: (dialogContext) => _GroupEditDialog(existing: existing),
+      builder: (dialogContext) => BookshelfGroupEditDialog(existing: existing),
     );
   }
 
@@ -432,16 +432,18 @@ class _GroupManageRow extends StatelessWidget {
   }
 }
 
-class _GroupEditDialog extends StatefulWidget {
-  const _GroupEditDialog({this.existing});
+class BookshelfGroupEditDialog extends StatefulWidget {
+  const BookshelfGroupEditDialog({super.key, this.existing});
 
   final BookshelfBookGroup? existing;
 
   @override
-  State<_GroupEditDialog> createState() => _GroupEditDialogState();
+  State<BookshelfGroupEditDialog> createState() =>
+      _BookshelfGroupEditDialogState();
 }
 
-class _GroupEditDialogState extends State<_GroupEditDialog> {
+class _BookshelfGroupEditDialogState
+    extends State<BookshelfGroupEditDialog> {
   late final TextEditingController _groupNameController;
 
   String? _coverPath;
@@ -507,7 +509,7 @@ class _GroupEditDialogState extends State<_GroupEditDialog> {
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('排序'),
         actions: [
-          for (final option in _groupSortOptions)
+          for (final option in bookshelfGroupSortOptions)
             CupertinoActionSheetAction(
               isDefaultAction: option.value == _bookSort,
               onPressed: () => Navigator.pop(popupContext, option.value),
@@ -532,7 +534,7 @@ class _GroupEditDialogState extends State<_GroupEditDialog> {
     }
     Navigator.pop(
       context,
-      _GroupEditDraft(
+      BookshelfGroupEditDraft(
         groupName: groupName,
         coverPath:
             (_coverPath ?? '').trim().isEmpty ? null : _coverPath!.trim(),
@@ -630,7 +632,7 @@ class _GroupEditDialogState extends State<_GroupEditDialog> {
                   ),
                   minimumSize: Size(26, 26),
                   onPressed: _pickSort,
-                  child: Text(_groupSortLabel(_bookSort)),
+                  child: Text(bookshelfGroupSortLabel(_bookSort)),
                 ),
               ],
             ),
@@ -673,8 +675,8 @@ class _GroupEditDialogState extends State<_GroupEditDialog> {
   }
 }
 
-class _GroupEditDraft {
-  const _GroupEditDraft({
+class BookshelfGroupEditDraft {
+  const BookshelfGroupEditDraft({
     required this.groupName,
     required this.bookSort,
     required this.enableRefresh,
@@ -687,25 +689,26 @@ class _GroupEditDraft {
   final bool enableRefresh;
 }
 
-class _GroupSortOption {
-  const _GroupSortOption(this.value, this.label);
+class BookshelfGroupSortOption {
+  const BookshelfGroupSortOption(this.value, this.label);
 
   final int value;
   final String label;
 }
 
-const List<_GroupSortOption> _groupSortOptions = <_GroupSortOption>[
-  _GroupSortOption(-1, '默认'),
-  _GroupSortOption(0, '按阅读时间'),
-  _GroupSortOption(1, '按更新时间'),
-  _GroupSortOption(2, '按书名'),
-  _GroupSortOption(3, '手动排序'),
-  _GroupSortOption(4, '综合排序'),
-  _GroupSortOption(5, '按作者'),
+const List<BookshelfGroupSortOption> bookshelfGroupSortOptions =
+    <BookshelfGroupSortOption>[
+  BookshelfGroupSortOption(-1, '默认'),
+  BookshelfGroupSortOption(0, '按阅读时间'),
+  BookshelfGroupSortOption(1, '按更新时间'),
+  BookshelfGroupSortOption(2, '按书名'),
+  BookshelfGroupSortOption(3, '手动排序'),
+  BookshelfGroupSortOption(4, '综合排序'),
+  BookshelfGroupSortOption(5, '按作者'),
 ];
 
-String _groupSortLabel(int value) {
-  for (final option in _groupSortOptions) {
+String bookshelfGroupSortLabel(int value) {
+  for (final option in bookshelfGroupSortOptions) {
     if (option.value == value) return option.label;
   }
   return '默认';

@@ -60,7 +60,6 @@ enum _DiscoverySourceMenuAction {
 }
 
 class _DiscoveryViewState extends State<DiscoveryView> {
-  static const int _collapsedKindsLimit = 12;
   static const double _minTapSize = SourceUiTokens.minTapSize;
   static const Duration _expandCollapseDuration = AppDesignTokens.motionNormal;
 
@@ -79,7 +78,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   String? _expandedSourceUrl;
   final Set<String> _loadingKindsSources = <String>{};
-  final Set<String> _expandedKindsSources = <String>{};
   final Map<String, List<SourceExploreKind>> _sourceKindsCache =
       <String, List<SourceExploreKind>>{};
 
@@ -262,27 +260,12 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     HapticFeedback.selectionClick();
     final sourceUrl = source.bookSourceUrl;
     if (_expandedSourceUrl == sourceUrl) {
-      setState(() {
-        _expandedSourceUrl = null;
-        _expandedKindsSources.remove(sourceUrl);
-      });
+      setState(() => _expandedSourceUrl = null);
       return;
     }
 
-    setState(() {
-      _expandedSourceUrl = sourceUrl;
-      _expandedKindsSources.remove(sourceUrl);
-    });
+    setState(() => _expandedSourceUrl = sourceUrl);
     await _loadKinds(source, forceRefresh: false);
-  }
-
-  void _toggleKindsExpanded(String sourceUrl) {
-    HapticFeedback.selectionClick();
-    if (_expandedKindsSources.contains(sourceUrl)) {
-      setState(() => _expandedKindsSources.remove(sourceUrl));
-      return;
-    }
-    setState(() => _expandedKindsSources.add(sourceUrl));
   }
 
   Future<void> _loadKinds(
@@ -782,8 +765,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: SourceConsistentCard(
-        borderColor: model.cardBorderColor,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -806,9 +788,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                       sourceUrl: model.sourceUrl,
                       loadingKinds: model.loadingKinds,
                       kinds: model.kinds,
-                      visibleKinds: model.visibleKinds,
-                      hasHiddenKinds: model.hasHiddenKinds,
-                      kindsExpanded: model.kindsExpanded,
                       theme: theme,
                       uiTokens: uiTokens,
                       secondaryLabel: model.secondaryLabel,
@@ -829,26 +808,13 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final sourceUrl = source.bookSourceUrl;
     final kinds = _sourceKindsCache[sourceUrl] ?? const <SourceExploreKind>[];
     final expanded = _expandedSourceUrl == sourceUrl;
-    final kindsExpanded = _expandedKindsSources.contains(sourceUrl);
-    final visibleKinds = kindsExpanded || kinds.length <= _collapsedKindsLimit
-        ? kinds
-        : kinds.take(_collapsedKindsLimit).toList(growable: false);
-    final hasHiddenKinds = visibleKinds.length < kinds.length;
-    final cardBorderColor = expanded
-        ? uiTokens.colors.accent
-            .withValues(alpha: SourceUiTokens.discoveryExpandedCardBorderAlpha)
-        : null;
     return _DiscoverySourceItemModel(
       sourceUrl: sourceUrl,
       expanded: expanded,
       loadingKinds: _loadingKindsSources.contains(sourceUrl),
-      kindsExpanded: kindsExpanded,
       kinds: kinds,
-      visibleKinds: visibleKinds,
-      hasHiddenKinds: hasHiddenKinds,
       groupText: (source.bookSourceGroup ?? '').trim(),
       secondaryLabel: secondaryLabel,
-      cardBorderColor: cardBorderColor,
     );
   }
 
@@ -882,10 +848,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               expanded
                   ? CupertinoIcons.chevron_down
                   : CupertinoIcons.chevron_forward,
-              size: 16,
-              color: expanded
-                  ? uiTokens.colors.accent
-                  : uiTokens.colors.mutedForeground,
+              size: 15,
+              color: uiTokens.colors.tertiaryLabel,
             ),
           ],
         ),
@@ -903,15 +867,28 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          source.bookSourceName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.textStyle.copyWith(
-            fontSize: SourceUiTokens.itemTitleSize,
-            fontWeight: FontWeight.w600,
-            color: uiTokens.colors.foreground,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                source.bookSourceName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.textStyle.copyWith(
+                  fontSize: SourceUiTokens.itemTitleSize,
+                  fontWeight: FontWeight.w600,
+                  color: uiTokens.colors.foreground,
+                ),
+              ),
+            ),
+            if (groupText.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              SourceGroupBadge(
+                text: groupText,
+                textColor: secondaryLabel.withValues(alpha: 0.9),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 2),
         Text(
@@ -920,16 +897,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.textStyle.copyWith(
             fontSize: SourceUiTokens.itemMetaSize,
-            color: secondaryLabel,
+            color: uiTokens.colors.tertiaryLabel,
           ),
         ),
-        if (groupText.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          SourceGroupBadge(
-            text: groupText,
-            textColor: secondaryLabel.withValues(alpha: 0.9),
-          ),
-        ],
       ],
     );
   }
@@ -939,9 +909,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required String sourceUrl,
     required bool loadingKinds,
     required List<SourceExploreKind> kinds,
-    required List<SourceExploreKind> visibleKinds,
-    required bool hasHiddenKinds,
-    required bool kindsExpanded,
     required CupertinoThemeData theme,
     required AppUiTokens uiTokens,
     required Color secondaryLabel,
@@ -949,20 +916,17 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
+        const SizedBox(height: 8),
         Container(
-          height: SourceUiTokens.borderWidth,
-          color: uiTokens.colors.separator.withValues(alpha: 0.55),
+          height: AppDesignTokens.hairlineBorderWidth,
+          color: uiTokens.colors.separator,
         ),
-        const SizedBox(height: SourceUiTokens.discoveryCardInnerGap),
+        const SizedBox(height: 8),
         _buildExpandedKindsBody(
           source: source,
           sourceUrl: sourceUrl,
           loadingKinds: loadingKinds,
           kinds: kinds,
-          visibleKinds: visibleKinds,
-          hasHiddenKinds: hasHiddenKinds,
-          kindsExpanded: kindsExpanded,
           theme: theme,
           uiTokens: uiTokens,
           secondaryLabel: secondaryLabel,
@@ -976,9 +940,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required String sourceUrl,
     required bool loadingKinds,
     required List<SourceExploreKind> kinds,
-    required List<SourceExploreKind> visibleKinds,
-    required bool hasHiddenKinds,
-    required bool kindsExpanded,
     required CupertinoThemeData theme,
     required AppUiTokens uiTokens,
     required Color secondaryLabel,
@@ -1000,9 +961,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       source: source,
       sourceUrl: sourceUrl,
       kinds: kinds,
-      visibleKinds: visibleKinds,
-      hasHiddenKinds: hasHiddenKinds,
-      kindsExpanded: kindsExpanded,
       theme: theme,
       uiTokens: uiTokens,
     );
@@ -1031,110 +989,33 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required BookSource source,
     required String sourceUrl,
     required List<SourceExploreKind> kinds,
-    required List<SourceExploreKind> visibleKinds,
-    required bool hasHiddenKinds,
-    required bool kindsExpanded,
     required CupertinoThemeData theme,
     required AppUiTokens uiTokens,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
-        final chips = _buildKindWidgets(
-          source: source,
-          kinds: kinds,
-          visibleKinds: visibleKinds,
-          hasHiddenKinds: hasHiddenKinds,
-          kindsExpanded: kindsExpanded,
-          sourceUrl: sourceUrl,
-          maxWidth: maxWidth,
-          theme: theme,
-          uiTokens: uiTokens,
-        );
+        final chips = <Widget>[];
+        for (final kind in kinds) {
+          if (kind.style?.layoutWrapBefore == true) {
+            chips.add(SizedBox(width: maxWidth, height: 0));
+          }
+          final width = _kindWidth(kind.style, maxWidth);
+          final chip = _buildKindChip(
+            source,
+            kind,
+            theme: theme,
+            uiTokens: uiTokens,
+          );
+          chips.add(
+              width == null ? chip : SizedBox(width: width, child: chip));
+        }
         return Wrap(
           spacing: SourceUiTokens.discoveryHeaderGap,
           runSpacing: SourceUiTokens.discoveryHeaderGap,
           children: chips,
         );
       },
-    );
-  }
-
-  List<Widget> _buildKindWidgets({
-    required BookSource source,
-    required List<SourceExploreKind> kinds,
-    required List<SourceExploreKind> visibleKinds,
-    required bool hasHiddenKinds,
-    required bool kindsExpanded,
-    required String sourceUrl,
-    required double maxWidth,
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-  }) {
-    final chips = <Widget>[];
-    for (final kind in visibleKinds) {
-      if (kind.style?.layoutWrapBefore == true) {
-        chips.add(SizedBox(width: maxWidth, height: 0));
-      }
-      final width = _kindWidth(kind.style, maxWidth);
-      final chip = _buildKindChip(
-        source,
-        kind,
-        theme: theme,
-        uiTokens: uiTokens,
-      );
-      chips.add(width == null ? chip : SizedBox(width: width, child: chip));
-    }
-    if (hasHiddenKinds || kindsExpanded) {
-      chips.add(
-        _buildKindsToggleChip(
-          expanded: kindsExpanded,
-          hiddenCount: kinds.length - visibleKinds.length,
-          theme: theme,
-          uiTokens: uiTokens,
-          onTap: () => _toggleKindsExpanded(sourceUrl),
-        ),
-      );
-    }
-    return chips;
-  }
-
-  Widget _buildKindsToggleChip({
-    required bool expanded,
-    required int hiddenCount,
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-    required VoidCallback onTap,
-  }) {
-    final title = expanded ? '收起' : '更多 $hiddenCount';
-    final textColor = uiTokens.colors.secondaryLabel;
-    final backgroundColor =
-        CupertinoColors.tertiarySystemFill.resolveFrom(context);
-    final borderColor = uiTokens.colors.separator.withValues(alpha: 0.62);
-    return _buildKindPill(
-      onTap: onTap,
-      uiTokens: uiTokens,
-      backgroundColor: backgroundColor,
-      borderColor: borderColor,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.textStyle.copyWith(
-              fontSize: SourceUiTokens.actionTextSize,
-              color: textColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Icon(
-            expanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
-            size: 12,
-            color: textColor,
-          ),
-        ],
-      ),
     );
   }
 
@@ -1154,24 +1035,21 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: tapHandler,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: _minTapSize),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(uiTokens.radii.control),
-            border: Border.all(
-              color: borderColor,
-              width: SourceUiTokens.borderWidth,
-            ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(uiTokens.radii.control),
+          border: Border.all(
+            color: borderColor,
+            width: SourceUiTokens.borderWidth,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
-              vertical: SourceUiTokens.discoveryChipVerticalPadding,
-            ),
-            child: child,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
+            vertical: SourceUiTokens.discoveryChipVerticalPadding,
           ),
+          child: child,
         ),
       ),
     );
@@ -1219,9 +1097,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             : uiTokens.colors.tertiaryLabel;
     final resolvedBorderColor = isError
         ? uiTokens.colors.destructive.withValues(alpha: 0.4)
-        : isEnabled
-            ? uiTokens.colors.accent.withValues(alpha: 0.34)
-            : uiTokens.colors.separator.withValues(alpha: 0.45);
+        : uiTokens.colors.separator.withValues(alpha: 0.55);
 
     return _buildKindPill(
       onTap: isEnabled ? () => _openExploreKind(source, kind) : null,
@@ -1248,23 +1124,15 @@ class _DiscoverySourceItemModel {
     required this.sourceUrl,
     required this.expanded,
     required this.loadingKinds,
-    required this.kindsExpanded,
     required this.kinds,
-    required this.visibleKinds,
-    required this.hasHiddenKinds,
     required this.groupText,
     required this.secondaryLabel,
-    required this.cardBorderColor,
   });
 
   final String sourceUrl;
   final bool expanded;
   final bool loadingKinds;
-  final bool kindsExpanded;
   final List<SourceExploreKind> kinds;
-  final List<SourceExploreKind> visibleKinds;
-  final bool hasHiddenKinds;
   final String groupText;
   final Color secondaryLabel;
-  final Color? cardBorderColor;
 }

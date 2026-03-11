@@ -33,6 +33,7 @@ import '../../source/services/rule_parser_engine.dart';
 import 'cache_export_placeholder_view.dart';
 import 'bookshelf_manage_placeholder_view.dart';
 import 'bookshelf_group_manage_placeholder_dialog.dart';
+import 'bookshelf_group_switch_sheet.dart';
 import 'remote_books_servers_view.dart';
 import '../services/book_add_service.dart';
 import '../services/bookshelf_book_group_store.dart';
@@ -1275,6 +1276,25 @@ class _BookshelfViewState extends State<BookshelfView> {
     _loadBooks();
   }
 
+  Future<void> _openGroupSwitchSheet() async {
+    await showCupertinoBottomSheetDialog<void>(
+      context: context,
+      builder: (_) => BookshelfGroupSwitchSheet(
+        groups: _bookGroups,
+        selectedGroupId: _selectedGroupId,
+        groupStore: _bookGroupStore,
+        onGroupSelected: (groupId) {
+          setState(() => _selectedGroupId = groupId);
+          _scrollToTop();
+        },
+        onGroupsChanged: () {
+          unawaited(_reloadBookGroupContext(showError: true));
+          _loadBooks();
+        },
+      ),
+    );
+  }
+
   String? _extractBaseUrl(String rawUrl) {
     final uri = Uri.tryParse(rawUrl.trim());
     if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
@@ -2180,39 +2200,69 @@ class _BookshelfViewState extends State<BookshelfView> {
   Widget? _buildBookshelfMiddleTitle() {
     final settings = _settingsService.appSettings;
     final pageTitle = _currentBookshelfTitle();
-    if (_isStyle2Enabled && _selectedGroupId != BookshelfBookGroup.idRoot) {
-      return Text(pageTitle);
-    }
-    if (!settings.bookshelfShowWaitUpCount) return null;
-    final count = _waitUpCount(_displayBooks());
-    if (count <= 0) {
-      return Text(pageTitle);
-    }
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(pageTitle),
-        const SizedBox(width: 6),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemRed.resolveFrom(context),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            child: Text(
-              count > 99 ? '99+' : '$count',
-              style: const TextStyle(
-                fontSize: 11,
-                color: CupertinoColors.white,
-                fontWeight: FontWeight.w600,
-                height: 1.1,
-                letterSpacing: -0.2,
+
+    Widget buildTitleWidget() {
+      if (_isStyle2Enabled && _selectedGroupId != BookshelfBookGroup.idRoot) {
+        return Text(pageTitle);
+      }
+      if (!settings.bookshelfShowWaitUpCount) {
+        return Text(pageTitle);
+      }
+      final count = _waitUpCount(_displayBooks());
+      if (count <= 0) {
+        return Text(pageTitle);
+      }
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(pageTitle),
+          const SizedBox(width: 6),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemRed.resolveFrom(context),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: CupertinoColors.white,
+                  fontWeight: FontWeight.w600,
+                  height: 1.1,
+                  letterSpacing: -0.2,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      );
+    }
+
+    if (!_isStyle2Enabled) {
+      if (!settings.bookshelfShowWaitUpCount) return null;
+      final count = _waitUpCount(_displayBooks());
+      if (count <= 0) return null;
+      return buildTitleWidget();
+    }
+
+    // style2：标题可点击，带下拉箭头。
+    return GestureDetector(
+      onTap: _openGroupSwitchSheet,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          buildTitleWidget(),
+          const SizedBox(width: 3),
+          Icon(
+            CupertinoIcons.chevron_down,
+            size: 13,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          ),
+        ],
+      ),
     );
   }
 

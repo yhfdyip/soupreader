@@ -1927,3 +1927,73 @@ extension PageDirectionExtension on PageDirection {
     }
   }
 }
+
+/// 内置背景图片列表（assets/bg/ 目录下的文件名）
+const List<String> kBundledBgAssets = <String>[
+  '护眼漫绿.jpg',
+  '清新时光.jpg',
+  '山水墨影.jpg',
+  '深宫魅影.jpg',
+  '午后沙滩.jpg',
+  '宁静夜色.jpg',
+  '新羊皮纸.jpg',
+  '羊皮纸1.jpg',
+  '山水画.jpg',
+  '明媚倾城.jpg',
+  '羊皮纸4.jpg',
+  '羊皮纸2.jpg',
+  '羊皮纸3.jpg',
+  '边彩画布.jpg',
+];
+
+/// 6 个预设阅读样式（对标 legado defaultData/readConfig.json）
+const List<ReadStyleConfig> kDefaultReadStyleConfigs = <ReadStyleConfig>[
+  ReadStyleConfig(
+    name: '白色',
+    backgroundColor: 0xFFFFFFFF,
+    textColor: 0xFF333333,
+    bgType: ReadStyleConfig.bgTypeColor,
+    bgStr: '#FFFFFF',
+    bgAlpha: 100,
+  ),
+  ReadStyleConfig(
+    name: '羊皮纸',
+    backgroundColor: 0xFFFDF6E3,
+    textColor: 0xFF5C4B3C,
+    bgType: ReadStyleConfig.bgTypeColor,
+    bgStr: '#FDF6E3',
+    bgAlpha: 100,
+  ),
+  ReadStyleConfig(
+    name: '护眼绿',
+    backgroundColor: 0xFFCCE8CF,
+    textColor: 0xFF3C4033,
+    bgType: ReadStyleConfig.bgTypeColor,
+    bgStr: '#CCE8CF',
+    bgAlpha: 100,
+  ),
+  ReadStyleConfig(
+    name: '淡紫',
+    backgroundColor: 0xFFE8E0F0,
+    textColor: 0xFF3A3050,
+    bgType: ReadStyleConfig.bgTypeColor,
+    bgStr: '#E8E0F0',
+    bgAlpha: 100,
+  ),
+  ReadStyleConfig(
+    name: '深色',
+    backgroundColor: 0xFF1C1C1E,
+    textColor: 0xFFD0D0D0,
+    bgType: ReadStyleConfig.bgTypeColor,
+    bgStr: '#1C1C1E',
+    bgAlpha: 100,
+  ),
+  ReadStyleConfig(
+    name: '微信',
+    backgroundColor: 0xFFEAE2D4,
+    textColor: 0xFF3E3128,
+    bgType: ReadStyleConfig.bgTypeColor,
+    bgStr: '#EAE2D4',
+    bgAlpha: 100,
+  ),
+];

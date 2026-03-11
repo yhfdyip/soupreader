@@ -1,13 +1,15 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/app_sheet_header.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/config/migration_exclusions.dart';
 import '../models/reading_settings.dart';
 
-/// 点击区域配置对话框
-/// 允许用户配置9宫格区域的点击动作
+/// 点击区域配置对话框 — 允许用户配置 9 宫格区域的点击动作。
 class ClickActionConfigDialog extends StatefulWidget {
   final Map<String, int> initialConfig;
   final Function(Map<String, int>) onSave;
@@ -27,144 +29,86 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   late Map<String, int> _config;
   String? _selectedZone;
 
-  // 默认配置
-  static const Map<String, int> _defaultConfig = ClickAction.defaultZoneConfig;
-
-  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
-
-  Color get _accent =>
-      _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
-
-  Color get _panelBg =>
-      CupertinoColors.systemGroupedBackground.resolveFrom(context);
-
-  Color get _textNormal =>
-      CupertinoColors.secondaryLabel.resolveFrom(context);
-
-  Color get _textSubtle =>
-      CupertinoColors.tertiaryLabel.resolveFrom(context);
-
-  Color get _lineColor =>
-      CupertinoColors.separator.resolveFrom(context);
-
-  Color get _chipBg => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.16)
-      : CupertinoColors.systemGroupedBackground.resolveFrom(context);
-
-  List<int> get _availableActions {
-    return ClickAction.availableActions(
-      excludeTts: MigrationExclusions.excludeTts,
-    );
-  }
-
-  Map<String, int> _normalizeConfigForExclusions(Map<String, int> rawConfig) {
-    return ClickAction.normalizeConfigForExclusions(
-      rawConfig,
-      excludeTts: MigrationExclusions.excludeTts,
-    );
-  }
+  List<int> get _availableActions => ClickAction.availableActions(
+        excludeTts: MigrationExclusions.excludeTts,
+      );
 
   @override
   void initState() {
     super.initState();
-    _config = _normalizeConfigForExclusions(
-      Map<String, int>.from(widget.initialConfig),
-    );
+    _config = _normalizeConfig(Map<String, int>.from(widget.initialConfig));
   }
 
-  String _getZoneName(String zone) {
-    switch (zone) {
-      case 'tl':
-        return '左上';
-      case 'tc':
-        return '中上';
-      case 'tr':
-        return '右上';
-      case 'ml':
-        return '左中';
-      case 'mc':
-        return '中间';
-      case 'mr':
-        return '右中';
-      case 'bl':
-        return '左下';
-      case 'bc':
-        return '中下';
-      case 'br':
-        return '右下';
-      default:
-        return zone;
-    }
-  }
+  Map<String, int> _normalizeConfig(Map<String, int> raw) =>
+      ClickAction.normalizeConfigForExclusions(
+        raw,
+        excludeTts: MigrationExclusions.excludeTts,
+      );
 
-  Color _getActionColor(int action) {
-    switch (action) {
-      case ClickAction.showMenu:
-        return _accent;
-      case ClickAction.nextPage:
-        return AppDesignTokens.success;
-      case ClickAction.prevPage:
-        return AppDesignTokens.info;
-      case ClickAction.nextChapter:
-        return AppDesignTokens.warning;
-      case ClickAction.prevChapter:
-        return const Color(0xFF8B5CF6);
-      case ClickAction.addBookmark:
-        return const Color(0xFFEC4899);
-      case ClickAction.openChapterList:
-        return const Color(0xFF6366F1);
-      default:
-        return _textSubtle;
-    }
-  }
+  String _zoneName(String zone) => switch (zone) {
+        'tl' => '左上',
+        'tc' => '中上',
+        'tr' => '右上',
+        'ml' => '左中',
+        'mc' => '中间',
+        'mr' => '右中',
+        'bl' => '左下',
+        'bc' => '中下',
+        'br' => '右下',
+        _ => zone,
+      };
+
+  Color _actionColor(int action, AppUiTokens ui) => switch (action) {
+        ClickAction.showMenu => ui.colors.accent,
+        ClickAction.nextPage => AppDesignTokens.success,
+        ClickAction.prevPage => AppDesignTokens.info,
+        ClickAction.nextChapter => AppDesignTokens.warning,
+        ClickAction.prevChapter => const Color(0xFF8B5CF6),
+        ClickAction.addBookmark => const Color(0xFFEC4899),
+        ClickAction.openChapterList => const Color(0xFF6366F1),
+        _ => CupertinoColors.tertiaryLabel.resolveFrom(context),
+      };
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.sizeOf(context).height * 0.75,
-      decoration: BoxDecoration(
-        color: _panelBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
-      ),
+    final ui = AppUiTokens.resolve(context);
+    return AppSheetPanel(
+      contentPadding: EdgeInsets.zero,
       child: SafeArea(
         top: false,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppSheetHeader(title: '点击区域设置'),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // 说明文字
-                    Text(
-                      '点击下方区域选择该位置的动作',
-                      style: TextStyle(color: _textNormal, fontSize: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                '点击下方区域选择该位置的动作',
+                textAlign: TextAlign.center,
+                style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                      fontSize: 13,
+                      color: ui.colors.secondaryLabel,
                     ),
-                    const SizedBox(height: 16),
-
-                    // 9宫格预览
-                    _buildGridPreview(),
-
-                    const SizedBox(height: 24),
-
-                    // 动作说明
-                    _buildLegend(),
-
-                    const SizedBox(height: 16),
-
-                    // 重置按钮
-                    CupertinoButton(
-                      onPressed: _resetToDefault,
-                      child: Text(
-                        '恢复默认',
-                        style: TextStyle(
-                          color: _textSubtle,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildGridPreview(context, ui),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildLegend(context, ui),
+            ),
+            CupertinoButton(
+              onPressed: _resetToDefault,
+              child: Text(
+                '恢复默认',
+                style: TextStyle(
+                  color: ui.colors.tertiaryLabel,
+                  fontSize: 14,
                 ),
               ),
             ),
@@ -174,97 +118,138 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
     );
   }
 
-
-  Widget _buildGridPreview() {
+  Widget _buildGridPreview(BuildContext context, AppUiTokens ui) {
     final screenSize = MediaQuery.sizeOf(context);
-    // 每格宽高比 = (屏幕宽/3) / (屏幕高/3) = 屏幕宽/屏幕高，
-    // 真实反映屏幕点击区域的实际比例。
-    final cellAspectRatio = screenSize.width / screenSize.height;
-    return Container(
-      decoration: BoxDecoration(
-        color: _chipBg,
-        border: Border.all(color: _lineColor, width: 0.5),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-      ),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: cellAspectRatio,
-        ),
-        itemCount: 9,
-        itemBuilder: (context, index) {
-            final zone = ClickAction.zoneOrder[index];
-            final action = _config[zone] ?? ClickAction.showMenu;
-            final isSelected = _selectedZone == zone;
-            final actionColor = _getActionColor(action);
+    final gridBg = CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    final sep = ui.colors.separator;
 
-            return CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              onPressed: () => _showActionPicker(zone),
-              child: AnimatedContainer(
-                duration: AppDesignTokens.motionQuick,
-                margin: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color:
-                      actionColor.withValues(alpha: isSelected ? 0.28 : 0.14),
-                  border: Border.all(
-                    color: isSelected
-                        ? _accent
-                        : actionColor.withValues(alpha: 0.45),
-                    width: isSelected ? 2.0 : 0.5,
-                  ),
-                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _getZoneName(zone),
-                      style: TextStyle(
-                        color: _textSubtle,
-                        fontSize: 10,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      ClickAction.getName(action),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: actionColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+    // 网格宽高比与屏幕一致，但限制最大高度避免撑满对话框
+    final gridWidth = screenSize.width - 32;
+    final gridHeight = (gridWidth * screenSize.height / screenSize.width)
+        .clamp(0.0, screenSize.height * 0.28);
+    final cellAspectRatio = gridWidth / gridHeight;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+      child: Container(
+        height: gridHeight,
+        decoration: BoxDecoration(
+          color: gridBg,
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+          border: Border.all(
+              color: sep, width: AppDesignTokens.hairlineBorderWidth),
         ),
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: cellAspectRatio,
+          ),
+          itemCount: 9,
+          itemBuilder: (context, index) => _buildCell(context, ui, index, sep),
+        ),
+      ),
     );
   }
 
-  Widget _buildLegend() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _availableActions.map((action) {
-        final actionColor = _getActionColor(action);
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: actionColor.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl / 2),
-            border: Border.all(color: actionColor.withValues(alpha: 0.4), width: 0.5),
+  Widget _buildCell(
+    BuildContext context,
+    AppUiTokens ui,
+    int index,
+    Color sep,
+  ) {
+    final zone = ClickAction.zoneOrder[index];
+    final action = _config[zone] ?? ClickAction.showMenu;
+    final isSelected = _selectedZone == zone;
+    final color = _actionColor(action, ui);
+
+    final row = index ~/ 3;
+    final col = index % 3;
+    final showRight = col < 2;
+    final showBottom = row < 2;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        _showActionPicker(zone);
+      },
+      child: AnimatedContainer(
+        duration: AppDesignTokens.motionQuick,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: isSelected ? 0.22 : 0.10),
+          border: Border(
+            right: showRight
+                ? BorderSide(
+                    color: sep, width: AppDesignTokens.hairlineBorderWidth)
+                : BorderSide.none,
+            bottom: showBottom
+                ? BorderSide(
+                    color: sep, width: AppDesignTokens.hairlineBorderWidth)
+                : BorderSide.none,
+            left: isSelected
+                ? BorderSide(color: color.withValues(alpha: 0.6), width: 1.5)
+                : BorderSide.none,
+            top: isSelected
+                ? BorderSide(color: color.withValues(alpha: 0.6), width: 1.5)
+                : BorderSide.none,
           ),
-          child: Text(
-            ClickAction.getName(action),
-            style: TextStyle(
-              color: actionColor,
-              fontSize: 12,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _zoneName(zone),
+              style: TextStyle(
+                color: ui.colors.tertiaryLabel,
+                fontSize: 10,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              ClickAction.getName(action),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegend(BuildContext context, AppUiTokens ui) {
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      alignment: WrapAlignment.center,
+      children: _availableActions.map((action) {
+        final color = _actionColor(action, ui);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+            border: Border.all(
+              color: color.withValues(alpha: 0.35),
+              width: AppDesignTokens.hairlineBorderWidth,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Text(
+              ClickAction.getName(action),
+              style: textStyle.copyWith(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: -0.2,
+              ),
             ),
           ),
         );
@@ -273,31 +258,28 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   }
 
   void _showActionPicker(String zone) {
-    setState(() {
-      _selectedZone = zone;
-    });
+    setState(() => _selectedZone = zone);
 
     showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (context) => CupertinoActionSheet(
-        title: Text('选择 ${_getZoneName(zone)} 的动作'),
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text('选择「${_zoneName(zone)}」的动作'),
         actions: _availableActions.map((action) {
-          final actionColor = _getActionColor(action);
+          final color = _actionColor(action, AppUiTokens.resolve(context));
           return CupertinoActionSheetAction(
             onPressed: () {
-              final next = Map<String, int>.from(_config)..[zone] = action;
-              _applyConfig(next);
-              Navigator.pop(context);
+              _applyConfig({...Map<String, int>.from(_config), zone: action});
+              Navigator.pop(ctx);
             },
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 12,
-                  height: 12,
+                  width: 10,
+                  height: 10,
                   decoration: BoxDecoration(
-                    color: actionColor,
+                    color: color,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -310,10 +292,8 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
         cancelButton: CupertinoActionSheetAction(
           isDefaultAction: true,
           onPressed: () {
-            setState(() {
-              _selectedZone = null;
-            });
-            Navigator.pop(context);
+            setState(() => _selectedZone = null);
+            Navigator.pop(ctx);
           },
           child: const Text('取消'),
         ),
@@ -323,38 +303,35 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
 
   void _resetToDefault() {
     _applyConfig(
-      Map<String, int>.from(_defaultConfig),
+      Map<String, int>.from(ClickAction.defaultZoneConfig),
       showRecoveryNotice: false,
     );
   }
 
   void _applyConfig(
-    Map<String, int> nextConfig, {
+    Map<String, int> next, {
     bool showRecoveryNotice = true,
   }) {
-    final hadMenuZone = ClickAction.hasMenuZone(nextConfig);
-    final normalized = _normalizeConfigForExclusions(nextConfig);
-    final recoveredMenuZone =
-        !hadMenuZone && ClickAction.hasMenuZone(normalized);
+    final hadMenu = ClickAction.hasMenuZone(next);
+    final normalized = _normalizeConfig(next);
+    final recovered = !hadMenu && ClickAction.hasMenuZone(normalized);
     setState(() {
       _config = normalized;
       _selectedZone = null;
     });
     widget.onSave(Map<String, int>.from(normalized));
-    if (recoveredMenuZone && showRecoveryNotice) {
-      _showMenuRecoveryNotice();
-    }
+    if (recovered && showRecoveryNotice) _showMenuRecoveryNotice();
   }
 
   void _showMenuRecoveryNotice() {
     showCupertinoBottomDialog<void>(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
+      builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提示'),
         content: const Text('\n当前没有配置菜单区域，已自动恢复中间区域为菜单。'),
         actions: [
           CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('好'),
           ),
         ],
@@ -363,22 +340,21 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   }
 }
 
-/// 显示点击区域配置对话框
+/// 显示点击区域配置对话框。
 void showClickActionConfigDialog(
   BuildContext context, {
   Map<String, int>? initialConfig,
   Map<String, int>? currentConfig,
   required Function(Map<String, int>) onSave,
 }) {
-  final resolvedConfig = initialConfig ?? currentConfig;
-  if (resolvedConfig == null) {
+  final config = initialConfig ?? currentConfig;
+  if (config == null) {
     throw ArgumentError('initialConfig 或 currentConfig 至少需要提供一个');
   }
-
   showCupertinoBottomSheetDialog(
     context: context,
     builder: (context) => ClickActionConfigDialog(
-      initialConfig: resolvedConfig,
+      initialConfig: config,
       onSave: onSave,
     ),
   );

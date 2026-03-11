@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/ui_tokens.dart';
-import 'app_glass_sheet_panel.dart';
+import 'app_sheet_panel.dart';
 import 'cupertino_bottom_dialog.dart';
 
 class AppActionListItem<T> {
@@ -100,7 +100,7 @@ class _AppActionListSheet<T> extends StatelessWidget {
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: sheetMaxHeight),
-        child: AppGlassSheetPanel(
+        child: AppSheetPanel(
           contentPadding: EdgeInsets.fromLTRB(10, _panelTopPadding, 10, bottomInset),
           radius: ui.radii.sheet,
           child: Column(

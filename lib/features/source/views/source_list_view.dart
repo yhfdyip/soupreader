@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/source_ui_tokens.dart';
@@ -14,7 +15,6 @@ import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-import '../../../app/widgets/source_state_dot.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -358,8 +358,8 @@ class _SourceListViewState extends State<SourceListView> {
     BookSource source, {
     Map<String, SourceCheckItem>? checkIndex,
   }) {
-    final item =
-        checkIndex?[source.bookSourceUrl] ?? _findCheckItem(source.bookSourceUrl);
+    final item = checkIndex?[source.bookSourceUrl] ??
+        _findCheckItem(source.bookSourceUrl);
     if (item != null) return item.status;
     final cached = _checkTaskService.lastResultFor(source.bookSourceUrl);
     return cached?.status;
@@ -369,8 +369,8 @@ class _SourceListViewState extends State<SourceListView> {
     BookSource source, {
     Map<String, SourceCheckItem>? checkIndex,
   }) {
-    final item =
-        checkIndex?[source.bookSourceUrl] ?? _findCheckItem(source.bookSourceUrl);
+    final item = checkIndex?[source.bookSourceUrl] ??
+        _findCheckItem(source.bookSourceUrl);
     final cached = _checkTaskService.lastResultFor(source.bookSourceUrl);
     final status = item?.status ?? cached?.status;
     if (status == null) return null;
@@ -650,7 +650,34 @@ class _SourceListViewState extends State<SourceListView> {
           ? source.bookSourceName
           : "${source.bookSourceName} ($groupText)";
 
-      return Column(
+      Widget buildStatusIcon(
+        bool? state,
+        VoidCallback? onTap, {
+        IconData activeIcon = CupertinoIcons.checkmark_circle_fill,
+        IconData inactiveIcon = CupertinoIcons.circle,
+      }) {
+        if (state == null) {
+          return const SizedBox(width: 36, height: 44);
+        }
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox(
+            width: 36,
+            height: 44,
+            child: Icon(
+              state ? activeIcon : inactiveIcon,
+              size: 20,
+              color: state
+                  ? primaryActionColor
+                  : CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ),
+        );
+      }
+
+      final rowContent = Column(
+        key: _itemKeyForUrl(source.bookSourceUrl),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (showHeader)
@@ -665,11 +692,14 @@ class _SourceListViewState extends State<SourceListView> {
                 ),
               ),
             ),
-          Container(
-            key: _itemKeyForUrl(source.bookSourceUrl),
-            color: CupertinoColors.systemBackground.resolveFrom(context),
+          ColoredBox(
+            color: selected
+                ? primaryActionColor.withValues(alpha: 0.06)
+                : CupertinoColors.systemBackground.resolveFrom(context),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
+              onTap: () =>
+                  setState(() => _toggleSelection(source.bookSourceUrl)),
               onLongPressStart: (_) {
                 _startDragSelection(visible, index);
               },
@@ -688,7 +718,7 @@ class _SourceListViewState extends State<SourceListView> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 12,
+                  vertical: 10,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -696,22 +726,13 @@ class _SourceListViewState extends State<SourceListView> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(28, 44),
-                          onPressed: () {
-                            setState(
-                                () => _toggleSelection(source.bookSourceUrl));
-                          },
+                        AnimatedOpacity(
+                          opacity: selected ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 150),
                           child: Icon(
-                            selected
-                                ? CupertinoIcons.check_mark_circled_solid
-                                : CupertinoIcons.circle,
-                            size: 22,
-                            color: selected
-                                ? primaryActionColor
-                                : CupertinoColors.systemGrey3
-                                    .resolveFrom(context),
+                            CupertinoIcons.check_mark_circled_solid,
+                            size: 20,
+                            color: primaryActionColor,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -736,51 +757,24 @@ class _SourceListViewState extends State<SourceListView> {
                               ),
                             ),
                           ),
-                        CupertinoSwitch(
-                          value: source.enabled,
-                          onChanged: (value) async {
+                        buildStatusIcon(
+                          source.enabled,
+                          () async {
                             await _sourceRepo.updateSource(
-                              source.copyWith(enabled: value),
+                              source.copyWith(enabled: !source.enabled),
                             );
                           },
                         ),
-                        const SizedBox(width: 6),
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(36, 36),
-                          onPressed: () => _openEditor(source.bookSourceUrl),
-                          child: Icon(
-                            CupertinoIcons.pencil,
-                            size: 20,
-                            color: titleColor,
-                          ),
-                        ),
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(36, 36),
-                              onPressed: () =>
-                                  unawaited(_showSourceActions(source)),
-                              child: Icon(
-                                CupertinoIcons.ellipsis_vertical,
-                                size: 20,
-                                color: titleColor,
-                              ),
-                            ),
-                            if (hasExplore)
-                              Positioned(
-                                top: 4,
-                                right: 2,
-                                child: SourceStateDot(
-                                  enabled: source.enabledExplore,
-                                  disabledColor:
-                                      SourceUiTokens.resolveDangerColor(
-                                          context),
-                                ),
-                              ),
-                          ],
+                        buildStatusIcon(
+                          hasExplore ? source.enabledExplore : null,
+                          hasExplore
+                              ? () async {
+                                  await _toggleSourceExploreFromItemAction(
+                                      source);
+                                }
+                              : null,
+                          activeIcon: CupertinoIcons.compass_fill,
+                          inactiveIcon: CupertinoIcons.compass,
                         ),
                       ],
                     ),
@@ -804,7 +798,7 @@ class _SourceListViewState extends State<SourceListView> {
                             ),
                             if (_checkTaskService.snapshot?.running == true &&
                                 (checkStatus == SourceCheckStatus.pending ||
-                                 checkStatus == SourceCheckStatus.running))
+                                    checkStatus == SourceCheckStatus.running))
                               const Padding(
                                 padding: EdgeInsets.only(left: 6),
                                 child: SizedBox(
@@ -824,6 +818,50 @@ class _SourceListViewState extends State<SourceListView> {
             ),
           ),
         ],
+      );
+
+      return Slidable(
+        key: ValueKey(source.bookSourceUrl),
+        endActionPane: ActionPane(
+          motion: const DrawerMotion(),
+          extentRatio: _sortMode == _SourceSortMode.manual ? 0.75 : 0.6,
+          children: [
+            SlidableAction(
+              onPressed: (_) => _openEditor(source.bookSourceUrl),
+              backgroundColor: primaryActionColor,
+              foregroundColor: CupertinoColors.white,
+              icon: CupertinoIcons.pencil,
+              label: '编辑',
+            ),
+            if (_sortMode == _SourceSortMode.manual)
+              SlidableAction(
+                onPressed: (_) => _toTop(source),
+                backgroundColor:
+                    CupertinoColors.systemOrange.resolveFrom(context),
+                foregroundColor: CupertinoColors.white,
+                icon: CupertinoIcons.arrow_up,
+                label: '置顶',
+              ),
+            SlidableAction(
+              onPressed: (_) => unawaited(_showSourceActions(source)),
+              backgroundColor: CupertinoColors.systemGrey.resolveFrom(context),
+              foregroundColor: CupertinoColors.white,
+              icon: CupertinoIcons.ellipsis,
+              label: '更多',
+            ),
+            SlidableAction(
+              onPressed: (_) async {
+                setState(() => _selectedUrls.remove(source.bookSourceUrl));
+                await _confirmDeleteSource(source);
+              },
+              backgroundColor: CupertinoColors.systemRed.resolveFrom(context),
+              foregroundColor: CupertinoColors.white,
+              icon: CupertinoIcons.delete,
+              label: '删除',
+            ),
+          ],
+        ),
+        child: rowContent,
       );
     }
 
@@ -859,6 +897,7 @@ class _SourceListViewState extends State<SourceListView> {
       itemCount: visible.length,
       separatorBuilder: (_, __) => Container(
         height: SourceUiTokens.borderWidth,
+        margin: const EdgeInsets.only(left: 44),
         color: SourceUiTokens.resolveSeparatorColor(context),
       ),
       itemBuilder: (context, index) {
@@ -1357,8 +1396,7 @@ class _SourceListViewState extends State<SourceListView> {
                         itemCount: groups.length,
                         separatorBuilder: (_, __) => Container(
                           height: 0.5,
-                          color:
-                              CupertinoColors.separator.resolveFrom(context),
+                          color: CupertinoColors.separator.resolveFrom(context),
                         ),
                         itemBuilder: (context, index) {
                           final group = groups[index];
@@ -2729,7 +2767,8 @@ class _SourceListViewState extends State<SourceListView> {
                               itemBuilder: (context, index) {
                                 final item = history[index];
                                 return AppCard(
-                                  backgroundColor: CupertinoColors.systemGrey6.resolveFrom(context),
+                                  backgroundColor: CupertinoColors.systemGrey6
+                                      .resolveFrom(context),
                                   padding:
                                       const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                   child: Row(
@@ -2763,7 +2802,8 @@ class _SourceListViewState extends State<SourceListView> {
                                         child: Icon(
                                           CupertinoIcons.delete,
                                           size: 18,
-                                          color: CupertinoColors.systemRed.resolveFrom(context),
+                                          color: CupertinoColors.systemRed
+                                              .resolveFrom(context),
                                         ),
                                       ),
                                     ],
@@ -2935,7 +2975,8 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(context),
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
                             onPressed: () {
                               setDialogState(() {
                                 if (selectedIndexes.length ==
@@ -2964,7 +3005,8 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(context),
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
                             onPressed: () {
                               setDialogState(() {
                                 final targetIndexes = <int>{
@@ -2993,7 +3035,8 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(context),
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
                             onPressed: () {
                               setDialogState(
                                 () {
@@ -3024,7 +3067,8 @@ class _SourceListViewState extends State<SourceListView> {
                               horizontal: 10,
                               vertical: 6,
                             ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(context),
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
                             onPressed: () async {
                               final input = await _showImportCustomGroupDialog(
                                 initialGroupName: customGroupName,
@@ -3098,7 +3142,8 @@ class _SourceListViewState extends State<SourceListView> {
                             '待导入：$selectedCount/$totalCount',
                             style: TextStyle(
                               fontSize: 12,
-                              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                              color: CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
                             ),
                           ),
                         ],
@@ -3110,8 +3155,7 @@ class _SourceListViewState extends State<SourceListView> {
                         itemCount: dialogCandidates.length,
                         separatorBuilder: (_, __) => Container(
                           height: 0.5,
-                          color:
-                              CupertinoColors.separator.resolveFrom(context),
+                          color: CupertinoColors.separator.resolveFrom(context),
                         ),
                         itemBuilder: (context, index) {
                           final candidate = dialogCandidates[index];
@@ -3144,7 +3188,8 @@ class _SourceListViewState extends State<SourceListView> {
                                       color: selected
                                           ? CupertinoTheme.of(context)
                                               .primaryColor
-                                          : CupertinoColors.systemGrey.resolveFrom(context),
+                                          : CupertinoColors.systemGrey
+                                              .resolveFrom(context),
                                       size: 20,
                                     ),
                                   ),
@@ -3724,7 +3769,6 @@ class _SourceListViewState extends State<SourceListView> {
       ),
     );
   }
-
 }
 
 typedef _SourceSortModeLabelBuilder = String Function(_SourceSortMode mode);

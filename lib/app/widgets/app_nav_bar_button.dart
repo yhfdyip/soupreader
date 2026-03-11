@@ -79,7 +79,11 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
   }
 
   Widget _buildDecoratedChild(AppUiTokens ui, bool useGlass) {
-    if (!useGlass) return widget.child;
+    final iconThemed = IconTheme.merge(
+      data: IconThemeData(size: ui.iconSizes.navBar),
+      child: widget.child,
+    );
+    if (!useGlass) return iconThemed;
     final style = _resolveGlassStyle(ui);
     return AppSquircleSurface(
       padding: const EdgeInsets.all(6),
@@ -96,7 +100,7 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
           spreadRadius: -8,
         ),
       ],
-      child: widget.child,
+      child: iconThemed,
     );
   }
 
