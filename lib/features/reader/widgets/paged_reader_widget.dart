@@ -63,6 +63,7 @@ class PagedReaderWidget extends StatefulWidget {
   final PageTurnMode pageTurnMode;
   final TextStyle textStyle;
   final Color backgroundColor;
+  final Color? shaderBackgroundColor;
   final EdgeInsets padding;
   final VoidCallback? onTap;
   final bool showStatusBar;
@@ -139,6 +140,7 @@ class PagedReaderWidget extends StatefulWidget {
     required this.pageTurnMode,
     required this.textStyle,
     required this.backgroundColor,
+    this.shaderBackgroundColor,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
     this.showStatusBar = true,
@@ -2876,7 +2878,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         touch: Offset(simulationTouchX, _touchY),
         viewSize: size,
         isTurnToNext: isNext,
-        backgroundColor: widget.backgroundColor.withValues(alpha: 1.0),
+        backgroundColor: widget.shaderBackgroundColor ?? widget.backgroundColor,
         cornerX: effectiveCornerX,
         cornerY: _cornerY,
         shaderProgram: pageCurlProgram!,
@@ -2933,7 +2935,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         touch: Offset(simulationTouchX, _touchY),
         viewSize: size,
         isTurnToNext: isNext,
-        backgroundColor: widget.backgroundColor.withValues(alpha: 1.0),
+        backgroundColor: widget.shaderBackgroundColor ?? widget.backgroundColor,
         cornerX: effectiveCornerX,
         cornerY: _cornerY,
       ),

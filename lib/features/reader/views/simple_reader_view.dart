@@ -5240,6 +5240,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         decoration: _currentTextDecoration,
       ),
       backgroundColor: _readerContentBackgroundColor,
+      shaderBackgroundColor: _readerBackgroundBaseColor,
       padding: _contentPadding,
       enableGestures: !_showMenu && !_showSearchMenu, // 菜单显示时禁止翻页手势
       onTap: () {
