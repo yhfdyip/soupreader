@@ -630,6 +630,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           bodyHeight -= consumed;
         }
         if (bodyHeight > 0) {
+          canvas.save();
+          canvas.clipRect(Rect.fromLTWH(
+            originX,
+            bodyOriginY,
+            columnWidth,
+            bodyHeight,
+          ));
           LegacyJustifyComposer.paintContentOnCanvas(
             canvas: canvas,
             origin: Offset(originX, bodyOriginY),
@@ -646,6 +653,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             highlightBackgroundColor: widget.searchHighlightColor,
             highlightTextColor: widget.searchHighlightTextColor,
           );
+          canvas.restore();
         }
       }
 
