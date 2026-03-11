@@ -1,5 +1,23 @@
 import 'package:flutter/widgets.dart';
+import 'legacy_justified_text.dart';
 import 'reader_page_agent.dart';
+
+/// 一页的数据，包含文本内容和可选的预排版行缓存。
+///
+/// [precomposedLines] 不为 null 时表示纯文本页，绘制时可直接复用，
+/// 跳过二次排版；为 null 时表示含图片页，走原有逻辑。
+class PageData {
+  final String text;
+  final List<LegacyComposedLine>? precomposedLines;
+
+  const PageData(this.text, {this.precomposedLines});
+
+  /// 纯文本页（携带预排版行）
+  const PageData.text(this.text, this.precomposedLines);
+
+  /// 含图片页（无预排版行）
+  const PageData.image(this.text) : precomposedLines = null;
+}
 
 enum PageRenderSlot { prev, current, next }
 
@@ -26,9 +44,9 @@ class PageFactory {
   int _currentPageIndex = 0;
 
   // 分页后的页面内容
-  List<String> _prevChapterPages = [];
-  List<String> _currentChapterPages = [];
-  List<String> _nextChapterPages = [];
+  List<PageData> _prevChapterPages = [];
+  List<PageData> _currentChapterPages = [];
+  List<PageData> _nextChapterPages = [];
 
   // 分页参数
   double _contentHeight = 0;
@@ -188,6 +206,7 @@ class PageFactory {
     }
   }
 
+
   // ============ 对标 Legado TextPageFactory ============
 
   /// 是否有上一页（包含上一章）
@@ -324,35 +343,37 @@ class PageFactory {
 
   // ============ 获取三个页面内容 ============
 
-  /// 上一页内容
-  String get prevPage {
+  static final PageData _emptyPageData = const PageData('');
+
+  /// 上一页数据
+  PageData get prevPageData {
     if (_currentPageIndex > 0) {
       return _currentChapterPages[_currentPageIndex - 1];
     } else if (_prevChapterPages.isNotEmpty) {
       return _prevChapterPages.last;
     }
-    return '';
+    return _emptyPageData;
   }
 
-  /// 当前页内容
-  String get curPage {
-    if (_currentChapterPages.isEmpty) return '';
+  /// 当前页数据
+  PageData get curPageData {
+    if (_currentChapterPages.isEmpty) return _emptyPageData;
     return _currentChapterPages[
         _currentPageIndex.clamp(0, _currentChapterPages.length - 1)];
   }
 
-  /// 下一页内容
-  String get nextPage {
+  /// 下一页数据
+  PageData get nextPageData {
     if (_currentPageIndex < _currentChapterPages.length - 1) {
       return _currentChapterPages[_currentPageIndex + 1];
     } else if (_nextChapterPages.isNotEmpty) {
       return _nextChapterPages.first;
     }
-    return '';
+    return _emptyPageData;
   }
 
-  /// 下下页内容（双页模式右栏的下一页）
-  String get nextNextPage {
+  /// 下下页数据（双页模式右栏的下一页）
+  PageData get nextNextPageData {
     if (_currentPageIndex + 1 < _currentChapterPages.length - 1) {
       return _currentChapterPages[_currentPageIndex + 2];
     } else if (_currentPageIndex + 1 == _currentChapterPages.length - 1 &&
@@ -362,11 +383,11 @@ class PageFactory {
         _nextChapterPages.length > 1) {
       return _nextChapterPages[1];
     }
-    return '';
+    return _emptyPageData;
   }
 
-  /// 下下下页内容（双页模式：下一视觉页的右栏）
-  String get nextNextNextPage {
+  /// 下下下页数据（双页模式：下一视觉页的右栏）
+  PageData get nextNextNextPageData {
     final i = _currentPageIndex + 3;
     if (i < _currentChapterPages.length) {
       return _currentChapterPages[i];
@@ -375,11 +396,11 @@ class PageFactory {
     if (_nextChapterPages.length > overflow) {
       return _nextChapterPages[overflow];
     }
-    return '';
+    return _emptyPageData;
   }
 
-  /// 上上页内容（双页模式左栏的前一页）
-  String get prevPrevPage {
+  /// 上上页数据（双页模式左栏的前一页）
+  PageData get prevPrevPageData {
     if (_currentPageIndex > 1) {
       return _currentChapterPages[_currentPageIndex - 2];
     } else if (_currentPageIndex == 1 && _prevChapterPages.isNotEmpty) {
@@ -387,8 +408,16 @@ class PageFactory {
     } else if (_currentPageIndex == 0 && _prevChapterPages.length > 1) {
       return _prevChapterPages[_prevChapterPages.length - 2];
     }
-    return '';
+    return _emptyPageData;
   }
+
+  // 兼容旧调用的字符串 getter
+  String get prevPage => prevPageData.text;
+  String get curPage => curPageData.text;
+  String get nextPage => nextPageData.text;
+  String get nextNextPage => nextNextPageData.text;
+  String get nextNextNextPage => nextNextNextPageData.text;
+  String get prevPrevPage => prevPrevPageData.text;
 
   // ============ Getters ============
 
@@ -540,7 +569,7 @@ class PageFactory {
     return _resolveCurrentRenderPosition();
   }
 
-  List<String> get currentPages => _currentChapterPages;
+  List<PageData> get currentPages => _currentChapterPages;
 }
 
 /// 章节数据

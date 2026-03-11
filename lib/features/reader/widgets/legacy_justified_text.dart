@@ -9,6 +9,8 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
   final String paragraphIndent;
   final bool applyParagraphIndent;
   final bool preserveEmptyLines;
+  /// 预排版行缓存（由分页器提供）。不为 null 时跳过重新排版，直接复用。
+  final List<LegacyComposedLine>? precomposedLines;
 
   const LegacyJustifiedTextBlock({
     super.key,
@@ -19,6 +21,7 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
     this.paragraphIndent = '　　',
     this.applyParagraphIndent = true,
     this.preserveEmptyLines = true,
+    this.precomposedLines,
   });
 
   @override
@@ -29,15 +32,16 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
           return const SizedBox.shrink();
         }
         final maxWidth = constraints.maxWidth;
-        final lines = LegacyJustifyComposer.composeContentLines(
-          content: content,
-          style: style,
-          maxWidth: maxWidth,
-          justify: justify,
-          paragraphIndent: paragraphIndent,
-          applyParagraphIndent: applyParagraphIndent,
-          preserveEmptyLines: preserveEmptyLines,
-        );
+        final lines = precomposedLines ??
+            LegacyJustifyComposer.composeContentLines(
+              content: content,
+              style: style,
+              maxWidth: maxWidth,
+              justify: justify,
+              paragraphIndent: paragraphIndent,
+              applyParagraphIndent: applyParagraphIndent,
+              preserveEmptyLines: preserveEmptyLines,
+            );
         if (lines.isEmpty) {
           return const SizedBox.shrink();
         }
@@ -414,16 +418,18 @@ class LegacyJustifyComposer {
     String? highlightQuery,
     Color? highlightBackgroundColor,
     Color? highlightTextColor,
+    List<LegacyComposedLine>? precomposedLines,
   }) {
-    final renderLines = composeContentLines(
-      content: content,
-      style: style,
-      maxWidth: maxWidth,
-      justify: justify,
-      paragraphIndent: paragraphIndent,
-      applyParagraphIndent: applyParagraphIndent,
-      preserveEmptyLines: preserveEmptyLines,
-    );
+    final renderLines = precomposedLines ??
+        composeContentLines(
+          content: content,
+          style: style,
+          maxWidth: maxWidth,
+          justify: justify,
+          paragraphIndent: paragraphIndent,
+          applyParagraphIndent: applyParagraphIndent,
+          preserveEmptyLines: preserveEmptyLines,
+        );
     if (renderLines.isEmpty) {
       return 0;
     }

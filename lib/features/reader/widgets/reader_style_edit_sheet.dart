@@ -579,11 +579,8 @@ class _ReaderStyleEditSheetState extends State<ReaderStyleEditSheet> {
         bgAlpha: 100,
       ));
     } else if (type == ReadStyleConfig.bgTypeFile) {
-      _update(_draft.copyWith(
-        bgType: ReadStyleConfig.bgTypeFile,
-        bgStr: _draft.bgType == ReadStyleConfig.bgTypeFile ? _draft.bgStr : '',
-        bgAlpha: _draft.bgAlpha == 100 ? 80 : _draft.bgAlpha,
-      ));
+      // 对齐 legado：直接触发文件选择，不产生 bgStr 为空的中间状态
+      _pickBgFile();
     } else {
       final defaultAsset = kBundledBgAssets.isNotEmpty
           ? kBundledBgAssets.first

@@ -1,6 +1,8 @@
 import 'dart:ui' as ui;
 import 'package:flutter/widgets.dart';
 import '../services/reader_image_marker_codec.dart';
+import 'legacy_justified_text.dart';
+import 'page_factory.dart';
 
 /// 阅读器分页代理
 /// 重构：完全对标 Legado TextChapterLayout 逻辑
@@ -17,7 +19,7 @@ class ReaderPageAgent {
   static const double defaultParagraphSpacing = 0.0;
 
   /// 将内容转换为页面列表
-  static List<String> paginateContent(
+  static List<PageData> paginateContent(
     String content,
     double height,
     double width,
@@ -82,8 +84,12 @@ class ReaderPageAgent {
     }
 
     // 3. 分页状态变量
-    List<String> pages = [];
+    final List<PageData> pages = [];
     StringBuffer currentPageContent = StringBuffer();
+    // 当前页正在收集的预排版行（仅纯文本段落）
+    List<LegacyComposedLine> currentPageLines = [];
+    // 当前页是否含图片（含图片时 precomposedLines 置 null）
+    bool currentPageHasImage = false;
     double currentY = 0;
     double maxPageHeight = height - 1.0;
     final normalizedImageStyle = _normalizeImageStyle(imageStyle);
@@ -92,12 +98,17 @@ class ReaderPageAgent {
     void commitPage() {
       if (currentPageContent.isNotEmpty) {
         // 去除页末可能多余的换行符
-        String pageData = currentPageContent.toString();
-        while (pageData.endsWith('\n')) {
-          pageData = pageData.substring(0, pageData.length - 1);
+        String pageText = currentPageContent.toString();
+        while (pageText.endsWith('\n')) {
+          pageText = pageText.substring(0, pageText.length - 1);
         }
-        pages.add(pageData);
+        pages.add(PageData(
+          pageText,
+          precomposedLines: currentPageHasImage ? null : List.unmodifiable(currentPageLines),
+        ));
         currentPageContent.clear();
+        currentPageLines = [];
+        currentPageHasImage = false;
       }
       currentY = 0;
     }
@@ -117,6 +128,7 @@ class ReaderPageAgent {
           commitPage();
         }
         currentPageContent.write('\n');
+        currentPageLines.add(LegacyComposedLine.empty(height: emptyLineHeight, lineStartY: currentY));
         currentY += emptyLineHeight;
         continue;
       }
@@ -141,6 +153,7 @@ class ReaderPageAgent {
           if (currentPageContent.isNotEmpty) {
             commitPage();
           }
+          currentPageHasImage = true;
           currentPageContent.write(marker);
           currentY = imageHeight;
           if (spacingHeight > 0 && currentY + spacingHeight <= maxPageHeight) {
@@ -154,6 +167,7 @@ class ReaderPageAgent {
         if (currentY + imageHeight > maxPageHeight) {
           commitPage();
         }
+        currentPageHasImage = true;
         currentPageContent.write(marker);
         currentPageContent.write('\n');
         currentY += imageHeight;
@@ -216,6 +230,41 @@ class ReaderPageAgent {
         boundaryOffset = range.end;
 
         currentPageContent.write(lineText);
+        // 仅对非标题的正文行收集预排版数据；标题行不缓存（绘制路径单独处理）
+        if (!isTitle) {
+          final isLastLine = lineIndex == lines.length - 1;
+          final canJustify = textAlign == TextAlign.justify &&
+              !isLastLine &&
+              lineText.trim().isNotEmpty &&
+              lineText.runes.length > 1;
+          if (canJustify) {
+            final composed = LegacyJustifyComposer.composeParagraph(
+              paragraph: lineText,
+              style: textStyle,
+              maxWidth: width,
+              justify: true,
+              paragraphIndent: '',
+              applyParagraphIndent: false,
+            );
+            for (final composedLine in composed.lines) {
+              currentPageLines.add(LegacyComposedLine(
+                plainText: composedLine.plainText,
+                segments: composedLine.segments,
+                justified: composedLine.justified,
+                height: lineH,
+                lineStartY: currentY,
+              ));
+            }
+          } else {
+            currentPageLines.add(LegacyComposedLine(
+              plainText: lineText,
+              segments: [LegacyComposedSegment(text: lineText, extraAfter: 0)],
+              justified: false,
+              height: lineH,
+              lineStartY: currentY,
+            ));
+          }
+        }
         currentY += lineH;
 
         // 段落结束处理
@@ -236,6 +285,10 @@ class ReaderPageAgent {
             // 只有当剩余空间足够放一个空行时才插入，避免页面底部只有空行
             if (currentY + spacingHeight <= maxPageHeight) {
               currentPageContent.write('\n');
+              if (!isTitle) {
+                currentPageLines.add(LegacyComposedLine.empty(
+                    height: spacingHeight, lineStartY: currentY));
+              }
               currentY += spacingHeight;
             }
           }
@@ -244,11 +297,15 @@ class ReaderPageAgent {
     }
 
     if (currentPageContent.isNotEmpty) {
-      pages.add(currentPageContent.toString().trimRight());
+      final pageText = currentPageContent.toString().trimRight();
+      pages.add(PageData(
+        pageText,
+        precomposedLines: currentPageHasImage ? null : List.unmodifiable(currentPageLines),
+      ));
     }
 
     if (pages.isEmpty) {
-      pages.add('');
+      pages.add(const PageData(''));
     }
 
     return pages;

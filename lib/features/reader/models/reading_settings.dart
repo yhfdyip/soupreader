@@ -1491,7 +1491,9 @@ class ReadStyleConfig {
       );
     }
 
-    if (safeRawBgStr.isEmpty) {
+    // bgTypeFile 允许 bgStr 为空（用户尚未选图），不强制回退到 bgTypeColor。
+    // bgTypeAsset 若 bgStr 为空则回退，因为内置图片必须有文件名。
+    if (safeRawBgStr.isEmpty && safeBgType != bgTypeFile) {
       return ReadStyleConfig(
         name: safeName,
         backgroundColor: safeBackgroundColor,
