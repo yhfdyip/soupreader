@@ -18,6 +18,7 @@ import '../services/direct_link_upload_config_service.dart';
 import '../services/other_source_settings_service.dart';
 import 'check_source_settings_view.dart';
 import 'direct_link_upload_config_view.dart';
+import 'read_aloud_settings_view.dart';
 import 'storage_settings_view.dart';
 
 class OtherSettingsView extends StatefulWidget {
@@ -388,6 +389,21 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
       title: '其它设置',
       child: AppListView(
         children: [
+          if (!MigrationExclusions.excludeTts)
+            AppListSection(
+              header: const Text('朗读'),
+              hasLeading: false,
+              children: [
+                AppListTile(
+                  title: const Text('朗读设置'),
+                  onTap: () => Navigator.of(context).push(
+                    CupertinoPageRoute<void>(
+                      builder: (_) => const ReadAloudSettingsView(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           AppListSection(
             header: const Text('基本设置'),
             hasLeading: false,

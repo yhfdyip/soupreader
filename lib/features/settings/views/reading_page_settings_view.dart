@@ -190,4 +190,5 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
     final value = _settings.pageTouchSlop;
     return value == 0 ? '系统默认' : value.toString();
   }
+
 }

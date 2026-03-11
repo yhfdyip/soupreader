@@ -24,7 +24,6 @@ import 'app_help_dialog.dart';
 import 'backup_settings_view.dart';
 import 'file_manage_view.dart';
 import 'other_settings_view.dart';
-import 'read_aloud_settings_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_profile_card.dart';
 import 'theme_settings_view.dart';
@@ -234,7 +233,6 @@ class _SettingsViewState extends State<SettingsView> {
               ),
               const SizedBox(height: 8),
               AppListSection(
-                header: const Text('内容管理'),
                 children: [
                   AppListTile(
                     key: const Key('my_menu_bookSourceManage'),
@@ -276,11 +274,6 @@ class _SettingsViewState extends State<SettingsView> {
                       const DictRuleManageView(),
                     ),
                   ),
-                ],
-              ),
-              AppListSection(
-                header: const Text('外观'),
-                children: [
                   AppListTile(
                     key: const Key('my_menu_themeMode'),
                     leadingIcon: CupertinoIcons.circle_lefthalf_fill,
@@ -288,16 +281,6 @@ class _SettingsViewState extends State<SettingsView> {
                     subtitle: const Text('选择主题模式'),
                     additionalInfo: Text(_themeModeSummary),
                     onTap: _pickThemeMode,
-                  ),
-                  AppListTile(
-                    key: const Key('my_menu_theme_setting'),
-                    leadingIcon: CupertinoIcons.paintbrush,
-                    title: const Text('主题设置'),
-                    subtitle: const Text('与界面/颜色相关的一些设置'),
-                    onTap: () => _open(
-                      context,
-                      const ThemeSettingsView(),
-                    ),
                   ),
                   if (!MigrationExclusions.excludeWebService)
                     AppListTile(
@@ -313,7 +296,42 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
               AppListSection(
-                header: const Text('数据'),
+                header: const Text('设置'),
+                children: [
+                  AppListTile(
+                    key: const Key('my_menu_web_dav_setting'),
+                    leadingIcon: CupertinoIcons.cloud_upload,
+                    title: const Text('备份与恢复'),
+                    subtitle: const Text('WebDav 设置/导入旧版本数据'),
+                    onTap: () => _open(
+                      context,
+                      const BackupSettingsView(),
+                    ),
+                  ),
+                  AppListTile(
+                    key: const Key('my_menu_theme_setting'),
+                    leadingIcon: CupertinoIcons.paintbrush,
+                    title: const Text('主题设置'),
+                    subtitle: const Text('与界面/颜色相关的一些设置'),
+                    onTap: () => _open(
+                      context,
+                      const ThemeSettingsView(),
+                    ),
+                  ),
+                  AppListTile(
+                    key: const Key('my_menu_setting'),
+                    leadingIcon: CupertinoIcons.gear,
+                    title: const Text('其它设置'),
+                    subtitle: const Text('与功能相关的一些设置'),
+                    onTap: () => _open(
+                      context,
+                      const OtherSettingsView(),
+                    ),
+                  ),
+                ],
+              ),
+              AppListSection(
+                header: const Text('其他'),
                 children: [
                   AppListTile(
                     key: const Key('my_menu_bookmark'),
@@ -336,16 +354,6 @@ class _SettingsViewState extends State<SettingsView> {
                     ),
                   ),
                   AppListTile(
-                    key: const Key('my_menu_web_dav_setting'),
-                    leadingIcon: CupertinoIcons.cloud_upload,
-                    title: const Text('备份与恢复'),
-                    subtitle: const Text('WebDav 设置/导入旧版本数据'),
-                    onTap: () => _open(
-                      context,
-                      const BackupSettingsView(),
-                    ),
-                  ),
-                  AppListTile(
                     key: const Key('my_menu_fileManage'),
                     leadingIcon: CupertinoIcons.folder,
                     title: const Text('文件管理'),
@@ -353,36 +361,6 @@ class _SettingsViewState extends State<SettingsView> {
                     onTap: () => _open(
                       context,
                       const FileManageView(),
-                    ),
-                  ),
-                ],
-              ),
-              if (!MigrationExclusions.excludeTts)
-                AppListSection(
-                  header: const Text('朗读'),
-                  children: [
-                    AppListTile(
-                      key: const Key('my_menu_read_aloud'),
-                      leadingIcon: CupertinoIcons.speaker_2,
-                      title: const Text('朗读设置'),
-                      onTap: () => _open(
-                        context,
-                        const ReadAloudSettingsView(),
-                      ),
-                    ),
-                  ],
-                ),
-              AppListSection(
-                header: const Text('通用'),
-                children: [
-                  AppListTile(
-                    key: const Key('my_menu_setting'),
-                    leadingIcon: CupertinoIcons.gear,
-                    title: const Text('其它设置'),
-                    subtitle: const Text('与功能相关的一些设置'),
-                    onTap: () => _open(
-                      context,
-                      const OtherSettingsView(),
                     ),
                   ),
                   AppListTile(

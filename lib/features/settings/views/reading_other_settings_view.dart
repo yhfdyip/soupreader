@@ -153,6 +153,12 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
             hasLeading: false,
             children: [
               _buildSwitchItem(
+                title: '正文适应左手',
+                value: _settings.readBodyToLh,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(readBodyToLh: v)),
+              ),
+              _buildSwitchItem(
                 title: '刘海屏留边',
                 value: _settings.paddingDisplayCutouts,
                 onChanged: (v) =>

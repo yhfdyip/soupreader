@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_ui_kit.dart';
@@ -40,6 +41,26 @@ class _ReadAloudSettingsViewState extends State<ReadAloudSettingsView> {
     setState(() {
       _appSettings = _settingsService.appSettingsListenable.value;
     });
+  }
+
+  Future<void> _openSysTtsConfig() async {
+    const url = 'App-prefs:root=ACCESSIBILITY';
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri)) {
+      if (!mounted) return;
+      showCupertinoDialog<void>(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          content: const Text('无法跳转到系统设置，请手动前往「设置 > 辅助功能 > 朗读内容」'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('好'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _save(Future<void> Function() action) async {
@@ -85,6 +106,12 @@ class _ReadAloudSettingsViewState extends State<ReadAloudSettingsView> {
                     builder: (_) => const SpeakEngineManageView(),
                   ),
                 ),
+              ),
+              AppListTile(
+                leadingIcon: CupertinoIcons.settings,
+                title: const Text('系统 TTS 设置'),
+                additionalInfo: const Text('跳转到系统朗读内容设置'),
+                onTap: _openSysTtsConfig,
               ),
             ],
           ),
