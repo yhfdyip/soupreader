@@ -433,8 +433,8 @@ class LegacyJustifyComposer {
       if (lineIndex > 0 && extraGap > 0.01) {
         y += extraGap;
       }
-      if (y - origin.dy > maxHeight) break;
       final line = renderLines[lineIndex];
+      if (y - origin.dy + line.height > maxHeight) break;
       if (line.segments.isEmpty || line.isVisualEmpty) {
         y += line.height;
         continue;
