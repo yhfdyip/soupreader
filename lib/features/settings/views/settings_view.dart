@@ -223,7 +223,7 @@ class _SettingsViewState extends State<SettingsView> {
       bottom: true,
       sliver: SliverToBoxAdapter(
         child: Padding(
-          padding: tokens.spacings.pageListPadding,
+          padding: tokens.spacings.pageListPadding.copyWith(bottom: 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -380,7 +380,7 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
             ],
           ),
         ),
