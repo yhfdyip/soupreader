@@ -4825,7 +4825,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         }
       },
       child: CupertinoPageScaffold(
-        backgroundColor: _readerBackgroundBaseColor,
+        backgroundColor: _readerUsesImageBackground
+            ? const Color(0x00000000)
+            : _readerBackgroundBaseColor,
         child: KeyboardListener(
           focusNode: _keyboardFocusNode,
           autofocus: true,
@@ -5240,7 +5242,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         decoration: _currentTextDecoration,
       ),
       backgroundColor: _readerContentBackgroundColor,
-      shaderBackgroundColor: _readerBackgroundBaseColor,
+      shaderBackgroundColor: _readerUsesImageBackground
+          ? const Color(0x00000000)
+          : _readerBackgroundBaseColor,
       padding: _contentPadding,
       enableGestures: !_showMenu && !_showSearchMenu, // 菜单显示时禁止翻页手势
       onTap: () {

@@ -291,7 +291,6 @@ class LegacyJustifyComposer {
       return const LegacyComposedParagraph(<LegacyComposedLine>[]);
     }
 
-    final widthCache = <String, double>{};
     final lines = <LegacyComposedLine>[];
     var offset = 0;
     final indentLen = paragraphIndent.length;
@@ -342,11 +341,8 @@ class LegacyJustifyComposer {
         body = body.substring(paragraphIndent.length);
       }
 
-      final lineNaturalWidth = _measureWidth(
-        text: lineText,
-        style: style,
-        cache: widthCache,
-      );
+      // 直接用 lineMetrics 的实际行宽，避免重新 layout 时尾部 letterSpacing 导致偏差
+      final lineNaturalWidth = metric.width;
       final residualWidth = maxWidth - lineNaturalWidth;
       if (residualWidth <= 0.01) {
         lines.add(
@@ -620,25 +616,6 @@ class LegacyJustifyComposer {
     }
     painter.paint(canvas, Offset(x, y));
     return painter.width;
-  }
-
-  static double _measureWidth({
-    required String text,
-    required TextStyle style,
-    required Map<String, double> cache,
-  }) {
-    if (text.isEmpty) return 0;
-    final key = '${style.fontSize}|${style.height}|${style.letterSpacing}|'
-        '${style.fontWeight}|${style.fontFamily}|$text';
-    final cached = cache[key];
-    if (cached != null) return cached;
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: ui.TextDirection.ltr,
-      maxLines: 1,
-    )..layout();
-    cache[key] = tp.width;
-    return tp.width;
   }
 
   /// 计算选区内每行的高亮矩形（相对于 [origin] 的绝对坐标）。

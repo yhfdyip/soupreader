@@ -245,24 +245,55 @@ class ReaderPageAgent {
               lineText.trim().isNotEmpty &&
               lineText.runes.length > 1;
           if (canJustify) {
-            final composed = LegacyJustifyComposer.composeParagraph(
-              paragraph: lineText,
-              style: textStyle,
-              maxWidth: width,
-              justify: true,
-              paragraphIndent: '',
-              applyParagraphIndent: false,
-            );
-            for (final composedLine in composed.lines) {
-              currentPageLines.add(LegacyComposedLine(
-                plainText: composedLine.plainText,
-                segments: composedLine.segments,
-                justified: composedLine.justified,
-                height: lineH,
-                renderHeight: curFontSize,
-                lineStartY: currentY,
-              ));
+            // 直接用 lineMetrics.width（Flutter 排版引擎的实际行宽）计算 residualWidth，
+            // 避免重新 layout 时尾部 letterSpacing 导致偏差，也避免单行文本永远不 justify 的问题
+            final lineNaturalWidth = line.width;
+            final residualWidth = width - lineNaturalWidth;
+            final segments = <LegacyComposedSegment>[];
+            if (residualWidth > 0.01) {
+              // 首行缩进：缩进前缀不参与间距扩展，只对正文部分 justify（对标 legado addCharsToLineFirst）
+              var prefix = '';
+              var body = lineText;
+              if (lineIndex == 0 && indent.isNotEmpty && lineText.startsWith(indent)) {
+                prefix = indent;
+                body = lineText.substring(indent.length);
+              }
+              if (prefix.isNotEmpty) {
+                segments.add(LegacyComposedSegment(text: prefix, extraAfter: 0));
+              }
+              final chars =
+                  body.runes.map(String.fromCharCode).toList(growable: false);
+              if (chars.length > 1) {
+                final spaceCount = chars.where((c) => c == ' ').length;
+                if (spaceCount > 1) {
+                  final gap = residualWidth / spaceCount;
+                  for (var idx = 0; idx < chars.length; idx++) {
+                    final isLast = idx == chars.length - 1;
+                    final extra = (chars[idx] == ' ' && !isLast) ? gap : 0.0;
+                    segments.add(LegacyComposedSegment(text: chars[idx], extraAfter: extra));
+                  }
+                } else {
+                  final gapCount = chars.length - 1;
+                  final gap = residualWidth / gapCount;
+                  for (var idx = 0; idx < chars.length; idx++) {
+                    final extra = idx < chars.length - 1 ? gap : 0.0;
+                    segments.add(LegacyComposedSegment(text: chars[idx], extraAfter: extra));
+                  }
+                }
+              } else {
+                segments.add(LegacyComposedSegment(text: body, extraAfter: 0));
+              }
+            } else {
+              segments.add(LegacyComposedSegment(text: lineText, extraAfter: 0));
             }
+            currentPageLines.add(LegacyComposedLine(
+              plainText: lineText,
+              segments: segments,
+              justified: residualWidth > 0.01,
+              height: lineH,
+              renderHeight: curFontSize,
+              lineStartY: currentY,
+            ));
           } else {
             currentPageLines.add(LegacyComposedLine(
               plainText: lineText,

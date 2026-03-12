@@ -471,14 +471,26 @@ class _ReaderStyleQuickSheetState
     final mutedColor = isDark
         ? CupertinoColors.white.withValues(alpha: 0.5)
         : CupertinoColors.secondaryLabel.resolveFrom(context);
+    // 从 _draft 实时派生，确保新增/编辑后立即反映在列表中
+    final configs = _draft.readStyleConfigs.isNotEmpty
+        ? _draft.readStyleConfigs
+        : widget.styleConfigs;
+    final themes = configs
+        .map(
+          (c) => ReadingThemeColors(
+            background: Color(c.backgroundColor),
+            text: Color(c.textColor),
+            name: c.name.trim().isEmpty ? '文字' : c.name.trim(),
+          ),
+        )
+        .toList(growable: false);
     final safeSelected =
-        (_draft.themeIndex >= 0 && _draft.themeIndex < widget.themes.length)
+        (_draft.themeIndex >= 0 && _draft.themeIndex < themes.length)
             ? _draft.themeIndex
             : 0;
     final borderNormal = CupertinoColors.separator.resolveFrom(context);
-    final configs = widget.styleConfigs;
     // 总格子数 = 样式数 + 1个「+」格
-    final cellCount = widget.themes.length + 1;
+    final cellCount = themes.length + 1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
@@ -536,11 +548,11 @@ class _ReaderStyleQuickSheetState
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, i) {
                 // 最后一格为「+」新增按钮
-                if (i == widget.themes.length) {
+                if (i == themes.length) {
                   return _buildAddCell(isDark, borderNormal);
                 }
                 final selected = i == safeSelected;
-                final t = widget.themes[i];
+                final t = themes[i];
                 final config = i < configs.length ? configs[i] : null;
                 return GestureDetector(
                   onTap: () => _apply(_draft.copyWith(themeIndex: i)),
@@ -644,7 +656,9 @@ class _ReaderStyleQuickSheetState
   }
 
   void _addNewStyle() {
-    final configs = widget.styleConfigs;
+    final configs = _draft.readStyleConfigs.isNotEmpty
+        ? _draft.readStyleConfigs
+        : widget.styleConfigs;
     final newConfig = const ReadStyleConfig(
       name: '新样式',
       backgroundColor: 0xFFFFFFFF,

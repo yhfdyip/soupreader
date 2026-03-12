@@ -402,6 +402,24 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                     ),
                   ),
                 ),
+                _buildBooleanTile(
+                  title: '退出时释放媒体按钮',
+                  additionalInfo: '退出阅读界面时释放媒体按钮占用',
+                  value: _appSettings.mediaButtonOnExit,
+                  save: _settingsService.saveMediaButtonOnExit,
+                ),
+                _buildBooleanTile(
+                  title: '媒体按钮朗读',
+                  additionalInfo: '使用媒体按钮控制朗读',
+                  value: _appSettings.readAloudByMediaButton,
+                  save: _settingsService.saveReadAloudByMediaButton,
+                ),
+                _buildBooleanTile(
+                  title: '忽略音频焦点',
+                  additionalInfo: '朗读时忽略音频焦点变化',
+                  value: _appSettings.ignoreAudioFocus,
+                  save: _settingsService.saveIgnoreAudioFocus,
+                ),
               ],
             ),
           AppListSection(
