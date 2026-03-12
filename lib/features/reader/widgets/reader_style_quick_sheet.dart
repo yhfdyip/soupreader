@@ -489,8 +489,6 @@ class _ReaderStyleQuickSheetState
             ? _draft.themeIndex
             : 0;
     final borderNormal = CupertinoColors.separator.resolveFrom(context);
-    // 总格子数 = 样式数 + 1个「+」格
-    final cellCount = themes.length + 1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
@@ -539,18 +537,13 @@ class _ReaderStyleQuickSheetState
             ],
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 52,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: cellCount,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                // 最后一格为「+」新增按钮
-                if (i == themes.length) {
-                  return _buildAddCell(isDark, borderNormal);
-                }
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // 「+」按钮放在第一位
+              _buildAddCell(isDark, borderNormal),
+              ...List.generate(themes.length, (i) {
                 final selected = i == safeSelected;
                 final t = themes[i];
                 final config = i < configs.length ? configs[i] : null;
@@ -620,8 +613,8 @@ class _ReaderStyleQuickSheetState
                     ),
                   ),
                 );
-              },
-            ),
+              }),
+            ],
           ),
         ],
       ),
