@@ -73,13 +73,11 @@ class _ReadAloudSettingsViewState extends State<ReadAloudSettingsView> {
 
   Widget _buildBooleanTile({
     required String title,
-    required String additionalInfo,
     required bool value,
     required Future<void> Function(bool) save,
   }) {
     return AppListTile(
       title: Text(title),
-      additionalInfo: Text(additionalInfo),
       showChevron: false,
       trailing: CupertinoSwitch(
         value: value,
@@ -99,9 +97,7 @@ class _ReadAloudSettingsViewState extends State<ReadAloudSettingsView> {
             children: [
               AppListTile(
                 leadingIcon: CupertinoIcons.speaker_2,
-                title: const Text('朗读引擎'),
-                additionalInfo: const Text('系统/HTTP 引擎'),
-                onTap: () => Navigator.of(context).push(
+                title: const Text('朗读引擎'),                onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (_) => const SpeakEngineManageView(),
                   ),
@@ -109,9 +105,7 @@ class _ReadAloudSettingsViewState extends State<ReadAloudSettingsView> {
               ),
               AppListTile(
                 leadingIcon: CupertinoIcons.settings,
-                title: const Text('系统 TTS 设置'),
-                additionalInfo: const Text('跳转到系统朗读内容设置'),
-                onTap: _openSysTtsConfig,
+                title: const Text('系统 TTS 设置'),                onTap: _openSysTtsConfig,
               ),
             ],
           ),
@@ -121,33 +115,23 @@ class _ReadAloudSettingsViewState extends State<ReadAloudSettingsView> {
                 header: const Text('控制'),
                 children: [
                   _buildBooleanTile(
-                    title: '全程响应耳机按键',
-                    additionalInfo: '即使退出软件也响应耳机按键',
-                    value: _appSettings.mediaButtonOnExit,
+                    title: '全程响应耳机按键',                    value: _appSettings.mediaButtonOnExit,
                     save: _settingsService.saveMediaButtonOnExit,
                   ),
                   _buildBooleanTile(
-                    title: '耳机按键启动朗读',
-                    additionalInfo: '通过耳机按键来启动朗读',
-                    value: _appSettings.readAloudByMediaButton,
+                    title: '耳机按键启动朗读',                    value: _appSettings.readAloudByMediaButton,
                     save: _settingsService.saveReadAloudByMediaButton,
                   ),
                   _buildBooleanTile(
-                    title: '忽略音频焦点',
-                    additionalInfo: '允许与其他应用同时播放音频',
-                    value: _appSettings.ignoreAudioFocus,
+                    title: '忽略音频焦点',                    value: _appSettings.ignoreAudioFocus,
                     save: _settingsService.saveIgnoreAudioFocus,
                   ),
                   _buildBooleanTile(
-                    title: '来电时暂停朗读',
-                    additionalInfo: '接到电话时自动暂停朗读',
-                    value: _appSettings.pauseReadAloudWhilePhoneCalls,
+                    title: '来电时暂停朗读',                    value: _appSettings.pauseReadAloudWhilePhoneCalls,
                     save: _settingsService.savePauseReadAloudWhilePhoneCalls,
                   ),
                   _buildBooleanTile(
-                    title: '朗读时保持屏幕常亮',
-                    additionalInfo: '防止朗读时屏幕熄灭',
-                    value: _appSettings.readAloudWakeLock,
+                    title: '朗读时保持屏幕常亮',                    value: _appSettings.readAloudWakeLock,
                     save: _settingsService.saveReadAloudWakeLock,
                   ),
                 ],
@@ -156,15 +140,11 @@ class _ReadAloudSettingsViewState extends State<ReadAloudSettingsView> {
                 header: const Text('朗读方式'),
                 children: [
                   _buildBooleanTile(
-                    title: '按页朗读',
-                    additionalInfo: '以页为单位朗读，翻页后继续',
-                    value: _appSettings.readAloudByPage,
+                    title: '按页朗读',                    value: _appSettings.readAloudByPage,
                     save: _settingsService.saveReadAloudByPage,
                   ),
                   _buildBooleanTile(
-                    title: '流式朗读',
-                    additionalInfo: '边加载边朗读，减少等待',
-                    value: _appSettings.streamReadAloudAudio,
+                    title: '流式朗读',                    value: _appSettings.streamReadAloudAudio,
                     save: _settingsService.saveStreamReadAloudAudio,
                   ),
                 ],

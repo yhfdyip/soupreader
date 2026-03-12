@@ -216,9 +216,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('自定义欢迎页'),
-                additionalInfo: const Text('是否使用自定义欢迎页'),
-                trailing: CupertinoSwitch(
+                title: const Text('自定义欢迎页'),                trailing: CupertinoSwitch(
                   value: _customWelcome,
                   onChanged: (value) async {
                     await _settingsService.saveCustomWelcome(value);
@@ -239,9 +237,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
                 onTap: () => _editWelcomeImage(night: false),
               ),
               AppListTile(
-                title: const Text('显示文字'),
-                additionalInfo: const Text('阅读|享受美好时光'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示文字'),                trailing: CupertinoSwitch(
                   value: _welcomeShowText,
                   onChanged: hasDayImage
                       ? (value) async {
@@ -253,9 +249,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('显示图标'),
-                additionalInfo: const Text('显示默认书籍图标'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示图标'),                trailing: CupertinoSwitch(
                   value: _welcomeShowIcon,
                   onChanged: hasDayImage
                       ? (value) async {
@@ -278,9 +272,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
                 onTap: () => _editWelcomeImage(night: true),
               ),
               AppListTile(
-                title: const Text('显示文字'),
-                additionalInfo: const Text('阅读|享受美好时光'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示文字'),                trailing: CupertinoSwitch(
                   value: _welcomeShowTextDark,
                   onChanged: hasNightImage
                       ? (value) async {
@@ -292,9 +284,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('显示图标'),
-                additionalInfo: const Text('显示默认书籍图标'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示图标'),                trailing: CupertinoSwitch(
                   value: _welcomeShowIconDark,
                   onChanged: hasNightImage
                       ? (value) async {

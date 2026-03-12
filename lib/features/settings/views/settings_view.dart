@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/ui_tokens.dart';
@@ -360,12 +360,6 @@ class _SettingsViewState extends State<SettingsView> {
                       context,
                       const AboutSettingsView(),
                     ),
-                  ),
-                  AppListTile(
-                    key: const Key('my_menu_exit'),
-                    leadingIcon: CupertinoIcons.arrow_right_circle,
-                    title: const Text('退出'),
-                    onTap: () => SystemNavigator.pop(),
                   ),
                 ],
               ),

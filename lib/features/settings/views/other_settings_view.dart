@@ -403,21 +403,15 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   ),
                 ),
                 _buildBooleanTile(
-                  title: '退出时释放媒体按钮',
-                  additionalInfo: '退出阅读界面时释放媒体按钮占用',
-                  value: _appSettings.mediaButtonOnExit,
+                  title: '退出时释放媒体按钮',                  value: _appSettings.mediaButtonOnExit,
                   save: _settingsService.saveMediaButtonOnExit,
                 ),
                 _buildBooleanTile(
-                  title: '媒体按钮朗读',
-                  additionalInfo: '使用媒体按钮控制朗读',
-                  value: _appSettings.readAloudByMediaButton,
+                  title: '媒体按钮朗读',                  value: _appSettings.readAloudByMediaButton,
                   save: _settingsService.saveReadAloudByMediaButton,
                 ),
                 _buildBooleanTile(
-                  title: '忽略音频焦点',
-                  additionalInfo: '朗读时忽略音频焦点变化',
-                  value: _appSettings.ignoreAudioFocus,
+                  title: '忽略音频焦点',                  value: _appSettings.ignoreAudioFocus,
                   save: _settingsService.saveIgnoreAudioFocus,
                 ),
               ],
@@ -427,9 +421,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('自动刷新'),
-                additionalInfo: const Text('打开软件时自动更新书籍'),
-                trailing: CupertinoSwitch(
+                title: const Text('自动刷新'),                trailing: CupertinoSwitch(
                   value: _appSettings.autoRefresh,
                   onChanged: _settingsService.saveAutoRefresh,
                 ),
@@ -438,9 +430,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('自动跳转最近阅读'),
-                additionalInfo: const Text('默认打开书架'),
-                trailing: CupertinoSwitch(
+                title: const Text('自动跳转最近阅读'),                trailing: CupertinoSwitch(
                   value: _appSettings.defaultToRead,
                   onChanged: _settingsService.saveDefaultToRead,
                 ),
@@ -542,9 +532,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   onTap: _editImageRetainNum,
                 ),
               AppListTile(
-                title: const Text('默认启用替换净化'),
-                additionalInfo: const Text('新加入书架的书是否启用替换净化'),
-                trailing: CupertinoSwitch(
+                title: const Text('默认启用替换净化'),                trailing: CupertinoSwitch(
                   value: _appSettings.replaceEnableDefault,
                   onChanged: _settingsService.saveReplaceEnableDefault,
                 ),
@@ -553,9 +541,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('下载与缓存'),
-                additionalInfo: const Text('缓存清理、WebView 数据、数据库维护'),
-                onTap: () => Navigator.of(context).push(
+                title: const Text('下载与缓存'),                onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (context) => const StorageSettingsView(),
                   ),
@@ -568,9 +554,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('文字操作显示搜索'),
-                additionalInfo: const Text('长按文字在操作菜单中显示阅读·搜索'),
-                trailing: CupertinoSwitch(
+                title: const Text('文字操作显示搜索'),                trailing: CupertinoSwitch(
                   value: _appSettings.processText,
                   onChanged: _settingsService.saveProcessText,
                 ),
@@ -579,9 +563,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('记录日志'),
-                additionalInfo: const Text('记录调试日志'),
-                trailing: CupertinoSwitch(
+                title: const Text('记录日志'),                trailing: CupertinoSwitch(
                   value: _appSettings.recordLog,
                   onChanged: _settingsService.saveRecordLog,
                 ),
@@ -589,9 +571,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                     _settingsService.saveRecordLog(!_appSettings.recordLog),
               ),
               AppListTile(
-                title: const Text('记录堆转储'),
-                additionalInfo: const Text('当应用发生 OOM 崩溃时保存堆转储'),
-                trailing: CupertinoSwitch(
+                title: const Text('记录堆转储'),                trailing: CupertinoSwitch(
                   value: _appSettings.recordHeapDump,
                   onChanged: _settingsService.saveRecordHeapDump,
                 ),
@@ -607,28 +587,20 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               hasLeading: false,
               children: [
                 _buildBooleanTile(
-                  title: 'Cronet',
-                  additionalInfo: '使用 Cronet 网络组件',
-                  value: _appSettings.cronet,
+                  title: 'Cronet',                  value: _appSettings.cronet,
                   save: _settingsService.saveCronet,
                 ),
                 _buildBooleanTile(
-                  title: '抗锯齿',
-                  additionalInfo: '绘制图片时抗锯齿',
-                  value: _appSettings.antiAlias,
+                  title: '抗锯齿',                  value: _appSettings.antiAlias,
                   save: _settingsService.saveAntiAlias,
                 ),
 
                 _buildBooleanTile(
-                  title: '自动清除过期搜索数据',
-                  additionalInfo: '超过一天的搜索数据',
-                  value: _appSettings.autoClearExpired,
+                  title: '自动清除过期搜索数据',                  value: _appSettings.autoClearExpired,
                   save: _settingsService.saveAutoClearExpired,
                 ),
                 _buildBooleanTile(
-                  title: '返回时提示放入书架',
-                  additionalInfo: '阅读未放入书架的书籍在返回时提示放入书架',
-                  value: _appSettings.showAddToShelfAlert,
+                  title: '返回时提示放入书架',                  value: _appSettings.showAddToShelfAlert,
                   save: _settingsService.saveShowAddToShelfAlert,
                 ),
                 AppListTile(

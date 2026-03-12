@@ -25,9 +25,7 @@ class SourceManagementView extends StatelessWidget {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('书源管理'),
-                additionalInfo: const Text('导入/导出/启用'),
-                onTap: () {
+                title: const Text('书源管理'),                onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) => const SourceListView(),
@@ -37,9 +35,7 @@ class SourceManagementView extends StatelessWidget {
               ),
               if (showRssManagement)
                 AppListTile(
-                  title: const Text('订阅管理'),
-                  additionalInfo: const Text('搜索/分组/启停'),
-                  onTap: () {
+                  title: const Text('订阅管理'),                  onTap: () {
                     Navigator.of(context).push(
                       CupertinoPageRoute<void>(
                         builder: (context) => const RssSourceManageView(),
@@ -54,9 +50,7 @@ class SourceManagementView extends StatelessWidget {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('替换净化'),
-                additionalInfo: const Text('净化/繁简'),
-                onTap: () {
+                title: const Text('替换净化'),                onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) => const TextRulesSettingsView(),
@@ -65,9 +59,7 @@ class SourceManagementView extends StatelessWidget {
                 },
               ),
               AppListTile(
-                title: const Text('目录规则'),
-                additionalInfo: const Text('书源编辑'),
-                onTap: () {
+                title: const Text('目录规则'),                onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute<void>(
                       builder: (context) => const TxtTocRuleManageView(),

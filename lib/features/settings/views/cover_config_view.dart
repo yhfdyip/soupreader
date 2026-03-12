@@ -323,9 +323,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('仅 WiFi'),
-                additionalInfo: const Text('仅在 WiFi 下加载网络封面'),
-                trailing: CupertinoSwitch(
+                title: const Text('仅 WiFi'),                trailing: CupertinoSwitch(
                   value: _loadCoverOnlyWifi,
                   onChanged: (value) async {
                     await _settingsService.saveCoverLoadOnlyWifi(value);
@@ -335,14 +333,10 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                 ),
               ),
               AppListTile(
-                title: const Text('封面规则'),
-                additionalInfo: const Text('进入详情页时使用封面规则重新获取封面'),
-                onTap: _editCoverRule,
+                title: const Text('封面规则'),                onTap: _editCoverRule,
               ),
               AppListTile(
-                title: const Text('总是使用默认封面'),
-                additionalInfo: const Text('总是显示默认封面（不显示网络封面）'),
-                trailing: CupertinoSwitch(
+                title: const Text('总是使用默认封面'),                trailing: CupertinoSwitch(
                   value: _useDefaultCover,
                   onChanged: (value) async {
                     await _settingsService.saveUseDefaultCover(value);
@@ -363,9 +357,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                 onTap: () => _editDefaultCover(night: false),
               ),
               AppListTile(
-                title: const Text('显示书名'),
-                additionalInfo: const Text('封面上显示书名'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示书名'),                trailing: CupertinoSwitch(
                   value: _coverShowName,
                   onChanged: (value) async {
                     await _settingsService.saveCoverShowName(value);
@@ -375,9 +367,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                 ),
               ),
               AppListTile(
-                title: const Text('显示作者'),
-                additionalInfo: const Text('封面上显示作者'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示作者'),                trailing: CupertinoSwitch(
                   value: _coverShowAuthor,
                   onChanged: _coverShowName
                       ? (value) async {
@@ -400,9 +390,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                 onTap: () => _editDefaultCover(night: true),
               ),
               AppListTile(
-                title: const Text('显示书名'),
-                additionalInfo: const Text('封面上显示书名'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示书名'),                trailing: CupertinoSwitch(
                   value: _coverShowNameNight,
                   onChanged: (value) async {
                     await _settingsService.saveCoverShowNameNight(value);
@@ -412,9 +400,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                 ),
               ),
               AppListTile(
-                title: const Text('显示作者'),
-                additionalInfo: const Text('封面上显示作者'),
-                trailing: CupertinoSwitch(
+                title: const Text('显示作者'),                trailing: CupertinoSwitch(
                   value: _coverShowAuthorNight,
                   onChanged: _coverShowNameNight
                       ? (value) async {

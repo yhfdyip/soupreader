@@ -35,8 +35,6 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       'SoupReader 下载链接：\nhttps://github.com/Inighty/soupreader/releases';
   static const String _contributorsUrl =
       'https://github.com/gedoor/legado/graphs/contributors';
-  static const String _contributorsSummary =
-      'gedoor、Invinciblelee 和 Xwite 等，详情请在 GitHub 中查看';
 
   final SettingsService _settingsService = SettingsService();
   final ExceptionLogService _exceptionLogService = ExceptionLogService();
@@ -90,9 +88,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
                 hasLeading: false,
                 children: [
                   AppListTile(
-                    title: const Text('开发人员'),
-                    additionalInfo: const Text(_contributorsSummary),
-                    onTap: _openContributors,
+                    title: const Text('开发人员'),                    onTap: _openContributors,
                   ),
                   AppListTile(
                     title: const Text('更新日志'),

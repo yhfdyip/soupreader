@@ -321,14 +321,10 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('导出备份（推荐）'),
-                additionalInfo: const Text('不含在线缓存'),
-                onTap: () => _export(includeOnlineCache: false),
+                title: const Text('导出备份（推荐）'),                onTap: () => _export(includeOnlineCache: false),
               ),
               AppListTile(
-                title: const Text('导出（含在线缓存）'),
-                additionalInfo: const Text('体积大'),
-                onTap: () => _export(includeOnlineCache: true),
+                title: const Text('导出（含在线缓存）'),                onTap: () => _export(includeOnlineCache: true),
               ),
             ],
           ),
@@ -337,14 +333,10 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('从文件导入（合并）'),
-                additionalInfo: const Text('不清空当前数据'),
-                onTap: () => _import(overwrite: false),
+                title: const Text('从文件导入（合并）'),                onTap: () => _import(overwrite: false),
               ),
               AppListTile(
-                title: const Text('从文件导入（覆盖）'),
-                additionalInfo: const Text('会清空当前数据'),
-                onTap: () => _import(overwrite: true),
+                title: const Text('从文件导入（覆盖）'),                onTap: () => _import(overwrite: true),
               ),
             ],
           ),
@@ -430,19 +422,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('同步阅读进度'),
-                additionalInfo: const Text('进入退出阅读界面时同步阅读进度'),
-                trailing: CupertinoSwitch(
+                title: const Text('同步阅读进度'),                trailing: CupertinoSwitch(
                   value: settings.syncBookProgress,
                   onChanged: _settingsService.saveSyncBookProgress,
                 ),
               ),
               AppListTile(
-                title: const Text('同步增强'),
-                additionalInfo: const Text(
-                  '重新进入页面（息屏、后台返回等）或者网络变为可用时同步云端进度',
-                ),
-                trailing: CupertinoSwitch(
+                title: const Text('同步增强'),                trailing: CupertinoSwitch(
                   value: settings.syncBookProgressPlus,
                   onChanged: settings.syncBookProgress
                       ? _settingsService.saveSyncBookProgressPlus
@@ -450,9 +436,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('测试连接'),
-                additionalInfo: const Text('检查授权并准备 books 目录'),
-                onTap: _testWebDavConnection,
+                title: const Text('测试连接'),                onTap: _testWebDavConnection,
               ),
             ],
           ),
@@ -468,17 +452,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                 onTap: _editBackupPath,
               ),
               AppListTile(
-                title: const Text('备份到 WebDav'),
-                additionalInfo: const Text('上传当前备份到云端'),
-                onTap: _backupToWebDav,
+                title: const Text('备份到 WebDav'),                onTap: _backupToWebDav,
               ),
               GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onLongPress: _restoreFromLocal,
                 child: AppListTile(
-                  title: const Text('从 WebDav 恢复'),
-                  additionalInfo: const Text('优先从 WebDav 恢复，长按从本地恢复'),
-                  onTap: _restoreFromWebDav,
+                  title: const Text('从 WebDav 恢复'),                  onTap: _restoreFromWebDav,
                 ),
               ),
               ..._buildAutoCheckNewBackupPromptTiles(),
@@ -489,22 +469,16 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
               ),
               AppListTile(
                 key: const Key('import_old'),
-                title: const Text('导入旧数据'),
-                additionalInfo: const Text('选择旧版备份文件夹'),
-                onTap: _importOldData,
+                title: const Text('导入旧数据'),                onTap: _importOldData,
               ),
               AppListTile(
-                title: const Text('仅保留最新备份'),
-                additionalInfo: const Text('本地备份仅保留最新备份文件'),
-                trailing: CupertinoSwitch(
+                title: const Text('仅保留最新备份'),                trailing: CupertinoSwitch(
                   value: settings.onlyLatestBackup,
                   onChanged: _settingsService.saveOnlyLatestBackup,
                 ),
               ),
               AppListTile(
-                title: const Text('自动检查新备份'),
-                additionalInfo: const Text('打开软件时检查是否有新备份，有新备份时提示是否更新'),
-                trailing: CupertinoSwitch(
+                title: const Text('自动检查新备份'),                trailing: CupertinoSwitch(
                   value: settings.autoCheckNewBackup,
                   onChanged: _onAutoCheckNewBackupChanged,
                 ),

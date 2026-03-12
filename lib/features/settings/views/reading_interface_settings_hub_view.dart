@@ -82,13 +82,11 @@ class _ReadingInterfaceSettingsHubViewState
               _buildItem(
                 leading: CupertinoIcons.textformat,
                 title: '样式与排版',
-                description: '字体/排版',
                 onTap: _openPreferences,
               ),
               _buildItem(
                 leading: CupertinoIcons.doc_text,
                 title: '页眉页脚与标题',
-                description: '标题间距/内容位/分割线',
                 onTap: _openTipSettings,
               ),
             ],
@@ -99,7 +97,6 @@ class _ReadingInterfaceSettingsHubViewState
               _buildItem(
                 leading: CupertinoIcons.slider_horizontal_3,
                 title: '排版与边距（高级）',
-                description: '标题/正文/边距',
                 onTap: _openTypographyDialog,
               ),
             ],
@@ -113,7 +110,6 @@ class _ReadingInterfaceSettingsHubViewState
   Widget _buildItem({
     required IconData leading,
     required String title,
-    required String description,
     required VoidCallback onTap,
   }) {
     return AppListTile(
@@ -129,15 +125,6 @@ class _ReadingInterfaceSettingsHubViewState
         style: TextStyle(
           color: ReaderSettingsTokens.rowTitleColor(isDark: _isDark),
           fontSize: ReaderSettingsTokens.rowTitleSize,
-        ),
-      ),
-      additionalInfo: Text(
-        description.trim(),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: ReaderSettingsTokens.rowMetaSize,
-          color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
         ),
       ),
       onTap: onTap,

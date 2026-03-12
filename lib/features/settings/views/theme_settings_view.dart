@@ -325,29 +325,19 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
             header: Text('主题模式：${_themeModeSummary(context)}'),
             children: [
               AppListTile(
-                title: const Text('启动界面样式'),
-                additionalInfo: const Text('启动界面图片和是否显示文字等'),
-                onTap: _openWelcomeStyle,
+                title: const Text('启动界面样式'),                onTap: _openWelcomeStyle,
               ),
               AppListTile(
-                title: const Text('封面设置'),
-                additionalInfo: const Text('通用封面规则及默认封面样式'),
-                onTap: _openCoverConfig,
+                title: const Text('封面设置'),                onTap: _openCoverConfig,
               ),
               AppListTile(
-                title: const Text('主题列表'),
-                additionalInfo: const Text('使用、保存、导入或分享主题'),
-                onTap: _openThemeList,
+                title: const Text('主题列表'),                onTap: _openThemeList,
               ),
               AppListTile(
-                title: const Text('保存白天主题'),
-                additionalInfo: const Text('保存当前白天主题快照'),
-                onTap: () => _saveThemeSnapshot(isNightTheme: false),
+                title: const Text('保存白天主题'),                onTap: () => _saveThemeSnapshot(isNightTheme: false),
               ),
               AppListTile(
-                title: const Text('保存夜间主题'),
-                additionalInfo: const Text('保存当前夜间主题快照'),
-                onTap: () => _saveThemeSnapshot(isNightTheme: true),
+                title: const Text('保存夜间主题'),                onTap: () => _saveThemeSnapshot(isNightTheme: true),
               ),
             ],
           ),
@@ -360,18 +350,14 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
                 onTap: _openAppearanceSettings,
               ),
               AppListTile(
-                title: const Text('阅读主题'),
-                additionalInfo: const Text('主题 / 字体 / 排版'),
-                onTap: () => Navigator.of(context).push(
+                title: const Text('阅读主题'),                onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (context) => const ReadingThemeSettingsView(),
                   ),
                 ),
               ),
               AppListTile(
-                title: const Text('阅读界面样式'),
-                additionalInfo: const Text('页眉页脚 / 排版 / 标题'),
-                onTap: () => Navigator.of(context).push(
+                title: const Text('阅读界面样式'),                onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (context) =>
                         const ReadingInterfaceSettingsHubView(),

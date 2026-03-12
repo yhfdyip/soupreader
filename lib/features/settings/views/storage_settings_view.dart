@@ -89,9 +89,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
                     Text(SettingsUiTokens.status(cacheText, chapterText)),
               ),
               AppListTile(
-                title: const Text('清理缓存'),
-                additionalInfo: const Text('清除已下载书籍和字体缓存'),
-                onTap: _confirmClearCache,
+                title: const Text('清理缓存'),                onTap: _confirmClearCache,
               ),
             ],
           ),
@@ -100,14 +98,10 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('清除 WebView 数据'),
-                additionalInfo: const Text('清除内置浏览器所有数据'),
-                onTap: _confirmClearWebViewData,
+                title: const Text('清除 WebView 数据'),                onTap: _confirmClearWebViewData,
               ),
               AppListTile(
-                title: const Text('压缩数据库'),
-                additionalInfo: const Text('减小数据库文件的大小'),
-                onTap: _confirmShrinkDatabase,
+                title: const Text('压缩数据库'),                onTap: _confirmShrinkDatabase,
               ),
             ],
           ),
