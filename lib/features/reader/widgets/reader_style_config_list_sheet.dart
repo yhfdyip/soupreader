@@ -3,6 +3,7 @@ import 'package:flutter/material.dart'
     show Material, ReorderableDragStartListener, ReorderableListView;
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../models/reading_settings.dart';
@@ -273,52 +274,45 @@ class _ReaderStyleConfigListSheetState
   @override
   Widget build(BuildContext context) {
     final isDark = _isDark;
-    final sheetBg =
-        CupertinoColors.systemGroupedBackground.resolveFrom(context);
     final sep = CupertinoColors.separator.resolveFrom(context);
     final labelColor = CupertinoColors.label.resolveFrom(context);
     final secondaryLabel =
         CupertinoColors.secondaryLabel.resolveFrom(context);
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(AppDesignTokens.radiusSheet),
-      ),
-      child: Container(
-        color: sheetBg,
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              _buildHeader(labelColor, sep),
-              Expanded(
-                child: _configs.isEmpty
-                    ? Center(
-                        child: Text(
-                          '暂无样式',
-                          style: TextStyle(
-                              color: secondaryLabel, fontSize: 15),
-                        ),
-                      )
-                    : ReorderableListView.builder(
-                        itemCount: _configs.length,
-                        onReorder: _isSelecting ? (_, __) {} : _onReorder,
-                        proxyDecorator: (child, index, animation) => Material(
-                          color: CupertinoColors.transparent,
-                          child: child,
-                        ),
-                        itemBuilder: (_, i) => _buildItem(
-                          i,
-                          isDark,
-                          labelColor,
-                          secondaryLabel,
-                          sep,
-                        ),
+    return AppSheetPanel(
+      contentPadding: EdgeInsets.zero,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildHeader(labelColor, sep),
+            Expanded(
+              child: _configs.isEmpty
+                  ? Center(
+                      child: Text(
+                        '暂无样式',
+                        style: TextStyle(
+                            color: secondaryLabel, fontSize: 15),
                       ),
-              ),
-              if (_isSelecting) _buildBatchBar(sep),
-            ],
-          ),
+                    )
+                  : ReorderableListView.builder(
+                      itemCount: _configs.length,
+                      onReorder: _isSelecting ? (_, __) {} : _onReorder,
+                      proxyDecorator: (child, index, animation) => Material(
+                        color: CupertinoColors.transparent,
+                        child: child,
+                      ),
+                      itemBuilder: (_, i) => _buildItem(
+                        i,
+                        isDark,
+                        labelColor,
+                        secondaryLabel,
+                        sep,
+                      ),
+                    ),
+            ),
+            if (_isSelecting) _buildBatchBar(sep),
+          ],
         ),
       ),
     );
