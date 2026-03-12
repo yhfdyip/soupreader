@@ -111,7 +111,7 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

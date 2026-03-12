@@ -196,7 +196,7 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -362,7 +362,7 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
     if (!mounted) return false;
     // 对齐 legado WebViewLoginFragment：
     // 非 http(s) 仅二次确认是否跳转其它应用，不提供额外管理动作。
-    final result = await showCupertinoBottomDialog<bool>(
+    final result = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('跳转其它应用'),

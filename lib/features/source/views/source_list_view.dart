@@ -1573,7 +1573,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _confirmDeleteSource(BookSource source) async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -1919,7 +1919,7 @@ class _SourceListViewState extends State<SourceListView> {
       return;
     }
 
-    final ok = await showCupertinoBottomDialog<bool>(
+    final ok = await showCupertinoBottomSheetDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
             title: const Text('批量删除'),
@@ -2146,7 +2146,7 @@ class _SourceListViewState extends State<SourceListView> {
     final controller = TextEditingController(text: initialValue ?? '');
     final allGroups =
         _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
-    final value = await showCupertinoBottomDialog<String>(
+    final value = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
@@ -2263,7 +2263,7 @@ class _SourceListViewState extends State<SourceListView> {
     );
 
     try {
-      final saved = await showCupertinoBottomDialog<bool>(
+      final saved = await showCupertinoBottomSheetDialog<bool>(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(
@@ -2434,7 +2434,7 @@ class _SourceListViewState extends State<SourceListView> {
   ) async {
     final controller = TextEditingController(text: initialKeyword);
     try {
-      return await showCupertinoBottomDialog<String>(
+      return await showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (ctx) => CupertinoAlertDialog(
           title: const Text('搜索关键词'),
@@ -2492,7 +2492,7 @@ class _SourceListViewState extends State<SourceListView> {
       await showAppHelpDialog(context, markdownText: markdownText);
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoBottomDialog<void>(
+      await showCupertinoBottomSheetDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('帮助'),
@@ -3300,7 +3300,7 @@ class _SourceListViewState extends State<SourceListView> {
         _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
     var appendGroup = initialAppendGroup;
     try {
-      return showCupertinoBottomDialog<_ImportCustomGroupInput>(
+      return showCupertinoBottomSheetDialog<_ImportCustomGroupInput>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -3719,7 +3719,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -3746,7 +3746,7 @@ class _SourceListViewState extends State<SourceListView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),

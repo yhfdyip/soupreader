@@ -463,7 +463,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
     final titleController = TextEditingController(text: article.title);
     final groupController = TextEditingController(text: article.group);
     try {
-      final action = await showCupertinoBottomDialog<_RssFavoriteDialogAction>(
+      final action = await showCupertinoBottomSheetDialog<_RssFavoriteDialogAction>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('收藏设置'),
@@ -613,7 +613,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
   Future<void> _showMoreMenu(RssSource? source) async {
     if (!mounted) return;
     final actions = _buildReadMenuActions(source);
-    final selected = await showCupertinoBottomDialog<_RssReadMenuAction>(
+    final selected = await showCupertinoBottomSheetDialog<_RssReadMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(

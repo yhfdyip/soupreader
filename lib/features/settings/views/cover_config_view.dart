@@ -61,7 +61,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
     final searchUrlController = TextEditingController(text: initial.searchUrl);
     final coverRuleController = TextEditingController(text: initial.coverRule);
 
-    final action = await showCupertinoBottomDialog<_CoverRuleDialogAction>(
+    final action = await showCupertinoBottomSheetDialog<_CoverRuleDialogAction>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => CupertinoAlertDialog(
@@ -298,7 +298,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

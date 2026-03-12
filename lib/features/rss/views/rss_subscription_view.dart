@@ -561,7 +561,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
 
   Future<void> _deleteSource(RssSource source) async {
     if (!mounted) return;
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提醒'),

@@ -215,7 +215,7 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    showCupertinoBottomDialog(
+    showCupertinoBottomSheetDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -385,7 +385,7 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
     if (sourceUrl.isEmpty || !mounted) return;
     final sourceName = widget.sourceName.trim();
 
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),

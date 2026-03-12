@@ -51,7 +51,7 @@ class AppErrorWidget extends StatelessWidget {
                 HapticFeedback.lightImpact();
                 await Clipboard.setData(ClipboardData(text: payload));
                 if (!context.mounted) return;
-                await showCupertinoBottomDialog<void>(
+                await showCupertinoBottomSheetDialog<void>(
                   context: context,
                   builder: (ctx) => CupertinoAlertDialog(
                     title: const Text('已复制'),

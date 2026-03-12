@@ -75,7 +75,7 @@ class _RemoteBooksServerConfigViewState
     bool obscureText = false,
   }) async {
     final controller = TextEditingController(text: initialValue);
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -137,7 +137,7 @@ class _RemoteBooksServerConfigViewState
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

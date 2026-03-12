@@ -402,7 +402,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -872,7 +872,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
     final navigator = Navigator.of(context, rootNavigator: true);
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => const CupertinoAlertDialog(
@@ -894,7 +894,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
     required String message,
   }) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),

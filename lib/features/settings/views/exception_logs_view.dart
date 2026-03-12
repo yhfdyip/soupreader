@@ -28,7 +28,7 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   final ExceptionLogService _service = ExceptionLogService();
 
   Future<void> _clearLogs() async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('清空日志'),
@@ -59,7 +59,7 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   }
 
   Future<void> _showMessage(String message) async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

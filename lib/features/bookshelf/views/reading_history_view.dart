@@ -439,7 +439,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   Future<bool> _showDeleteConfirm({
     required String message,
   }) async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('删除'),
@@ -488,7 +488,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   }
 
   void _showActions(Book book) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(

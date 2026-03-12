@@ -5410,7 +5410,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     var expanded = _settings.expandTextMenu;
     while (mounted) {
       final selectedAction =
-          await showCupertinoBottomDialog<_ReaderTextActionMenuAction>(
+          await showCupertinoBottomSheetDialog<_ReaderTextActionMenuAction>(
         context: context,
         barrierDismissible: true,
         builder: (sheetContext) => CupertinoActionSheet(
@@ -6388,7 +6388,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final hasLogin =
         source != null && ReaderSourceActionHelper.hasLoginUrl(source.loginUrl);
     final selected =
-        await showCupertinoBottomDialog<_ReaderAudioPlayMenuAction>(
+        await showCupertinoBottomSheetDialog<_ReaderAudioPlayMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -6778,7 +6778,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   Future<_EffectiveReplaceMenuEntry?> _showEffectiveReplacesDialog(
     List<_EffectiveReplaceMenuEntry> entries,
   ) async {
-    return showCupertinoBottomDialog<_EffectiveReplaceMenuEntry>(
+    return showCupertinoBottomSheetDialog<_EffectiveReplaceMenuEntry>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -6802,7 +6802,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Future<bool> _showChineseConverterPickerFromEffectiveReplaces() async {
-    final selected = await showCupertinoBottomDialog<int>(
+    final selected = await showCupertinoBottomSheetDialog<int>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -6951,7 +6951,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
     _showingReadAloudExclusionDialog = true;
     try {
-      await showCupertinoBottomDialog<void>(
+      await showCupertinoBottomSheetDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('扩展阶段'),
@@ -7073,7 +7073,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   Future<void> _showReadAloudTimerPicker() async {
     const times = [0, 5, 10, 15, 30, 60, 90, 180];
     final current = _readAloudSnapshot.sleepTimerMinutes;
-    final selected = await showCupertinoBottomDialog<int>(
+    final selected = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('定时停止'),
@@ -7113,7 +7113,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (_settings.progressBarBehavior == ProgressBarBehavior.chapter &&
         _settings.confirmSkipChapter &&
         !_chapterSeekConfirmed) {
-      final confirmed = await showCupertinoBottomDialog<bool>(
+      final confirmed = await showCupertinoBottomSheetDialog<bool>(
             context: context,
             builder: (dialogContext) => CupertinoAlertDialog(
               title: const Text('章节跳转确认'),
@@ -7166,7 +7166,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               action != ReaderLegacyReadMenuAction.setCharset,
         )
         .toList(growable: false);
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -7226,7 +7226,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _closeReaderMenuOverlay();
     }
     final controller = TextEditingController(text: _contentSearchQuery);
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('搜索正文'),
@@ -7704,7 +7704,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Future<bool?> _promptAddToShelf() {
-    return showCupertinoBottomDialog<bool>(
+    return showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('加入书架'),
@@ -7746,7 +7746,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Future<bool> _confirmRestoreSearchProgress() async {
-    return await showCupertinoBottomDialog<bool>(
+    return await showCupertinoBottomSheetDialog<bool>(
           context: context,
           builder: (dialogContext) => CupertinoAlertDialog(
             title: const Text('恢复进度'),
@@ -7788,7 +7788,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   void _showContentSearchOptionsSheet() {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -8154,7 +8154,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   void _showToast(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -8489,7 +8489,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
     if (remoteBehindLocal) {
       if (!mounted) return;
-      final confirmOverride = await showCupertinoBottomDialog<bool>(
+      final confirmOverride = await showCupertinoBottomSheetDialog<bool>(
             context: context,
             builder: (dialogContext) => CupertinoAlertDialog(
               title: const Text('获取进度'),
@@ -8907,7 +8907,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     required String initialValue,
   }) async {
     final controller = TextEditingController(text: initialValue);
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('设置编码'),
@@ -9255,7 +9255,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       text: _simulatedDailyChaptersForDialogDefault().toString(),
     );
     try {
-      return await showCupertinoBottomDialog<_ReaderSimulatedReadingInput>(
+      return await showCupertinoBottomSheetDialog<_ReaderSimulatedReadingInput>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -9490,7 +9490,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   // --- from simple_reader_view_source_switch.dart ---
   Future<void> _showChangeSourceEntryActions() async {
     final selected =
-        await showCupertinoBottomDialog<ReaderLegacyChangeSourceMenuAction>(
+        await showCupertinoBottomSheetDialog<ReaderLegacyChangeSourceMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -9601,7 +9601,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       text: totalChapters.toString(),
     );
     try {
-      return await showCupertinoBottomDialog<_ReaderOfflineCacheInput>(
+      return await showCupertinoBottomSheetDialog<_ReaderOfflineCacheInput>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('离线缓存'),
@@ -9799,7 +9799,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   Future<void> _showRefreshEntryActions() async {
     final selected =
-        await showCupertinoBottomDialog<ReaderLegacyRefreshMenuAction>(
+        await showCupertinoBottomSheetDialog<ReaderLegacyRefreshMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -9998,7 +9998,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       await showAppHelpDialog(context, markdownText: markdownText);
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoBottomDialog<void>(
+      await showCupertinoBottomSheetDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('帮助'),
@@ -10110,7 +10110,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
 
     final currentOpenInBrowser = _settingsService.readerChapterUrlOpenInBrowser;
-    final nextOpenInBrowser = await showCupertinoBottomDialog<bool>(
+    final nextOpenInBrowser = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('章节链接打开方式'),
@@ -10262,7 +10262,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       currentChapterIsPay: _resolveCurrentChapterIsPay(),
     );
 
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -10362,7 +10362,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final chapterIsVip = _resolveCurrentChapterIsVip();
     final chapterIsPay = _resolveCurrentChapterIsPay();
 
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
           context: context,
           builder: (dialogContext) => CupertinoAlertDialog(
             title: const Text('章节购买'),
@@ -11209,7 +11209,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Future<bool> _confirmSwitchChangeSourceGroupToAll(String group) async {
-    final result = await showCupertinoBottomDialog<bool>(
+    final result = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('搜索结果为空'),
@@ -12245,7 +12245,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   ) async {
     final bookTextController = TextEditingController(text: draft.pageText);
     final noteController = TextEditingController();
-    final result = await showCupertinoBottomDialog<_ReaderBookmarkEditResult>(
+    final result = await showCupertinoBottomSheetDialog<_ReaderBookmarkEditResult>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('书签'),
@@ -12707,7 +12707,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   /// 编辑书签（对标 legado BookmarkDialog）
   Future<void> _openEditBookmarkDialog(BookmarkEntity bookmark) async {
     final controller = TextEditingController(text: bookmark.content);
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: Text(bookmark.chapterTitle, maxLines: 1,

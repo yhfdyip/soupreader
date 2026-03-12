@@ -21,7 +21,7 @@ class ReaderTxtTocRuleDialog extends StatefulWidget {
     Color? accentColor,
     List<TxtTocRuleOption> options = TxtParser.defaultTocRuleOptions,
   }) {
-    return showCupertinoBottomDialog<String?>(
+    return showCupertinoBottomSheetDialog<String?>(
       context: context,
       builder: (_) => ReaderTxtTocRuleDialog(
         currentRegex: currentRegex,

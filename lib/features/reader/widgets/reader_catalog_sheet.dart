@@ -655,7 +655,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       bookmarkTab: _selectedTab == 1,
       isLocalTxt: widget.isLocalTxtBook,
     );
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -1005,7 +1005,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   Future<bool> _confirmDeleteBookmark(BookmarkEntity bookmark) async {
-    return await showCupertinoBottomDialog<bool>(
+    return await showCupertinoBottomSheetDialog<bool>(
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('删除书签'),
@@ -1059,7 +1059,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       return;
     }
 
-    final ok = await showCupertinoBottomDialog<bool>(
+    final ok = await showCupertinoBottomSheetDialog<bool>(
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('清理缓存'),

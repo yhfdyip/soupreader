@@ -62,7 +62,7 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -111,7 +111,7 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
     final loginHeaderText =
         key.isEmpty ? null : await SourceLoginStore.getLoginHeaderText(key);
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('登录头'),

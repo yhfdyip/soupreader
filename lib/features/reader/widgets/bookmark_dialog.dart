@@ -101,7 +101,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   }
 
   Future<void> _deleteBookmark(BookmarkEntity bookmark) async {
-    final confirm = await showCupertinoBottomDialog<bool>(
+    final confirm = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('删除书签'),

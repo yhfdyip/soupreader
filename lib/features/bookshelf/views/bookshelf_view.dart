@@ -693,7 +693,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       return;
     }
 
-    final action = await showCupertinoBottomDialog<_ImportFolderAction>(
+    final action = await showCupertinoBottomSheetDialog<_ImportFolderAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -787,7 +787,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   Future<String?> _showCreateFolderNameDialog() async {
     final controller = TextEditingController();
     String? name;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) {
         String? errorText;
@@ -901,7 +901,7 @@ class _BookshelfViewState extends State<BookshelfView> {
         candidates.map((candidate) => candidate.filePath).toSet();
     var deletingSelection = false;
 
-    return showCupertinoBottomDialog<List<String>>(
+    return showCupertinoBottomSheetDialog<List<String>>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -1113,7 +1113,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   Future<bool> _showScanCandidateLongPressMenu({
     required BuildContext context,
   }) async {
-    final result = await showCupertinoBottomDialog<bool>(
+    final result = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -1177,7 +1177,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     final controller = TextEditingController(
       text: _bookImportFileNameRuleService.getRule(),
     );
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1267,7 +1267,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Future<void> _openBookshelfGroupManageDialog() async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (_) => const BookshelfGroupManagePlaceholderDialog(),
     );
@@ -1354,7 +1354,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     var progressDialogClosed = false;
     Future<void>? progressDialogFuture;
     if (mounted) {
-      progressDialogFuture = showCupertinoBottomDialog<void>(
+      progressDialogFuture = showCupertinoBottomSheetDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) {
@@ -1457,7 +1457,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   // --- from bookshelf_view_manage.dart ---
   Future<void> _showAddBookByUrlDialog() async {
     final controller = TextEditingController();
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1508,7 +1508,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _showExportSuccessDialog(String pathOrHint) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -1538,7 +1538,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Future<void> _showImportBookshelfDialog() async {
     final controller = TextEditingController();
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1616,7 +1616,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
 
     if (!mounted) return;
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => CupertinoAlertDialog(
@@ -2171,7 +2171,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         content: Text(message),
@@ -2979,7 +2979,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _onBookLongPress(Book book) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(

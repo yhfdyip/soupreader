@@ -58,7 +58,7 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
       return;
     }
     if (!mounted) return;
-    final shouldClear = await showCupertinoBottomDialog<bool>(
+    final shouldClear = await showCupertinoBottomSheetDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
             title: const Text('提醒'),

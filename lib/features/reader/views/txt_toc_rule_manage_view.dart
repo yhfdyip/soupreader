@@ -280,7 +280,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _showRuleItemMenu(TxtTocRule rule) async {
     if (_menuBusy || _selectionMode) return;
-    final selected = await showCupertinoBottomDialog<_TxtTocRuleItemMenuAction>(
+    final selected = await showCupertinoBottomSheetDialog<_TxtTocRuleItemMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -333,7 +333,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   }
 
   Future<void> _confirmDeleteRule(TxtTocRule rule) async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -385,7 +385,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   Future<void> _confirmDeleteSelectedRules() async {
     final selectedIds = _selectedRuleIds.toSet();
     if (selectedIds.isEmpty) return;
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -570,7 +570,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -1030,7 +1030,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
     final navigator = Navigator.of(context, rootNavigator: true);
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => const CupertinoAlertDialog(
@@ -1052,7 +1052,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     required String message,
   }) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),

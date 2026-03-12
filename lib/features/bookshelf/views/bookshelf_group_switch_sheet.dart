@@ -99,7 +99,7 @@ class _BookshelfGroupSwitchSheetState
   }
 
   Future<void> _handleDeleteGroup(BookshelfBookGroup group) async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('删除分组'),
@@ -179,14 +179,14 @@ class _BookshelfGroupSwitchSheetState
   Future<BookshelfGroupEditDraft?> _showEditDialog(
     BookshelfBookGroup? existing,
   ) {
-    return showCupertinoBottomDialog<BookshelfGroupEditDraft>(
+    return showCupertinoBottomSheetDialog<BookshelfGroupEditDraft>(
       context: context,
       builder: (ctx) => BookshelfGroupEditDialog(existing: existing),
     );
   }
 
   Future<void> _showHint(String message) {
-    return showCupertinoBottomDialog<void>(
+    return showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提示'),

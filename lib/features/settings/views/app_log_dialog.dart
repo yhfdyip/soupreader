@@ -9,7 +9,7 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 
 Future<void> showAppLogDialog(BuildContext context) {
-  return showCupertinoBottomDialog<void>(
+  return showCupertinoBottomSheetDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (_) => const _AppLogDialog(),
@@ -124,7 +124,7 @@ class _AppLogTile extends StatelessWidget {
   Future<void> _showStackTrace(BuildContext context) async {
     final stack = entry.stackTrace?.trim() ?? '';
     if (stack.isEmpty) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (_) => _AppLogStackTraceDialog(stackTrace: stack),
     );

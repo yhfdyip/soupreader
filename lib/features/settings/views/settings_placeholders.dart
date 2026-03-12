@@ -9,7 +9,7 @@ class SettingsPlaceholders {
     final raw = title ?? '该功能暂未实现';
     final normalized = SettingsUiTokens.normalizePlannedText(raw);
 
-    showCupertinoBottomDialog(
+    showCupertinoBottomSheetDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('扩展阶段'),

@@ -98,7 +98,7 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
   }
 
   Future<void> _deleteConfig(int index) async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('删除'),
@@ -148,7 +148,7 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
   }
 
   Future<void> _showMessage(String message) async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(message),

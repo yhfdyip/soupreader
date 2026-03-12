@@ -328,7 +328,7 @@ class _CacheExportViewState extends State<CacheExportView> {
 
   Future<void> _handleDownloadActionLongPress() async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -359,7 +359,7 @@ class _CacheExportViewState extends State<CacheExportView> {
   }
 
   Future<bool> _confirmStartDownload() async {
-    final result = await showCupertinoBottomDialog<bool>(
+    final result = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -383,7 +383,7 @@ class _CacheExportViewState extends State<CacheExportView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -422,7 +422,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       _exportTypeIndex = _exportService.getExportTypeIndex();
       _exportCharset = _exportService.getExportCharset();
     });
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -586,7 +586,7 @@ class _CacheExportViewState extends State<CacheExportView> {
     if (!mounted) return;
     final options = _legacyBookGroups.toList(growable: false)
       ..sort((a, b) => a.order.compareTo(b.order));
-    final selectedGroupId = await showCupertinoBottomDialog<int>(
+    final selectedGroupId = await showCupertinoBottomSheetDialog<int>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -761,7 +761,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       text: _exportService.getBookExportFileName() ?? '',
     );
     try {
-      final shouldSave = await showCupertinoBottomDialog<bool>(
+      final shouldSave = await showCupertinoBottomSheetDialog<bool>(
         context: context,
         builder: (dialogContext) {
           return CupertinoAlertDialog(
@@ -818,7 +818,7 @@ class _CacheExportViewState extends State<CacheExportView> {
   Future<void> _handleExportTypeTap() async {
     if (!mounted) return;
     final options = _exportService.getExportTypeOptions();
-    final selected = await showCupertinoBottomDialog<int>(
+    final selected = await showCupertinoBottomSheetDialog<int>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -874,7 +874,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       text: _exportService.getExportCharset(),
     );
     try {
-      final result = await showCupertinoBottomDialog<String>(
+      final result = await showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (dialogContext) {
           return CupertinoAlertDialog(

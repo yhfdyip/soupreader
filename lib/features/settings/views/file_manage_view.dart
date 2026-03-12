@@ -342,7 +342,7 @@ class _FileManageViewState extends State<FileManageView> {
     final current = _currentDir;
     if (current == null || _creatingFolder) return;
     final controller = TextEditingController();
-    final folderName = await showCupertinoBottomDialog<String>(
+    final folderName = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('新建文件夹'),
@@ -445,7 +445,7 @@ class _FileManageViewState extends State<FileManageView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

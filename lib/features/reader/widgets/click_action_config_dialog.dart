@@ -267,7 +267,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   void _showActionPicker(String zone) {
     setState(() => _selectedZone = zone);
 
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
@@ -331,7 +331,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   }
 
   void _showMenuRecoveryNotice() {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提示'),

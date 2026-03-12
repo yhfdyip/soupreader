@@ -55,7 +55,7 @@ class _RssFavoritesPlaceholderViewState
     required String currentGroup,
   }) async {
     if (!mounted || groups.isEmpty) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -85,7 +85,7 @@ class _RssFavoritesPlaceholderViewState
     required String currentGroup,
   }) async {
     if (!mounted) return;
-    final selected = await showCupertinoBottomDialog<_RssFavoritesMenuAction>(
+    final selected = await showCupertinoBottomSheetDialog<_RssFavoritesMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -131,7 +131,7 @@ class _RssFavoritesPlaceholderViewState
   Future<void> _deleteCurrentGroup(String currentGroup) async {
     final group = currentGroup.trim();
     if (group.isEmpty || !mounted) return;
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -167,7 +167,7 @@ class _RssFavoritesPlaceholderViewState
 
   Future<void> _deleteAllFavorites() async {
     if (!mounted) return;
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

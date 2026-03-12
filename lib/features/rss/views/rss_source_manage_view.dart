@@ -825,7 +825,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     final allGroups = _repo.allGroups();
     final controller = TextEditingController();
     try {
-      return await showCupertinoBottomDialog<String>(
+      return await showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (dialogContext, setDialogState) {
@@ -1662,7 +1662,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -1690,7 +1690,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -1819,7 +1819,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
         _selectedSourceUrls.remove(sourceUrl);
       });
     }
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提醒'),

@@ -153,7 +153,7 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
   Future<void> _pickTouchSlop() async {
     final controller =
         TextEditingController(text: _settings.pageTouchSlop.toString());
-    final result = await showCupertinoBottomDialog<int>(
+    final result = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('翻页触发阈值'),

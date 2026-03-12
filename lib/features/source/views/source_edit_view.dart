@@ -1702,7 +1702,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog(
+    showCupertinoBottomSheetDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

@@ -191,7 +191,7 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
   }
 
   Future<void> _pickAutoReadSpeed() async {
-    final result = await showCupertinoBottomDialog<int>(
+    final result = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (context) => _AutoReadSpeedPicker(
         initialSpeed: _settings.autoReadSpeed,

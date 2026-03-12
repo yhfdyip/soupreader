@@ -13,7 +13,7 @@ Future<void> copyTextWithFeedback(
 }) async {
   await Clipboard.setData(ClipboardData(text: text));
   if (!context.mounted) return;
-  await showCupertinoBottomDialog<void>(
+  await showCupertinoBottomSheetDialog<void>(
     context: context,
     builder: (dialogContext) => CupertinoAlertDialog(
       title: const Text('已复制'),

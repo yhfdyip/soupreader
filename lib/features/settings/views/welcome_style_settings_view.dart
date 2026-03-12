@@ -188,7 +188,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

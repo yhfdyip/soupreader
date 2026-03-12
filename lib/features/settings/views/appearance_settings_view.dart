@@ -55,7 +55,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
   }
 
   Future<void> _showThemeModeManagedHint() async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('外观开关'),
@@ -380,7 +380,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     required String initialValue,
   }) async {
     final controller = TextEditingController(text: initialValue);
-    return showCupertinoBottomDialog<String>(
+    return showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -415,7 +415,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
   }
 
   Future<void> _showValidationMessage(String message) async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('输入无效'),
@@ -431,7 +431,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
   }
 
   Future<void> _showMessage(String message) async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

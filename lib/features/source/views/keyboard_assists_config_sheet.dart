@@ -14,7 +14,7 @@ Future<void> showKeyboardAssistsConfigSheet(
   BuildContext context, {
   KeyboardAssistStore? store,
 }) async {
-  await showCupertinoBottomDialog<void>(
+  await showCupertinoBottomSheetDialog<void>(
     context: context,
     builder: (dialogContext) => _KeyboardAssistsConfigDialog(
       store: store ?? KeyboardAssistStore(),
@@ -62,7 +62,7 @@ class _KeyboardAssistsConfigDialogState
   Future<void> _editAssist([KeyboardAssistEntry? editing]) async {
     final keyController = TextEditingController(text: editing?.key ?? '');
     final valueController = TextEditingController(text: editing?.value ?? '');
-    final shouldSave = await showCupertinoBottomDialog<bool>(
+    final shouldSave = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (popupContext) => CupertinoAlertDialog(
         title: const Text('辅助按键'),
@@ -121,7 +121,7 @@ class _KeyboardAssistsConfigDialogState
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (popupContext) => CupertinoAlertDialog(
         title: const Text('提示'),

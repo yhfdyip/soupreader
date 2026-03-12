@@ -689,7 +689,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }) async {
     final controller = TextEditingController(text: initialValue);
     try {
-      final value = await showCupertinoBottomDialog<String>(
+      final value = await showCupertinoBottomSheetDialog<String>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: Text(title),
@@ -1049,7 +1049,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _confirmDeleteRule(ReplaceRule rule) async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -1090,7 +1090,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       List<ReplaceRule> visibleRules) async {
     final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
     if (selectedRules.isEmpty) return;
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -1803,7 +1803,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -1823,7 +1823,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -2093,7 +2093,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     final controller = TextEditingController(text: initialGroupName.trim());
     var appendGroup = initialAppendGroup;
     try {
-      return showCupertinoBottomDialog<_ReplaceRuleImportGroupInput>(
+      return showCupertinoBottomSheetDialog<_ReplaceRuleImportGroupInput>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -2156,7 +2156,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
     final navigator = Navigator.of(context, rootNavigator: true);
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => const CupertinoAlertDialog(
@@ -2227,7 +2227,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     required String message,
   }) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),

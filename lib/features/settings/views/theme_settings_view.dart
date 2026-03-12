@@ -49,7 +49,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
   }
 
   Future<void> _showThemeModeManagedHint() async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('主题模式'),
@@ -105,7 +105,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
       {required bool isNightTheme}) async {
     final controller = TextEditingController();
     final modeLabel = isNightTheme ? '夜间' : '白天';
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text('保存$modeLabel主题'),
@@ -136,7 +136,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
   }
 
   Future<void> _showSuccessHint(String message) async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('保存成功'),
@@ -153,7 +153,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
   }
 
   Future<void> _showFallbackHint(String message) async {
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

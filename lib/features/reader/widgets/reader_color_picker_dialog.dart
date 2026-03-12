@@ -12,7 +12,7 @@ Future<int?> showReaderColorPickerDialog({
   String invalidHexMessage = '请输入 6 位十六进制颜色（如 FF6600）',
 }) {
   final safeInitialColor = 0xFF000000 | (initialColor & 0x00FFFFFF);
-  return showCupertinoBottomDialog<int>(
+  return showCupertinoBottomSheetDialog<int>(
     context: context,
     builder: (dialogContext) => _ReaderColorPickerDialog(
       title: title,

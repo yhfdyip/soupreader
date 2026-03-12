@@ -40,7 +40,7 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
     final controller = TextEditingController(
       text: (_draft.timeoutMs ~/ 1000).toString(),
     );
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('单个书源校验超时（秒）'),
@@ -128,7 +128,7 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         content: Text(message),

@@ -11,7 +11,7 @@ Future<void> showAppHelpDialog(
   required String markdownText,
   String title = '帮助',
 }) {
-  return showCupertinoBottomDialog<void>(
+  return showCupertinoBottomSheetDialog<void>(
     context: context,
     builder: (_) => _AppHelpDialog(
       title: title,

@@ -667,7 +667,7 @@ class ReaderBottomMenu extends StatelessWidget {
     ValueChanged<ReadingSettings> onSettingsChanged,
   ) {
     final rootContext = context;
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: rootContext,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -736,7 +736,7 @@ class ReaderBottomMenu extends StatelessWidget {
   }
 
   void _showMessage(BuildContext context, String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

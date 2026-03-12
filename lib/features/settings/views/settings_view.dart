@@ -165,7 +165,7 @@ class _SettingsViewState extends State<SettingsView> {
       );
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoBottomDialog<void>(
+      await showCupertinoBottomSheetDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('帮助'),

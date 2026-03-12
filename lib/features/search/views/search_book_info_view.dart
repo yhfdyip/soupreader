@@ -1587,7 +1587,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (!mounted) return;
 
     final controller = TextEditingController(text: current);
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('设置源变量'),
@@ -1646,7 +1646,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (!mounted) return;
 
     final controller = TextEditingController(text: current);
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('设置书籍变量'),
@@ -1705,7 +1705,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final existingRemoteUrl =
         bookId.isEmpty ? null : _settingsService.getBookRemoteUploadUrl(bookId);
     if (existingRemoteUrl != null) {
-      final confirmed = await showCupertinoBottomDialog<bool>(
+      final confirmed = await showCupertinoBottomSheetDialog<bool>(
             context: context,
             builder: (dialogContext) => CupertinoAlertDialog(
               title: const Text('提醒'),
@@ -3101,7 +3101,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

@@ -683,7 +683,7 @@ class _BookshelfManagePlaceholderViewState
       });
     var openGroupManage = false;
     int? selectedGroupId;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (popupContext) {
@@ -742,14 +742,14 @@ class _BookshelfManagePlaceholderViewState
   }
 
   Future<void> _openGroupManageDialog() {
-    return showCupertinoBottomDialog<void>(
+    return showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (_) => const BookshelfGroupManagePlaceholderDialog(),
     );
   }
 
   void _showMoreMenu() {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (popupContext) {
@@ -941,7 +941,7 @@ class _BookshelfManagePlaceholderViewState
       return;
     }
 
-    final selectedGroupBits = await showCupertinoBottomDialog<int>(
+    final selectedGroupBits = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (_) => _BookshelfManageGroupSelectDialog(
         groups: selectableGroups,
@@ -1045,7 +1045,7 @@ class _BookshelfManagePlaceholderViewState
 
   Future<bool?> _confirmDeleteSelection() async {
     var deleteOriginal = _settingsService.getDeleteBookOriginal();
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -1204,7 +1204,7 @@ class _BookshelfManagePlaceholderViewState
     var dialogVisible = true;
 
     setState(() => _isBatchChangingSource = true);
-    final dialogFuture = showCupertinoBottomDialog<void>(
+    final dialogFuture = showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -1322,7 +1322,7 @@ class _BookshelfManagePlaceholderViewState
       unawaited(showAppToast(context, message: '导出成功'));
       return;
     }
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1355,7 +1355,7 @@ class _BookshelfManagePlaceholderViewState
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1926,7 +1926,7 @@ class _BookshelfManageSourcePickerViewState
   }
 
   void _showMoreMenu() {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {

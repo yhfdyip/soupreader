@@ -58,7 +58,7 @@ Future<void> showRssLoginMessage(
   String message,
 ) async {
   if (!context.mounted) return;
-  await showCupertinoBottomDialog<void>(
+  await showCupertinoBottomSheetDialog<void>(
     context: context,
     builder: (dialogContext) => CupertinoAlertDialog(
       title: const Text('提示'),

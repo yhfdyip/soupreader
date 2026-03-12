@@ -343,10 +343,9 @@ Future<void> showReaderPaddingConfigDialog(
   required ValueChanged<ReadingSettings> onSettingsChanged,
   required bool isDarkMode,
 }) {
-  return showCupertinoBottomDialog<void>(
+  return showCupertinoBottomSheetDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: '边距设置',
     builder: (context) => ReaderPaddingConfigDialog(
       settings: settings,
       onSettingsChanged: onSettingsChanged,

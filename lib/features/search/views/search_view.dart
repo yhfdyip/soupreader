@@ -896,7 +896,7 @@ class _SearchViewState extends State<SearchView> {
     required String confirmText,
     bool isDestructive = false,
   }) async {
-    final result = await showCupertinoBottomDialog<bool>(
+    final result = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: Text(title),
@@ -936,7 +936,7 @@ class _SearchViewState extends State<SearchView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

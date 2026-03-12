@@ -225,7 +225,7 @@ class _DiscoveryExploreResultsViewState
   }
 
   Future<bool> _showLoadErrorDialog(String detail) async {
-    final result = await showCupertinoBottomDialog<bool>(
+    final result = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('加载失败'),
@@ -250,7 +250,7 @@ class _DiscoveryExploreResultsViewState
   }
 
   void _showMessage(String message, {String title = '提示'}) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: Text(title),

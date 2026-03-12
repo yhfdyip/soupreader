@@ -187,7 +187,7 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
     String initialValue = '',
   }) async {
     final controller = TextEditingController(text: initialValue);
-    final result = await showCupertinoBottomDialog<String>(
+    final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: Text(title),

@@ -117,7 +117,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     final controller = TextEditingController(
       text: _otherSourceSettingsService.getUserAgent(),
     );
-    final value = await showCupertinoBottomDialog<String>(
+    final value = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('用户代理'),
@@ -164,7 +164,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     final controller = TextEditingController(
       text: _otherSourceSettingsService.getSourceEditMaxLine().toString(),
     );
-    final value = await showCupertinoBottomDialog<String>(
+    final value = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('源编辑框最大行数'),
@@ -331,7 +331,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     required Future<void> Function(int value) save,
   }) async {
     final controller = TextEditingController(text: currentValue.toString());
-    final value = await showCupertinoBottomDialog<String>(
+    final value = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -665,7 +665,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         content: Text(message),

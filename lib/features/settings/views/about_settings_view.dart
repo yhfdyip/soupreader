@@ -533,7 +533,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     required String confirmText,
   }) async {
     if (!mounted) return false;
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -587,7 +587,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
   Future<void> _checkUpdate() async {
     if (!mounted) return;
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
@@ -638,7 +638,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    await showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -765,7 +765,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
   }
 
   void _showUpdateInfo(_AppUpdateInfo updateInfo) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _AppUpdateDialog(

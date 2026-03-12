@@ -534,7 +534,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _confirmDeleteSource(BookSource source) async {
-    final ok = await showCupertinoBottomDialog<bool>(
+    final ok = await showCupertinoBottomSheetDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
             title: const Text('提醒'),
@@ -580,7 +580,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   void _showMessage(String message, {String title = '提示'}) {
-    showCupertinoBottomDialog<void>(
+    showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
