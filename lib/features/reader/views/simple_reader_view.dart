@@ -1317,11 +1317,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final titleLineHeight = (_settings.fontSize + _settings.titleSize) *
         ((_scrollParagraphStyle().height ?? 1.2).clamp(1.0, 2.5));
     final titleExtra = hasTitle
-        ? (_settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20) +
+        ? _settings.titleTopSpacing +
             titleLineHeight +
-            (_settings.titleBottomSpacing > 0
-                ? _settings.titleBottomSpacing
-                : _settings.paragraphSpacing * 1.5)
+            _settings.titleBottomSpacing
         : 0.0;
     return _settings.paddingTop +
         _settings.paddingBottom +
@@ -2784,11 +2782,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       textAlign: _bodyTextAlign,
       titleFontSize: _settings.fontSize + _settings.titleSize,
       titleAlign: _titleTextAlign,
-      titleTopSpacing:
-          _settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20,
-      titleBottomSpacing: _settings.titleBottomSpacing > 0
-          ? _settings.titleBottomSpacing
-          : _settings.paragraphSpacing * 1.5,
+      titleTopSpacing: _settings.titleTopSpacing,
+      titleBottomSpacing: _settings.titleBottomSpacing,
       fontWeight: _currentFontWeight,
       underline: _settings.underline,
       showTitle: _settings.titleMode != 2,
@@ -3474,12 +3469,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       return cached;
     }
 
-    final titleTopSpacing =
-        _settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20.0;
-    final titleBottomSpacing = _settings.titleBottomSpacing > 0
-        ? _settings.titleBottomSpacing
-        : _settings.paragraphSpacing * 1.5;
-
     final snapshot = ScrollPageStepCalculator.buildLayoutSnapshot(
       title: _currentTitle,
       content: _currentContent,
@@ -3488,8 +3477,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       paddingTop: _settings.paddingTop,
       paddingBottom: _settings.paddingBottom.toDouble(),
       paragraphSpacing: _settings.paragraphSpacing,
-      titleTopSpacing: titleTopSpacing,
-      titleBottomSpacing: titleBottomSpacing,
+      titleTopSpacing: _settings.titleTopSpacing,
+      titleBottomSpacing: _settings.titleBottomSpacing,
       // 对齐滚动正文尾部结构（章节导航与留白）
       trailingSpacing: 192.0,
       paragraphStyle: TextStyle(
@@ -7568,11 +7557,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (_settings.titleMode == 2 || segment.title.trim().isEmpty) {
       return 0.0;
     }
-    final topSpacing =
-        _settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20.0;
-    final bottomSpacing = _settings.titleBottomSpacing > 0
-        ? _settings.titleBottomSpacing
-        : _settings.paragraphSpacing * 1.5;
     final titlePainter = TextPainter(
       text: TextSpan(
         text: segment.title,
@@ -7587,7 +7571,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       textDirection: TextDirection.ltr,
       maxLines: null,
     )..layout(maxWidth: _scrollBodyWidth());
-    return topSpacing + titlePainter.height + bottomSpacing;
+    return _settings.titleTopSpacing + titlePainter.height + _settings.titleBottomSpacing;
   }
 
   String _lineText(ScrollTextLine line) {
@@ -13000,9 +12984,7 @@ class _ScrollContentViewState extends State<_ScrollContentView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (cfg.titleMode != 2) ...[
-              SizedBox(
-                height: cfg.titleTopSpacing > 0 ? cfg.titleTopSpacing : 20,
-              ),
+              SizedBox(height: cfg.titleTopSpacing),
               SizedBox(
                 width: double.infinity,
                 child: Text(
@@ -13011,11 +12993,7 @@ class _ScrollContentViewState extends State<_ScrollContentView> {
                   style: cfg.titleStyle,
                 ),
               ),
-              SizedBox(
-                height: cfg.titleBottomSpacing > 0
-                    ? cfg.titleBottomSpacing
-                    : cfg.paragraphSpacing * 1.5,
-              ),
+              SizedBox(height: cfg.titleBottomSpacing),
             ],
             contentBody,
             SizedBox(height: isTailSegment ? 80 : 24),

@@ -196,6 +196,11 @@ class ReaderPageAgent {
 
       // 标题顶部间距：只在第一行标题前加（对标 legado titleTopSpacing）
       if (isTitle && i == 0 && titleTopSpacing > 0) {
+        currentPageLines.add(LegacyComposedLine.empty(
+          height: titleTopSpacing,
+          lineStartY: currentY,
+          isTitleSpacing: true,
+        ));
         currentY += titleTopSpacing;
       }
 
@@ -243,8 +248,18 @@ class ReaderPageAgent {
         boundaryOffset = range.end;
 
         currentPageContent.write(lineText);
-        // 仅对非标题的正文行收集预排版数据；标题行不缓存（绘制路径单独处理）
-        if (!isTitle) {
+        // 标题行不做两端对齐（与 legado 一致），直接作为普通行加入 precomposedLines
+        if (isTitle) {
+          currentPageLines.add(LegacyComposedLine(
+            plainText: lineText,
+            segments: [LegacyComposedSegment(text: lineText, extraAfter: 0)],
+            justified: false,
+            height: lineH,
+            renderHeight: curFontSize,
+            lineStartY: currentY,
+            isTitle: true,
+          ));
+        } else {
           final isLastLine = lineIndex == lines.length - 1;
           final canJustify = textAlign == TextAlign.justify &&
               !isLastLine &&
@@ -319,6 +334,11 @@ class ReaderPageAgent {
 
           // titleBottomSpacing：只在最后一行标题后加（对标 legado: durY += titleBottomSpacing）
           if (isLastTitleLine && titleBottomSpacing > 0) {
+            currentPageLines.add(LegacyComposedLine.empty(
+              height: titleBottomSpacing,
+              lineStartY: currentY,
+              isTitleSpacing: true,
+            ));
             currentY += titleBottomSpacing;
           }
 

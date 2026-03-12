@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 class LegacyJustifiedTextBlock extends StatelessWidget {
   final String content;
   final TextStyle style;
+  /// 标题行样式（由分页器标记的 isTitle=true 行使用此样式渲染）。
+  final TextStyle? titleStyle;
   final bool justify;
   final bool bottomJustify;
   final String paragraphIndent;
@@ -18,6 +20,7 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
     super.key,
     required this.content,
     required this.style,
+    this.titleStyle,
     required this.justify,
     this.bottomJustify = false,
     this.paragraphIndent = '　　',
@@ -69,7 +72,11 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
             children.add(SizedBox(height: lineExtraGap));
             usedHeight += lineExtraGap;
           }
-          children.add(line.toWidget(style: style, maxWidth: maxWidth));
+          children.add(line.toWidget(
+            style: style,
+            titleStyle: titleStyle,
+            maxWidth: maxWidth,
+          ));
           usedHeight += line.height;
         }
 
@@ -111,6 +118,10 @@ class LegacyComposedLine {
   final double renderHeight;
   /// 行在页面内容区的起始 y 坐标（相对于 bodyOriginY），由 composeContentLines 填入
   final double lineStartY;
+  /// 是否为标题行（渲染时使用 titleStyle）
+  final bool isTitle;
+  /// 是否为标题间距占位行（topSpacing/bottomSpacing/paragraphSpacing）
+  final bool isTitleSpacing;
 
   const LegacyComposedLine({
     required this.plainText,
@@ -119,9 +130,16 @@ class LegacyComposedLine {
     required this.height,
     double? renderHeight,
     this.lineStartY = 0.0,
+    this.isTitle = false,
+    this.isTitleSpacing = false,
   }) : renderHeight = renderHeight ?? height;
 
-  factory LegacyComposedLine.empty({required double height, double? renderHeight, double lineStartY = 0.0}) {
+  factory LegacyComposedLine.empty({
+    required double height,
+    double? renderHeight,
+    double lineStartY = 0.0,
+    bool isTitleSpacing = false,
+  }) {
     return LegacyComposedLine(
       plainText: '',
       segments: const <LegacyComposedSegment>[],
@@ -129,6 +147,7 @@ class LegacyComposedLine {
       height: height,
       renderHeight: renderHeight ?? height,
       lineStartY: lineStartY,
+      isTitleSpacing: isTitleSpacing,
     );
   }
 
@@ -139,6 +158,7 @@ class LegacyComposedLine {
 
   Widget toWidget({
     required TextStyle style,
+    TextStyle? titleStyle,
     required double maxWidth,
   }) {
     if (isVisualEmpty) {
@@ -147,12 +167,13 @@ class LegacyComposedLine {
         height: height,
       );
     }
+    final effectiveStyle = (isTitle && titleStyle != null) ? titleStyle : style;
     if (!justified || segments.length <= 1) {
       return SizedBox(
         width: maxWidth,
         child: Text(
           plainText,
-          style: style,
+          style: effectiveStyle,
           textAlign: TextAlign.left,
           maxLines: 1,
           softWrap: false,
@@ -183,7 +204,7 @@ class LegacyComposedLine {
         maxLines: 1,
         overflow: TextOverflow.clip,
         softWrap: false,
-        text: TextSpan(style: style, children: spans),
+        text: TextSpan(style: effectiveStyle, children: spans),
       ),
     );
   }
@@ -430,6 +451,7 @@ class LegacyJustifyComposer {
     required Offset origin,
     required String content,
     required TextStyle style,
+    TextStyle? titleStyle,
     required double maxWidth,
     required bool justify,
     required String paragraphIndent,
@@ -478,6 +500,8 @@ class LegacyJustifyComposer {
         continue;
       }
 
+      final effectiveStyle =
+          (line.isTitle && titleStyle != null) ? titleStyle : style;
       final lineRanges = hasHighlight
           ? _resolveMatchRanges(line.plainText, normalizedQuery)
           : const <TextRange>[];
@@ -498,7 +522,7 @@ class LegacyJustifyComposer {
             x += _paintTextPiece(
               canvas: canvas,
               text: segment.text,
-              style: style,
+              style: effectiveStyle,
               x: x,
               y: y,
               lineHeight: line.height,
@@ -513,7 +537,7 @@ class LegacyJustifyComposer {
                 x += _paintTextPiece(
                   canvas: canvas,
                   text: before,
-                  style: style,
+                  style: effectiveStyle,
                   x: x,
                   y: y,
                   lineHeight: line.height,
@@ -523,8 +547,8 @@ class LegacyJustifyComposer {
               x += _paintTextPiece(
                 canvas: canvas,
                 text: hitText,
-                style: style.copyWith(
-                  color: highlightTextColor ?? style.color,
+                style: effectiveStyle.copyWith(
+                  color: highlightTextColor ?? effectiveStyle.color,
                 ),
                 x: x,
                 y: y,
@@ -539,7 +563,7 @@ class LegacyJustifyComposer {
               x += _paintTextPiece(
                 canvas: canvas,
                 text: tail,
-                style: style,
+                style: effectiveStyle,
                 x: x,
                 y: y,
                 lineHeight: line.height,

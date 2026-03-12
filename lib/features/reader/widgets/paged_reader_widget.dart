@@ -595,7 +595,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final topSafe = systemPadding.top;
     final bottomSafe = systemPadding.bottom;
     final renderPosition = _factory.resolveRenderPosition(slot);
-    final effectiveRightRenderPosition = rightRenderPosition ?? renderPosition;
 
     // 绘制背景：图片背景时 backgroundColor 为透明，用 shaderBackgroundColor 填底色
     canvas.drawRect(
@@ -612,56 +611,34 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           (topSafe + _topOffset + widget.padding.top) -
           (bottomSafe + _bottomOffset + widget.padding.bottom);
 
-      void paintColumn(
-          PageData colData,
-          double originX,
-          PageRenderPosition colRenderPosition) {
+      void paintColumn(PageData colData, double originX) {
         final col = _contentForPictureSnapshot(colData.text);
-        final titleData = _resolvePageTitleRenderData(
-          content: col,
-          renderPosition: colRenderPosition,
-        );
-        var bodyOriginY = topSafe + _topOffset + widget.padding.top;
-        var bodyHeight = contentHeight;
-        if (titleData.shouldRenderTitle) {
-          final consumed = _paintPageTitleOnCanvas(
-            canvas: canvas,
-            origin: Offset(originX, bodyOriginY),
-            maxWidth: columnWidth,
-            maxHeight: bodyHeight,
-            title: titleData.title!,
-          );
-          bodyOriginY += consumed;
-          bodyHeight -= consumed;
-        }
-        if (bodyHeight > 0) {
-          // 若标题占用了部分高度，预排版行与当前 bodyContent 可能不完全匹配，
-          // 此时退回到重新排版以保证正确性。
-          final cachedLines =
-              titleData.shouldRenderTitle ? null : colData.precomposedLines;
+        final bodyOriginY = topSafe + _topOffset + widget.padding.top;
+        if (contentHeight > 0) {
           canvas.save();
           canvas.clipRect(Rect.fromLTWH(
             originX,
             bodyOriginY,
             columnWidth,
-            bodyHeight,
+            contentHeight,
           ));
           LegacyJustifyComposer.paintContentOnCanvas(
             canvas: canvas,
             origin: Offset(originX, bodyOriginY),
-            content: titleData.bodyContent,
+            content: col,
             style: widget.textStyle,
+            titleStyle: _resolvedTitleStyle,
             maxWidth: columnWidth,
             justify: widget.settings.textFullJustify,
             paragraphIndent: widget.settings.paragraphIndent,
             applyParagraphIndent: false,
             preserveEmptyLines: true,
-            maxHeight: bodyHeight,
+            maxHeight: contentHeight,
             bottomJustify: widget.settings.textBottomJustify,
             highlightQuery: widget.searchHighlightQuery,
             highlightBackgroundColor: widget.searchHighlightColor,
             highlightTextColor: widget.searchHighlightTextColor,
-            precomposedLines: cachedLines,
+            precomposedLines: colData.precomposedLines,
             emptyLineHeight: widget.settings.paragraphSpacing > 0
                 ? widget.settings.fontSize * widget.settings.paragraphSpacing / 10.0
                 : null,
@@ -670,14 +647,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         }
       }
 
-      paintColumn(pageData, widget.padding.left, renderPosition);
+      paintColumn(pageData, widget.padding.left);
 
       if (_isDoublePage) {
         final rightOriginX =
             widget.padding.left + columnWidth + _doublePageGutter;
         final rightCol = rightPageData;
         if (rightCol != null && rightCol.text.isNotEmpty)
-          paintColumn(rightCol, rightOriginX, effectiveRightRenderPosition);
+          paintColumn(rightCol, rightOriginX);
 
         // 双栏中间分隔线
         final dividerX =
@@ -1660,20 +1637,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   List<LegacyComposedLine>? _getSelectionLines() {
     if (_selectionLines != null) return _selectionLines;
-    final content = _factory.curPage;
-    if (content.trim().isEmpty) return null;
+    final pageData = _factory.curPageData;
+    if (pageData.text.trim().isEmpty) return null;
+    // 优先使用预排版缓存（含标题行），避免重排
+    if (pageData.precomposedLines != null) {
+      _selectionLines = pageData.precomposedLines;
+      return _selectionLines;
+    }
     final size = MediaQuery.sizeOf(context);
     final totalWidth = size.width - widget.padding.left - widget.padding.right;
     final columnWidth =
         _isDoublePage ? (totalWidth - _doublePageGutter) / 2 : totalWidth;
     if (columnWidth <= 0) return null;
-    final renderPosition =
-        _factory.resolveRenderPosition(PageRenderSlot.current);
-    final titleData = _resolvePageTitleRenderData(
-      content: content,
-      renderPosition: renderPosition,
-    );
-    final bodyText = _stripImageMarkersFromContent(titleData.bodyContent);
+    final bodyText = _stripImageMarkersFromContent(pageData.text);
     if (bodyText.trim().isEmpty) return null;
     _selectionLines = LegacyJustifyComposer.composeContentLines(
       content: bodyText,
@@ -1701,20 +1677,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (columnWidth <= 0) return null;
     final systemPadding = _resolveStableSystemPadding();
     final topSafe = systemPadding.top;
-    final renderPosition =
-        _factory.resolveRenderPosition(PageRenderSlot.current);
-    final titleData = _resolvePageTitleRenderData(
-      content: content,
-      renderPosition: renderPosition,
-    );
-    var contentTop = topSafe + _topOffset + widget.padding.top;
-    if (titleData.shouldRenderTitle) {
-      contentTop += _pageTitleTopSpacing +
-          _titlePainterHeight(titleData.title!, columnWidth) +
-          _pageTitleBottomSpacing;
-    }
-    final bodyText = _stripImageMarkersFromContent(titleData.bodyContent);
-    if (bodyText.trim().isEmpty) return null;
+    final contentTop = topSafe + _topOffset + widget.padding.top;
     final localY = globalPosition.dy - contentTop;
     if (!localY.isFinite || localY < 0) return null;
     final lines = _getSelectionLines();
@@ -1809,18 +1772,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final totalWidth = size.width - widget.padding.left - widget.padding.right;
     final columnWidth =
         _isDoublePage ? (totalWidth - _doublePageGutter) / 2 : totalWidth;
-    final renderPosition =
-        _factory.resolveRenderPosition(PageRenderSlot.current);
-    final titleData = _resolvePageTitleRenderData(
-      content: _factory.curPage,
-      renderPosition: renderPosition,
-    );
-    var bodyOriginY = topSafe + _topOffset + widget.padding.top;
-    if (titleData.shouldRenderTitle) {
-      bodyOriginY += _pageTitleTopSpacing +
-          _titlePainterHeight(titleData.title!, columnWidth) +
-          _pageTitleBottomSpacing;
-    }
+    final bodyOriginY = topSafe + _topOffset + widget.padding.top;
     final origin = Offset(widget.padding.left, bodyOriginY);
 
     final contentHeight = size.height -
@@ -1904,106 +1856,64 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   String _resolveLongPressSelectedText(Offset globalPosition) {
-    final content = _factory.curPage;
-    if (content.trim().isEmpty) return '';
+    final pageData = _factory.curPageData;
+    if (pageData.text.trim().isEmpty) return '';
 
     final size = MediaQuery.sizeOf(context);
     final contentWidth =
         size.width - widget.padding.left - widget.padding.right;
-    if (!contentWidth.isFinite || contentWidth <= 0) {
-      return '';
-    }
+    if (!contentWidth.isFinite || contentWidth <= 0) return '';
 
     final systemPadding = _resolveStableSystemPadding();
     final topSafe = systemPadding.top;
-    final renderPosition =
-        _factory.resolveRenderPosition(PageRenderSlot.current);
-    final titleData = _resolvePageTitleRenderData(
-      content: content,
-      renderPosition: renderPosition,
-    );
-    final bodyText = _stripImageMarkersFromContent(titleData.bodyContent);
-
+    final contentTop = topSafe + _topOffset + widget.padding.top;
     final contentLeft = widget.padding.left;
-    final contentTopBase = topSafe + _topOffset + widget.padding.top;
-    var contentTop = contentTopBase;
-
-    if (titleData.shouldRenderTitle) {
-      final title = titleData.title!.trim();
-      if (title.isNotEmpty) {
-        final titlePainter = _buildPageTitlePainter(title, contentWidth);
-
-        final titleStart = contentTop + _pageTitleTopSpacing;
-        final titleEnd = titleStart + titlePainter.height;
-        if (globalPosition.dy >= titleStart && globalPosition.dy <= titleEnd) {
-          final localDx =
-              (globalPosition.dx - contentLeft).clamp(0.0, contentWidth);
-          final localDy = (globalPosition.dy - titleStart)
-              .clamp(0.0, titlePainter.height)
-              .toDouble();
-          final offset = titlePainter
-              .getPositionForOffset(Offset(localDx, localDy))
-              .offset
-              .clamp(0, title.length - 1)
-              .toInt();
-          return _extractWordAtIndex(title, offset);
-        }
-      }
-      contentTop += _pageTitleTopSpacing +
-          _titlePainterHeight(titleData.title!, contentWidth) +
-          _pageTitleBottomSpacing;
-    }
-
-    if (bodyText.trim().isEmpty) {
-      return '';
-    }
-
     final localY = globalPosition.dy - contentTop;
-    if (!localY.isFinite || localY < 0) {
-      return '';
-    }
+    if (!localY.isFinite || localY < 0) return '';
 
-    final lines = LegacyJustifyComposer.composeContentLines(
-      content: bodyText,
-      style: widget.textStyle,
-      maxWidth: contentWidth,
-      justify: widget.settings.textFullJustify,
-      paragraphIndent: widget.settings.paragraphIndent,
-      applyParagraphIndent: false,
-      preserveEmptyLines: true,
-      emptyLineHeight: widget.settings.paragraphSpacing > 0
-          ? widget.settings.fontSize * widget.settings.paragraphSpacing / 10.0
-          : null,
-    );
-    if (lines.isEmpty) {
-      return '';
-    }
+    // 优先使用预排版缓存（含标题行）
+    final lines = pageData.precomposedLines ??
+        LegacyJustifyComposer.composeContentLines(
+          content: _stripImageMarkersFromContent(pageData.text),
+          style: widget.textStyle,
+          maxWidth: contentWidth,
+          justify: widget.settings.textFullJustify,
+          paragraphIndent: widget.settings.paragraphIndent,
+          applyParagraphIndent: false,
+          preserveEmptyLines: true,
+          emptyLineHeight: widget.settings.paragraphSpacing > 0
+              ? widget.settings.fontSize *
+                  widget.settings.paragraphSpacing /
+                  10.0
+              : null,
+        );
+    if (lines.isEmpty) return '';
 
     LegacyComposedLine? targetLine;
-    var lineStartY = 0.0;
     for (final line in lines) {
-      final lineEndY = lineStartY + line.height;
-      if (localY <= lineEndY) {
+      if (line.isVisualEmpty) continue;
+      if (localY <= line.lineStartY + line.height) {
         targetLine = line;
         break;
       }
-      lineStartY = lineEndY;
     }
-    targetLine ??= lines.last;
+    targetLine ??= lines.lastWhere(
+      (l) => !l.isVisualEmpty,
+      orElse: () => lines.last,
+    );
 
     final localDx = (globalPosition.dx - contentLeft).clamp(0.0, contentWidth);
+    final effectiveStyle =
+        (targetLine.isTitle && _resolvedTitleStyle != null)
+            ? _resolvedTitleStyle!
+            : widget.textStyle;
     final charIndex = _resolveCharacterIndexInLine(
       line: targetLine,
       x: localDx,
-      style: widget.textStyle,
+      style: effectiveStyle,
       maxWidth: contentWidth,
     );
     return _extractWordAtIndex(targetLine.plainText, charIndex);
-  }
-
-  double _titlePainterHeight(String title, double maxWidth) {
-    final painter = _buildPageTitlePainter(title, maxWidth);
-    return painter.height;
   }
 
   String _stripImageMarkersFromContent(String content) {
@@ -3103,7 +3013,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final topSafe = systemPadding.top;
     final bottomSafe = systemPadding.bottom;
 
-    final renderPosition = _factory.resolveRenderPosition(slot);
     return Container(
       color: widget.backgroundColor,
       child: Stack(
@@ -3116,10 +3025,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 widget.padding.right,
                 bottomSafe + _bottomOffset + widget.padding.bottom,
               ),
-              child: _buildPageBodyContent(
-                pageData,
-                renderPosition: renderPosition,
-              ),
+              child: _buildPageBodyContent(pageData),
             ),
           ),
           if (_showAnyTipBar)
@@ -3133,44 +3039,31 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
-  Widget _buildPageBodyContent(
-    PageData pageData, {
-    required PageRenderPosition renderPosition,
-  }) {
-    final content = pageData.text;
-    final titleData = _resolvePageTitleRenderData(
-      content: content,
-      renderPosition: renderPosition,
-    );
-    final blocks = _parsePageRenderBlocks(titleData.bodyContent);
-    Widget body;
+  Widget _buildPageBodyContent(PageData pageData) {
+    final blocks = _parsePageRenderBlocks(pageData.text);
     if (!blocks.any((block) => block.isImage)) {
-      // 若标题占用了部分高度，预排版行与 bodyContent 不完全匹配，退回重新排版。
-      final cachedLines =
-          titleData.shouldRenderTitle ? null : pageData.precomposedLines;
-      body = LegacyJustifiedTextBlock(
-        content: titleData.bodyContent,
+      return LegacyJustifiedTextBlock(
+        content: pageData.text,
         style: widget.textStyle,
+        titleStyle: _resolvedTitleStyle,
         justify: widget.settings.textFullJustify,
         bottomJustify: widget.settings.textBottomJustify,
         paragraphIndent: widget.settings.paragraphIndent,
         applyParagraphIndent: false,
         preserveEmptyLines: true,
-        precomposedLines: cachedLines,
+        precomposedLines: pageData.precomposedLines,
         emptyLineHeight: widget.settings.paragraphSpacing > 0
             ? widget.settings.fontSize * widget.settings.paragraphSpacing / 10.0
             : null,
       );
-    } else {
-      body = LayoutBuilder(
-        builder: (context, constraints) => _buildImageAwarePageBody(
-          blocks: blocks,
-          maxWidth: constraints.maxWidth,
-          maxHeight: constraints.maxHeight,
-        ),
-      );
     }
-    return _wrapPageBodyWithTitle(body: body, titleData: titleData);
+    return LayoutBuilder(
+      builder: (context, constraints) => _buildImageAwarePageBody(
+        blocks: blocks,
+        maxWidth: constraints.maxWidth,
+        maxHeight: constraints.maxHeight,
+      ),
+    );
   }
 
   String _normalizeLegacyImageStyleValue(String style) {
@@ -3262,113 +3155,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
-  _PageTitleRenderData _resolvePageTitleRenderData({
-    required String content,
-    required PageRenderPosition renderPosition,
-  }) {
-    final normalizedContent = content.replaceAll('\r\n', '\n');
-    if (normalizedContent.isEmpty) {
-      return _PageTitleRenderData.none(normalizedContent);
-    }
-    if (widget.settings.titleMode == 2 || renderPosition.pageIndex != 0) {
-      return _PageTitleRenderData.none(normalizedContent);
-    }
-    final normalizedTitle = renderPosition.chapterTitle.trim();
-    if (normalizedTitle.isEmpty ||
-        !normalizedContent.startsWith(normalizedTitle)) {
-      return _PageTitleRenderData.none(normalizedContent);
-    }
-    return _PageTitleRenderData(
-      title: normalizedTitle,
-      bodyContent: normalizedContent.substring(normalizedTitle.length),
-    );
-  }
-
-  TextStyle get _pageTitleStyle => widget.textStyle.copyWith(
-        fontSize:
-            ((widget.textStyle.fontSize ?? 16.0) + widget.settings.titleSize)
-                .clamp(10.0, 72.0),
-        fontWeight: FontWeight.w600,
-      );
-
-  TextAlign get _pageTitleAlign =>
-      widget.settings.titleMode == 1 ? TextAlign.center : TextAlign.left;
-
-  TextPainter _buildPageTitlePainter(String title, double maxWidth) {
-    final painter = TextPainter(
-      text: TextSpan(text: title, style: _pageTitleStyle),
-      textDirection: ui.TextDirection.ltr,
-      textAlign: _pageTitleAlign,
-      maxLines: null,
-    );
-    final layoutWidth = (maxWidth.isFinite ? maxWidth : 0.0)
-        .clamp(0.0, double.infinity)
-        .toDouble();
-    if (layoutWidth <= 0) {
-      painter.layout(minWidth: 0, maxWidth: 0);
-      return painter;
-    }
-    // 固定段宽以确保标题居中模式在画布渲染与命中计算中语义一致。
-    painter.layout(minWidth: layoutWidth, maxWidth: layoutWidth);
-    return painter;
-  }
-
-  double get _pageTitleTopSpacing => (widget.settings.titleTopSpacing > 0
-          ? widget.settings.titleTopSpacing
-          : 20.0)
-      .clamp(0.0, double.infinity);
-
-  double get _pageTitleBottomSpacing => (widget.settings.titleBottomSpacing > 0
-          ? widget.settings.titleBottomSpacing
-          : widget.settings.paragraphSpacing * 1.5)
-      .clamp(0.0, double.infinity);
-
-  Widget _wrapPageBodyWithTitle({
-    required Widget body,
-    required _PageTitleRenderData titleData,
-  }) {
-    if (!titleData.shouldRenderTitle) {
-      return body;
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(height: _pageTitleTopSpacing),
-        SizedBox(
-          width: double.infinity,
-          child: Text(
-            titleData.title!,
-            style: _pageTitleStyle,
-            textAlign: _pageTitleAlign,
-          ),
-        ),
-        SizedBox(height: _pageTitleBottomSpacing),
-        body,
-      ],
-    );
-  }
-
-  double _paintPageTitleOnCanvas({
-    required Canvas canvas,
-    required Offset origin,
-    required double maxWidth,
-    required double maxHeight,
-    required String title,
-  }) {
-    if (maxHeight <= 0 || title.trim().isEmpty) {
-      return 0;
-    }
-    final topSpacing = _pageTitleTopSpacing.clamp(0.0, maxHeight);
-    final titlePainter = _buildPageTitlePainter(title, maxWidth);
-    final restHeight = (maxHeight - topSpacing).clamp(0.0, maxHeight);
-    final paintableTitleHeight = titlePainter.height.clamp(0.0, restHeight);
-    titlePainter.paint(canvas, Offset(origin.dx, origin.dy + topSpacing));
-    final remainingAfterTitle =
-        (restHeight - paintableTitleHeight).clamp(0.0, restHeight);
-    final bottomSpacing =
-        _pageTitleBottomSpacing.clamp(0.0, remainingAfterTitle);
-    return topSpacing + paintableTitleHeight + bottomSpacing;
-  }
+  /// 标题行渲染样式（titleMode==2 时返回 null 表示不显示标题）。
+  TextStyle? get _resolvedTitleStyle => widget.settings.titleMode == 2
+      ? null
+      : widget.textStyle.copyWith(
+          fontSize:
+              ((widget.textStyle.fontSize ?? 16.0) + widget.settings.titleSize)
+                  .clamp(10.0, 72.0),
+          fontWeight: FontWeight.w600,
+          decoration: TextDecoration.none,
+        );
 
   double _estimatePagedImageHeight({
     required String imageStyle,
@@ -3752,20 +3548,6 @@ class _PagedRenderBlock {
         );
 
   bool get isImage => imageSrc != null;
-}
-
-class _PageTitleRenderData {
-  final String? title;
-  final String bodyContent;
-
-  const _PageTitleRenderData({
-    required this.title,
-    required this.bodyContent,
-  });
-
-  const _PageTitleRenderData.none(this.bodyContent) : title = null;
-
-  bool get shouldRenderTitle => title != null && title!.isNotEmpty;
 }
 
 class _PagePicturePainter extends CustomPainter {
