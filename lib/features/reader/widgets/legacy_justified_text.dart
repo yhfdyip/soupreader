@@ -58,10 +58,12 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
         var usedHeight = 0.0;
         for (var i = 0; i < lines.length; i++) {
           final line = lines[i];
-          if (maxHeight != null && usedHeight + line.renderHeight > maxHeight) break;
-          if (i > 0 && extraGap > 0.01) {
-            children.add(SizedBox(height: extraGap));
-            usedHeight += extraGap;
+          final lineExtraGap = (i > 0 && extraGap > 0.01) ? extraGap : 0.0;
+          if (maxHeight != null &&
+              usedHeight + lineExtraGap + line.renderHeight > maxHeight) break;
+          if (lineExtraGap > 0.01) {
+            children.add(SizedBox(height: lineExtraGap));
+            usedHeight += lineExtraGap;
           }
           children.add(line.toWidget(style: style, maxWidth: maxWidth));
           usedHeight += line.height;
@@ -457,11 +459,12 @@ class LegacyJustifyComposer {
     final hasHighlight = normalizedQuery.isNotEmpty;
 
     for (var lineIndex = 0; lineIndex < renderLines.length; lineIndex++) {
-      if (lineIndex > 0 && extraGap > 0.01) {
-        y += extraGap;
-      }
       final line = renderLines[lineIndex];
-      if (y - origin.dy + line.renderHeight > maxHeight) break;
+      final lineExtraGap = (lineIndex > 0 && extraGap > 0.01) ? extraGap : 0.0;
+      if (y - origin.dy + lineExtraGap + line.renderHeight > maxHeight) break;
+      if (lineExtraGap > 0.01) {
+        y += lineExtraGap;
+      }
       if (line.segments.isEmpty || line.isVisualEmpty) {
         y += line.height;
         continue;
