@@ -207,7 +207,10 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
     final chapters =
         _isReversed ? widget.chapters.reversed.toList() : widget.chapters;
 
-    return ListView.builder(
+    return CupertinoScrollbar(
+      controller: _chapterScrollController,
+      thumbVisibility: true,
+      child: ListView.builder(
       controller: _chapterScrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: chapters.length,
@@ -289,6 +292,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
           ),
         );
       },
+    ),
     );
   }
 
