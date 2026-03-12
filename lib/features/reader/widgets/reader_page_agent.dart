@@ -68,10 +68,12 @@ class ReaderPageAgent {
 
     // 如果有标题，插入到最前面
     // legado 标题后通过 titleBottomSpacing 控制间距，无额外空行
-    bool hasTitle = title != null && title.isNotEmpty;
+    // 标题 trim 对齐渲染侧 normalizedTitle = chapterTitle.trim()，确保 startsWith 能匹配
+    final normalizedTitle = title?.trim() ?? '';
+    bool hasTitle = normalizedTitle.isNotEmpty;
     int titleLineCount = hasTitle ? 1 : 0;
     if (hasTitle) {
-      paragraphs.add(title);
+      paragraphs.add(normalizedTitle);
     }
 
     // 清洗段落（去除行尾空白，过滤空段落）
