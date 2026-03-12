@@ -279,9 +279,11 @@ class _ReaderStyleConfigListSheetState
     final secondaryLabel =
         CupertinoColors.secondaryLabel.resolveFrom(context);
 
-    return AppSheetPanel(
-      contentPadding: EdgeInsets.zero,
-      child: SafeArea(
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.75,
+      child: AppSheetPanel(
+        contentPadding: EdgeInsets.zero,
+        child: SafeArea(
         top: false,
         child: Column(
           children: [
@@ -314,6 +316,7 @@ class _ReaderStyleConfigListSheetState
             if (_isSelecting) _buildBatchBar(sep),
           ],
         ),
+      ),
       ),
     );
   }
