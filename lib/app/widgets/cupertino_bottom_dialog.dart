@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 const Color _kSheetBarrierDynamicColor = CupertinoDynamicColor.withBrightness(
   color: Color(0x1A0B1630),
@@ -9,9 +10,12 @@ const Color _kDialogBarrierDynamicColor = CupertinoDynamicColor.withBrightness(
   darkColor: Color(0x73000000),
 );
 
-/// 下滑速度阈值（px/s），超过此值触发关闭。
-const double _kDismissVelocityThreshold = 600.0;
-
+/// 底部弹窗：使用 [showCupertinoModalBottomSheet] 实现 iOS 原生交互。
+///
+/// 支持：
+/// - 无滚动内容：任意位置拖拽控制 sheet 位置，下滑松开关闭
+/// - 有滚动内容：滚动到顶部时下滑接管 sheet，否则只滚动内容
+/// - 标题栏始终可拖拽关闭
 Future<T?> showCupertinoBottomSheetDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -23,87 +27,39 @@ Future<T?> showCupertinoBottomSheetDialog<T>({
     barrierColor ?? _kSheetBarrierDynamicColor,
     context,
   );
-  return showCupertinoModalPopup<T>(
+  return showCupertinoModalBottomSheet<T>(
     context: context,
-    barrierDismissible: barrierDismissible,
+    isDismissible: barrierDismissible,
     barrierColor: resolvedBarrierColor,
-    builder: (popupContext) => CupertinoTheme(
+    backgroundColor: CupertinoColors.transparent,
+    elevation: 0,
+    builder: (modalContext) => CupertinoTheme(
       data: themeData,
-      child: _SwipeDownToDismiss(child: builder(popupContext)),
+      child: builder(modalContext),
     ),
   );
 }
 
-/// 包装 bottom sheet 内容，支持下滑快速关闭。
-///
-/// 使用 [HitTestBehavior.translucent]，内部滚动组件不受影响。
-/// 当下滑速度超过阈值时调用 [Navigator.pop]。
-class _SwipeDownToDismiss extends StatelessWidget {
-  final Widget child;
-
-  const _SwipeDownToDismiss({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragEnd: (details) {
-        final velocity = details.primaryVelocity ?? 0;
-        if (velocity > _kDismissVelocityThreshold) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: child,
-    );
-  }
-}
-
-Future<T?> showCupertinoBottomDialog<T>({
+/// 底部对话框（Alert 风格），保持原有实现。
+Future<T?> showCupertinoBottomSheetDialogAsAlert<T>({
   required BuildContext context,
   required WidgetBuilder builder,
-  bool barrierDismissible = false,
-  String? barrierLabel,
-  Color? barrierColor,
-  bool useRootNavigator = true,
-  RouteSettings? routeSettings,
+  bool barrierDismissible = true,
 }) {
   final themeData = CupertinoTheme.of(context);
-  final probeContext =
-      Navigator.of(context, rootNavigator: useRootNavigator).context;
-  final probeWidget = builder(probeContext);
-
-  Widget themedBuilder(BuildContext popupContext) {
-    return CupertinoTheme(
-      data: themeData,
-      child: builder(popupContext),
-    );
-  }
-
-  if (probeWidget is CupertinoActionSheet) {
-    final resolvedBarrierColor = barrierColor ?? _kSheetBarrierDynamicColor;
-    final resolvedBarrierLabel = barrierLabel ??
-        CupertinoLocalizations.of(context).modalBarrierDismissLabel;
-
-    return Navigator.of(context, rootNavigator: useRootNavigator).push<T>(
-      CupertinoModalPopupRoute<T>(
-        builder: themedBuilder,
-        barrierColor:
-            CupertinoDynamicColor.resolve(resolvedBarrierColor, context),
-        barrierDismissible: barrierDismissible,
-        semanticsDismissible: barrierDismissible,
-        settings: routeSettings,
-        barrierLabel: resolvedBarrierLabel,
-      ),
-    );
-  }
-
-  return showCupertinoDialog<T>(
+  final resolvedBarrierColor = CupertinoDynamicColor.resolve(
+    _kDialogBarrierDynamicColor,
+    context,
+  );
+  return showCupertinoModalBottomSheet<T>(
     context: context,
-    builder: themedBuilder,
-    barrierDismissible: barrierDismissible,
-    barrierLabel: barrierLabel,
-    barrierColor: barrierColor ?? _kDialogBarrierDynamicColor,
-    useRootNavigator: useRootNavigator,
-    routeSettings: routeSettings,
+    isDismissible: barrierDismissible,
+    barrierColor: resolvedBarrierColor,
+    backgroundColor: CupertinoColors.transparent,
+    elevation: 0,
+    builder: (modalContext) => CupertinoTheme(
+      data: themeData,
+      child: builder(modalContext),
+    ),
   );
 }

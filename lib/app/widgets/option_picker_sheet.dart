@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/design_tokens.dart';
@@ -238,6 +239,7 @@ class OptionPickerBody<T> extends StatelessWidget {
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: ListView(
+        controller: ModalScrollController.of(context),
         shrinkWrap: true,
         physics: const BouncingScrollPhysics(),
         children: [

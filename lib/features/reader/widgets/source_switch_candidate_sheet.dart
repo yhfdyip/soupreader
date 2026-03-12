@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/ui_tokens.dart';
@@ -614,7 +615,7 @@ class _SourceSwitchCandidateSheetState
       return;
     }
     final action =
-        await showCupertinoBottomDialog<_SourceSwitchCandidateAction>(
+        await showCupertinoBottomSheetDialog<_SourceSwitchCandidateAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -693,7 +694,7 @@ class _SourceSwitchCandidateSheetState
   Future<bool> _confirmDeleteSourceCandidate(
     ReaderSourceSwitchCandidate candidate,
   ) async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -813,7 +814,7 @@ class _SourceSwitchCandidateSheetState
   }
 
   Future<bool> _confirmSwitchGroupToAll(String group) async {
-    final confirmed = await showCupertinoBottomDialog<bool>(
+    final confirmed = await showCupertinoBottomSheetDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('搜索结果为空'),
@@ -895,7 +896,7 @@ class _SourceSwitchCandidateSheetState
     }
     final groups = _normalizedSourceGroups;
     final selectedGroup = _normalizeGroupText(_changeSourceGroup);
-    final selected = await showCupertinoBottomDialog<String>(
+    final selected = await showCupertinoBottomSheetDialog<String>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -935,7 +936,7 @@ class _SourceSwitchCandidateSheetState
         _updatingSourceDelay) {
       return;
     }
-    final action = await showCupertinoBottomDialog<_SourceSwitchMenuAction>(
+    final action = await showCupertinoBottomSheetDialog<_SourceSwitchMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -1303,6 +1304,7 @@ class _SourceSwitchCandidateSheetState
                           _query.trim().isEmpty ? '可尝试刷新列表或更换分组' : '请尝试更换筛选关键字',
                     )
                   : ListView.separated(
+                      controller: ModalScrollController.of(context),
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) => Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16),

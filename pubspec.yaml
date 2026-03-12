@@ -69,6 +69,7 @@ dependencies:
   flutter_tts: ^4.2.5
   flutter_slidable: ^4.0.3
   just_audio: ^0.10.5
+  modal_bottom_sheet: ^3.0.0
 
 dev_dependencies:
   flutter_test:

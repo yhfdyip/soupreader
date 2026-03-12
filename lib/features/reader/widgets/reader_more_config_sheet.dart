@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 
@@ -122,7 +123,7 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
 
   Future<void> _pickTouchSlop() async {
     final ctrl = TextEditingController(text: _s.pageTouchSlop.toString());
-    final r = await showCupertinoBottomDialog<int>(
+    final r = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('翻页触发阈值'),
@@ -172,6 +173,7 @@ class _ReaderMoreConfigSheetState extends State<_ReaderMoreConfigSheet> {
             SizedBox(
               height: h * 0.62,
               child: ListView(
+                controller: ModalScrollController.of(context),
                 padding: const EdgeInsets.only(bottom: 12),
                 children: [
                   AppListSection(

@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_sheet_header.dart';
@@ -75,6 +76,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
             const AppSheetHeader(title: '排版设置'),
             Expanded(
               child: SingleChildScrollView(
+                controller: ModalScrollController.of(context),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

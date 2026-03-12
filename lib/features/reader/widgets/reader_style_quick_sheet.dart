@@ -4,6 +4,7 @@ import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/widgets/app_sheet_header.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../models/reading_settings.dart';
 import 'reader_style_config_list_sheet.dart';
 import 'reader_style_edit_sheet.dart';
@@ -62,35 +63,26 @@ class _ReaderStyleQuickSheetState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = _isDark;
-    final sheetBg = isDark
-        ? CupertinoColors.systemGroupedBackground.resolveFrom(context).darkColor
-        : CupertinoColors.systemGroupedBackground.resolveFrom(context).color;
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(AppDesignTokens.radiusSheet),
-      ),
-      child: Container(
-        color: sheetBg,
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const AppSheetHeader(title: '界面'),
-              _buildChipRow(),
-              _buildDivider(),
-              _buildThemeRow(),
-              _buildDivider(),
-              _buildFontSizeRow(),
-              _buildLetterSpacingRow(),
-              _buildLineHeightRow(),
-              _buildParagraphSpacingRow(),
-              _buildDivider(),
-              _buildPageTurnRow(),
-              const SizedBox(height: 8),
-            ],
-          ),
+    return AppSheetPanel(
+      contentPadding: EdgeInsets.zero,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppSheetHeader(title: '界面'),
+            _buildChipRow(),
+            _buildDivider(),
+            _buildThemeRow(),
+            _buildDivider(),
+            _buildFontSizeRow(),
+            _buildLetterSpacingRow(),
+            _buildLineHeightRow(),
+            _buildParagraphSpacingRow(),
+            _buildDivider(),
+            _buildPageTurnRow(),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -465,7 +457,7 @@ class _ReaderStyleQuickSheetState
   }
 
   // 快速面板最多展示的样式 chip 数量
-  static const int _kQuickChipCount = 5;
+  static const int _kQuickChipCount = 4;
 
   Widget _buildThemeRow() {
     final isDark = _isDark;
