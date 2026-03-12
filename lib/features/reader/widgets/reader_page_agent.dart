@@ -91,7 +91,8 @@ class ReaderPageAgent {
     // 当前页是否含图片（含图片时 precomposedLines 置 null）
     bool currentPageHasImage = false;
     double currentY = 0;
-    double maxPageHeight = height - 1.0;
+    // 对标 legado: durY + textHeight > visibleHeight（严格大于）
+    double maxPageHeight = height;
     final normalizedImageStyle = _normalizeImageStyle(imageStyle);
 
     // 辅助函数：提交当前页
@@ -319,13 +320,13 @@ class ReaderPageAgent {
             }
           }
 
-          // 段落间距逻辑：如果设置了段距且足够大，插入空行模拟
-          if (paragraphSpacing > fontSize * 0.5) {
-            double spacingHeight = fontSize * lineHeight; // 模拟一个空行的高度
-            // 只有当剩余空间足够放一个空行时才插入，避免页面底部只有空行
-            if (currentY + spacingHeight <= maxPageHeight) {
-              currentPageContent.write('\n');
+          // 段落间距：对标 legado durY += textHeight * paragraphSpacing / 10f
+          // 按比例无条件累加，不插空行到 content（避免重新排版路径高度错位）
+          if (paragraphSpacing > 0) {
+            final spacingHeight = curFontSize * paragraphSpacing / 10.0;
+            if (spacingHeight > 0 && currentY + spacingHeight < maxPageHeight) {
               if (!isTitle) {
+                // precomposedLines 路径插入间距占位行（不写 \n 到 content）
                 currentPageLines.add(LegacyComposedLine.empty(
                     height: spacingHeight, lineStartY: currentY));
               }
