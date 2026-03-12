@@ -147,9 +147,8 @@ class ReaderPageAgent {
           lineHeight: lineHeight,
           imageSize: intrinsicSize,
         );
-        final spacingHeight = paragraphSpacing > fontSize * 0.5
-            ? fontSize * lineHeight
-            : defaultParagraphSpacing;
+        // 对标 legado: textHeight * paragraphSpacing / 10f
+        final spacingHeight = fontSize * paragraphSpacing / 10.0;
 
         if (normalizedImageStyle == _imageStyleSingle) {
           if (currentPageContent.isNotEmpty) {
@@ -321,12 +320,12 @@ class ReaderPageAgent {
           }
 
           // 段落间距：对标 legado durY += textHeight * paragraphSpacing / 10f
-          // 按比例无条件累加，不插空行到 content（避免重新排版路径高度错位）
+          // 无条件累加（超出时下一行自动触发分页），同步写入 content 和 precomposedLines
           if (paragraphSpacing > 0) {
             final spacingHeight = curFontSize * paragraphSpacing / 10.0;
-            if (spacingHeight > 0 && currentY + spacingHeight < maxPageHeight) {
+            if (spacingHeight > 0) {
+              currentPageContent.write('\n');
               if (!isTitle) {
-                // precomposedLines 路径插入间距占位行（不写 \n 到 content）
                 currentPageLines.add(LegacyComposedLine.empty(
                     height: spacingHeight, lineStartY: currentY));
               }

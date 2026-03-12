@@ -662,6 +662,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             highlightBackgroundColor: widget.searchHighlightColor,
             highlightTextColor: widget.searchHighlightTextColor,
             precomposedLines: cachedLines,
+            emptyLineHeight: widget.settings.paragraphSpacing > 0
+                ? widget.settings.fontSize * widget.settings.paragraphSpacing / 10.0
+                : null,
           );
           canvas.restore();
         }
@@ -1680,6 +1683,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       paragraphIndent: widget.settings.paragraphIndent,
       applyParagraphIndent: false,
       preserveEmptyLines: true,
+      emptyLineHeight: widget.settings.paragraphSpacing > 0
+          ? widget.settings.fontSize * widget.settings.paragraphSpacing / 10.0
+          : null,
     );
     return _selectionLines;
   }
@@ -1965,6 +1971,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       paragraphIndent: widget.settings.paragraphIndent,
       applyParagraphIndent: false,
       preserveEmptyLines: true,
+      emptyLineHeight: widget.settings.paragraphSpacing > 0
+          ? widget.settings.fontSize * widget.settings.paragraphSpacing / 10.0
+          : null,
     );
     if (lines.isEmpty) {
       return '';
@@ -3148,6 +3157,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         applyParagraphIndent: false,
         preserveEmptyLines: true,
         precomposedLines: cachedLines,
+        emptyLineHeight: widget.settings.paragraphSpacing > 0
+            ? widget.settings.fontSize * widget.settings.paragraphSpacing / 10.0
+            : null,
       );
     } else {
       body = LayoutBuilder(

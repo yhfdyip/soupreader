@@ -11,6 +11,8 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
   final bool preserveEmptyLines;
   /// 预排版行缓存（由分页器提供）。不为 null 时跳过重新排版，直接复用。
   final List<LegacyComposedLine>? precomposedLines;
+  /// 空段落（段落间距占位行）的高度。为 null 时使用默认行高。
+  final double? emptyLineHeight;
 
   const LegacyJustifiedTextBlock({
     super.key,
@@ -22,6 +24,7 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
     this.applyParagraphIndent = true,
     this.preserveEmptyLines = true,
     this.precomposedLines,
+    this.emptyLineHeight,
   });
 
   @override
@@ -41,6 +44,7 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
               paragraphIndent: paragraphIndent,
               applyParagraphIndent: applyParagraphIndent,
               preserveEmptyLines: preserveEmptyLines,
+              emptyLineHeight: emptyLineHeight,
             );
         if (lines.isEmpty) {
           return const SizedBox.shrink();
@@ -204,22 +208,24 @@ class LegacyJustifyComposer {
     required String paragraphIndent,
     required bool applyParagraphIndent,
     required bool preserveEmptyLines,
+    double? emptyLineHeight,
   }) {
     final paragraphs = content.split('\n');
     final fontSize = style.fontSize ?? 16.0;
-    final lineHeight =
+    final defaultLineHeight =
         fontSize * (style.height ?? 1.2).clamp(1.0, 2.5);
     final lines = <LegacyComposedLine>[];
     var currentY = 0.0;
     for (final paragraph in paragraphs) {
       if (paragraph.trim().isEmpty) {
         if (preserveEmptyLines) {
+          final h = emptyLineHeight ?? defaultLineHeight;
           lines.add(LegacyComposedLine.empty(
-            height: lineHeight,
+            height: h,
             renderHeight: fontSize,
             lineStartY: currentY,
           ));
-          currentY += lineHeight;
+          currentY += h;
         }
         continue;
       }
@@ -435,6 +441,7 @@ class LegacyJustifyComposer {
     Color? highlightBackgroundColor,
     Color? highlightTextColor,
     List<LegacyComposedLine>? precomposedLines,
+    double? emptyLineHeight,
   }) {
     final renderLines = precomposedLines ??
         composeContentLines(
@@ -445,6 +452,7 @@ class LegacyJustifyComposer {
           paragraphIndent: paragraphIndent,
           applyParagraphIndent: applyParagraphIndent,
           preserveEmptyLines: preserveEmptyLines,
+          emptyLineHeight: emptyLineHeight,
         );
     if (renderLines.isEmpty) {
       return 0;
