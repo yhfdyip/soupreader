@@ -196,10 +196,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
 
             // 列表内容
             Expanded(
-              child: PrimaryScrollController(
-                controller: _chapterScrollController,
-                child: _currentTab == 0 ? _buildChapterList() : _buildBookmarkList(),
-              ),
+              child: _currentTab == 0 ? _buildChapterList() : _buildBookmarkList(),
             ),
             // 底部当前章节跳转栏（仅目录 Tab 显示）
             if (_currentTab == 0) _buildCurrentChapterBar(),
