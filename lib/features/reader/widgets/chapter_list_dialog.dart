@@ -60,6 +60,16 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
   final ScrollController _chapterScrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted) _scrollToCurrentChapter();
+      });
+    });
+  }
+
+  @override
   void dispose() {
     _chapterScrollController.dispose();
     super.dispose();
