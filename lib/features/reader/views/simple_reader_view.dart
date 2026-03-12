@@ -423,6 +423,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   bool _programmaticScrollInFlight = false;
   double _scrollAnchorWithinViewport = 32.0;
   String? _readStyleBackgroundDirectoryPath;
+  ui.Image? _readerBgUiImage;
+  String? _readerBgUiImageKey; // 用于避免重复加载
   String? _readerCustomFontFamily;
   Timer? _keepLightTimer;
   bool _pendingImageSizeRepagination = false;
@@ -554,6 +556,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _settingsService.appSettingsListenable
         .addListener(_handleAppSettingsChanged);
     _warmUpReadStyleBackgroundDirectoryPath();
+    _loadReaderBgUiImage();
     _autoPager.setSpeed(_settings.autoReadSpeed);
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
@@ -759,6 +762,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     unawaited(_brightnessService.resetToSystem());
     unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
     unawaited(_restoreSystemUiAndOrientation());
+    _readerBgUiImage?.dispose();
+    _readerBgUiImage = null;
     super.dispose();
   }
 
@@ -2922,6 +2927,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       }
       _invalidateScrollLayoutSnapshot();
     });
+    if (oldSettings.themeIndex != newSettings.themeIndex ||
+        oldSettings.readStyleConfigs != newSettings.readStyleConfigs) {
+      _loadReaderBgUiImage();
+    }
     if (oldSettings.autoReadSpeed != newSettings.autoReadSpeed) {
       _autoPager.setSpeed(newSettings.autoReadSpeed);
     }
@@ -5094,6 +5103,70 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return _buildScrollContent();
   }
 
+  void _loadReaderBgUiImage() {
+    if (!_readerUsesImageBackground) {
+      if (_readerBgUiImage != null) {
+        setState(() {
+          _readerBgUiImage?.dispose();
+          _readerBgUiImage = null;
+          _readerBgUiImageKey = null;
+        });
+      }
+      return;
+    }
+    final style = _currentReadStyleConfig.sanitize();
+    String? imageKey;
+    ImageProvider? provider;
+    if (style.bgType == ReadStyleConfig.bgTypeAsset) {
+      final assetPath = _normalizeBundledReadStyleAssetPath(style.bgStr);
+      if (assetPath != null) {
+        imageKey = 'asset:$assetPath';
+        provider = AssetImage(assetPath);
+      }
+    } else if (style.bgType == ReadStyleConfig.bgTypeFile && !kIsWeb) {
+      final resolvedPath =
+          _resolveReadStyleBackgroundFilePath(style.bgStr);
+      if (resolvedPath != null && resolvedPath.isNotEmpty) {
+        imageKey = 'file:$resolvedPath';
+        provider = FileImage(File(resolvedPath));
+      }
+    }
+    if (imageKey == null || provider == null) return;
+    if (imageKey == _readerBgUiImageKey) return; // 已加载，跳过
+    unawaited(() async {
+      try {
+        final config = ImageConfiguration.empty;
+        final stream = provider!.resolve(config);
+        final completer = Completer<ui.Image>();
+        late ImageStreamListener listener;
+        listener = ImageStreamListener((info, _) {
+          if (!completer.isCompleted) {
+            completer.complete(info.image.clone());
+          }
+          stream.removeListener(listener);
+        }, onError: (e, st) {
+          if (!completer.isCompleted) {
+            completer.completeError(e, st);
+          }
+          stream.removeListener(listener);
+        });
+        stream.addListener(listener);
+        final img = await completer.future;
+        if (!mounted) {
+          img.dispose();
+          return;
+        }
+        setState(() {
+          _readerBgUiImage?.dispose();
+          _readerBgUiImage = img;
+          _readerBgUiImageKey = imageKey;
+        });
+      } catch (_) {
+        // 加载失败时静默回退，仍用纯色背景
+      }
+    }());
+  }
+
   void _warmUpReadStyleBackgroundDirectoryPath() {
     if (kIsWeb) return;
     unawaited(() async {
@@ -5106,6 +5179,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         setState(() {
           _readStyleBackgroundDirectoryPath = directory.path;
         });
+        _loadReaderBgUiImage();
       } catch (_) {
         // ignore path lookup failure; reader will gracefully fallback to solid bg
       }
@@ -5231,9 +5305,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         decoration: _currentTextDecoration,
       ),
       backgroundColor: _readerContentBackgroundColor,
-      shaderBackgroundColor: _readerUsesImageBackground
-          ? const Color(0x00000000)
-          : _readerBackgroundBaseColor,
+      shaderBackgroundColor: _readerBackgroundBaseColor,
+      backgroundUiImage: _readerBgUiImage,
+      backgroundImageOpacity:
+          _currentReadStyleConfig.bgAlpha.clamp(0, 100) / 100.0,
       padding: _contentPadding,
       enableGestures: !_showMenu && !_showSearchMenu, // 菜单显示时禁止翻页手势
       onTap: () {

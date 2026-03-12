@@ -64,6 +64,8 @@ class PagedReaderWidget extends StatefulWidget {
   final TextStyle textStyle;
   final Color backgroundColor;
   final Color? shaderBackgroundColor;
+  final ui.Image? backgroundUiImage;
+  final double backgroundImageOpacity;
   final EdgeInsets padding;
   final VoidCallback? onTap;
   final bool showStatusBar;
@@ -141,6 +143,8 @@ class PagedReaderWidget extends StatefulWidget {
     required this.textStyle,
     required this.backgroundColor,
     this.shaderBackgroundColor,
+    this.backgroundUiImage,
+    this.backgroundImageOpacity = 1.0,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
     this.showStatusBar = true,
@@ -372,6 +376,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (oldWidget.pageFactory != widget.pageFactory ||
         oldWidget.textStyle != widget.textStyle ||
         oldWidget.backgroundColor != widget.backgroundColor ||
+        oldWidget.backgroundUiImage != widget.backgroundUiImage ||
+        oldWidget.backgroundImageOpacity != widget.backgroundImageOpacity ||
         oldWidget.padding != widget.padding ||
         oldWidget.settings != widget.settings ||
         oldWidget.searchHighlightQuery != widget.searchHighlightQuery ||
@@ -596,11 +602,26 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final bottomSafe = systemPadding.bottom;
     final renderPosition = _factory.resolveRenderPosition(slot);
 
-    // 绘制背景：图片背景时 backgroundColor 为透明，用 shaderBackgroundColor 填底色
+    // 绘制背景：先填底色，再叠加图片（如有）
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Paint()..color = widget.shaderBackgroundColor ?? widget.backgroundColor,
     );
+    final bgImage = widget.backgroundUiImage;
+    if (bgImage != null && widget.backgroundImageOpacity > 0) {
+      final srcRect = Rect.fromLTWH(
+          0, 0, bgImage.width.toDouble(), bgImage.height.toDouble());
+      final dstRect = Rect.fromLTWH(0, 0, size.width, size.height);
+      canvas.drawImageRect(
+        bgImage,
+        srcRect,
+        dstRect,
+        Paint()
+          ..filterQuality = FilterQuality.medium
+          ..color = Color.fromRGBO(
+              255, 255, 255, widget.backgroundImageOpacity.clamp(0.0, 1.0)),
+      );
+    }
 
     if (content.isNotEmpty) {
       final totalWidth =
