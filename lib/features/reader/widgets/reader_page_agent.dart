@@ -103,6 +103,10 @@ class ReaderPageAgent {
         while (pageText.endsWith('\n')) {
           pageText = pageText.substring(0, pageText.length - 1);
         }
+        // 同步去除 precomposedLines 尾部的空行（与 content 尾部 \n 对应）
+        while (currentPageLines.isNotEmpty && currentPageLines.last.isVisualEmpty) {
+          currentPageLines.removeLast();
+        }
         pages.add(PageData(
           pageText,
           precomposedLines: currentPageHasImage ? null : List.unmodifiable(currentPageLines),
