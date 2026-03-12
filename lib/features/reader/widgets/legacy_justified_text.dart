@@ -222,7 +222,7 @@ class LegacyJustifyComposer {
           final h = emptyLineHeight ?? defaultLineHeight;
           lines.add(LegacyComposedLine.empty(
             height: h,
-            renderHeight: fontSize,
+            renderHeight: h,
             lineStartY: currentY,
           ));
           currentY += h;
