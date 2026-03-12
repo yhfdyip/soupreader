@@ -209,7 +209,7 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
 
     return CupertinoScrollbar(
       controller: _chapterScrollController,
-      thumbVisibility: true,
+      thumbVisibility: false,
       child: ListView.builder(
       controller: _chapterScrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16),
