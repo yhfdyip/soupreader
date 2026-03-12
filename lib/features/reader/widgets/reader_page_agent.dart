@@ -67,10 +67,11 @@ class ReaderPageAgent {
     final List<String> paragraphs = [];
 
     // 如果有标题，插入到最前面
+    // legado 标题后通过 titleBottomSpacing 控制间距，无额外空行
     bool hasTitle = title != null && title.isNotEmpty;
+    int titleLineCount = hasTitle ? 1 : 0;
     if (hasTitle) {
       paragraphs.add(title);
-      paragraphs.add(''); // 标题后的视觉空行
     }
 
     // 清洗段落（去除行尾空白，过滤空段落）
@@ -122,10 +123,12 @@ class ReaderPageAgent {
     for (int i = 0; i < paragraphs.length; i++) {
       String paraText = paragraphs[i];
 
-      // 判断是否是标题
-      bool isTitle = hasTitle && i == 0;
+      // 判断是否是标题（对标 legado：多行标题每段都是 isTitle=true）
+      bool isTitle = hasTitle && i < titleLineCount;
+      // 是否是最后一行标题（titleBottomSpacing 只在最后一行标题后加）
+      bool isLastTitleLine = hasTitle && i == titleLineCount - 1;
 
-      // 这里的 paragraphs[i] 已经是清洗过的非空文本（除了标题后插入的空字符串）
+      // 这里的 paragraphs[i] 已经是清洗过的非空文本
       if (paraText.isEmpty) {
         // 仅用于标题后的空行
         double emptyLineHeight = fontSize * lineHeight;
@@ -189,11 +192,8 @@ class ReaderPageAgent {
       final normalizedPara =
           (isTitle || indent.isEmpty) ? paraText : '$indent$trimmedLeft';
 
-      // 标题可设置顶部/底部间距
-      if (isTitle && titleTopSpacing > 0) {
-        if (currentY + titleTopSpacing > maxPageHeight) {
-          commitPage();
-        }
+      // 标题顶部间距：只在第一行标题前加（对标 legado titleTopSpacing）
+      if (isTitle && i == 0 && titleTopSpacing > 0) {
         currentY += titleTopSpacing;
       }
 
@@ -315,8 +315,8 @@ class ReaderPageAgent {
         if (lineIndex == lines.length - 1) {
           currentPageContent.write('\n');
 
-          // titleBottomSpacing：对标 legado 无条件累加（超出时下一行自然触发分页）
-          if (isTitle && titleBottomSpacing > 0) {
+          // titleBottomSpacing：只在最后一行标题后加（对标 legado: durY += titleBottomSpacing）
+          if (isLastTitleLine && titleBottomSpacing > 0) {
             currentY += titleBottomSpacing;
           }
 
