@@ -537,9 +537,12 @@ class _ReaderStyleQuickSheetState
             ],
           ),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 94),
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
             children: [
               // 「+」按钮放在第一位
               _buildAddCell(isDark, borderNormal),
@@ -554,8 +557,8 @@ class _ReaderStyleQuickSheetState
                       : null,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    width: 68,
-                    height: 52,
+                    width: 56,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: t.background,
                       borderRadius: BorderRadius.circular(10),
@@ -616,6 +619,8 @@ class _ReaderStyleQuickSheetState
               }),
             ],
           ),
+            ),
+          ),
         ],
       ),
     );
@@ -630,8 +635,8 @@ class _ReaderStyleQuickSheetState
       minimumSize: Size.zero,
       onPressed: _addNewStyle,
       child: Container(
-        width: 68,
-        height: 52,
+        width: 56,
+        height: 44,
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
