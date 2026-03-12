@@ -33,6 +33,7 @@ Future<T?> showCupertinoBottomSheetDialog<T>({
     barrierColor: resolvedBarrierColor,
     backgroundColor: CupertinoColors.transparent,
     elevation: 0,
+    bounce: false,
     builder: (modalContext) => CupertinoTheme(
       data: themeData,
       child: builder(modalContext),
@@ -57,6 +58,7 @@ Future<T?> showCupertinoBottomSheetDialogAsAlert<T>({
     barrierColor: resolvedBarrierColor,
     backgroundColor: CupertinoColors.transparent,
     elevation: 0,
+    bounce: false,
     builder: (modalContext) => CupertinoTheme(
       data: themeData,
       child: builder(modalContext),
