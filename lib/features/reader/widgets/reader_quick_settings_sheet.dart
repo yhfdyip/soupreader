@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 import 'reader_quick_settings_tab_bodies.dart';
@@ -60,14 +61,11 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final sheetBg = ReaderSettingsTokens.sheetBackground(isDark: isDark);
     final height = MediaQuery.sizeOf(context).height * 0.65;
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
-      child: Container(
-        height: height,
-        color: sheetBg,
+    return SizedBox(
+      height: height,
+      child: AppSheetPanel(
+        contentPadding: EdgeInsets.zero,
         child: SafeArea(
           top: false,
           child: Column(

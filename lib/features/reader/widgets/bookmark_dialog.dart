@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -42,9 +43,6 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
   Color get _accent =>
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
-
-  Color get _panelBg =>
-      CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
       CupertinoColors.label.resolveFrom(context);
@@ -134,13 +132,11 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.6,
-      decoration: BoxDecoration(
-        color: _panelBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
-      ),
-      child: SafeArea(
+      child: AppSheetPanel(
+        contentPadding: EdgeInsets.zero,
+        child: SafeArea(
         top: false,
         child: Column(
           children: [
@@ -225,6 +221,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

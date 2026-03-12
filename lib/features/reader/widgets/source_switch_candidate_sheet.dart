@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
-import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -1112,7 +1112,6 @@ class _SourceSwitchCandidateSheetState
 
   @override
   Widget build(BuildContext context) {
-    final colors = CupertinoTheme.of(context);
     final compactTapSquare =
         AppUiTokens.resolve(context).sizes.compactTapSquare;
     final size = MediaQuery.sizeOf(context);
@@ -1130,15 +1129,13 @@ class _SourceSwitchCandidateSheetState
         showLoadWordCountAction;
     final showHeaderTitle = !_filterExpanded;
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        height: size.height * 0.8,
-        decoration: BoxDecoration(
-          color: colors.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
-        ),
-        child: Column(
+    return SizedBox(
+      height: size.height * 0.8,
+      child: AppSheetPanel(
+        contentPadding: EdgeInsets.zero,
+        child: SafeArea(
+          top: false,
+          child: Column(
           children: [
             Center(
               child: Container(
@@ -1424,6 +1421,7 @@ class _SourceSwitchCandidateSheetState
             ),
           ],
         ),
+      ),
       ),
     );
   }

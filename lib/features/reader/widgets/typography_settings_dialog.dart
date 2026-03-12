@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/app_sheet_header.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
@@ -30,9 +31,6 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
 
   Color get _accent =>
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
-
-  Color get _panelBg =>
-      CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
       CupertinoColors.label.resolveFrom(context);
@@ -63,13 +61,11 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.75,
-      decoration: BoxDecoration(
-        color: _panelBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
-      ),
-      child: SafeArea(
+      child: AppSheetPanel(
+        contentPadding: EdgeInsets.zero,
+        child: SafeArea(
         top: false,
         child: Column(
           children: [
@@ -213,6 +209,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
