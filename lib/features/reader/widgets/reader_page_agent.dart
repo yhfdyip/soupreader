@@ -311,24 +311,19 @@ class ReaderPageAgent {
         if (lineIndex == lines.length - 1) {
           currentPageContent.write('\n');
 
+          // titleBottomSpacing：对标 legado 无条件累加（超出时下一行自然触发分页）
           if (isTitle && titleBottomSpacing > 0) {
-            if (currentY + titleBottomSpacing > maxPageHeight) {
-              commitPage();
-            } else {
-              currentY += titleBottomSpacing;
-            }
+            currentY += titleBottomSpacing;
           }
 
           // 段落间距：对标 legado durY += textHeight * paragraphSpacing / 10f
-          // 无条件累加（超出时下一行自动触发分页），同步写入 content 和 precomposedLines
+          // 无条件累加（标题/正文均适用），超出时下一行自动触发分页
           if (paragraphSpacing > 0) {
             final spacingHeight = curFontSize * paragraphSpacing / 10.0;
             if (spacingHeight > 0) {
               currentPageContent.write('\n');
-              if (!isTitle) {
-                currentPageLines.add(LegacyComposedLine.empty(
-                    height: spacingHeight, lineStartY: currentY));
-              }
+              currentPageLines.add(LegacyComposedLine.empty(
+                  height: spacingHeight, lineStartY: currentY));
               currentY += spacingHeight;
             }
           }
