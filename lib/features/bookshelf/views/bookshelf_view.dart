@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../app/theme/design_tokens.dart';
@@ -20,6 +21,8 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../import/book_import_file_name_rule_service.dart';
@@ -68,7 +71,7 @@ enum _BookshelfMoreMenuAction {
 }
 
 /// 书架页面 - 纯 iOS 原生风格
-class BookshelfView extends StatefulWidget {
+class BookshelfView extends ConsumerStatefulWidget {
   final ValueListenable<int>? reselectSignal;
 
   const BookshelfView({
@@ -77,10 +80,10 @@ class BookshelfView extends StatefulWidget {
   });
 
   @override
-  State<BookshelfView> createState() => _BookshelfViewState();
+  ConsumerState<BookshelfView> createState() => _BookshelfViewState();
 }
 
-class _BookshelfViewState extends State<BookshelfView> {
+class _BookshelfViewState extends ConsumerState<BookshelfView> {
   static const String _bookGroupMembershipSettingKey =
       'bookshelf.book_group_membership_map';
   static const String _style1SelectedTabIndexSettingKey =
@@ -177,11 +180,11 @@ class _BookshelfViewState extends State<BookshelfView> {
     super.initState();
     try {
       debugPrint('[bookshelf] init start');
-      _settingsService = SettingsService();
-      final db = DatabaseService();
+      _settingsService = ref.read(settingsServiceProvider);
+      final db = ref.read(databaseServiceProvider);
       _database = db;
-      _bookRepo = BookRepository(db);
-      _sourceRepo = SourceRepository(db);
+      _bookRepo = ref.read(bookRepositoryProvider);
+      _sourceRepo = ref.read(sourceRepositoryProvider);
       _bookAddService = BookAddService(database: db);
       _importService = ImportService();
       _bookImportFileNameRuleService = BookImportFileNameRuleService();

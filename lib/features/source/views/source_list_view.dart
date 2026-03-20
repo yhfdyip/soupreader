@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../app/theme/typography.dart';
@@ -23,6 +24,8 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/qr_scan_service.dart';
@@ -137,7 +140,7 @@ class _CheckSettings {
 }
 
 /// 书源管理页面
-class SourceListView extends StatefulWidget {
+class SourceListView extends ConsumerStatefulWidget {
   const SourceListView({
     super.key,
     this.moveSourcesHandler,
@@ -146,10 +149,10 @@ class SourceListView extends StatefulWidget {
   final SourceMoveSourcesHandler? moveSourcesHandler;
 
   @override
-  State<SourceListView> createState() => _SourceListViewState();
+  ConsumerState<SourceListView> createState() => _SourceListViewState();
 }
 
-class _SourceListViewState extends State<SourceListView> {
+class _SourceListViewState extends ConsumerState<SourceListView> {
   _SourceSortMode _sortMode = _SourceSortMode.manual;
   bool _sortAscending = true;
   bool _groupSourcesByDomain = false;
@@ -158,7 +161,7 @@ class _SourceListViewState extends State<SourceListView> {
   late final SourceRepository _sourceRepo;
   late final DatabaseService _db;
   late final SourceImportCommitService _importCommitService;
-  final SettingsService _settingsService = SettingsService();
+  late final SettingsService _settingsService;
   final KeepScreenOnService _keepScreenOnService = KeepScreenOnService.instance;
   final SourceAvailabilityCheckTaskService _checkTaskService =
       SourceAvailabilityCheckTaskService.instance;
@@ -200,8 +203,9 @@ class _SourceListViewState extends State<SourceListView> {
   @override
   void initState() {
     super.initState();
-    _db = DatabaseService();
-    _sourceRepo = SourceRepository(_db);
+    _db = ref.read(databaseServiceProvider);
+    _sourceRepo = ref.read(sourceRepositoryProvider);
+    _settingsService = ref.read(settingsServiceProvider);
     _importCommitService = SourceImportCommitService(
       upsertSourceRawJson: _sourceRepo.upsertSourceRawJson,
       loadAllSources: _sourceRepo.getAllSources,

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -12,7 +13,8 @@ import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/config/migration_exclusions.dart';
 import '../../../core/models/app_settings.dart';
-import '../../../core/services/settings_service.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/providers/settings_providers.dart';
 import '../../bookshelf/views/reading_history_view.dart';
 import '../../reader/views/all_bookmark_view.dart';
 import '../../reader/views/dict_rule_manage_view.dart';
@@ -29,7 +31,7 @@ import 'settings_profile_card.dart';
 import 'theme_settings_view.dart';
 
 /// 我的页菜单（按 legado `pref_main.xml` 入口顺序迁移）
-class SettingsView extends StatefulWidget {
+class SettingsView extends ConsumerStatefulWidget {
   const SettingsView({
     super.key,
     this.reselectSignal,
@@ -38,11 +40,10 @@ class SettingsView extends StatefulWidget {
   final ValueListenable<int>? reselectSignal;
 
   @override
-  State<SettingsView> createState() => _SettingsViewState();
+  ConsumerState<SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> {
-  final SettingsService _settingsService = SettingsService();
+class _SettingsViewState extends ConsumerState<SettingsView> {
   final ScrollController _sliverScrollController = ScrollController();
   bool _loadingMyHelp = false;
   int? _lastReselectVersion;
@@ -50,7 +51,6 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   void initState() {
     super.initState();
-    _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
     _bindReselectSignal(widget.reselectSignal);
   }
 
@@ -65,15 +65,8 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   void dispose() {
     _unbindReselectSignal(widget.reselectSignal);
-    _settingsService.appSettingsListenable
-        .removeListener(_onAppSettingsChanged);
     _sliverScrollController.dispose();
     super.dispose();
-  }
-
-  void _onAppSettingsChanged() {
-    if (!mounted) return;
-    setState(() {});
   }
 
   void _bindReselectSignal(ValueListenable<int>? signal) {
@@ -104,7 +97,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   String get _themeModeSummary {
-    final app = _settingsService.appSettingsListenable.value;
+    final app = ref.read(appSettingsProvider);
     switch (app.appearanceMode) {
       case AppAppearanceMode.followSystem:
         return '跟随系统';
@@ -118,7 +111,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _pickThemeMode() async {
-    final current = _settingsService.appSettingsListenable.value.appearanceMode;
+    final current = ref.read(appSettingsProvider).appearanceMode;
     final selected = await showOptionPickerSheet<AppAppearanceMode>(
       context: context,
       title: '主题模式',
@@ -144,8 +137,8 @@ class _SettingsViewState extends State<SettingsView> {
       ],
     );
     if (selected == null || selected == current) return;
-    final currentSettings = _settingsService.appSettingsListenable.value;
-    await _settingsService.saveAppSettings(
+    final currentSettings = ref.read(appSettingsProvider);
+    await ref.read(settingsServiceProvider).saveAppSettings(
       currentSettings.copyWith(appearanceMode: selected),
     );
     if (!mounted) return;
@@ -372,7 +365,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Widget _buildProfileCard(BuildContext context) {
-    final appSettings = _settingsService.appSettingsListenable.value;
+    final appSettings = ref.read(appSettingsProvider);
     return SettingsProfileCard(
       appearanceMode: appSettings.appearanceMode,
       modeLabel: _themeModeSummary,

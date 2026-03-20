@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/design_tokens.dart';
@@ -12,8 +13,8 @@ import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/source_variable_store.dart';
 import '../models/rss_source.dart';
@@ -24,7 +25,7 @@ import 'rule_subscription_view.dart';
 import 'rss_source_edit_view.dart';
 import 'rss_source_manage_view.dart';
 
-class RssSubscriptionView extends StatefulWidget {
+class RssSubscriptionView extends ConsumerStatefulWidget {
   const RssSubscriptionView({
     super.key,
     this.repository,
@@ -35,7 +36,8 @@ class RssSubscriptionView extends StatefulWidget {
   final ValueListenable<int>? reselectSignal;
 
   @override
-  State<RssSubscriptionView> createState() => _RssSubscriptionViewState();
+  ConsumerState<RssSubscriptionView> createState() =>
+      _RssSubscriptionViewState();
 }
 
 enum _RssSubscriptionSourceAction {
@@ -45,7 +47,7 @@ enum _RssSubscriptionSourceAction {
   delete,
 }
 
-class _RssSubscriptionViewState extends State<RssSubscriptionView> {
+class _RssSubscriptionViewState extends ConsumerState<RssSubscriptionView> {
   late final RssSourceRepository _repo;
   final TextEditingController _queryController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -54,7 +56,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
   @override
   void initState() {
     super.initState();
-    _repo = widget.repository ?? RssSourceRepository(DatabaseService());
+    _repo = widget.repository ?? ref.read(rssSourceRepositoryProvider);
     _bindReselectSignal(widget.reselectSignal);
   }
 

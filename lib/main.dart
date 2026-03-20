@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/bootstrap/app_bootstrap.dart';
 import 'app/bootstrap/boot_host_app.dart';
@@ -19,9 +20,11 @@ void main() {
   installGlobalErrorHandlers(exceptionLogService: exceptionLogService);
   runGuardedApp(
     () => runApp(
-      BootHostApp(
-        bootDependencies: BootDependencies.defaults(
-          exceptionLogService: exceptionLogService,
+      ProviderScope(
+        child: BootHostApp(
+          bootDependencies: BootDependencies.defaults(
+            exceptionLogService: exceptionLogService,
+          ),
         ),
       ),
     ),

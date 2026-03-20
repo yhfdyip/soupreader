@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/bootstrap/boot_log.dart';
 import '../../core/models/app_settings.dart';
 import '../../core/services/exception_log_service.dart';
 import '../../core/services/settings_service.dart';
-import '../main_screen.dart';
+import '../router/app_router.dart';
 import 'app_bootstrap.dart';
 import 'boot_app_shell.dart';
 import 'boot_copy_feedback.dart';
@@ -16,7 +18,9 @@ import 'boot_log_buffer.dart';
 import 'booting_progress_view.dart';
 
 /// 应用启动宿主，负责展示启动进度页并在成功后切入主界面。
-class BootHostApp extends StatefulWidget {
+///
+/// 启动成功后使用 [BootAppShell.router] 接入 go_router 声明式路由。
+class BootHostApp extends ConsumerStatefulWidget {
   /// 可选的启动依赖覆盖，用于测试或自定义装配。
   final BootDependencies? bootDependencies;
 
@@ -27,10 +31,11 @@ class BootHostApp extends StatefulWidget {
   });
 
   @override
-  State<BootHostApp> createState() => _BootHostAppState();
+  ConsumerState<BootHostApp> createState() => _BootHostAppState();
 }
 
-class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
+class _BootHostAppState extends ConsumerState<BootHostApp>
+    with WidgetsBindingObserver {
   static const Duration _kTickerInterval = Duration(seconds: 1);
   static const String _kBootStartStep = 'boot.start';
 
@@ -274,10 +279,8 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
         bootLog: _bootLogBuffer.payload(),
       );
     }
-    return MainScreen(
-      brightness: _shellBrightness,
-      appSettings: _currentAppSettings,
-    );
+    // 启动成功 → 由 go_router 接管，此处返回 null 标记切换。
+    return const SizedBox.shrink();
   }
 
   Widget _buildCurrentHome() {
@@ -285,8 +288,19 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
     return _buildReadyHome();
   }
 
+  bool get _useRouter => !_booting && _failure == null;
+
   @override
   Widget build(BuildContext context) {
+    if (_useRouter) {
+      final router = ref.watch(appRouterProvider);
+      return BootAppShell.router(
+        shellKey: _shellKey,
+        brightness: _shellBrightness,
+        routerConfig: router,
+      );
+    }
+
     return BootAppShell(
       shellKey: _shellKey,
       brightness: _shellBrightness,

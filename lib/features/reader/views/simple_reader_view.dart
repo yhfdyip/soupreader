@@ -87,10 +87,8 @@ import '../widgets/page_factory.dart';
 import '../widgets/reader_menus.dart';
 import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
-import '../widgets/legacy_justified_text.dart';
 import '../widgets/reader_catalog_sheet.dart';
 import '../widgets/scroll_page_step_calculator.dart';
-import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
 import '../widgets/reader_txt_toc_rule_dialog.dart';
@@ -101,6 +99,8 @@ import '../widgets/reader_style_quick_sheet.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_content_editor.dart';
 import 'reader_dict_lookup_sheet.dart';
+import '../models/reader_view_types.dart';
+import '../widgets/scroll_content_view.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 
@@ -267,28 +267,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   final PageFactory _pageFactory = PageFactory();
   final PagedReaderController _pagedReaderController = PagedReaderController();
 
-  final _replaceStageCache = <String, _ReplaceStageCache>{};
+  final _replaceStageCache = <String, ReplaceStageCache>{};
   final _catalogDisplayTitleCacheByChapterId = <String, String>{};
-  final Map<String, _ResolvedChapterSnapshot>
+  final Map<String, ResolvedChapterSnapshot>
       _resolvedChapterSnapshotByChapterId =
-      <String, _ResolvedChapterSnapshot>{};
-  final Map<String, _ChapterImageMetaSnapshot>
+      <String, ResolvedChapterSnapshot>{};
+  final Map<String, ChapterImageMetaSnapshot>
       _chapterImageMetaSnapshotByChapterId =
-      <String, _ChapterImageMetaSnapshot>{};
+      <String, ChapterImageMetaSnapshot>{};
   bool _hasDeferredChapterTransformRefresh = false;
 
 
-  static const List<_TipOption> _chineseConverterOptions = [
-    _TipOption(ChineseConverterType.off, '关闭'),
-    _TipOption(ChineseConverterType.traditionalToSimplified, '繁转简'),
-    _TipOption(ChineseConverterType.simplifiedToTraditional, '简转繁'),
+  static const List<TipOption> _chineseConverterOptions = [
+    TipOption(ChineseConverterType.off, '关闭'),
+    TipOption(ChineseConverterType.traditionalToSimplified, '繁转简'),
+    TipOption(ChineseConverterType.simplifiedToTraditional, '简转繁'),
   ];
   static const List<String> _legacyCharsetOptions =
       ReaderCharsetService.legacyCharsetOptions;
   static const String _defaultLegacyImageStyle = 'DEFAULT';
-  static const String _legacyImageStyleFull = 'FULL';
-  static const String _legacyImageStyleText = 'TEXT';
-  static const String _legacyImageStyleSingle = 'SINGLE';
+  static const String _legacyImageStyleFull = legacyImageStyleFull;
+  static const String _legacyImageStyleText = legacyImageStyleText;
+  static const String _legacyImageStyleSingle = legacyImageStyleSingle;
   static const int _legacyBookPageAnimDefault = -1;
   static const List<MapEntry<int, String>> _legacyBookPageAnimOptions =
       <MapEntry<int, String>>[
@@ -305,10 +305,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _legacyImageStyleText,
     _legacyImageStyleSingle,
   ];
-  static final RegExp _legacyImageTagRegex = RegExp(
-    r"""<img[^>]*src=['"]([^'"]*(?:['"][^>]+\})?)['"][^>]*>""",
-    caseSensitive: false,
-  );
+  static final RegExp _legacyImageTagRegex = legacyImageTagRegex;
   static final RegExp _readAloudSpeakablePattern =
       RegExp(r'[\u4E00-\u9FFFA-Za-z0-9]');
   static final RegExp _cssStyleAttrRegex = RegExp(
@@ -388,21 +385,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   int? _scrollLayoutChapterIndex;
   int _scrollLayoutFingerprint = 0;
   String _contentSearchQuery = '';
-  List<_ReaderSearchHit> _contentSearchHits = <_ReaderSearchHit>[];
+  List<ReaderSearchHit> _contentSearchHits = <ReaderSearchHit>[];
   int _currentSearchHitIndex = -1;
   bool _isSearchingContent = false;
   bool _contentSearchUseReplace = false;
-  _ReaderSearchProgressSnapshot? _searchProgressSnapshot;
+  ReaderSearchProgressSnapshot? _searchProgressSnapshot;
   int _contentSearchTaskToken = 0;
-  final List<_ScrollSegment> _scrollSegments = <_ScrollSegment>[];
+  final List<ScrollSegment> _scrollSegments = <ScrollSegment>[];
   final Map<int, GlobalKey> _scrollSegmentKeys = <int, GlobalKey>{};
   final Map<int, double> _scrollSegmentHeights = <int, double>{};
-  final List<_ScrollSegmentOffsetRange> _scrollSegmentOffsetRanges =
-      <_ScrollSegmentOffsetRange>[];
+  final List<ScrollSegmentOffsetRange> _scrollSegmentOffsetRanges =
+      <ScrollSegmentOffsetRange>[];
   final GlobalKey _scrollViewportKey =
       GlobalKey(debugLabel: 'reader_scroll_viewport');
   // Notifier：章节 tip 信息（供 Header/Footer 局部重建）
-  final _scrollTipNotifier = ValueNotifier<_ScrollTipData>(const _ScrollTipData.empty());
+  final _scrollTipNotifier = ValueNotifier<ScrollTipData>(const ScrollTipData.empty());
   // Notifier：segment 列表版本号（供 scroll content 局部重建）
   final _scrollSegmentsVersion = ValueNotifier<int>(0);
 
@@ -440,9 +437,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   final ReaderImageResolver _readerImageResolver =
       const ReaderImageResolver(isWeb: kIsWeb);
   Duration _recentChapterFetchDuration = Duration.zero;
-  final Map<String, _ReaderImageWarmupSourceTelemetry>
+  final Map<String, ReaderImageWarmupSourceTelemetry>
       _imageWarmupTelemetryBySource =
-      <String, _ReaderImageWarmupSourceTelemetry>{};
+      <String, ReaderImageWarmupSourceTelemetry>{};
 
   @override
   void initState() {
@@ -1275,7 +1272,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   ScrollTextLayoutKey _scrollLayoutKeyFor({
-    required _ScrollSegmentSeed seed,
+    required ScrollSegmentSeed seed,
     required double maxWidth,
     required TextStyle style,
   }) {
@@ -1296,7 +1293,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   ScrollTextLayout _resolveScrollTextLayout({
-    required _ScrollSegmentSeed seed,
+    required ScrollSegmentSeed seed,
     required double maxWidth,
     required TextStyle style,
   }) {
@@ -1333,7 +1330,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         24.0;
   }
 
-  Future<_ScrollSegment> _loadScrollSegment(
+  Future<ScrollSegment> _loadScrollSegment(
     int chapterIndex, {
     bool showLoading = false,
   }) async {
@@ -1364,7 +1361,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       baseTitle: stage.title,
       baseContent: stage.content,
     );
-    final seed = _ScrollSegmentSeed(
+    final seed = ScrollSegmentSeed(
       chapterId: chapter.id,
       title: resolved.title,
       content: resolved.content,
@@ -1377,7 +1374,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       style: paragraphStyle,
     );
 
-    return _ScrollSegment(
+    return ScrollSegment(
       chapterIndex: chapterIndex,
       chapterId: seed.chapterId,
       title: seed.title,
@@ -1401,7 +1398,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final safeCenterIndex = centerIndex.clamp(0, maxReadableIndex).toInt();
     final start = (safeCenterIndex - 1).clamp(0, maxReadableIndex);
     final end = (safeCenterIndex + 1).clamp(0, maxReadableIndex);
-    final segments = <_ScrollSegment>[];
+    final segments = <ScrollSegment>[];
     for (var i = start; i <= end; i++) {
       segments.add(
         await _loadScrollSegment(
@@ -1542,7 +1539,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           : fallbackHeight;
       final end = cursor + height;
       _scrollSegmentOffsetRanges.add(
-        _ScrollSegmentOffsetRange(
+        ScrollSegmentOffsetRange(
           segment: segment,
           start: cursor,
           end: end,
@@ -1651,7 +1648,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               )
               .toDouble();
 
-      _ScrollSegmentOffsetRange? chosenRange;
+      ScrollSegmentOffsetRange? chosenRange;
       double chosenProgress = _currentScrollChapterProgress;
       double bestDistance = double.infinity;
 
@@ -1713,7 +1710,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   void _updateScrollTipNotifier() {
     final totalPages = _resolveScrollTipTotalPages();
     final currentPage = _resolveScrollTipCurrentPage(totalPages);
-    final newTip = _ScrollTipData(
+    final newTip = ScrollTipData(
       title: _currentTitle,
       bookTitle: widget.bookTitle,
       bookProgress: _getBookProgress(),
@@ -2050,12 +2047,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return _isCurrentBookLocal();
   }
 
-  _ResolvedChapterSnapshot _resolveDeferredChapterSnapshot(int chapterIndex) {
+  ResolvedChapterSnapshot _resolveDeferredChapterSnapshot(int chapterIndex) {
     final chapter = _chapters[chapterIndex];
     final stage = _replaceStageCache[chapter.id];
     final baseTitle = stage?.title ?? chapter.title;
     final baseContent = stage?.content ?? (chapter.content ?? '');
-    return _ResolvedChapterSnapshot(
+    return ResolvedChapterSnapshot(
       chapterId: chapter.id,
       postProcessSignature: _chapterPostProcessSignature(chapter.id),
       baseTitleHash: baseTitle.hashCode,
@@ -2081,7 +2078,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     ]);
   }
 
-  _ResolvedChapterSnapshot _resolveChapterSnapshotFromBase({
+  ResolvedChapterSnapshot _resolveChapterSnapshotFromBase({
     required Chapter chapter,
     required String baseTitle,
     required String baseContent,
@@ -2098,7 +2095,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       return cached;
     }
 
-    final snapshot = _ResolvedChapterSnapshot(
+    final snapshot = ResolvedChapterSnapshot(
       chapterId: chapter.id,
       postProcessSignature: signature,
       baseTitleHash: baseTitleHash,
@@ -2138,7 +2135,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  _ResolvedChapterSnapshot _resolveChapterSnapshot(
+  ResolvedChapterSnapshot _resolveChapterSnapshot(
     int chapterIndex, {
     bool allowStale = false,
   }) {
@@ -2172,8 +2169,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         cached.baseContentHash == baseContent.hashCode;
   }
 
-  _ChapterImageMetaSnapshot _resolveChapterImageMetaSnapshot(
-    _ResolvedChapterSnapshot snapshot,
+  ChapterImageMetaSnapshot _resolveChapterImageMetaSnapshot(
+    ResolvedChapterSnapshot snapshot,
   ) {
     final contentHash = snapshot.content.hashCode;
     final cached = _chapterImageMetaSnapshotByChapterId[snapshot.chapterId];
@@ -2183,7 +2180,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       return cached;
     }
 
-    final next = _ChapterImageMetaSnapshot(
+    final next = ChapterImageMetaSnapshot(
       chapterId: snapshot.chapterId,
       postProcessSignature: snapshot.postProcessSignature,
       contentHash: contentHash,
@@ -2205,7 +2202,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   void _cacheCurrentChapterImageMetasFromSnapshot(
-    _ResolvedChapterSnapshot snapshot,
+    ResolvedChapterSnapshot snapshot,
   ) {
     _chapterImageMetaByCacheKey.clear();
     final metas = _resolveChapterImageMetaSnapshot(snapshot).metas;
@@ -3700,7 +3697,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return safeTitle;
   }
 
-  Future<_ReplaceStageCache> _computeReplaceStage({
+  Future<ReplaceStageCache> _computeReplaceStage({
     required String chapterId,
     required String rawTitle,
     required String rawContent,
@@ -3730,7 +3727,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             appliedRules: const <ReplaceRule>[],
           );
 
-    final stage = _ReplaceStageCache(
+    final stage = ReplaceStageCache(
       rawTitle: rawTitle,
       rawContent: rawContent,
       title: title,
@@ -3874,7 +3871,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return '__global__';
   }
 
-  _ReaderImageWarmupSourceTelemetry _telemetryForSource(BookSource? source) {
+  ReaderImageWarmupSourceTelemetry _telemetryForSource(BookSource? source) {
     final key = _resolveWarmupTelemetrySourceKey(source);
     final cached = _imageWarmupTelemetryBySource[key];
     if (cached != null) {
@@ -3893,12 +3890,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         _imageWarmupTelemetryBySource.remove(staleKey);
       }
     }
-    final created = _ReaderImageWarmupSourceTelemetry();
+    final created = ReaderImageWarmupSourceTelemetry();
     _imageWarmupTelemetryBySource[key] = created;
     return created;
   }
 
-  _ReaderImageWarmupSourceTelemetry? _telemetrySnapshotForSource(
+  ReaderImageWarmupSourceTelemetry? _telemetrySnapshotForSource(
     BookSource? source,
   ) {
     final key = _resolveWarmupTelemetrySourceKey(source);
@@ -3910,53 +3907,53 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   void _recordWarmupProbeFailureForSource(
-    _ReaderImageWarmupFailureKind kind,
+    ReaderImageWarmupFailureKind kind,
     BookSource? source,
   ) {
     _telemetryForSource(source).recordFailure(kind);
   }
 
-  _ReaderImageWarmupFailureKind _mergeWarmupFailureKind(
-    _ReaderImageWarmupFailureKind? current,
-    _ReaderImageWarmupFailureKind candidate,
+  ReaderImageWarmupFailureKind _mergeWarmupFailureKind(
+    ReaderImageWarmupFailureKind? current,
+    ReaderImageWarmupFailureKind candidate,
   ) {
     if (current == null) {
       return candidate;
     }
-    if (current == _ReaderImageWarmupFailureKind.timeout ||
-        candidate == _ReaderImageWarmupFailureKind.timeout) {
-      return _ReaderImageWarmupFailureKind.timeout;
+    if (current == ReaderImageWarmupFailureKind.timeout ||
+        candidate == ReaderImageWarmupFailureKind.timeout) {
+      return ReaderImageWarmupFailureKind.timeout;
     }
-    if (current == _ReaderImageWarmupFailureKind.auth ||
-        candidate == _ReaderImageWarmupFailureKind.auth) {
-      return _ReaderImageWarmupFailureKind.auth;
+    if (current == ReaderImageWarmupFailureKind.auth ||
+        candidate == ReaderImageWarmupFailureKind.auth) {
+      return ReaderImageWarmupFailureKind.auth;
     }
-    if (current == _ReaderImageWarmupFailureKind.decode ||
-        candidate == _ReaderImageWarmupFailureKind.decode) {
-      return _ReaderImageWarmupFailureKind.decode;
+    if (current == ReaderImageWarmupFailureKind.decode ||
+        candidate == ReaderImageWarmupFailureKind.decode) {
+      return ReaderImageWarmupFailureKind.decode;
     }
-    return _ReaderImageWarmupFailureKind.other;
+    return ReaderImageWarmupFailureKind.other;
   }
 
-  _ReaderImageWarmupFailureKind _classifyWarmupProbeError(Object error) {
+  ReaderImageWarmupFailureKind _classifyWarmupProbeError(Object error) {
     if (error is TimeoutException) {
-      return _ReaderImageWarmupFailureKind.timeout;
+      return ReaderImageWarmupFailureKind.timeout;
     }
     final statusCode = _extractStatusCodeFromProbeError(error);
     if (statusCode == 401 || statusCode == 403) {
-      return _ReaderImageWarmupFailureKind.auth;
+      return ReaderImageWarmupFailureKind.auth;
     }
     final message = '$error'.toLowerCase();
     if (_looksLikeTimeoutMessage(message)) {
-      return _ReaderImageWarmupFailureKind.timeout;
+      return ReaderImageWarmupFailureKind.timeout;
     }
     if (_looksLikeAuthFailureMessage(message)) {
-      return _ReaderImageWarmupFailureKind.auth;
+      return ReaderImageWarmupFailureKind.auth;
     }
     if (_looksLikeDecodeFailureMessage(message)) {
-      return _ReaderImageWarmupFailureKind.decode;
+      return ReaderImageWarmupFailureKind.decode;
     }
-    return _ReaderImageWarmupFailureKind.other;
+    return ReaderImageWarmupFailureKind.other;
   }
 
   int? _extractStatusCodeFromProbeError(Object error) {
@@ -4064,7 +4061,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           max: budget.perProbeTimeout,
         );
         Size? resolved;
-        _ReaderImageWarmupFailureKind? failureKind;
+        ReaderImageWarmupFailureKind? failureKind;
         var attempted = false;
         if (imageProvider != null) {
           final providerProbe = await _resolveImageIntrinsicSize(
@@ -4098,7 +4095,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         if (resolved == null) {
           if (attempted) {
             _recordWarmupProbeFailureForSource(
-              failureKind ?? _ReaderImageWarmupFailureKind.other,
+              failureKind ?? ReaderImageWarmupFailureKind.other,
               source,
             );
           }
@@ -4127,7 +4124,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return changed;
   }
 
-  _ReaderImageWarmupBudget _resolveImageWarmupBudget({
+  ReaderImageWarmupBudget _resolveImageWarmupBudget({
     required int baseProbeCount,
     required Duration baseDuration,
   }) {
@@ -4207,7 +4204,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final perProbeTimeout = Duration(
       milliseconds: perProbeTimeoutMs.clamp(180, 620),
     );
-    return _ReaderImageWarmupBudget(
+    return ReaderImageWarmupBudget(
       probeCount: probeCount,
       maxDuration: maxDuration,
       perProbeTimeout: perProbeTimeout,
@@ -4223,34 +4220,34 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return max;
   }
 
-  Future<_ReaderImageSizeProbeResult>
+  Future<ReaderImageSizeProbeResult>
       _resolveImageIntrinsicSizeFromSourceAwareFetch(
     ReaderImageRequest request, {
     Duration timeout = const Duration(milliseconds: 220),
   }) async {
     if (timeout <= Duration.zero) {
-      return const _ReaderImageSizeProbeResult.skipped();
+      return const ReaderImageSizeProbeResult.skipped();
     }
     final source = _resolveCurrentSource();
     if (source == null) {
-      return const _ReaderImageSizeProbeResult.skipped();
+      return const ReaderImageSizeProbeResult.skipped();
     }
     final normalizedUrl = request.url.trim();
     if (normalizedUrl.isEmpty) {
-      return const _ReaderImageSizeProbeResult.skipped();
+      return const ReaderImageSizeProbeResult.skipped();
     }
     if (normalizedUrl.toLowerCase().startsWith('data:image')) {
-      return const _ReaderImageSizeProbeResult.skipped();
+      return const ReaderImageSizeProbeResult.skipped();
     }
     final uri = Uri.tryParse(normalizedUrl);
     if (uri != null && uri.hasScheme && !_isHttpLikeUri(uri)) {
-      return const _ReaderImageSizeProbeResult.skipped();
+      return const ReaderImageSizeProbeResult.skipped();
     }
 
     final rawImageUrl = request.raw.isEmpty ? request.url : request.raw;
     final attemptTimeouts = _buildSourceAwareProbeTimeouts(timeout);
     var attempted = false;
-    _ReaderImageWarmupFailureKind? failureKind;
+    ReaderImageWarmupFailureKind? failureKind;
     for (var i = 0; i < attemptTimeouts.length; i++) {
       final probeTimeout = attemptTimeouts[i];
       if (probeTimeout <= Duration.zero) {
@@ -4281,18 +4278,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       }
       final size = await _decodeImageSizeFromBytes(bytes);
       if (size != null) {
-        return _ReaderImageSizeProbeResult.success(size);
+        return ReaderImageSizeProbeResult.success(size);
       }
       failureKind = _mergeWarmupFailureKind(
         failureKind,
-        _ReaderImageWarmupFailureKind.decode,
+        ReaderImageWarmupFailureKind.decode,
       );
     }
     if (!attempted) {
-      return const _ReaderImageSizeProbeResult.skipped();
+      return const ReaderImageSizeProbeResult.skipped();
     }
-    return _ReaderImageSizeProbeResult.failure(
-      failureKind ?? _ReaderImageWarmupFailureKind.other,
+    return ReaderImageSizeProbeResult.failure(
+      failureKind ?? ReaderImageWarmupFailureKind.other,
     );
   }
 
@@ -4333,7 +4330,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return attempts;
   }
 
-  Future<_ReaderImageBytesProbeResult> _loadImageBytesFromSourceAwareLoader({
+  Future<ReaderImageBytesProbeResult> _loadImageBytesFromSourceAwareLoader({
     required BookSource source,
     required String imageUrl,
     required Duration timeout,
@@ -4346,23 +4343,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           )
           .timeout(timeout);
       if (bytes == null || bytes.isEmpty) {
-        return const _ReaderImageBytesProbeResult.failure(
-          _ReaderImageWarmupFailureKind.other,
+        return const ReaderImageBytesProbeResult.failure(
+          ReaderImageWarmupFailureKind.other,
         );
       }
-      return _ReaderImageBytesProbeResult.success(bytes);
+      return ReaderImageBytesProbeResult.success(bytes);
     } on TimeoutException {
-      return const _ReaderImageBytesProbeResult.failure(
-        _ReaderImageWarmupFailureKind.timeout,
+      return const ReaderImageBytesProbeResult.failure(
+        ReaderImageWarmupFailureKind.timeout,
       );
     } catch (error) {
-      return _ReaderImageBytesProbeResult.failure(
+      return ReaderImageBytesProbeResult.failure(
         _classifyWarmupProbeError(error),
       );
     }
   }
 
-  Future<_ReaderImageBytesProbeResult> _loadImageBytesFromRuleEngine({
+  Future<ReaderImageBytesProbeResult> _loadImageBytesFromRuleEngine({
     required BookSource source,
     required String imageUrl,
     required Duration timeout,
@@ -4375,17 +4372,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           )
           .timeout(timeout);
       if (bytes == null || bytes.isEmpty) {
-        return const _ReaderImageBytesProbeResult.failure(
-          _ReaderImageWarmupFailureKind.other,
+        return const ReaderImageBytesProbeResult.failure(
+          ReaderImageWarmupFailureKind.other,
         );
       }
-      return _ReaderImageBytesProbeResult.success(bytes);
+      return ReaderImageBytesProbeResult.success(bytes);
     } on TimeoutException {
-      return const _ReaderImageBytesProbeResult.failure(
-        _ReaderImageWarmupFailureKind.timeout,
+      return const ReaderImageBytesProbeResult.failure(
+        ReaderImageWarmupFailureKind.timeout,
       );
     } catch (error) {
-      return _ReaderImageBytesProbeResult.failure(
+      return ReaderImageBytesProbeResult.failure(
         _classifyWarmupProbeError(error),
       );
     }
@@ -4413,19 +4410,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  Future<_ReaderImageSizeProbeResult> _resolveImageIntrinsicSize(
+  Future<ReaderImageSizeProbeResult> _resolveImageIntrinsicSize(
     ImageProvider<Object> imageProvider, {
     Duration timeout = const Duration(milliseconds: 220),
   }) async {
     if (timeout <= Duration.zero) {
-      return const _ReaderImageSizeProbeResult.skipped();
+      return const ReaderImageSizeProbeResult.skipped();
     }
-    final completer = Completer<_ReaderImageSizeProbeResult>();
+    final completer = Completer<ReaderImageSizeProbeResult>();
     final stream = imageProvider.resolve(const ImageConfiguration());
     ImageStreamListener? listener;
     Timer? timer;
 
-    void finish(_ReaderImageSizeProbeResult value) {
+    void finish(ReaderImageSizeProbeResult value) {
       if (completer.isCompleted) return;
       if (listener != null) {
         stream.removeListener(listener);
@@ -4440,17 +4437,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         final height = info.image.height.toDouble();
         if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
           finish(
-            const _ReaderImageSizeProbeResult.failure(
-              _ReaderImageWarmupFailureKind.decode,
+            const ReaderImageSizeProbeResult.failure(
+              ReaderImageWarmupFailureKind.decode,
             ),
           );
           return;
         }
-        finish(_ReaderImageSizeProbeResult.success(Size(width, height)));
+        finish(ReaderImageSizeProbeResult.success(Size(width, height)));
       },
       onError: (Object error, StackTrace? stackTrace) {
         finish(
-          _ReaderImageSizeProbeResult.failure(
+          ReaderImageSizeProbeResult.failure(
             _classifyWarmupProbeError(error),
           ),
         );
@@ -4461,8 +4458,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     timer = Timer(
       timeout,
       () => finish(
-        const _ReaderImageSizeProbeResult.failure(
-          _ReaderImageWarmupFailureKind.timeout,
+        const ReaderImageSizeProbeResult.failure(
+          ReaderImageWarmupFailureKind.timeout,
         ),
       ),
     );
@@ -4682,12 +4679,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return input.substring(start, end);
   }
 
-  _DuplicateTitleRemovalResult _removeDuplicateTitle(
+  DuplicateTitleRemovalResult _removeDuplicateTitle(
     String content,
     String title,
   ) {
     if (content.isEmpty) {
-      return _DuplicateTitleRemovalResult(content: content, removed: false);
+      return DuplicateTitleRemovalResult(content: content, removed: false);
     }
     final lines = content.replaceAll('\r\n', '\n').split('\n');
     final trimmedTitle = title.trim();
@@ -4696,13 +4693,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       final firstLine = lines[index].trim();
       if (firstLine == trimmedTitle || firstLine.contains(trimmedTitle)) {
         lines.removeAt(index);
-        return _DuplicateTitleRemovalResult(
+        return DuplicateTitleRemovalResult(
           content: lines.join('\n'),
           removed: true,
         );
       }
     }
-    return _DuplicateTitleRemovalResult(
+    return DuplicateTitleRemovalResult(
         content: lines.join('\n'), removed: false);
   }
 
@@ -4875,7 +4872,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         !_showAutoReadPanel &&
                         isScrollMode &&
                         _settings.shouldShowFooter())
-                      ValueListenableBuilder<_ScrollTipData>(
+                      ValueListenableBuilder<ScrollTipData>(
                         valueListenable: _scrollTipNotifier,
                         builder: (context, tip, _) => ReaderStatusBar(
                           settings: _settings,
@@ -4898,7 +4895,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         _settings.shouldShowHeader(
                           showStatusBar: _settings.showStatusBar,
                         ))
-                      ValueListenableBuilder<_ScrollTipData>(
+                      ValueListenableBuilder<ScrollTipData>(
                         valueListenable: _scrollTipNotifier,
                         builder: (context, tip, _) => ReaderHeaderBar(
                           settings: _settings,
@@ -5410,7 +5407,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     var expanded = _settings.expandTextMenu;
     while (mounted) {
       final selectedAction =
-          await showCupertinoBottomSheetDialog<_ReaderTextActionMenuAction>(
+          await showCupertinoBottomSheetDialog<ReaderTextActionMenuAction>(
         context: context,
         barrierDismissible: true,
         builder: (sheetContext) => CupertinoActionSheet(
@@ -5434,12 +5431,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         debugPrint('[reader][text-action] menu dismissed');
         return;
       }
-      if (selectedAction == _ReaderTextActionMenuAction.more) {
+      if (selectedAction == ReaderTextActionMenuAction.more) {
         debugPrint('[reader][text-action] expand more');
         expanded = true;
         continue;
       }
-      if (selectedAction == _ReaderTextActionMenuAction.collapse) {
+      if (selectedAction == ReaderTextActionMenuAction.collapse) {
         debugPrint('[reader][text-action] collapse to primary');
         expanded = false;
         continue;
@@ -5476,28 +5473,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final primaryActions = <CupertinoActionSheetAction>[
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.replace,
+        action: ReaderTextActionMenuAction.replace,
         label: '替换',
       ),
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.copy,
+        action: ReaderTextActionMenuAction.copy,
         label: '复制',
       ),
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.bookmark,
+        action: ReaderTextActionMenuAction.bookmark,
         label: '书签',
       ),
       if (!MigrationExclusions.excludeTts)
         _buildTextActionMenuAction(
           sheetContext: sheetContext,
-          action: _ReaderTextActionMenuAction.readAloud,
+          action: ReaderTextActionMenuAction.readAloud,
           label: '朗读',
         ),
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.dict,
+        action: ReaderTextActionMenuAction.dict,
         label: '字典',
       ),
     ];
@@ -5507,7 +5504,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         ...primaryActions,
         _buildTextActionMenuAction(
           sheetContext: sheetContext,
-          action: _ReaderTextActionMenuAction.more,
+          action: ReaderTextActionMenuAction.more,
           label: '更多',
         ),
       ];
@@ -5516,23 +5513,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final expandedActions = <CupertinoActionSheetAction>[
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.searchContent,
+        action: ReaderTextActionMenuAction.searchContent,
         label: '搜索正文',
       ),
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.browser,
+        action: ReaderTextActionMenuAction.browser,
         label: '浏览器',
       ),
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.share,
+        action: ReaderTextActionMenuAction.share,
         label: '分享',
       ),
       if (_settingsService.appSettings.processText)
         _buildTextActionMenuAction(
           sheetContext: sheetContext,
-          action: _ReaderTextActionMenuAction.processText,
+          action: ReaderTextActionMenuAction.processText,
           label: '系统处理文本',
         ),
     ];
@@ -5546,7 +5543,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       ...expandedActions,
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
-        action: _ReaderTextActionMenuAction.collapse,
+        action: ReaderTextActionMenuAction.collapse,
         label: '收起',
       ),
     ];
@@ -5554,7 +5551,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   CupertinoActionSheetAction _buildTextActionMenuAction({
     required BuildContext sheetContext,
-    required _ReaderTextActionMenuAction action,
+    required ReaderTextActionMenuAction action,
     required String label,
   }) {
     return CupertinoActionSheetAction(
@@ -5570,60 +5567,60 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Future<void> _handleTextActionMenuAction(
-    _ReaderTextActionMenuAction action, {
+    ReaderTextActionMenuAction action, {
     required String selectedText,
     required String rawSelectedText,
   }) async {
     debugPrint(
         '[reader][text-action] selected=${_textActionMenuActionName(action)}');
     switch (action) {
-      case _ReaderTextActionMenuAction.replace:
+      case ReaderTextActionMenuAction.replace:
         await _openReplaceRuleEditorFromSelectedText(selectedText);
         return;
-      case _ReaderTextActionMenuAction.copy:
+      case ReaderTextActionMenuAction.copy:
         await _copySelectedTextFromMenu(rawSelectedText);
         return;
-      case _ReaderTextActionMenuAction.bookmark:
+      case ReaderTextActionMenuAction.bookmark:
         await _openBookmarkEditorFromSelectedText(selectedText);
         return;
-      case _ReaderTextActionMenuAction.readAloud:
+      case ReaderTextActionMenuAction.readAloud:
         await _handleSelectedTextReadAloud(selectedText);
         return;
-      case _ReaderTextActionMenuAction.dict:
+      case ReaderTextActionMenuAction.dict:
         await _openDictDialogFromSelectedText(selectedText);
         return;
-      case _ReaderTextActionMenuAction.searchContent:
+      case ReaderTextActionMenuAction.searchContent:
         await _searchSelectedTextInContent(selectedText);
         return;
-      case _ReaderTextActionMenuAction.browser:
+      case ReaderTextActionMenuAction.browser:
         await _openBrowserFromSelectedText(selectedText);
         return;
-      case _ReaderTextActionMenuAction.share:
+      case ReaderTextActionMenuAction.share:
         await _shareSelectedText(selectedText);
         return;
-      case _ReaderTextActionMenuAction.processText:
+      case ReaderTextActionMenuAction.processText:
         await _processSelectedTextWithSystem(selectedText);
         return;
-      case _ReaderTextActionMenuAction.more:
-      case _ReaderTextActionMenuAction.collapse:
+      case ReaderTextActionMenuAction.more:
+      case ReaderTextActionMenuAction.collapse:
         return;
     }
   }
 
   /// 统一文本操作枚举名称，便于日志与异常记录定位。
-  String _textActionMenuActionName(_ReaderTextActionMenuAction action) {
+  String _textActionMenuActionName(ReaderTextActionMenuAction action) {
     return switch (action) {
-      _ReaderTextActionMenuAction.replace => 'replace',
-      _ReaderTextActionMenuAction.copy => 'copy',
-      _ReaderTextActionMenuAction.bookmark => 'bookmark',
-      _ReaderTextActionMenuAction.readAloud => 'readAloud',
-      _ReaderTextActionMenuAction.dict => 'dict',
-      _ReaderTextActionMenuAction.searchContent => 'searchContent',
-      _ReaderTextActionMenuAction.browser => 'browser',
-      _ReaderTextActionMenuAction.share => 'share',
-      _ReaderTextActionMenuAction.processText => 'processText',
-      _ReaderTextActionMenuAction.more => 'more',
-      _ReaderTextActionMenuAction.collapse => 'collapse',
+      ReaderTextActionMenuAction.replace => 'replace',
+      ReaderTextActionMenuAction.copy => 'copy',
+      ReaderTextActionMenuAction.bookmark => 'bookmark',
+      ReaderTextActionMenuAction.readAloud => 'readAloud',
+      ReaderTextActionMenuAction.dict => 'dict',
+      ReaderTextActionMenuAction.searchContent => 'searchContent',
+      ReaderTextActionMenuAction.browser => 'browser',
+      ReaderTextActionMenuAction.share => 'share',
+      ReaderTextActionMenuAction.processText => 'processText',
+      ReaderTextActionMenuAction.more => 'more',
+      ReaderTextActionMenuAction.collapse => 'collapse',
     };
   }
 
@@ -6064,8 +6061,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final scrollInsets =
         _resolveScrollContentInsetsFromPadding(mediaPadding, mediaViewPadding);
 
-    return _ScrollContentView(
-      config: _ScrollContentConfig(
+    return ScrollContentView(
+      config: ScrollContentConfig(
         fontSize: _settings.fontSize,
         lineHeight: _settings.lineHeight,
         letterSpacing: _settings.letterSpacing,
@@ -6357,7 +6354,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     Navigator.of(context).push(
       CupertinoPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => _ImagePreviewPage(imageProvider: imageProvider),
+        builder: (_) => ImagePreviewPage(imageProvider: imageProvider),
       ),
     ).then((_) {
       if (_autoPager.isPaused) _autoPager.resume();
@@ -6388,7 +6385,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final hasLogin =
         source != null && ReaderSourceActionHelper.hasLoginUrl(source.loginUrl);
     final selected =
-        await showCupertinoBottomSheetDialog<_ReaderAudioPlayMenuAction>(
+        await showCupertinoBottomSheetDialog<ReaderAudioPlayMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -6397,7 +6394,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
-              _ReaderAudioPlayMenuAction.changeSource,
+              ReaderAudioPlayMenuAction.changeSource,
             ),
             child: const Text('换源'),
           ),
@@ -6405,28 +6402,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             CupertinoActionSheetAction(
               onPressed: () => Navigator.pop(
                 sheetContext,
-                _ReaderAudioPlayMenuAction.login,
+                ReaderAudioPlayMenuAction.login,
               ),
               child: const Text('登录'),
             ),
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
-              _ReaderAudioPlayMenuAction.copyAudioUrl,
+              ReaderAudioPlayMenuAction.copyAudioUrl,
             ),
             child: const Text('拷贝播放 URL'),
           ),
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
-              _ReaderAudioPlayMenuAction.editSource,
+              ReaderAudioPlayMenuAction.editSource,
             ),
             child: const Text('编辑书源'),
           ),
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
-              _ReaderAudioPlayMenuAction.wakeLock,
+              ReaderAudioPlayMenuAction.wakeLock,
             ),
             child: Text(
               _audioPlayUseWakeLock ? '✓ 音频服务唤醒锁' : '音频服务唤醒锁',
@@ -6435,7 +6432,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
-              _ReaderAudioPlayMenuAction.log,
+              ReaderAudioPlayMenuAction.log,
             ),
             child: const Text('日志'),
           ),
@@ -6448,23 +6445,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
     if (selected == null) return;
     switch (selected) {
-      case _ReaderAudioPlayMenuAction.login:
+      case ReaderAudioPlayMenuAction.login:
         if (source != null) {
           await _openSourceLoginFromReader(source.bookSourceUrl);
         }
         return;
-      case _ReaderAudioPlayMenuAction.changeSource:
+      case ReaderAudioPlayMenuAction.changeSource:
         await _showSwitchSourceBookMenu();
         return;
-      case _ReaderAudioPlayMenuAction.copyAudioUrl:
+      case ReaderAudioPlayMenuAction.copyAudioUrl:
         await _copyAudioPlayUrlFromMenu();
         return;
-      case _ReaderAudioPlayMenuAction.editSource:
+      case ReaderAudioPlayMenuAction.editSource:
         if (source != null) {
           await _openSourceEditorFromReader(source.bookSourceUrl);
         }
         return;
-      case _ReaderAudioPlayMenuAction.wakeLock:
+      case ReaderAudioPlayMenuAction.wakeLock:
         final next = !_audioPlayUseWakeLock;
         if (mounted) {
           setState(() {
@@ -6475,7 +6472,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         }
         await _settingsService.saveAudioPlayUseWakeLock(next);
         return;
-      case _ReaderAudioPlayMenuAction.log:
+      case ReaderAudioPlayMenuAction.log:
         await _openAppLogsFromAudioPlayMenu();
         return;
     }
@@ -6747,11 +6744,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return _chapters[_currentChapterIndex];
   }
 
-  Future<List<_EffectiveReplaceMenuEntry>>
+  Future<List<EffectiveReplaceMenuEntry>>
       _buildEffectiveReplaceEntriesForCurrentChapter() async {
     final chapter = _resolveCurrentChapterForEffectiveReplaces();
     if (chapter == null) {
-      return const <_EffectiveReplaceMenuEntry>[];
+      return const <EffectiveReplaceMenuEntry>[];
     }
     final stage = await _computeReplaceStage(
       chapterId: chapter.id,
@@ -6761,7 +6758,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
     final entries = stage.effectiveContentReplaceRules.map((rule) {
       final label = rule.name.trim().isEmpty ? '(未命名)' : rule.name.trim();
-      return _EffectiveReplaceMenuEntry.rule(
+      return EffectiveReplaceMenuEntry.rule(
         label: label,
         rule: rule,
       );
@@ -6769,16 +6766,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
     if (_settings.chineseConverterType != ChineseConverterType.off) {
       entries.add(
-        const _EffectiveReplaceMenuEntry.chineseConverter(label: '繁简转换'),
+        const EffectiveReplaceMenuEntry.chineseConverter(label: '繁简转换'),
       );
     }
     return entries;
   }
 
-  Future<_EffectiveReplaceMenuEntry?> _showEffectiveReplacesDialog(
-    List<_EffectiveReplaceMenuEntry> entries,
+  Future<EffectiveReplaceMenuEntry?> _showEffectiveReplacesDialog(
+    List<EffectiveReplaceMenuEntry> entries,
   ) async {
-    return showCupertinoBottomSheetDialog<_EffectiveReplaceMenuEntry>(
+    return showCupertinoBottomSheetDialog<EffectiveReplaceMenuEntry>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) {
@@ -7273,7 +7270,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     setState(() {
       _contentSearchQuery = normalized;
       _isSearchingContent = true;
-      _contentSearchHits = const <_ReaderSearchHit>[];
+      _contentSearchHits = const <ReaderSearchHit>[];
       _currentSearchHitIndex = -1;
     });
     _setSearchMenuVisible(true);
@@ -7281,7 +7278,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     debugPrint(
       '[reader][content-search] start token=$taskToken queryLength=${normalized.length}',
     );
-    late final List<_ReaderSearchHit> hits;
+    late final List<ReaderSearchHit> hits;
     try {
       hits = await _collectBookContentSearchHits(
         normalized,
@@ -7305,7 +7302,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       );
       setState(() {
         _isSearchingContent = false;
-        _contentSearchHits = const <_ReaderSearchHit>[];
+        _contentSearchHits = const <ReaderSearchHit>[];
         _currentSearchHitIndex = -1;
       });
       _showToast('全文搜索失败');
@@ -7329,20 +7326,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  Future<List<_ReaderSearchHit>> _collectBookContentSearchHits(
+  Future<List<ReaderSearchHit>> _collectBookContentSearchHits(
     String query, {
     required int taskToken,
   }) async {
     final normalizedQuery = query.trim();
-    if (normalizedQuery.isEmpty) return const <_ReaderSearchHit>[];
+    if (normalizedQuery.isEmpty) return const <ReaderSearchHit>[];
     final searchableChapters = _effectiveReadableChapters();
-    if (searchableChapters.isEmpty) return const <_ReaderSearchHit>[];
-    final hits = <_ReaderSearchHit>[];
+    if (searchableChapters.isEmpty) return const <ReaderSearchHit>[];
+    final hits = <ReaderSearchHit>[];
     for (var chapterIndex = 0;
         chapterIndex < searchableChapters.length;
         chapterIndex++) {
       if (taskToken != _contentSearchTaskToken) {
-        return const <_ReaderSearchHit>[];
+        return const <ReaderSearchHit>[];
       }
 
       final chapter = searchableChapters[chapterIndex];
@@ -7359,7 +7356,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         taskToken: taskToken,
       );
       if (taskToken != _contentSearchTaskToken) {
-        return const <_ReaderSearchHit>[];
+        return const <ReaderSearchHit>[];
       }
       if (searchableContent.isEmpty) {
         continue;
@@ -7402,13 +7399,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return _convertByChineseConverterType(processed);
   }
 
-  List<_ReaderSearchHit> _collectChapterSearchHits({
+  List<ReaderSearchHit> _collectChapterSearchHits({
     required int chapterIndex,
     required String chapterTitle,
     required String content,
     required String query,
   }) {
-    final hits = <_ReaderSearchHit>[];
+    final hits = <ReaderSearchHit>[];
     var from = 0;
     var occurrenceIndex = 0;
     while (from < content.length) {
@@ -7436,7 +7433,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             )
           : null;
       hits.add(
-        _ReaderSearchHit(
+        ReaderSearchHit(
           chapterIndex: chapterIndex,
           chapterTitle: chapterTitle,
           chapterContentLength: content.length,
@@ -7489,7 +7486,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  Future<void> _jumpToSearchHit(_ReaderSearchHit hit) async {
+  Future<void> _jumpToSearchHit(ReaderSearchHit hit) async {
     final chapterChanged = hit.chapterIndex != _currentChapterIndex;
     if (hit.chapterIndex != _currentChapterIndex) {
       await _loadChapter(hit.chapterIndex);
@@ -7523,7 +7520,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  Future<void> _jumpToSearchHitInScroll(_ReaderSearchHit hit) async {
+  Future<void> _jumpToSearchHitInScroll(ReaderSearchHit hit) async {
     if (!_scrollController.hasClients) return;
     final target = _resolveScrollSearchTargetOffset(hit);
     if (target == null) return;
@@ -7547,7 +7544,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  double? _resolveScrollSearchTargetOffset(_ReaderSearchHit hit) {
+  double? _resolveScrollSearchTargetOffset(ReaderSearchHit hit) {
     if (!_scrollController.hasClients) return null;
     if (_scrollSegments.isEmpty) return null;
 
@@ -7573,7 +7570,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return offsetWithAnchor.clamp(minOffset, maxOffset).toDouble();
   }
 
-  _ScrollSegmentOffsetRange? _findCurrentChapterScrollOffsetRange() {
+  ScrollSegmentOffsetRange? _findCurrentChapterScrollOffsetRange() {
     for (final range in _scrollSegmentOffsetRanges) {
       if (range.segment.chapterIndex == _currentChapterIndex) {
         return range;
@@ -7583,12 +7580,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   double _resolveScrollHitLocalAnchor({
-    required _ScrollSegment segment,
-    required _ReaderSearchHit hit,
+    required ScrollSegment segment,
+    required ReaderSearchHit hit,
   }) {
     final paragraphStyle = _scrollParagraphStyle();
     final layout = _resolveScrollTextLayout(
-      seed: _ScrollSegmentSeed(
+      seed: ScrollSegmentSeed(
         chapterId: segment.chapterId,
         title: segment.title,
         content: segment.content,
@@ -7624,11 +7621,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return contentTop + layout.bodyHeight * ratio;
   }
 
-  double _scrollSegmentContentTopInset(_ScrollSegment segment) {
+  double _scrollSegmentContentTopInset(ScrollSegment segment) {
     return _settings.paddingTop + _scrollSegmentTitleBlockHeight(segment);
   }
 
-  double _scrollSegmentTitleBlockHeight(_ScrollSegment segment) {
+  double _scrollSegmentTitleBlockHeight(ScrollSegment segment) {
     if (_settings.titleMode == 2 || segment.title.trim().isEmpty) {
       return 0.0;
     }
@@ -7679,7 +7676,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (_searchProgressSnapshot != null) return;
     final readableCount = _effectiveReadableChapterCount();
     if (readableCount <= 0) return;
-    _searchProgressSnapshot = _ReaderSearchProgressSnapshot(
+    _searchProgressSnapshot = ReaderSearchProgressSnapshot(
       chapterIndex: _clampChapterIndexToReadableRange(_currentChapterIndex),
       chapterProgress: _getChapterProgress().clamp(0.0, 1.0).toDouble(),
     );
@@ -7776,7 +7773,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     setState(() {
       _showSearchMenu = false;
       _isSearchingContent = false;
-      _contentSearchHits = <_ReaderSearchHit>[];
+      _contentSearchHits = <ReaderSearchHit>[];
       _currentSearchHitIndex = -1;
       _contentSearchQuery = '';
       _contentSearchUseReplace = false;
@@ -8029,7 +8026,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  Widget _buildSearchPreviewText(_ReaderSearchHit hit, Color accent) {
+  Widget _buildSearchPreviewText(ReaderSearchHit hit, Color accent) {
     final before = hit.previewBefore.trimLeft();
     final match = hit.previewMatch.trim();
     final after = hit.previewAfter.trimRight();
@@ -8215,26 +8212,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  _ReadAloudCapability _detectReadAloudCapability() {
+  ReadAloudCapability _detectReadAloudCapability() {
     if (kIsWeb) {
-      return const _ReadAloudCapability(
+      return const ReadAloudCapability(
         available: false,
         reason: '当前平台暂不支持语音朗读',
       );
     }
     if (_chapters.isEmpty) {
-      return const _ReadAloudCapability(
+      return const ReadAloudCapability(
         available: false,
         reason: '当前书籍暂无可朗读章节',
       );
     }
     if (_currentContent.trim().isEmpty) {
-      return const _ReadAloudCapability(
+      return const ReadAloudCapability(
         available: false,
         reason: '当前章节暂无可朗读内容',
       );
     }
-    return const _ReadAloudCapability(
+    return const ReadAloudCapability(
       available: true,
       reason: '',
     );
@@ -9244,7 +9241,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  Future<_ReaderSimulatedReadingInput?>
+  Future<ReaderSimulatedReadingInput?>
       _showSimulatedReadingInputDialog() async {
     var enabled = _isSimulatedReadingEnabled();
     var startDate = _simulatedStartDateOrToday();
@@ -9255,7 +9252,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       text: _simulatedDailyChaptersForDialogDefault().toString(),
     );
     try {
-      return await showCupertinoBottomSheetDialog<_ReaderSimulatedReadingInput>(
+      return await showCupertinoBottomSheetDialog<ReaderSimulatedReadingInput>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -9333,7 +9330,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                     onPressed: () {
                       Navigator.pop(
                         dialogContext,
-                        _ReaderSimulatedReadingInput(
+                        ReaderSimulatedReadingInput(
                           enabled: enabled,
                           startChapter: startController.text,
                           dailyChapters: dailyController.text,
@@ -9589,7 +9586,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     await _cacheChapterRangeFromMenu(range: range);
   }
 
-  Future<_ReaderOfflineCacheInput?> _showOfflineCacheRangeInputDialog() async {
+  Future<ReaderOfflineCacheInput?> _showOfflineCacheRangeInputDialog() async {
     final totalChapters = _chapters.length;
     if (totalChapters <= 0) return null;
     final defaultStartChapter =
@@ -9601,7 +9598,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       text: totalChapters.toString(),
     );
     try {
-      return await showCupertinoBottomSheetDialog<_ReaderOfflineCacheInput>(
+      return await showCupertinoBottomSheetDialog<ReaderOfflineCacheInput>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('离线缓存'),
@@ -9646,7 +9643,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               onPressed: () {
                 Navigator.pop(
                   dialogContext,
-                  _ReaderOfflineCacheInput(
+                  ReaderOfflineCacheInput(
                     startChapter: startController.text,
                     endChapter: endController.text,
                   ),
@@ -9663,7 +9660,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  _ReaderOfflineCacheRange? _resolveOfflineCacheRange({
+  ReaderOfflineCacheRange? _resolveOfflineCacheRange({
     required String startText,
     required String endText,
     required int totalChapters,
@@ -9678,14 +9675,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final maxIndex = totalChapters - 1;
     final startIndex = (startInput - 1).clamp(0, maxIndex).toInt();
     final endIndex = (endInput - 1).clamp(0, maxIndex).toInt();
-    return _ReaderOfflineCacheRange(
+    return ReaderOfflineCacheRange(
       startIndex: startIndex,
       endIndex: endIndex,
     );
   }
 
   Future<void> _cacheChapterRangeFromMenu({
-    required _ReaderOfflineCacheRange range,
+    required ReaderOfflineCacheRange range,
   }) async {
     if (_chapters.isEmpty) return;
     final maxIndex = _chapters.length - 1;
@@ -12189,7 +12186,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _showToast('创建书签失败');
       return;
     }
-    final draft = _ReaderBookmarkDraft(
+    final draft = ReaderBookmarkDraft(
       chapterTitle: baseDraft.chapterTitle,
       chapterPos: baseDraft.chapterPos,
       pageText: selectedText.trim(),
@@ -12197,7 +12194,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     await _openBookmarkEditorFromDraft(draft);
   }
 
-  Future<void> _openBookmarkEditorFromDraft(_ReaderBookmarkDraft? draft) async {
+  Future<void> _openBookmarkEditorFromDraft(ReaderBookmarkDraft? draft) async {
     if (draft == null || !mounted) return;
     final result = await _showBookmarkEditorDialog(draft);
     if (result == null) return;
@@ -12222,7 +12219,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  _ReaderBookmarkDraft? _buildBookmarkDraft() {
+  ReaderBookmarkDraft? _buildBookmarkDraft() {
     if (_chapters.isEmpty ||
         _currentChapterIndex < 0 ||
         _currentChapterIndex >= _chapters.length) {
@@ -12231,7 +12228,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final fallbackTitle = _chapters[_currentChapterIndex].title.trim();
     final chapterTitle =
         _currentTitle.trim().isNotEmpty ? _currentTitle.trim() : fallbackTitle;
-    return _ReaderBookmarkDraft(
+    return ReaderBookmarkDraft(
       chapterTitle: chapterTitle.isEmpty
           ? '第 ${_currentChapterIndex + 1} 章'
           : chapterTitle,
@@ -12240,12 +12237,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  Future<_ReaderBookmarkEditResult?> _showBookmarkEditorDialog(
-    _ReaderBookmarkDraft draft,
+  Future<ReaderBookmarkEditResult?> _showBookmarkEditorDialog(
+    ReaderBookmarkDraft draft,
   ) async {
     final bookTextController = TextEditingController(text: draft.pageText);
     final noteController = TextEditingController();
-    final result = await showCupertinoBottomSheetDialog<_ReaderBookmarkEditResult>(
+    final result = await showCupertinoBottomSheetDialog<ReaderBookmarkEditResult>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('书签'),
@@ -12282,7 +12279,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             onPressed: () {
               Navigator.pop(
                 dialogContext,
-                _ReaderBookmarkEditResult(
+                ReaderBookmarkEditResult(
                   bookText: bookTextController.text,
                   note: noteController.text,
                 ),
@@ -12755,1010 +12752,4 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
     _updateBookmarkStatus();
   }
-}
-
-
-// ─── Scroll Content 独立 Widget ───────────────────────────────────────────────
-
-@immutable
-class _ScrollContentConfig {
-  const _ScrollContentConfig({
-    required this.fontSize,
-    required this.lineHeight,
-    required this.letterSpacing,
-    required this.paragraphSpacing,
-    required this.paragraphIndent,
-    required this.textFullJustify,
-    required this.textColor,
-    required this.fontFamily,
-    required this.fontFamilyFallback,
-    required this.fontWeight,
-    required this.textDecoration,
-    required this.titleMode,
-    required this.titleSize,
-    required this.titleTopSpacing,
-    required this.titleBottomSpacing,
-    required this.titleTextAlign,
-    required this.paddingLeft,
-    required this.paddingRight,
-    required this.paddingTop,
-    required this.paddingBottom,
-    required this.paddingDisplayCutouts,
-    required this.imageStyle,
-    required this.searchHighlightQuery,
-    required this.searchHighlightColor,
-    required this.searchHighlightTextColor,
-  });
-
-  final double fontSize;
-  final double lineHeight;
-  final double letterSpacing;
-  final double paragraphSpacing;
-  final String paragraphIndent;
-  final bool textFullJustify;
-  final Color textColor;
-  final String? fontFamily;
-  final List<String>? fontFamilyFallback;
-  final FontWeight fontWeight;
-  final TextDecoration? textDecoration;
-  final int titleMode;
-  final int titleSize;
-  final double titleTopSpacing;
-  final double titleBottomSpacing;
-  final TextAlign titleTextAlign;
-  final double paddingLeft;
-  final double paddingRight;
-  final double paddingTop;
-  final double paddingBottom;
-  final bool paddingDisplayCutouts;
-  final String imageStyle;
-  final String? searchHighlightQuery;
-  final Color? searchHighlightColor;
-  final Color? searchHighlightTextColor;
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! _ScrollContentConfig) return false;
-    return fontSize == other.fontSize &&
-        lineHeight == other.lineHeight &&
-        letterSpacing == other.letterSpacing &&
-        paragraphSpacing == other.paragraphSpacing &&
-        paragraphIndent == other.paragraphIndent &&
-        textFullJustify == other.textFullJustify &&
-        textColor == other.textColor &&
-        fontFamily == other.fontFamily &&
-        _listEquals(fontFamilyFallback, other.fontFamilyFallback) &&
-        fontWeight == other.fontWeight &&
-        textDecoration == other.textDecoration &&
-        titleMode == other.titleMode &&
-        titleSize == other.titleSize &&
-        titleTopSpacing == other.titleTopSpacing &&
-        titleBottomSpacing == other.titleBottomSpacing &&
-        titleTextAlign == other.titleTextAlign &&
-        paddingLeft == other.paddingLeft &&
-        paddingRight == other.paddingRight &&
-        paddingTop == other.paddingTop &&
-        paddingBottom == other.paddingBottom &&
-        paddingDisplayCutouts == other.paddingDisplayCutouts &&
-        imageStyle == other.imageStyle &&
-        searchHighlightQuery == other.searchHighlightQuery &&
-        searchHighlightColor == other.searchHighlightColor &&
-        searchHighlightTextColor == other.searchHighlightTextColor;
-  }
-
-  @override
-  int get hashCode => Object.hashAll([
-        fontSize,
-        lineHeight,
-        letterSpacing,
-        paragraphSpacing,
-        paragraphIndent,
-        textFullJustify,
-        textColor,
-        fontFamily,
-        fontWeight,
-        textDecoration,
-        titleMode,
-        titleSize,
-        titleTopSpacing,
-        titleBottomSpacing,
-        titleTextAlign,
-        paddingLeft,
-        paddingRight,
-        paddingTop,
-        paddingBottom,
-        paddingDisplayCutouts,
-        imageStyle,
-        searchHighlightQuery,
-        searchHighlightColor,
-        searchHighlightTextColor,
-      ]);
-
-  static bool _listEquals<T>(List<T>? a, List<T>? b) {
-    if (a == null) return b == null;
-    if (b == null) return false;
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
-
-  TextStyle get paragraphStyle => TextStyle(
-        fontSize: fontSize,
-        height: lineHeight,
-        letterSpacing: letterSpacing,
-        color: textColor,
-        fontFamily: fontFamily,
-        fontFamilyFallback: fontFamilyFallback,
-        fontWeight: fontWeight,
-        decoration: textDecoration,
-      );
-
-  TextStyle get titleStyle => TextStyle(
-        fontSize: fontSize + titleSize,
-        fontWeight: FontWeight.w600,
-        color: textColor,
-        fontFamily: fontFamily,
-        fontFamilyFallback: fontFamilyFallback,
-      );
-
-  TextStyle fallbackStyle(double size) => TextStyle(
-        fontSize: (size - 2).clamp(10.0, 22.0),
-        color: textColor.withValues(alpha: 0.7),
-        fontFamily: fontFamily,
-        fontFamilyFallback: fontFamilyFallback,
-      );
-}
-
-class _ScrollContentView extends StatefulWidget {
-  const _ScrollContentView({
-    required this.config,
-    required this.scrollInsets,
-    required this.segments,
-    required this.segmentsVersion,
-    required this.scrollController,
-    required this.scrollViewportKey,
-    required this.onScrollStart,
-    required this.onScrollEnd,
-    required this.resolveScrollTextLayout,
-    required this.resolveSegmentKey,
-    required this.resolveImageProvider,
-    required this.normalizeImageSrc,
-  });
-
-  final _ScrollContentConfig config;
-  final EdgeInsets scrollInsets;
-  final List<_ScrollSegment> segments;
-  final ValueNotifier<int> segmentsVersion;
-  final ScrollController scrollController;
-  final GlobalKey scrollViewportKey;
-  final VoidCallback onScrollStart;
-  final VoidCallback onScrollEnd;
-  final ScrollTextLayout Function({
-    required _ScrollSegmentSeed seed,
-    required double maxWidth,
-    required TextStyle style,
-  }) resolveScrollTextLayout;
-  final GlobalKey Function(int chapterIndex) resolveSegmentKey;
-  final ImageProvider<Object>? Function(String src) resolveImageProvider;
-  final String Function(String raw) normalizeImageSrc;
-
-  @override
-  State<_ScrollContentView> createState() => _ScrollContentViewState();
-}
-
-class _ScrollContentViewState extends State<_ScrollContentView> {
-  _ScrollContentConfig? _lastConfig;
-  EdgeInsets? _lastScrollInsets;
-  Widget? _cachedContent;
-
-  @override
-  void didUpdateWidget(_ScrollContentView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // config 或 insets 变化时清除缓存，下次 build 重建
-    if (widget.config != oldWidget.config ||
-        widget.scrollInsets != oldWidget.scrollInsets) {
-      _cachedContent = null;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // config 和 insets 均未变化时直接返回缓存，跳过 layout pass
-    if (_cachedContent != null &&
-        widget.config == _lastConfig &&
-        widget.scrollInsets == _lastScrollInsets) {
-      return _cachedContent!;
-    }
-    _lastConfig = widget.config;
-    _lastScrollInsets = widget.scrollInsets;
-    _cachedContent = _buildContent();
-    return _cachedContent!;
-  }
-
-  Widget _buildContent() {
-    return Padding(
-      padding: widget.scrollInsets,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis != Axis.vertical) return false;
-          if (notification is ScrollStartNotification) {
-            widget.onScrollStart();
-          }
-          if (notification is ScrollEndNotification) {
-            widget.onScrollEnd();
-          }
-          return false;
-        },
-        child: ValueListenableBuilder<int>(
-          valueListenable: widget.segmentsVersion,
-          builder: (context, _, __) {
-            if (widget.segments.isEmpty) {
-              return const Center(child: CupertinoActivityIndicator());
-            }
-            return SingleChildScrollView(
-              key: widget.scrollViewportKey,
-              controller: widget.scrollController,
-              physics: const BouncingScrollPhysics(
-                decelerationRate: ScrollDecelerationRate.fast,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < widget.segments.length; i++)
-                    _buildSegmentBody(
-                      widget.segments[i],
-                      isTailSegment: i == widget.segments.length - 1,
-                    ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSegmentBody(_ScrollSegment segment, {required bool isTailSegment}) {
-    final cfg = widget.config;
-    final bodyWidth = _resolveBodyWidth();
-    final imageBlocks = _buildImageRenderBlocks(segment.content);
-    final contentBody = imageBlocks == null
-        ? ScrollSegmentPaintView(
-            layout: widget.resolveScrollTextLayout(
-              seed: _ScrollSegmentSeed(
-                chapterId: segment.chapterId,
-                title: segment.title,
-                content: segment.content,
-              ),
-              maxWidth: bodyWidth,
-              style: cfg.paragraphStyle,
-            ),
-            style: cfg.paragraphStyle,
-            highlightQuery: cfg.searchHighlightQuery,
-            highlightColor: cfg.searchHighlightColor,
-            highlightTextColor: cfg.searchHighlightTextColor,
-          )
-        : _buildImageAwareBody(
-            blocks: imageBlocks,
-            bodyWidth: bodyWidth,
-          );
-
-    return KeyedSubtree(
-      key: widget.resolveSegmentKey(segment.chapterIndex),
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: cfg.paddingLeft,
-          right: cfg.paddingRight,
-          top: cfg.paddingTop,
-          bottom: cfg.paddingBottom,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (cfg.titleMode != 2) ...[
-              SizedBox(height: cfg.titleTopSpacing),
-              SizedBox(
-                width: double.infinity,
-                child: Text(
-                  segment.title,
-                  textAlign: cfg.titleTextAlign,
-                  style: cfg.titleStyle,
-                ),
-              ),
-              SizedBox(height: cfg.titleBottomSpacing),
-            ],
-            contentBody,
-            SizedBox(height: isTailSegment ? 80 : 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<_ReaderRenderBlock>? _buildImageRenderBlocks(String content) {
-    final imageStyle = widget.config.imageStyle;
-    if (imageStyle == _SimpleReaderViewState._legacyImageStyleText ||
-        !_SimpleReaderViewState._legacyImageTagRegex.hasMatch(content)) {
-      return null;
-    }
-    final blocks = <_ReaderRenderBlock>[];
-    var cursor = 0;
-    for (final match
-        in _SimpleReaderViewState._legacyImageTagRegex.allMatches(content)) {
-      final before = content.substring(cursor, match.start);
-      if (before.trim().isNotEmpty) {
-        blocks.add(_ReaderRenderBlock.text(before));
-      }
-      final rawSrc = (match.group(1) ?? '').trim();
-      final src = widget.normalizeImageSrc(rawSrc);
-      if (src.isNotEmpty) {
-        blocks.add(_ReaderRenderBlock.image(src));
-      }
-      cursor = match.end;
-    }
-    if (cursor < content.length) {
-      final trailing = content.substring(cursor);
-      if (trailing.trim().isNotEmpty) {
-        blocks.add(_ReaderRenderBlock.text(trailing));
-      }
-    }
-    if (!blocks.any((b) => b.isImage)) return null;
-    return blocks;
-  }
-
-  Widget _buildImageAwareBody({
-    required List<_ReaderRenderBlock> blocks,
-    required double bodyWidth,
-  }) {
-    final cfg = widget.config;
-    final children = <Widget>[];
-    for (var i = 0; i < blocks.length; i++) {
-      final block = blocks[i];
-      if (block.isImage) {
-        children.add(_buildImageBlock(src: block.imageSrc ?? '', bodyWidth: bodyWidth));
-      } else if ((block.text ?? '').trim().isNotEmpty) {
-        children.add(
-          LegacyJustifiedTextBlock(
-            content: block.text ?? '',
-            style: cfg.paragraphStyle,
-            justify: cfg.textFullJustify,
-            paragraphIndent: cfg.paragraphIndent,
-            applyParagraphIndent: true,
-            preserveEmptyLines: true,
-          ),
-        );
-      }
-      if (i != blocks.length - 1) {
-        children.add(SizedBox(
-            height: cfg.paragraphSpacing.clamp(4.0, 24.0).toDouble()));
-      }
-    }
-    if (children.isEmpty) return const SizedBox.shrink();
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: children);
-  }
-
-  Widget _buildImageBlock({required String src, required double bodyWidth}) {
-    final cfg = widget.config;
-    final request = ReaderImageRequestParser.parse(src);
-    final displaySrc =
-        request.url.trim().isEmpty ? src.trim() : request.url;
-    final imageProvider = widget.resolveImageProvider(src);
-    if (imageProvider == null) return _buildImageFallback(displaySrc);
-
-    final forceFullWidth =
-        cfg.imageStyle == _SimpleReaderViewState._legacyImageStyleFull ||
-            cfg.imageStyle == _SimpleReaderViewState._legacyImageStyleSingle;
-    final image = Image(
-      image: imageProvider,
-      width: forceFullWidth ? bodyWidth : null,
-      fit: forceFullWidth ? BoxFit.fitWidth : BoxFit.contain,
-      filterQuality: FilterQuality.medium,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return const SizedBox(
-          width: double.infinity,
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CupertinoActivityIndicator()),
-          ),
-        );
-      },
-      errorBuilder: (_, __, ___) => _buildImageFallback(displaySrc),
-    );
-    final imageBox = ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: bodyWidth), child: image);
-
-    if (cfg.imageStyle == _SimpleReaderViewState._legacyImageStyleSingle) {
-      final viewportHeight = MediaQuery.sizeOf(context).height;
-      final singleHeight =
-          (viewportHeight - cfg.paddingTop - cfg.paddingBottom)
-              .clamp(220.0, 1200.0)
-              .toDouble();
-      return SizedBox(height: singleHeight, child: Center(child: imageBox));
-    }
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-            vertical:
-                (cfg.paragraphSpacing / 2).clamp(6.0, 20.0).toDouble()),
-        child: imageBox,
-      ),
-    );
-  }
-
-  Widget _buildImageFallback(String src) {
-    final display = src.trim();
-    final message = display.isEmpty ? '图片加载失败' : '图片加载失败：$display';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      alignment: Alignment.centerLeft,
-      child: Text(message, style: widget.config.fallbackStyle(widget.config.fontSize)),
-    );
-  }
-
-  double _resolveBodyWidth() {
-    final mediaQuery = MediaQuery.maybeOf(context);
-    if (mediaQuery == null) return 320.0;
-    final cfg = widget.config;
-    final screenSize = mediaQuery.size;
-    final safePadding = mediaQuery.padding;
-    final horizontalSafeInset =
-        cfg.paddingDisplayCutouts ? safePadding.left + safePadding.right : 0.0;
-    return (screenSize.width -
-            horizontalSafeInset -
-            cfg.paddingLeft -
-            cfg.paddingRight)
-        .clamp(1.0, double.infinity)
-        .toDouble();
-  }
-}
-
-/// 全屏图片预览页，支持双指缩放和平移。
-class _ImagePreviewPage extends StatelessWidget {
-  final ImageProvider imageProvider;
-
-  const _ImagePreviewPage({required this.imageProvider});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.black,
-      navigationBar: CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.black.withValues(alpha: 0.7),
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Icon(
-            CupertinoIcons.xmark,
-            color: CupertinoColors.white,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 8.0,
-          child: Center(
-            child: Image(
-              image: imageProvider,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Icon(
-                CupertinoIcons.photo,
-                color: CupertinoColors.systemGrey.resolveFrom(context),
-                size: 64,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReadAloudCapability {
-  final bool available;
-  final String reason;
-
-  const _ReadAloudCapability({
-    required this.available,
-    required this.reason,
-  });
-}
-
-enum _ReaderImageWarmupFailureKind {
-  timeout,
-  auth,
-  decode,
-  other,
-}
-
-class _ReaderImageSizeProbeResult {
-  final Size? size;
-  final _ReaderImageWarmupFailureKind? failureKind;
-  final bool attempted;
-
-  const _ReaderImageSizeProbeResult._({
-    required this.size,
-    required this.failureKind,
-    required this.attempted,
-  });
-
-  const _ReaderImageSizeProbeResult.success(Size value)
-      : this._(
-          size: value,
-          failureKind: null,
-          attempted: true,
-        );
-
-  const _ReaderImageSizeProbeResult.failure(_ReaderImageWarmupFailureKind kind)
-      : this._(
-          size: null,
-          failureKind: kind,
-          attempted: true,
-        );
-
-  const _ReaderImageSizeProbeResult.skipped()
-      : this._(
-          size: null,
-          failureKind: null,
-          attempted: false,
-        );
-}
-
-class _ReaderImageBytesProbeResult {
-  final Uint8List? bytes;
-  final _ReaderImageWarmupFailureKind? failureKind;
-
-  const _ReaderImageBytesProbeResult._({
-    required this.bytes,
-    required this.failureKind,
-  });
-
-  const _ReaderImageBytesProbeResult.success(Uint8List value)
-      : this._(
-          bytes: value,
-          failureKind: null,
-        );
-
-  const _ReaderImageBytesProbeResult.failure(_ReaderImageWarmupFailureKind kind)
-      : this._(
-          bytes: null,
-          failureKind: kind,
-        );
-}
-
-class _ReaderImageWarmupSourceTelemetry {
-  int sampleCount = 0;
-  int timeoutStreak = 0;
-  int authStreak = 0;
-  int decodeStreak = 0;
-  double successRateEma = 0.0;
-  double timeoutRateEma = 0.0;
-  double authRateEma = 0.0;
-  double decodeRateEma = 0.0;
-  DateTime updatedAt = DateTime.fromMillisecondsSinceEpoch(0);
-
-  void recordSuccess() {
-    _apply(success: true, failureKind: null);
-  }
-
-  void recordFailure(_ReaderImageWarmupFailureKind kind) {
-    _apply(success: false, failureKind: kind);
-  }
-
-  void _apply({
-    required bool success,
-    required _ReaderImageWarmupFailureKind? failureKind,
-  }) {
-    final alpha = sampleCount < 8 ? 0.34 : 0.18;
-    successRateEma = _ema(successRateEma, success ? 1.0 : 0.0, alpha);
-    timeoutRateEma = _ema(
-      timeoutRateEma,
-      failureKind == _ReaderImageWarmupFailureKind.timeout ? 1.0 : 0.0,
-      alpha,
-    );
-    authRateEma = _ema(
-      authRateEma,
-      failureKind == _ReaderImageWarmupFailureKind.auth ? 1.0 : 0.0,
-      alpha,
-    );
-    decodeRateEma = _ema(
-      decodeRateEma,
-      failureKind == _ReaderImageWarmupFailureKind.decode ? 1.0 : 0.0,
-      alpha,
-    );
-
-    if (success) {
-      timeoutStreak = 0;
-      authStreak = 0;
-      decodeStreak = 0;
-    } else {
-      switch (failureKind) {
-        case _ReaderImageWarmupFailureKind.timeout:
-          timeoutStreak = (timeoutStreak + 1).clamp(0, 24).toInt();
-          authStreak = 0;
-          decodeStreak = 0;
-          break;
-        case _ReaderImageWarmupFailureKind.auth:
-          authStreak = (authStreak + 1).clamp(0, 24).toInt();
-          timeoutStreak = 0;
-          decodeStreak = 0;
-          break;
-        case _ReaderImageWarmupFailureKind.decode:
-          decodeStreak = (decodeStreak + 1).clamp(0, 24).toInt();
-          timeoutStreak = 0;
-          authStreak = 0;
-          break;
-        case _ReaderImageWarmupFailureKind.other:
-          timeoutStreak = 0;
-          authStreak = 0;
-          decodeStreak = 0;
-          break;
-        case null:
-          timeoutStreak = 0;
-          authStreak = 0;
-          decodeStreak = 0;
-          break;
-      }
-    }
-
-    sampleCount = (sampleCount + 1).clamp(0, 4096).toInt();
-    updatedAt = DateTime.now();
-  }
-
-  double _ema(double current, double value, double alpha) {
-    if (sampleCount <= 0) {
-      return value;
-    }
-    return current * (1 - alpha) + value * alpha;
-  }
-}
-
-class _ReaderImageWarmupBudget {
-  final int probeCount;
-  final Duration maxDuration;
-  final Duration perProbeTimeout;
-
-  const _ReaderImageWarmupBudget({
-    required this.probeCount,
-    required this.maxDuration,
-    required this.perProbeTimeout,
-  });
-}
-
-class _ReaderOfflineCacheInput {
-  final String startChapter;
-  final String endChapter;
-
-  const _ReaderOfflineCacheInput({
-    required this.startChapter,
-    required this.endChapter,
-  });
-}
-
-class _ReaderOfflineCacheRange {
-  final int startIndex;
-  final int endIndex;
-
-  const _ReaderOfflineCacheRange({
-    required this.startIndex,
-    required this.endIndex,
-  });
-}
-
-enum _ReaderTextActionMenuAction {
-  replace,
-  copy,
-  bookmark,
-  readAloud,
-  dict,
-  searchContent,
-  browser,
-  share,
-  processText,
-  more,
-  collapse,
-}
-
-enum _ReaderAudioPlayMenuAction {
-  login,
-  changeSource,
-  copyAudioUrl,
-  editSource,
-  wakeLock,
-  log,
-}
-
-class _DuplicateTitleRemovalResult {
-  final String content;
-  final bool removed;
-
-  const _DuplicateTitleRemovalResult({
-    required this.content,
-    required this.removed,
-  });
-}
-
-class _ReaderSimulatedReadingInput {
-  final bool enabled;
-  final String startChapter;
-  final String dailyChapters;
-  final DateTime startDate;
-
-  const _ReaderSimulatedReadingInput({
-    required this.enabled,
-    required this.startChapter,
-    required this.dailyChapters,
-    required this.startDate,
-  });
-}
-
-class _ReaderBookmarkDraft {
-  final String chapterTitle;
-  final int chapterPos;
-  final String pageText;
-
-  const _ReaderBookmarkDraft({
-    required this.chapterTitle,
-    required this.chapterPos,
-    required this.pageText,
-  });
-}
-
-class _ReaderBookmarkEditResult {
-  final String bookText;
-  final String note;
-
-  const _ReaderBookmarkEditResult({
-    required this.bookText,
-    required this.note,
-  });
-}
-
-
-
-class _TipOption {
-  final int value;
-  final String label;
-
-  const _TipOption(this.value, this.label);
-}
-
-class _EffectiveReplaceMenuEntry {
-  final String label;
-  final ReplaceRule? rule;
-  final bool isChineseConverter;
-
-  const _EffectiveReplaceMenuEntry._({
-    required this.label,
-    required this.rule,
-    required this.isChineseConverter,
-  });
-
-  const _EffectiveReplaceMenuEntry.rule({
-    required String label,
-    required ReplaceRule rule,
-  }) : this._(
-          label: label,
-          rule: rule,
-          isChineseConverter: false,
-        );
-
-  const _EffectiveReplaceMenuEntry.chineseConverter({
-    required String label,
-  }) : this._(
-          label: label,
-          rule: null,
-          isChineseConverter: true,
-        );
-}
-
-class _ReplaceStageCache {
-  final String rawTitle;
-  final String rawContent;
-  final String title;
-  final String content;
-  final List<ReplaceRule> effectiveContentReplaceRules;
-
-  const _ReplaceStageCache({
-    required this.rawTitle,
-    required this.rawContent,
-    required this.title,
-    required this.content,
-    required this.effectiveContentReplaceRules,
-  });
-}
-
-class _ResolvedChapterSnapshot {
-  final String chapterId;
-  final int postProcessSignature;
-  final int baseTitleHash;
-  final int baseContentHash;
-  final String title;
-  final String content;
-  final bool isDeferredPlaceholder;
-
-  const _ResolvedChapterSnapshot({
-    required this.chapterId,
-    required this.postProcessSignature,
-    required this.baseTitleHash,
-    required this.baseContentHash,
-    required this.title,
-    required this.content,
-    this.isDeferredPlaceholder = false,
-  });
-}
-
-class _ChapterImageMetaSnapshot {
-  final String chapterId;
-  final int postProcessSignature;
-  final int contentHash;
-  final List<ReaderImageMarkerMeta> metas;
-
-  const _ChapterImageMetaSnapshot({
-    required this.chapterId,
-    required this.postProcessSignature,
-    required this.contentHash,
-    required this.metas,
-  });
-}
-
-class _ReaderSearchHit {
-  final int chapterIndex;
-  final String chapterTitle;
-  final int chapterContentLength;
-  final int start;
-  final int end;
-  final String query;
-  final int occurrenceIndex;
-  final String previewBefore;
-  final String previewMatch;
-  final String previewAfter;
-  final int? pageIndex;
-
-  const _ReaderSearchHit({
-    required this.chapterIndex,
-    required this.chapterTitle,
-    required this.chapterContentLength,
-    required this.start,
-    required this.end,
-    required this.query,
-    required this.occurrenceIndex,
-    required this.previewBefore,
-    required this.previewMatch,
-    required this.previewAfter,
-    required this.pageIndex,
-  });
-}
-
-class _ReaderSearchProgressSnapshot {
-  final int chapterIndex;
-  final double chapterProgress;
-
-  const _ReaderSearchProgressSnapshot({
-    required this.chapterIndex,
-    required this.chapterProgress,
-  });
-}
-
-class _ScrollSegmentSeed {
-  final String chapterId;
-  final String title;
-  final String content;
-
-  const _ScrollSegmentSeed({
-    required this.chapterId,
-    required this.title,
-    required this.content,
-  });
-}
-
-class _ReaderRenderBlock {
-  final String? text;
-  final String? imageSrc;
-
-  const _ReaderRenderBlock._({
-    this.text,
-    this.imageSrc,
-  });
-
-  const _ReaderRenderBlock.text(String value)
-      : this._(
-          text: value,
-        );
-
-  const _ReaderRenderBlock.image(String value)
-      : this._(
-          imageSrc: value,
-        );
-
-  bool get isImage => imageSrc != null;
-}
-
-class _ScrollSegment {
-  final int chapterIndex;
-  final String chapterId;
-  final String title;
-  final String content;
-  final double estimatedHeight;
-
-  const _ScrollSegment({
-    required this.chapterIndex,
-    required this.chapterId,
-    required this.title,
-    required this.content,
-    required this.estimatedHeight,
-  });
-}
-
-class _ScrollSegmentOffsetRange {
-  final _ScrollSegment segment;
-  final double start;
-  final double end;
-  final double height;
-
-  const _ScrollSegmentOffsetRange({
-    required this.segment,
-    required this.start,
-    required this.end,
-    required this.height,
-  });
-}
-
-class _ScrollTipData {
-  final String title;
-  final String bookTitle;
-  final double bookProgress;
-  final double chapterProgress;
-  final int currentPage;
-  final int totalPages;
-  final String currentTime;
-
-  const _ScrollTipData({
-    required this.title,
-    required this.bookTitle,
-    required this.bookProgress,
-    required this.chapterProgress,
-    required this.currentPage,
-    required this.totalPages,
-    required this.currentTime,
-  });
-
-  const _ScrollTipData.empty()
-      : title = '',
-        bookTitle = '',
-        bookProgress = 0.0,
-        chapterProgress = 0.0,
-        currentPage = 1,
-        totalPages = 1,
-        currentTime = '';
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is _ScrollTipData &&
-        other.title == title &&
-        other.bookTitle == bookTitle &&
-        other.bookProgress == bookProgress &&
-        other.chapterProgress == chapterProgress &&
-        other.currentPage == currentPage &&
-        other.totalPages == totalPages &&
-        other.currentTime == currentTime;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-        title,
-        bookTitle,
-        bookProgress,
-        chapterProgress,
-        currentPage,
-        totalPages,
-        currentTime,
-      );
 }

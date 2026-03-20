@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
@@ -14,10 +15,11 @@ import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/source_aware_cover_image.dart';
-import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../bookshelf/models/book.dart';
@@ -36,7 +38,7 @@ import 'search_book_info_view.dart';
 import 'search_scope_picker_view.dart';
 
 /// 搜索页面（对齐 legado 核心语义：范围、过滤、可停止、历史词）。
-class SearchView extends StatefulWidget {
+class SearchView extends ConsumerStatefulWidget {
   final List<String>? sourceUrls;
   final String? initialKeyword;
 
@@ -51,14 +53,14 @@ class SearchView extends StatefulWidget {
   });
 
   @override
-  State<SearchView> createState() => _SearchViewState();
+  ConsumerState<SearchView> createState() => _SearchViewState();
 }
 
-class _SearchViewState extends State<SearchView> {
+class _SearchViewState extends ConsumerState<SearchView> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _resultScrollController = ScrollController();
-  final SettingsService _settingsService = SettingsService();
+  late final SettingsService _settingsService;
   final SearchCacheService _cacheService = SearchCacheService();
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
@@ -113,9 +115,10 @@ class _SearchViewState extends State<SearchView> {
   @override
   void initState() {
     super.initState();
-    final db = DatabaseService();
-    _bookRepo = BookRepository(db);
-    _sourceRepo = SourceRepository(db);
+    _settingsService = ref.read(settingsServiceProvider);
+    final db = ref.read(databaseServiceProvider);
+    _bookRepo = ref.read(bookRepositoryProvider);
+    _sourceRepo = ref.read(sourceRepositoryProvider);
     _addService = BookAddService(database: db);
     _searchHasFocus = _searchFocusNode.hasFocus;
     _searchFocusNode.addListener(_onSearchFocusChanged);

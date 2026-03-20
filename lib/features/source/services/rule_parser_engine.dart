@@ -14,6 +14,8 @@ import 'package:xpath_selector_html_parser/xpath_selector_html_parser.dart';
 import '../../../core/utils/html_text_formatter.dart';
 import '../../../core/services/cookie_store.dart';
 import '../../../core/services/source_login_store.dart';
+import '../models/rule_parser_types.dart';
+export '../models/rule_parser_types.dart';
 
 /// 书源规则解析引擎
 /// 支持 CSS 选择器、XPath（简化版）和正则表达式
@@ -61,8 +63,8 @@ class RuleParserEngine {
   }
 
   // 对标 legado：并发率限制记录按 sourceKey 维度共享（跨 RuleParserEngine 实例生效）。
-  static final Map<String, _ConcurrentRecord> _concurrentRecordMap =
-      <String, _ConcurrentRecord>{};
+  static final Map<String, ConcurrentRecord> _concurrentRecordMap =
+      <String, ConcurrentRecord>{};
 
   // URL 选项里的 js（Legado 格式）需要一个 JS 执行环境。
   // iOS 下为 JavaScriptCore；Android/Linux 下为 QuickJS（flutter_js）。
@@ -1646,13 +1648,13 @@ class RuleParserEngine {
     }
   }
 
-  _TopLevelRuleSplit _splitRuleByTopLevelOperator(
+  TopLevelRuleSplit _splitRuleByTopLevelOperator(
     String raw,
     List<String> operators,
   ) {
     final source = raw.trim();
     if (source.isEmpty) {
-      return const _TopLevelRuleSplit(
+      return const TopLevelRuleSplit(
         parts: <String>[],
         operator: null,
       );
@@ -1664,7 +1666,7 @@ class RuleParserEngine {
         .toSet()
         .toList(growable: false);
     if (operatorSet.isEmpty) {
-      return _TopLevelRuleSplit(parts: <String>[source], operator: null);
+      return TopLevelRuleSplit(parts: <String>[source], operator: null);
     }
 
     final matchOrder = operatorSet.toList(growable: false)
@@ -1788,7 +1790,7 @@ class RuleParserEngine {
     if (parts.isEmpty) {
       parts.add(source);
     }
-    return _TopLevelRuleSplit(parts: parts, operator: activeOperator);
+    return TopLevelRuleSplit(parts: parts, operator: activeOperator);
   }
 
   List<String> _mergeRuleListResults(
@@ -1879,7 +1881,7 @@ class RuleParserEngine {
       return const <String>[];
     }
 
-    final parsed = _LegadoTextRule.parse(
+    final parsed = LegadoTextRule.parse(
       resolvedRule,
       isExtractor: _isExtractorToken,
     );
@@ -2078,7 +2080,7 @@ class RuleParserEngine {
     _concurrentRecordMap.clear();
   }
 
-  _ConcurrentRateSpec? _parseConcurrentRateSpec(String? concurrentRateRaw) {
+  ConcurrentRateSpec? _parseConcurrentRateSpec(String? concurrentRateRaw) {
     final raw = (concurrentRateRaw ?? '').trim();
     if (raw.isEmpty || raw == '0') return null;
 
@@ -2086,7 +2088,7 @@ class RuleParserEngine {
     if (slashIndex <= 0) {
       final intervalMs = int.tryParse(raw);
       if (intervalMs == null || intervalMs <= 0) return null;
-      return _ConcurrentRateSpec.interval(raw: raw, intervalMs: intervalMs);
+      return ConcurrentRateSpec.interval(raw: raw, intervalMs: intervalMs);
     }
 
     final countText = raw.substring(0, slashIndex).trim();
@@ -2096,20 +2098,20 @@ class RuleParserEngine {
     if (count == null || count <= 0 || windowMs == null || windowMs <= 0) {
       return null;
     }
-    return _ConcurrentRateSpec.window(
+    return ConcurrentRateSpec.window(
       raw: raw,
       maxCount: count,
       windowMs: windowMs,
     );
   }
 
-  _ConcurrentAcquireStep _tryAcquireConcurrentRate({
+  ConcurrentAcquireStep _tryAcquireConcurrentRate({
     required String sourceKey,
-    required _ConcurrentRateSpec spec,
+    required ConcurrentRateSpec spec,
   }) {
     final key = sourceKey.trim();
     if (key.isEmpty) {
-      return _ConcurrentAcquireStep(
+      return ConcurrentAcquireStep(
         record: null,
         waitMs: 0,
         decision: '${spec.modeLabel}（sourceKey 为空，跳过限制）',
@@ -2119,13 +2121,13 @@ class RuleParserEngine {
     final now = DateTime.now().millisecondsSinceEpoch;
     var record = _concurrentRecordMap[key];
     if (record == null) {
-      record = _ConcurrentRecord(
+      record = ConcurrentRecord(
         isWindowMode: spec.isWindowMode,
         timeMs: now,
         frequency: 1,
       );
       _concurrentRecordMap[key] = record;
-      return _ConcurrentAcquireStep(
+      return ConcurrentAcquireStep(
         record: record,
         waitMs: 0,
         decision: spec.modeLabel,
@@ -2135,14 +2137,14 @@ class RuleParserEngine {
     if (!record.isWindowMode) {
       final intervalMs = spec.intervalMs;
       if (intervalMs == null || intervalMs <= 0) {
-        return const _ConcurrentAcquireStep(
+        return const ConcurrentAcquireStep(
           record: null,
           waitMs: 0,
           decision: '并发率格式非法，跳过限制',
         );
       }
       if (record.frequency > 0) {
-        return _ConcurrentAcquireStep(
+        return ConcurrentAcquireStep(
           record: record,
           waitMs: intervalMs,
           decision: spec.modeLabel,
@@ -2152,13 +2154,13 @@ class RuleParserEngine {
       if (now >= nextTime) {
         record.timeMs = now;
         record.frequency = 1;
-        return _ConcurrentAcquireStep(
+        return ConcurrentAcquireStep(
           record: record,
           waitMs: 0,
           decision: spec.modeLabel,
         );
       }
-      return _ConcurrentAcquireStep(
+      return ConcurrentAcquireStep(
         record: record,
         waitMs: nextTime - now,
         decision: spec.modeLabel,
@@ -2171,7 +2173,7 @@ class RuleParserEngine {
         maxCount <= 0 ||
         windowMs == null ||
         windowMs <= 0) {
-      return const _ConcurrentAcquireStep(
+      return const ConcurrentAcquireStep(
         record: null,
         waitMs: 0,
         decision: '并发率格式非法，跳过限制',
@@ -2182,7 +2184,7 @@ class RuleParserEngine {
     if (now >= nextTime) {
       record.timeMs = now;
       record.frequency = 1;
-      return _ConcurrentAcquireStep(
+      return ConcurrentAcquireStep(
         record: record,
         waitMs: 0,
         decision: spec.modeLabel,
@@ -2191,7 +2193,7 @@ class RuleParserEngine {
 
     // 对标 legado：使用 `>`，允许窗口内先通过 maxCount+1 次后再等待。
     if (record.frequency > maxCount) {
-      return _ConcurrentAcquireStep(
+      return ConcurrentAcquireStep(
         record: record,
         waitMs: nextTime - now,
         decision: spec.modeLabel,
@@ -2199,20 +2201,20 @@ class RuleParserEngine {
     }
 
     record.frequency += 1;
-    return _ConcurrentAcquireStep(
+    return ConcurrentAcquireStep(
       record: record,
       waitMs: 0,
       decision: spec.modeLabel,
     );
   }
 
-  Future<_ConcurrentAcquireResult> _acquireConcurrentRatePermit({
+  Future<ConcurrentAcquireResult> _acquireConcurrentRatePermit({
     required String? sourceKey,
     required String? concurrentRate,
   }) async {
     final spec = _parseConcurrentRateSpec(concurrentRate);
     if (spec == null) {
-      return _ConcurrentAcquireResult(
+      return ConcurrentAcquireResult(
         record: null,
         waitMs: 0,
         decision: '未启用并发率限制',
@@ -2226,7 +2228,7 @@ class RuleParserEngine {
         spec: spec,
       );
       if (step.waitMs <= 0) {
-        return _ConcurrentAcquireResult(
+        return ConcurrentAcquireResult(
           record: step.record,
           waitMs: totalWaitMs,
           decision: step.decision,
@@ -2237,7 +2239,7 @@ class RuleParserEngine {
     }
   }
 
-  void _releaseConcurrentRatePermit(_ConcurrentRecord? record) {
+  void _releaseConcurrentRatePermit(ConcurrentRecord? record) {
     if (record == null || record.isWindowMode) return;
     if (record.frequency > 0) {
       record.frequency -= 1;
@@ -2397,13 +2399,13 @@ class RuleParserEngine {
   static final RegExp _httpHeaderTokenRegex =
       RegExp(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$");
 
-  _ParsedHeaders _parseRequestHeaders(
+  ParsedHeaders _parseRequestHeaders(
     String? header, {
     String? jsLib,
   }) {
-    if (header == null) return _ParsedHeaders.empty;
+    if (header == null) return ParsedHeaders.empty;
     final raw = header.trim();
-    if (raw.isEmpty) return _ParsedHeaders.empty;
+    if (raw.isEmpty) return ParsedHeaders.empty;
 
     String? warning;
 
@@ -2488,7 +2490,7 @@ class RuleParserEngine {
       try {
         final decoded = jsonDecode(normalizedRaw);
         if (decoded is Map) {
-          return _ParsedHeaders(
+          return ParsedHeaders(
             headers: mapToHeaders(decoded),
             warning: warning,
           );
@@ -2504,7 +2506,7 @@ class RuleParserEngine {
           final decoded = jsonDecode(fixed);
           if (decoded is Map) {
             warning ??= 'header 似乎被二次转义，已自动修复解析';
-            return _ParsedHeaders(
+            return ParsedHeaders(
               headers: mapToHeaders(decoded),
               warning: warning,
             );
@@ -2534,7 +2536,7 @@ class RuleParserEngine {
           m[key] = value;
         }
         if (m.isNotEmpty) {
-          return _ParsedHeaders(headers: m, warning: warning);
+          return ParsedHeaders(headers: m, warning: warning);
         }
       }
     }
@@ -2555,7 +2557,7 @@ class RuleParserEngine {
       }
       headers[key] = value;
     }
-    return _ParsedHeaders(headers: headers, warning: warning);
+    return ParsedHeaders(headers: headers, warning: warning);
   }
 
   int _findLegadoUrlOptionSplitIndex(String source) {
@@ -2635,37 +2637,37 @@ class RuleParserEngine {
     return -1;
   }
 
-  _LegadoUrlParsed _parseLegadoStyleUrl(String rawUrl) {
+  LegadoUrlParsed _parseLegadoStyleUrl(String rawUrl) {
     final trimmed = rawUrl.trim();
-    if (trimmed.isEmpty) return _LegadoUrlParsed(url: '', option: null);
+    if (trimmed.isEmpty) return LegadoUrlParsed(url: '', option: null);
 
     // Legado 常见：url,{jsonOption} 或 url, {jsonOption}
     // - 与 legado 的“逗号 + 可选空白 + JSON”分割语义保持一致。
     final idx = _findLegadoUrlOptionSplitIndex(trimmed);
-    if (idx <= 0) return _LegadoUrlParsed(url: trimmed, option: null);
+    if (idx <= 0) return LegadoUrlParsed(url: trimmed, option: null);
 
     final urlPart = trimmed.substring(0, idx).trim();
     final optPart = trimmed.substring(idx + 1).trim(); // starts with '{'
     if (!optPart.startsWith('{') || !optPart.endsWith('}')) {
-      return _LegadoUrlParsed(url: trimmed, option: null);
+      return LegadoUrlParsed(url: trimmed, option: null);
     }
 
     try {
       final decoded = jsonDecode(optPart);
       if (decoded is! Map) {
-        return _LegadoUrlParsed(url: trimmed, option: null);
+        return LegadoUrlParsed(url: trimmed, option: null);
       }
       final map = decoded.map((k, v) => MapEntry(k.toString(), v));
-      return _LegadoUrlParsed(
+      return LegadoUrlParsed(
         url: urlPart.isEmpty ? trimmed : urlPart,
-        option: _LegadoUrlOption.fromJson(map),
+        option: LegadoUrlOption.fromJson(map),
       );
     } catch (_) {
-      return _LegadoUrlParsed(url: trimmed, option: null);
+      return LegadoUrlParsed(url: trimmed, option: null);
     }
   }
 
-  _UrlJsPatchResult? _applyLegadoUrlOptionJs({
+  UrlJsPatchResult? _applyLegadoUrlOptionJs({
     required String js,
     required String url,
     required Map<String, String> headerMap,
@@ -2723,7 +2725,7 @@ class RuleParserEngine {
           patchedHeaders[k.toString()] = v.toString();
         });
       }
-      return _UrlJsPatchResult(
+      return UrlJsPatchResult(
         ok: ok,
         url: patchedUrl,
         headers: patchedHeaders.isEmpty ? headerMap : patchedHeaders,
@@ -2736,7 +2738,7 @@ class RuleParserEngine {
         headerMap: headerMap,
       );
       if (fallback != null) return fallback;
-      return _UrlJsPatchResult(
+      return UrlJsPatchResult(
         ok: false,
         url: url,
         headers: headerMap,
@@ -2745,7 +2747,7 @@ class RuleParserEngine {
     }
   }
 
-  _UrlJsPatchResult? _applyLegadoUrlOptionJsFallback({
+  UrlJsPatchResult? _applyLegadoUrlOptionJsFallback({
     required String js,
     required String url,
     required Map<String, String> headerMap,
@@ -2834,7 +2836,7 @@ class RuleParserEngine {
     }
 
     if (!changed) return null;
-    return _UrlJsPatchResult(
+    return UrlJsPatchResult(
       ok: true,
       url: patchedUrl,
       headers: patchedHeaders,
@@ -3088,7 +3090,7 @@ class RuleParserEngine {
     String bodyDecision,
   }) _normalizeRequestPayload(
     String url,
-    _LegadoUrlOption? option,
+    LegadoUrlOption? option,
     Map<String, String> requestHeaders,
   ) {
     final methodRaw = (option?.method ?? '').trim();
@@ -3199,12 +3201,12 @@ class RuleParserEngine {
         lastError = e;
         final canRetry = attempt < maxAttempt && _isRetryableRequestError(e);
         if (!canRetry) {
-          throw _RequestRetryFailure(error: e, retryCount: attempt);
+          throw RequestRetryFailure(error: e, retryCount: attempt);
         }
       }
     }
 
-    throw _RequestRetryFailure(
+    throw RequestRetryFailure(
       error: lastError ?? StateError('request failed without explicit error'),
       retryCount: maxAttempt,
     );
@@ -3240,7 +3242,7 @@ class RuleParserEngine {
     return null;
   }
 
-  _DecodedText _decodeResponseBytes({
+  DecodedText _decodeResponseBytes({
     required Uint8List bytes,
     required Map<String, String> responseHeaders,
     String? optionCharset,
@@ -3273,7 +3275,7 @@ class RuleParserEngine {
 
     try {
       if (normalized == 'gbk') {
-        return _DecodedText(
+        return DecodedText(
           text: gbk.decode(bytes, allowMalformed: true),
           charset: 'gbk',
           charsetSource: charsetSource,
@@ -3281,7 +3283,7 @@ class RuleParserEngine {
         );
       }
       if (normalized == 'utf-8') {
-        return _DecodedText(
+        return DecodedText(
           text: utf8.decode(bytes, allowMalformed: true),
           charset: 'utf-8',
           charsetSource: charsetSource,
@@ -3289,14 +3291,14 @@ class RuleParserEngine {
         );
       }
       // 其它编码先走 utf-8 容错；失败再回退 latin1
-      return _DecodedText(
+      return DecodedText(
         text: utf8.decode(bytes, allowMalformed: true),
         charset: normalized,
         charsetSource: charsetSource,
         charsetDecision: '$decisionPrefix，decoder=utf-8(容错)',
       );
     } catch (_) {
-      return _DecodedText(
+      return DecodedText(
         text: latin1.decode(bytes, allowInvalid: true),
         charset: normalized.isEmpty ? 'latin1' : normalized,
         charsetSource: charsetSource,
@@ -3305,14 +3307,14 @@ class RuleParserEngine {
     }
   }
 
-  _ResolvedBookListRule? _resolveBookListRuleForStage(
+  ResolvedBookListRule? _resolveBookListRuleForStage(
     BookSource source, {
     required bool isSearch,
   }) {
     if (isSearch) {
       final searchRule = source.ruleSearch;
       if (searchRule == null) return null;
-      return _ResolvedBookListRule(
+      return ResolvedBookListRule(
         rule: searchRule,
         usedSearchRuleAsExploreFallback: false,
       );
@@ -3320,7 +3322,7 @@ class RuleParserEngine {
 
     final exploreRule = source.ruleExplore;
     if (exploreRule != null && (exploreRule.bookList ?? '').trim().isNotEmpty) {
-      return _ResolvedBookListRule(
+      return ResolvedBookListRule(
         rule: exploreRule,
         usedSearchRuleAsExploreFallback: false,
       );
@@ -3328,14 +3330,14 @@ class RuleParserEngine {
 
     final searchRule = source.ruleSearch;
     if (searchRule != null) {
-      return _ResolvedBookListRule(
+      return ResolvedBookListRule(
         rule: searchRule,
         usedSearchRuleAsExploreFallback: true,
       );
     }
 
     if (exploreRule != null) {
-      return _ResolvedBookListRule(
+      return ResolvedBookListRule(
         rule: exploreRule,
         usedSearchRuleAsExploreFallback: false,
       );
@@ -3617,7 +3619,7 @@ class RuleParserEngine {
     );
   }
 
-  _BookListAnalyzeOutcome _analyzeBookListLikeLegado({
+  BookListAnalyzeOutcome _analyzeBookListLikeLegado({
     required BookSource source,
     required BookListRule rule,
     required String requestUrl,
@@ -3647,7 +3649,7 @@ class RuleParserEngine {
       );
       final infoList =
           info == null ? const <SearchResult>[] : <SearchResult>[info];
-      return _BookListAnalyzeOutcome(
+      return BookListAnalyzeOutcome(
         results: infoList,
         listCount: 0,
         fieldSample: info == null
@@ -3850,7 +3852,7 @@ class RuleParserEngine {
       }
     }
 
-    return _BookListAnalyzeOutcome(
+    return BookListAnalyzeOutcome(
       results: out,
       listCount: listCount,
       fieldSample: fieldSample,
@@ -4129,7 +4131,7 @@ class RuleParserEngine {
         final firstBookUrl = await _debugBookListThenPickFirst(
           source: source,
           keyOrUrl: url,
-          mode: _DebugListMode.explore,
+          mode: DebugListMode.explore,
           exploreUrlOverride: url,
           fetchStage: fetchStage,
           log: log,
@@ -4184,7 +4186,7 @@ class RuleParserEngine {
       final firstBookUrl = await _debugBookListThenPickFirst(
         source: source,
         keyOrUrl: trimmed,
-        mode: _DebugListMode.search,
+        mode: DebugListMode.search,
         fetchStage: fetchStage,
         log: log,
       );
@@ -4215,14 +4217,14 @@ class RuleParserEngine {
   Future<String?> _debugBookListThenPickFirst({
     required BookSource source,
     required String keyOrUrl,
-    required _DebugListMode mode,
+    required DebugListMode mode,
     String? exploreUrlOverride,
     required Future<FetchDebugResult> Function(String url,
             {required int rawState})
         fetchStage,
     required void Function(String msg, {int state, bool showTime}) log,
   }) async {
-    final isSearch = mode == _DebugListMode.search;
+    final isSearch = mode == DebugListMode.search;
     final resolved = _resolveBookListRuleForStage(
       source,
       isSearch: isSearch,
@@ -6060,7 +6062,7 @@ class RuleParserEngine {
     }
   }
 
-  _NormalizedListRule _normalizeListRule(String? rawRule) {
+  NormalizedListRule _normalizeListRule(String? rawRule) {
     var rule = (rawRule ?? '').trim();
     var reverse = false;
     if (rule.startsWith('-')) {
@@ -6070,7 +6072,7 @@ class RuleParserEngine {
     if (rule.startsWith('+')) {
       rule = rule.substring(1);
     }
-    return _NormalizedListRule(selector: rule.trim(), reverse: reverse);
+    return NormalizedListRule(selector: rule.trim(), reverse: reverse);
   }
 
   List<TocItem> _postProcessTocLikeLegado({
@@ -6941,7 +6943,7 @@ class RuleParserEngine {
         .addAll(parsedUrl.option?.headers ?? const <String, String>{});
 
     var finalUrl = parsedUrl.url;
-    _UrlJsPatchResult? urlJsPatch;
+    UrlJsPatchResult? urlJsPatch;
     if (parsedUrl.option?.js != null &&
         parsedUrl.option!.js!.trim().isNotEmpty) {
       urlJsPatch = _applyLegadoUrlOptionJs(
@@ -7082,8 +7084,8 @@ class RuleParserEngine {
       );
     } catch (e) {
       sw.stop();
-      final actualError = e is _RequestRetryFailure ? e.error : e;
-      final actualRetryCount = e is _RequestRetryFailure ? e.retryCount : retry;
+      final actualError = e is RequestRetryFailure ? e.error : e;
+      final actualRetryCount = e is RequestRetryFailure ? e.retryCount : retry;
       if (actualError is DioException &&
           actualError.type == DioExceptionType.cancel) {
         throw actualError;
@@ -7443,13 +7445,13 @@ class RuleParserEngine {
     return rule;
   }
 
-  ({String expr, List<_LegadoReplacePair> replacements})
+  ({String expr, List<LegadoReplacePair> replacements})
       _splitExprAndReplacements(
     String raw,
   ) {
     final parts = raw.split('##');
     final expr = parts.first.trim();
-    final reps = <_LegadoReplacePair>[];
+    final reps = <LegadoReplacePair>[];
     if (parts.length > 1) {
       final rep = parts.sublist(1);
       for (var i = 0; i < rep.length; i += 2) {
@@ -7457,7 +7459,7 @@ class RuleParserEngine {
         final replacement = (i + 1) < rep.length ? rep[i + 1] : '';
         if (pattern.isEmpty) continue;
         reps.add(
-            _LegadoReplacePair(pattern: pattern, replacement: replacement));
+            LegadoReplacePair(pattern: pattern, replacement: replacement));
       }
     }
     return (expr: expr, replacements: reps);
@@ -7747,7 +7749,7 @@ class RuleParserEngine {
   }) {
     if (rule.isEmpty) return '';
 
-    final parsed = _LegadoTextRule.parse(
+    final parsed = LegadoTextRule.parse(
       rule,
       isExtractor: _isExtractorToken,
     );
@@ -7777,7 +7779,7 @@ class RuleParserEngine {
 
   List<Element> _selectAllBySelectors(
     dynamic parent,
-    List<_LegadoSelectorStep> steps,
+    List<LegadoSelectorStep> steps,
   ) {
     List<dynamic> contexts = <dynamic>[parent];
 
@@ -7864,7 +7866,7 @@ class RuleParserEngine {
 
   List<Element> _applyLegadoIndexSpec(
     List<Element> elements,
-    _LegadoIndexSpec spec,
+    LegadoIndexSpec spec,
   ) {
     if (elements.isEmpty) return const <Element>[];
     final len = elements.length;
@@ -7909,7 +7911,7 @@ class RuleParserEngine {
     return len >= -index ? (index + len) : null;
   }
 
-  Iterable<int> _expandLegadoRange(_LegadoIndexTerm range, int len) sync* {
+  Iterable<int> _expandLegadoRange(LegadoIndexTerm range, int len) sync* {
     var start = range.start ?? 0;
     if (start < 0) start += len;
 
@@ -8143,15 +8145,15 @@ class RuleParserEngine {
     return out;
   }
 
-  _NthExpr? _parseNthExpr(String raw) {
+  NthExpr? _parseNthExpr(String raw) {
     final t = raw.trim().toLowerCase().replaceAll(' ', '');
     if (t.isEmpty) return null;
-    if (t == 'odd') return const _NthExpr(a: 2, b: 1);
-    if (t == 'even') return const _NthExpr(a: 2, b: 0);
+    if (t == 'odd') return const NthExpr(a: 2, b: 1);
+    if (t == 'even') return const NthExpr(a: 2, b: 0);
 
     if (!t.contains('n')) {
       final v = int.tryParse(t);
-      return v == null ? null : _NthExpr(a: 0, b: v);
+      return v == null ? null : NthExpr(a: 0, b: v);
     }
 
     final parts = t.split('n');
@@ -8172,10 +8174,10 @@ class RuleParserEngine {
       b = int.tryParse(bPart) ?? 0;
     }
 
-    return _NthExpr(a: a, b: b);
+    return NthExpr(a: a, b: b);
   }
 
-  bool _matchesNth(_NthExpr expr, int position1Based) {
+  bool _matchesNth(NthExpr expr, int position1Based) {
     final a = expr.a;
     final b = expr.b;
     final p = position1Based;
@@ -8195,9 +8197,9 @@ class RuleParserEngine {
     }
   }
 
-  List<_SelectorStepCompat> _tokenizeSelectorChain(String selector) {
+  List<SelectorStepCompat> _tokenizeSelectorChain(String selector) {
     // 仅实现 legado 常见链式：后代（空格）/子代（>）/兄弟（+、~）
-    final steps = <_SelectorStepCompat>[];
+    final steps = <SelectorStepCompat>[];
     final buf = StringBuffer();
 
     var bracket = 0;
@@ -8210,7 +8212,7 @@ class RuleParserEngine {
       if (raw.isEmpty) return;
       final extracted = _extractNthFilters(raw);
       steps.add(
-        _SelectorStepCompat(
+        SelectorStepCompat(
           combinator: combinator,
           selector: extracted.baseSelector,
           nthFilters: extracted.filters,
@@ -8263,7 +8265,7 @@ class RuleParserEngine {
     // 规范：第一个 step combinator 置空（不管前面怎么解析的）
     if (steps.isNotEmpty) {
       final first = steps.first;
-      steps[0] = _SelectorStepCompat(
+      steps[0] = SelectorStepCompat(
         combinator: '',
         selector: first.selector,
         nthFilters: first.nthFilters,
@@ -8272,9 +8274,9 @@ class RuleParserEngine {
     return steps;
   }
 
-  _NthExtractResult _extractNthFilters(String rawSelectorPart) {
+  NthExtractResult _extractNthFilters(String rawSelectorPart) {
     var s = rawSelectorPart;
-    final filters = <_NthFilter>[];
+    final filters = <NthFilter>[];
 
     // 只处理最常用的四种；避免误伤其它伪类（例如 :not(...)）
     final kinds = <String>[
@@ -8309,14 +8311,14 @@ class RuleParserEngine {
         final exprText = s.substring(start, end);
         final expr = _parseNthExpr(exprText);
         if (expr != null) {
-          filters.add(_NthFilter(kind: kind, expr: expr));
+          filters.add(NthFilter(kind: kind, expr: expr));
         }
         s = (s.substring(0, idx) + s.substring(end + 1)).trim();
       }
     }
 
     if (s.trim().isEmpty) s = '*';
-    return _NthExtractResult(baseSelector: s.trim(), filters: filters);
+    return NthExtractResult(baseSelector: s.trim(), filters: filters);
   }
 
   List<Element> _querySelectorAllCompat(dynamic ctx, String selector) {
@@ -8358,7 +8360,7 @@ class RuleParserEngine {
     }
 
     List<Element> applyNthFilters(
-        List<Element> elements, List<_NthFilter> filters) {
+        List<Element> elements, List<NthFilter> filters) {
       if (filters.isEmpty || elements.isEmpty) return elements;
       return elements.where((el) {
         final parent = el.parent;
@@ -8514,7 +8516,7 @@ class RuleParserEngine {
       }
     }
 
-    final parsed = _LegadoTextRule.parse(
+    final parsed = LegadoTextRule.parse(
       raw,
       isExtractor: _isExtractorToken,
     );
@@ -8601,7 +8603,7 @@ class RuleParserEngine {
 
   String _applyInlineReplacements(
     String input,
-    List<_LegadoReplacePair> replacements,
+    List<LegadoReplacePair> replacements,
   ) {
     var result = input;
     for (final r in replacements) {
@@ -8696,1117 +8698,3 @@ class RuleParserEngine {
   }
 }
 
-class _LegadoTextRule {
-  final List<_LegadoSelectorStep> selectors;
-  final List<String> extractors;
-  final List<_LegadoReplacePair> replacements;
-
-  const _LegadoTextRule({
-    required this.selectors,
-    required this.extractors,
-    required this.replacements,
-  });
-
-  static _LegadoTextRule parse(
-    String raw, {
-    required bool Function(String token) isExtractor,
-  }) {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) {
-      return const _LegadoTextRule(
-        selectors: <_LegadoSelectorStep>[],
-        extractors: <String>['text'],
-        replacements: <_LegadoReplacePair>[],
-      );
-    }
-
-    final parts = trimmed.split('##');
-    final pipeline = parts.first.trim();
-
-    final replacements = <_LegadoReplacePair>[];
-    if (parts.length > 1) {
-      final rep = parts.sublist(1).toList(growable: false);
-      var start = 0;
-      // 对齐 legado：当 replace 段为奇数时，首段按 replaceFirst 处理（如 `##a##b###`）。
-      if (rep.length >= 3 && rep.length.isOdd) {
-        final firstPattern = rep[0].trim();
-        if (firstPattern.isNotEmpty) {
-          replacements.add(
-            _LegadoReplacePair(
-              pattern: firstPattern,
-              replacement: rep[1],
-              firstOnly: true,
-            ),
-          );
-        }
-        start = 3;
-      }
-
-      for (var i = start; i < rep.length; i += 2) {
-        final pattern = rep[i].trim();
-        final replacement = (i + 1) < rep.length ? rep[i + 1] : '';
-        if (pattern.isEmpty) continue;
-        replacements.add(
-          _LegadoReplacePair(
-            pattern: pattern,
-            replacement: replacement,
-          ),
-        );
-      }
-    }
-
-    final tokens = pipeline
-        .split('@')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList(growable: false);
-
-    // 从末尾识别 extractor（对标 legado：h1@title@text 表示 title 为空则取 text）
-    final startsWithAt = pipeline.startsWith('@');
-    var cut = tokens.length;
-    final extractors = <String>[];
-    if (startsWithAt) {
-      // 兼容 legado 写法：@href / @textNodes 等表示“当前元素取属性/文本”
-      for (final t in tokens) {
-        if (isExtractor(t)) extractors.add(t);
-      }
-      cut = 0;
-    } else if (tokens.length == 1 && isExtractor(tokens.first)) {
-      // 对齐 legado：单 token 规则如 text / href 视为“当前元素 extractor”，
-      // 不能当作 selector，否则会出现 chapterName=text / chapterUrl=href 取值为空。
-      extractors.add(tokens.first);
-      cut = 0;
-    } else if (tokens.length >= 2) {
-      while (cut > 0) {
-        final candidate = tokens[cut - 1];
-        if (!isExtractor(candidate)) break;
-        extractors.insert(0, candidate);
-        cut--;
-      }
-    }
-
-    final selectors = <_LegadoSelectorStep>[];
-    for (final t in tokens.take(cut)) {
-      final step = _LegadoSelectorStep.tryParse(t);
-      if (step != null) selectors.add(step);
-    }
-
-    return _LegadoTextRule(
-      selectors: selectors,
-      extractors: extractors.isEmpty ? const <String>['text'] : extractors,
-      replacements: replacements,
-    );
-  }
-}
-
-class _LegadoSelectorStep {
-  final String cssSelector;
-  final _LegadoIndexSpec? indexSpec;
-  final bool childrenOnly;
-  final String? ownTextContains;
-
-  const _LegadoSelectorStep({
-    required this.cssSelector,
-    required this.indexSpec,
-    this.childrenOnly = false,
-    this.ownTextContains,
-  });
-
-  static _LegadoSelectorStep? tryParse(String token) {
-    final t = token.trim();
-    if (t.isEmpty) return null;
-
-    var base = t;
-    _LegadoIndexSpec? indexSpec;
-
-    final bracketParsed = _tryParseBracketIndex(t);
-    if (bracketParsed != null) {
-      base = bracketParsed.base;
-      indexSpec = bracketParsed.spec;
-    } else {
-      final dotParsed = _tryParseDotIndex(t);
-      if (dotParsed != null) {
-        base = dotParsed.base;
-        indexSpec = dotParsed.spec;
-      }
-    }
-
-    final selectorBase = _parseLegacySelectorBase(base);
-    if (selectorBase.textSelector &&
-        (selectorBase.ownTextContains == null ||
-            selectorBase.ownTextContains!.isEmpty)) {
-      return null;
-    }
-
-    base = selectorBase.cssBase;
-    final css = _toCssSelector(base);
-    if (css.trim().isEmpty) {
-      // 对齐 legado：允许仅写索引（如 [0]），语义等价于当前节点 children。
-      if (indexSpec != null && base.trim().isEmpty) {
-        return _LegadoSelectorStep(
-          cssSelector: '*',
-          indexSpec: indexSpec,
-          childrenOnly: true,
-          ownTextContains: null,
-        );
-      }
-      return null;
-    }
-    return _LegadoSelectorStep(
-      cssSelector: css,
-      indexSpec: indexSpec,
-      childrenOnly: selectorBase.childrenOnly,
-      ownTextContains: selectorBase.ownTextContains,
-    );
-  }
-
-  static ({
-    String cssBase,
-    bool childrenOnly,
-    bool textSelector,
-    String? ownTextContains,
-  }) _parseLegacySelectorBase(String raw) {
-    final t = raw.trim();
-    if (t == 'children' || t.startsWith('children.')) {
-      return (
-        cssBase: '*',
-        childrenOnly: true,
-        textSelector: false,
-        ownTextContains: null,
-      );
-    }
-
-    if (t.startsWith('text.')) {
-      var keyword = t.substring('text.'.length);
-      final nextDot = keyword.indexOf('.');
-      if (nextDot >= 0) {
-        keyword = keyword.substring(0, nextDot);
-      }
-      keyword = keyword.trim();
-      return (
-        cssBase: '*',
-        childrenOnly: false,
-        textSelector: true,
-        ownTextContains: keyword.isEmpty ? null : keyword,
-      );
-    }
-
-    return (
-      cssBase: t,
-      childrenOnly: false,
-      textSelector: false,
-      ownTextContains: null,
-    );
-  }
-
-  static ({String base, _LegadoIndexSpec spec})? _tryParseDotIndex(
-    String token,
-  ) {
-    ({String base, _LegadoIndexSpec spec})? parseBySplit(
-      int splitPos, {
-      required bool exclude,
-    }) {
-      if (splitPos < 0 || splitPos >= token.length - 1) return null;
-      final body = token.substring(splitPos + 1).trim();
-      final values = _parseLegacyColonIndexes(body);
-      if (values == null || values.isEmpty) return null;
-      final base = token.substring(0, splitPos).trimRight();
-      return (
-        base: base,
-        spec: _LegadoIndexSpec(
-          exclude: exclude,
-          terms: values
-              .map((v) => _LegadoIndexTerm.value(v))
-              .toList(growable: false),
-        ),
-      );
-    }
-
-    // 旧语法：selector!0:3（排除）
-    final bangPos = token.lastIndexOf('!');
-    if (bangPos >= 0) {
-      final parsed = parseBySplit(bangPos, exclude: true);
-      if (parsed != null) return parsed;
-    }
-
-    // 旧语法：selector.-1:10:2（选择）
-    for (var pos = token.length - 1; pos >= 0; pos--) {
-      if (token[pos] != '.') continue;
-      final parsed = parseBySplit(pos, exclude: false);
-      if (parsed != null) return parsed;
-    }
-
-    return null;
-  }
-
-  static List<int>? _parseLegacyColonIndexes(String raw) {
-    final t = raw.trim();
-    if (t.isEmpty) return null;
-    final out = <int>[];
-    for (final part in t.split(':')) {
-      final v = int.tryParse(part.trim());
-      if (v == null) return null;
-      out.add(v);
-    }
-    return out;
-  }
-
-  static ({String base, _LegadoIndexSpec spec})? _tryParseBracketIndex(
-    String token,
-  ) {
-    if (!token.endsWith(']')) return null;
-    final start = _findTrailingBracketStart(token);
-    if (start < 0) return null;
-
-    final body = token.substring(start + 1, token.length - 1).trim();
-    if (body.isEmpty) return null;
-
-    // 只接受 legado 索引语法字符，避免把 CSS 属性选择器误判为索引列表。
-    for (final rune in body.runes) {
-      final ch = String.fromCharCode(rune);
-      final isDigit = rune >= 0x30 && rune <= 0x39;
-      final isAllowed = isDigit ||
-          ch == '-' ||
-          ch == ':' ||
-          ch == ',' ||
-          ch == '!' ||
-          ch == ' ';
-      if (!isAllowed) return null;
-    }
-
-    var includeBody = body;
-    var exclude = false;
-    if (includeBody.startsWith('!')) {
-      exclude = true;
-      includeBody = includeBody.substring(1).trimLeft();
-      if (includeBody.isEmpty) return null;
-    }
-
-    final terms = <_LegadoIndexTerm>[];
-    final segments = includeBody.split(',');
-    for (final segment in segments) {
-      final raw = segment.trim();
-      if (raw.isEmpty) return null;
-
-      final colonCount = ':'.allMatches(raw).length;
-      if (colonCount == 0) {
-        final value = int.tryParse(raw);
-        if (value == null) return null;
-        terms.add(_LegadoIndexTerm.value(value));
-        continue;
-      }
-
-      if (colonCount > 2) return null;
-      final parts = raw.split(':');
-      if (parts.length < 2 || parts.length > 3) return null;
-
-      int? parseNullableInt(String s) {
-        final t = s.trim();
-        if (t.isEmpty) return null;
-        return int.tryParse(t);
-      }
-
-      final startRaw = parts[0].trim();
-      final endRaw = parts[1].trim();
-      final stepRaw = parts.length == 3 ? parts[2].trim() : '';
-
-      final startVal = parseNullableInt(parts[0]);
-      final endVal = parseNullableInt(parts[1]);
-      if (startRaw.isNotEmpty && startVal == null) return null;
-      if (endRaw.isNotEmpty && endVal == null) return null;
-
-      var stepVal = 1;
-      if (parts.length == 3) {
-        final parsedStep = parseNullableInt(parts[2]);
-        if (stepRaw.isNotEmpty && parsedStep == null) return null;
-        stepVal = parsedStep ?? 1;
-      }
-      if (stepVal == 0) stepVal = 1;
-
-      terms.add(
-        _LegadoIndexTerm.range(
-          start: startVal,
-          end: endVal,
-          step: stepVal,
-        ),
-      );
-    }
-
-    if (terms.isEmpty) return null;
-    final base = token.substring(0, start).trimRight();
-    return (
-      base: base,
-      spec: _LegadoIndexSpec(
-        exclude: exclude,
-        terms: terms,
-      ),
-    );
-  }
-
-  static int _findTrailingBracketStart(String token) {
-    var depth = 0;
-    for (var i = token.length - 1; i >= 0; i--) {
-      final ch = token[i];
-      if (ch == ']') {
-        depth++;
-        continue;
-      }
-      if (ch != '[') continue;
-      depth--;
-      if (depth == 0) return i;
-      if (depth < 0) return -1;
-    }
-    return -1;
-  }
-
-  static String _toCssSelector(String raw) {
-    final t = raw.trim();
-    if (t.startsWith('class.')) {
-      return '.${t.substring('class.'.length)}';
-    }
-    if (t.startsWith('id.')) {
-      return '#${t.substring('id.'.length)}';
-    }
-    if (t.startsWith('tag.')) {
-      return t.substring('tag.'.length);
-    }
-    if (t.startsWith('css.')) {
-      return t.substring('css.'.length);
-    }
-    return t;
-  }
-}
-
-class _LegadoIndexSpec {
-  final bool exclude;
-  final List<_LegadoIndexTerm> terms;
-
-  const _LegadoIndexSpec({
-    this.exclude = false,
-    required this.terms,
-  });
-}
-
-class _LegadoIndexTerm {
-  final int? value;
-  final int? start;
-  final int? end;
-  final int step;
-
-  const _LegadoIndexTerm.value(int value)
-      : this._(
-          value: value,
-          start: null,
-          end: null,
-          step: 1,
-        );
-
-  const _LegadoIndexTerm.range({
-    required int? start,
-    required int? end,
-    required int step,
-  }) : this._(
-          value: null,
-          start: start,
-          end: end,
-          step: step,
-        );
-
-  const _LegadoIndexTerm._({
-    required this.value,
-    required this.start,
-    required this.end,
-    required this.step,
-  });
-
-  bool get isRange => value == null;
-}
-
-class _LegadoReplacePair {
-  final String pattern;
-  final String replacement;
-  final bool firstOnly;
-
-  const _LegadoReplacePair({
-    required this.pattern,
-    required this.replacement,
-    this.firstOnly = false,
-  });
-}
-
-class _TopLevelRuleSplit {
-  final List<String> parts;
-  final String? operator;
-
-  const _TopLevelRuleSplit({
-    required this.parts,
-    required this.operator,
-  });
-}
-
-class _ConcurrentRateSpec {
-  final String raw;
-  final bool isWindowMode;
-  final int? intervalMs;
-  final int? maxCount;
-  final int? windowMs;
-
-  const _ConcurrentRateSpec.interval({
-    required this.raw,
-    required this.intervalMs,
-  })  : isWindowMode = false,
-        maxCount = null,
-        windowMs = null;
-
-  const _ConcurrentRateSpec.window({
-    required this.raw,
-    required this.maxCount,
-    required this.windowMs,
-  })  : isWindowMode = true,
-        intervalMs = null;
-
-  String get modeLabel {
-    if (!isWindowMode) {
-      return '间隔模式 ${intervalMs ?? 0}ms';
-    }
-    return '窗口模式 ${maxCount ?? 0}/${windowMs ?? 0}ms';
-  }
-}
-
-class _ConcurrentRecord {
-  final bool isWindowMode;
-  int timeMs;
-  int frequency;
-
-  _ConcurrentRecord({
-    required this.isWindowMode,
-    required this.timeMs,
-    required this.frequency,
-  });
-}
-
-class _ConcurrentAcquireStep {
-  final _ConcurrentRecord? record;
-  final int waitMs;
-  final String decision;
-
-  const _ConcurrentAcquireStep({
-    required this.record,
-    required this.waitMs,
-    required this.decision,
-  });
-}
-
-class _ConcurrentAcquireResult {
-  final _ConcurrentRecord? record;
-  final int waitMs;
-  final String decision;
-
-  const _ConcurrentAcquireResult({
-    required this.record,
-    required this.waitMs,
-    required this.decision,
-  });
-}
-
-enum _DebugListMode { search, explore }
-
-class SourceDebugEvent {
-  final int state;
-  final String message;
-  final bool isRaw;
-
-  const SourceDebugEvent({
-    required this.state,
-    required this.message,
-    this.isRaw = false,
-  });
-}
-
-enum DebugRequestType { search, explore, bookInfo, toc, content }
-
-class ScriptHttpResponse {
-  final String requestUrl;
-  final String finalUrl;
-  final int statusCode;
-  final String statusMessage;
-  final Map<String, String> headers;
-  final String body;
-
-  const ScriptHttpResponse({
-    required this.requestUrl,
-    required this.finalUrl,
-    required this.statusCode,
-    required this.statusMessage,
-    required this.headers,
-    required this.body,
-  });
-}
-
-class FetchDebugResult {
-  final String requestUrl;
-  final String? finalUrl;
-  final int? statusCode;
-  final int elapsedMs;
-  final bool isRedirect;
-  final String method;
-  final String? requestBodySnippet;
-  final String? responseCharset;
-  final int responseLength;
-  final String? responseSnippet;
-  final Map<String, String> requestHeaders;
-  final String? headersWarning;
-  final Map<String, String> responseHeaders;
-  final String? error;
-
-  /// 实际重试次数（不含首发请求）。
-  final int retryCount;
-
-  /// method 的最终决策说明。
-  final String methodDecision;
-
-  /// retry 的配置与归一化决策说明。
-  final String retryDecision;
-
-  /// 请求参数编码决策（url query / form body）。
-  final String requestCharsetDecision;
-
-  /// 请求体编码类型：none/form/json/raw。
-  final String bodyEncoding;
-
-  /// 请求体编码策略说明。
-  final String bodyDecision;
-
-  /// 响应编码来源：urlOption.charset / header / meta / default。
-  final String? responseCharsetSource;
-
-  /// 响应编码判定与解码器决策说明。
-  final String? responseCharsetDecision;
-
-  /// 并发率限流累计等待时长（毫秒）。
-  final int concurrentWaitMs;
-
-  /// 并发率决策说明（对标 legado：间隔模式 / 窗口模式）。
-  final String concurrentDecision;
-
-  /// 原始响应体（仅用于编辑器调试；不要在普通 UI 中到处传递）
-  final String? body;
-
-  const FetchDebugResult({
-    required this.requestUrl,
-    required this.finalUrl,
-    required this.statusCode,
-    required this.elapsedMs,
-    this.isRedirect = false,
-    this.method = 'GET',
-    this.requestBodySnippet,
-    this.responseCharset,
-    required this.responseLength,
-    required this.responseSnippet,
-    required this.requestHeaders,
-    required this.headersWarning,
-    required this.responseHeaders,
-    required this.error,
-    this.retryCount = 0,
-    this.methodDecision = '未解析',
-    this.retryDecision = '未解析',
-    this.requestCharsetDecision = '未解析',
-    this.bodyEncoding = 'none',
-    this.bodyDecision = '未解析',
-    this.responseCharsetSource,
-    this.responseCharsetDecision,
-    this.concurrentWaitMs = 0,
-    this.concurrentDecision = '未启用并发率限制',
-    required this.body,
-  });
-
-  factory FetchDebugResult.empty() {
-    return const FetchDebugResult(
-      requestUrl: '',
-      finalUrl: null,
-      statusCode: null,
-      elapsedMs: 0,
-      isRedirect: false,
-      method: 'GET',
-      requestBodySnippet: null,
-      responseCharset: null,
-      responseLength: 0,
-      responseSnippet: null,
-      requestHeaders: {},
-      headersWarning: null,
-      responseHeaders: {},
-      error: null,
-      retryCount: 0,
-      methodDecision: '未解析',
-      retryDecision: '未解析',
-      requestCharsetDecision: '未解析',
-      bodyEncoding: 'none',
-      bodyDecision: '未解析',
-      responseCharsetSource: null,
-      responseCharsetDecision: null,
-      concurrentWaitMs: 0,
-      concurrentDecision: '未启用并发率限制',
-      body: null,
-    );
-  }
-}
-
-class _LegadoUrlParsed {
-  final String url;
-  final _LegadoUrlOption? option;
-
-  const _LegadoUrlParsed({
-    required this.url,
-    required this.option,
-  });
-}
-
-class _LegadoUrlOption {
-  final String? method;
-  final String? body;
-  final String? charset;
-  final int? retry;
-  final Map<String, String> headers;
-  final String? origin;
-  final String? js;
-
-  const _LegadoUrlOption({
-    required this.method,
-    required this.body,
-    required this.charset,
-    required this.retry,
-    required this.headers,
-    required this.origin,
-    required this.js,
-  });
-
-  factory _LegadoUrlOption.fromJson(Map<String, dynamic> json) {
-    String? getString(String key) {
-      final v = json[key];
-      if (v == null) return null;
-      final t = v.toString().trim();
-      return t.isEmpty ? null : t;
-    }
-
-    Map<String, String> parseHeaders(dynamic raw) {
-      final out = <String, String>{};
-      if (raw == null) return out;
-      if (raw is Map) {
-        raw.forEach((k, v) {
-          if (k == null || v == null) return;
-          final key = k.toString().trim();
-          if (key.isEmpty) return;
-          out[key] = v.toString();
-        });
-        return out;
-      }
-      if (raw is String) {
-        final t = raw.trim();
-        if (t.isEmpty) return out;
-        // 对标 legado：UrlOption.headers 允许为 JSON 字符串
-        if (t.startsWith('{') && t.endsWith('}')) {
-          try {
-            final decoded = jsonDecode(t);
-            if (decoded is Map) {
-              decoded.forEach((k, v) {
-                if (k == null || v == null) return;
-                final key = k.toString().trim();
-                if (key.isEmpty) return;
-                out[key] = v.toString();
-              });
-              return out;
-            }
-          } catch (_) {
-            // fallthrough
-          }
-        }
-        // 兼容编辑器里每行 key:value 的形式
-        for (final line in t.split('\n')) {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty) continue;
-          final idx = trimmed.indexOf(':');
-          if (idx <= 0) continue;
-          final key = trimmed.substring(0, idx).trim();
-          final value = trimmed.substring(idx + 1).trim();
-          if (key.isEmpty) continue;
-          out[key] = value;
-        }
-        return out;
-      }
-      // 兜底：toString 后尝试 JSON
-      final t = raw.toString().trim();
-      if (t.isEmpty) return out;
-      if (t.startsWith('{') && t.endsWith('}')) {
-        try {
-          final decoded = jsonDecode(t);
-          if (decoded is Map) {
-            decoded.forEach((k, v) {
-              if (k == null || v == null) return;
-              final key = k.toString().trim();
-              if (key.isEmpty) return;
-              out[key] = v.toString();
-            });
-          }
-        } catch (_) {
-          // ignore
-        }
-      }
-      return out;
-    }
-
-    String? parseBody(dynamic raw) {
-      if (raw == null) return null;
-      if (raw is String) {
-        final t = raw.trimRight();
-        return t.isEmpty ? null : raw;
-      }
-      try {
-        return jsonEncode(raw);
-      } catch (_) {
-        final t = raw.toString();
-        return t.trim().isEmpty ? null : t;
-      }
-    }
-
-    int? parseRetry(dynamic raw) {
-      if (raw == null) return null;
-      if (raw is int) return raw;
-      if (raw is num) return raw.toInt();
-      final text = raw.toString().trim();
-      if (text.isEmpty) return null;
-      return int.tryParse(text);
-    }
-
-    final headers = parseHeaders(
-      json.containsKey('headers') ? json['headers'] : json['header'],
-    );
-
-    return _LegadoUrlOption(
-      method: getString('method'),
-      body: parseBody(json['body']),
-      charset: getString('charset'),
-      retry: parseRetry(json['retry']),
-      headers: headers,
-      origin: getString('origin'),
-      js: getString('js'),
-    );
-  }
-}
-
-class _UrlJsPatchResult {
-  final bool ok;
-  final String url;
-  final Map<String, String> headers;
-  final String? error;
-
-  const _UrlJsPatchResult({
-    required this.ok,
-    required this.url,
-    required this.headers,
-    required this.error,
-  });
-}
-
-class _RequestRetryFailure {
-  final Object error;
-  final int retryCount;
-
-  const _RequestRetryFailure({
-    required this.error,
-    required this.retryCount,
-  });
-
-  @override
-  String toString() =>
-      '_RequestRetryFailure(retryCount=$retryCount, error=$error)';
-}
-
-class _DecodedText {
-  final String text;
-  final String charset;
-  final String charsetSource;
-  final String charsetDecision;
-
-  const _DecodedText({
-    required this.text,
-    required this.charset,
-    required this.charsetSource,
-    required this.charsetDecision,
-  });
-}
-
-class _ParsedHeaders {
-  final Map<String, String> headers;
-  final String? warning;
-
-  const _ParsedHeaders({
-    required this.headers,
-    required this.warning,
-  });
-
-  static const empty = _ParsedHeaders(headers: {}, warning: null);
-
-  @override
-  String toString() => 'headers=$headers warning=$warning';
-}
-
-class _SelectorStepCompat {
-  // '' for first, ' ' descendant, '>' child, '+' adjacent, '~' sibling
-  final String combinator;
-  final String selector;
-  final List<_NthFilter> nthFilters;
-
-  const _SelectorStepCompat({
-    required this.combinator,
-    required this.selector,
-    required this.nthFilters,
-  });
-}
-
-class _NthFilter {
-  // nth-child / nth-last-child / nth-of-type / nth-last-of-type
-  final String kind;
-  final _NthExpr expr;
-
-  const _NthFilter({required this.kind, required this.expr});
-}
-
-class _NthExpr {
-  final int a;
-  final int b;
-
-  const _NthExpr({required this.a, required this.b});
-}
-
-class _NthExtractResult {
-  final String baseSelector;
-  final List<_NthFilter> filters;
-
-  const _NthExtractResult({required this.baseSelector, required this.filters});
-}
-
-class _NormalizedListRule {
-  final String selector;
-  final bool reverse;
-
-  const _NormalizedListRule({
-    required this.selector,
-    required this.reverse,
-  });
-
-  @override
-  String toString() => 'selector=$selector reverse=$reverse';
-}
-
-class _ResolvedBookListRule {
-  final BookListRule rule;
-  final bool usedSearchRuleAsExploreFallback;
-
-  const _ResolvedBookListRule({
-    required this.rule,
-    required this.usedSearchRuleAsExploreFallback,
-  });
-}
-
-class _BookListAnalyzeOutcome {
-  final List<SearchResult> results;
-  final int listCount;
-  final Map<String, String> fieldSample;
-  final String? listRuleRaw;
-  final bool usedInfoFallback;
-
-  const _BookListAnalyzeOutcome({
-    required this.results,
-    required this.listCount,
-    required this.fieldSample,
-    required this.listRuleRaw,
-    required this.usedInfoFallback,
-  });
-}
-
-class SearchDebugResult {
-  final FetchDebugResult fetch;
-  final DebugRequestType requestType;
-  final String? requestUrlRule;
-  final String? listRule;
-  final int listCount;
-  final List<SearchResult> results;
-  final Map<String, String> fieldSample;
-  final String? error;
-
-  const SearchDebugResult({
-    required this.fetch,
-    required this.requestType,
-    required this.requestUrlRule,
-    required this.listRule,
-    required this.listCount,
-    required this.results,
-    required this.fieldSample,
-    required this.error,
-  });
-}
-
-class ExploreDebugResult {
-  final FetchDebugResult fetch;
-  final DebugRequestType requestType;
-  final String? requestUrlRule;
-  final String? listRule;
-  final int listCount;
-  final List<SearchResult> results;
-  final Map<String, String> fieldSample;
-  final String? error;
-
-  const ExploreDebugResult({
-    required this.fetch,
-    required this.requestType,
-    required this.requestUrlRule,
-    required this.listRule,
-    required this.listCount,
-    required this.results,
-    required this.fieldSample,
-    required this.error,
-  });
-}
-
-class BookInfoDebugResult {
-  final FetchDebugResult fetch;
-  final DebugRequestType requestType;
-  final String? requestUrlRule;
-  final String? initRule;
-  final bool initMatched;
-  final BookDetail? detail;
-  final Map<String, String> fieldSample;
-  final String? error;
-
-  const BookInfoDebugResult({
-    required this.fetch,
-    required this.requestType,
-    required this.requestUrlRule,
-    required this.initRule,
-    required this.initMatched,
-    required this.detail,
-    required this.fieldSample,
-    required this.error,
-  });
-}
-
-class TocDebugResult {
-  final FetchDebugResult fetch;
-  final DebugRequestType requestType;
-  final String? requestUrlRule;
-  final String? listRule;
-  final int listCount;
-  final List<TocItem> toc;
-  final Map<String, String> fieldSample;
-  final String? error;
-
-  const TocDebugResult({
-    required this.fetch,
-    required this.requestType,
-    required this.requestUrlRule,
-    required this.listRule,
-    required this.listCount,
-    required this.toc,
-    required this.fieldSample,
-    required this.error,
-  });
-}
-
-class ContentDebugResult {
-  final FetchDebugResult fetch;
-  final DebugRequestType requestType;
-  final String? requestUrlRule;
-  final int extractedLength;
-  final int cleanedLength;
-  final String content;
-  final String? error;
-
-  const ContentDebugResult({
-    required this.fetch,
-    required this.requestType,
-    required this.requestUrlRule,
-    required this.extractedLength,
-    required this.cleanedLength,
-    required this.content,
-    required this.error,
-  });
-}
-
-/// 搜索结果
-class SearchResult {
-  final String name;
-  final String author;
-  final String coverUrl;
-  final String intro;
-  final String kind;
-  final String lastChapter;
-  final String updateTime;
-  final String wordCount;
-  final String bookUrl;
-  final String sourceUrl;
-  final String sourceName;
-
-  const SearchResult({
-    required this.name,
-    required this.author,
-    required this.coverUrl,
-    required this.intro,
-    this.kind = '',
-    required this.lastChapter,
-    this.updateTime = '',
-    this.wordCount = '',
-    required this.bookUrl,
-    required this.sourceUrl,
-    required this.sourceName,
-  });
-}
-
-/// 书籍详情
-class BookDetail {
-  final String name;
-  final String author;
-  final String coverUrl;
-  final String intro;
-  final String kind;
-  final String lastChapter;
-  final String updateTime;
-  final String wordCount;
-  final String tocUrl;
-  final String bookUrl;
-
-  const BookDetail({
-    required this.name,
-    required this.author,
-    required this.coverUrl,
-    required this.intro,
-    required this.kind,
-    required this.lastChapter,
-    this.updateTime = '',
-    this.wordCount = '',
-    required this.tocUrl,
-    required this.bookUrl,
-  });
-}
-
-/// 目录项
-class TocItem {
-  final int index;
-  final String name;
-  final String url;
-  final bool isVolume;
-  final bool isVip;
-  final bool isPay;
-  final String? tag;
-  final String? wordCount;
-
-  const TocItem({
-    required this.index,
-    required this.name,
-    required this.url,
-    this.isVolume = false,
-    this.isVip = false,
-    this.isPay = false,
-    this.tag,
-    this.wordCount,
-  });
-}
