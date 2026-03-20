@@ -8,7 +8,6 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -25,7 +24,6 @@ import '../../../core/services/js_runtime.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
-import '../../../core/services/source_variable_store.dart';
 import '../../../core/services/webdav_service.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/utils/chinese_script_converter.dart';
@@ -52,8 +50,6 @@ import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_login_webview_view.dart';
 import '../../source/views/source_web_verify_view.dart';
 import '../../search/services/search_book_info_refresh_helper.dart';
-import '../../search/models/search_scope.dart';
-import '../../search/models/search_scope_group_helper.dart';
 import '../../search/views/search_book_info_view.dart';
 import '../../settings/views/app_help_dialog.dart';
 import '../../settings/views/app_log_dialog.dart';
@@ -62,7 +58,7 @@ import '../../settings/views/reading_tip_settings_view.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
 import '../services/read_style_import_export_service.dart';
-import '../services/reader_bookmark_export_service.dart';
+import '../services/reader_bookmark_helper.dart';
 import '../services/reader_charset_service.dart';
 import '../services/reader_key_paging_helper.dart';
 import '../services/reader_image_request_parser.dart';
@@ -70,15 +66,15 @@ import '../services/reader_image_resolver.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_legacy_menu_helper.dart';
 import '../services/reader_refresh_scope_helper.dart';
-import '../services/reader_search_navigation_helper.dart';
+import '../services/reader_content_search_helper.dart';
+import '../services/reader_progress_helper.dart';
 import '../services/reader_source_action_helper.dart';
 import '../services/reader_source_switch_helper.dart';
 import '../services/reader_system_ui_helper.dart';
 import '../services/reader_theme_mode_helper.dart';
 import '../services/reader_top_bar_action_helper.dart';
-import '../services/http_tts_engine.dart';
-import '../services/http_tts_rule_store.dart';
-import '../services/read_aloud_service.dart';
+import '../services/reader_read_aloud_helper.dart';
+import '../services/reader_source_switch_config_helper.dart';
 import '../services/txt_toc_rule_store.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
@@ -171,8 +167,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       ScrollTextLayoutEngine.instance;
   final ChineseScriptConverter _chineseScriptConverter =
       ChineseScriptConverter.instance;
-  final ReaderBookmarkExportService _bookmarkExportService =
-      ReaderBookmarkExportService();
   final ReaderCharsetService _readerCharsetService = ReaderCharsetService();
   final TxtTocRuleStore _txtTocRuleStore = TxtTocRuleStore();
 
@@ -206,33 +200,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   // 书签系统
   late final BookmarkRepository _bookmarkRepo;
+  late final ReaderBookmarkHelper _bookmarkHelper;
   bool _hasBookmarkAtCurrent = false;
 
   // 自动阅读
   final AutoPager _autoPager = AutoPager();
-  final HttpTtsRuleStore _httpTtsRuleStore = HttpTtsRuleStore();
   bool _showAutoReadPanel = false;
   // 记录自动阅读是否因菜单弹出而被暂停，关闭菜单时仅恢复此类暂停
   bool _autoPagerPausedByMenu = false;
   EdgeInsets? _lastViewPadding;
-  ReadAloudService? _readAloudServiceOrNull;
-  ReadAloudService get _readAloudService =>
-      _readAloudServiceOrNull ??= ReadAloudService(
-        onStateChanged: _handleReadAloudStateChanged,
-        onMessage: _handleReadAloudMessage,
-        onRequestChapterSwitch: _handleReadAloudChapterSwitchRequest,
-      );
-  ReadAloudStatusSnapshot _readAloudSnapshot =
-      const ReadAloudStatusSnapshot.stopped();
-  int _readAloudSpeechRate = 10;
-  FlutterTts? _contentSelectReadAloudTts;
-  bool _contentSelectReadAloudTtsReady = false;
-  bool _showingReadAloudExclusionDialog = false;
-
-  /// 迁移排除：朗读（TTS）入口提示文案（与全局排除口径一致）。
-  // ignore: unused_field
-  static const String _readAloudExclusionHint =
-      '迁移排除：朗读（TTS）功能暂不开放\n该入口仅保留锚点，不可操作';
+  late final ReaderReadAloudHelper _readAloudHelper;
 
   // 当前书籍信息
   String _bookAuthor = '';
@@ -244,20 +221,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   final Map<String, bool> _chapterSameTitleRemovedById = <String, bool>{};
   bool _tocUiUseReplace = false;
   bool _tocUiLoadWordCount = true;
-  bool _changeSourceCheckAuthor = false;
-  bool _changeSourceLoadInfo = false;
-  bool _changeSourceLoadWordCount = false;
-  bool _changeSourceLoadToc = false;
-  String _changeSourceGroup = '';
-  int _changeSourceDelaySeconds = 0;
-  CancelToken? _sourceSwitchCandidateSearchCancelToken;
+  late final ReaderSourceSwitchConfigHelper _sourceSwitchConfig;
   bool _tocUiSplitLongChapter = false;
   bool _useReplaceRule = true;
   bool _reSegment = false;
   bool _delRubyTag = false;
   bool _delHTag = false;
-  bool _audioPlayUseWakeLock = false;
-  int _contentSelectSpeakMode = 0;
   bool _contentSelectMenuLongPressHandled = false;
   Timer? _contentSelectMenuLongPressResetTimer;
   String _imageStyle = _defaultLegacyImageStyle;
@@ -306,16 +275,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _legacyImageStyleSingle,
   ];
   static final RegExp _legacyImageTagRegex = legacyImageTagRegex;
-  static final RegExp _readAloudSpeakablePattern =
-      RegExp(r'[\u4E00-\u9FFFA-Za-z0-9]');
   static final RegExp _cssStyleAttrRegex = RegExp(
     r'''style\s*=\s*(?:"([^"]*)"|'([^']*)')''',
     caseSensitive: false,
   );
   static const int _scrollUiSyncIntervalMs = 100;
   static const int _scrollSaveProgressIntervalMs = 450;
-  static const int _readRecordPersistIntervalMs = 5000;
-  static const int _readRecordPersistMinChunkMs = 1000;
   static const int _scrollPreloadIntervalMs = 80;
   static const double _scrollPreloadExtent = 280.0;
   static const int _chapterLoadImageWarmupMaxProbeCount = 8;
@@ -371,7 +336,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   // 章节加载锁（用于翻页模式）
   bool _isLoadingChapter = false;
-  bool _isAutoChangingSource = false;
   bool _offlineCacheRunning = false;
   bool _isRestoringProgress = false;
   bool _isHydratingChapterFromPageFactory = false;
@@ -384,13 +348,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   ScrollLayoutSnapshot? _scrollLayoutSnapshot;
   int? _scrollLayoutChapterIndex;
   int _scrollLayoutFingerprint = 0;
-  String _contentSearchQuery = '';
-  List<ReaderSearchHit> _contentSearchHits = <ReaderSearchHit>[];
-  int _currentSearchHitIndex = -1;
-  bool _isSearchingContent = false;
-  bool _contentSearchUseReplace = false;
-  ReaderSearchProgressSnapshot? _searchProgressSnapshot;
-  int _contentSearchTaskToken = 0;
+  late final ReaderContentSearchHelper _searchHelper;
+  late final ReaderProgressHelper _progressHelper;
   final List<ScrollSegment> _scrollSegments = <ScrollSegment>[];
   final Map<int, GlobalKey> _scrollSegmentKeys = <int, GlobalKey>{};
   final Map<int, double> _scrollSegmentHeights = <int, double>{};
@@ -414,9 +373,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   DateTime _lastScrollProgressSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastScrollUiSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastScrollPreloadCheckAt = DateTime.fromMillisecondsSinceEpoch(0);
-  DateTime _lastReadRecordAccumulatedAt = DateTime.now();
-  DateTime _lastReadRecordPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
-  int _pendingReadRecordDurationMs = 0;
   bool _programmaticScrollInFlight = false;
   double _scrollAnchorWithinViewport = 32.0;
   String? _readStyleBackgroundDirectoryPath;
@@ -506,15 +462,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _settingsService = SettingsService();
     _tocUiUseReplace = _settingsService.getTocUiUseReplace();
     _tocUiLoadWordCount = _settingsService.getTocUiLoadWordCount();
-    _changeSourceCheckAuthor = _settingsService.getChangeSourceCheckAuthor();
-    _changeSourceLoadInfo = _settingsService.getChangeSourceLoadInfo();
-    _changeSourceLoadWordCount =
-        _settingsService.getChangeSourceLoadWordCount();
-    _changeSourceLoadToc = _settingsService.getChangeSourceLoadToc();
-    _changeSourceGroup = _settingsService.getChangeSourceGroup();
-    _changeSourceDelaySeconds = _settingsService.getBatchChangeSourceDelay();
-    _audioPlayUseWakeLock = _settingsService.getAudioPlayUseWakeLock();
-    _contentSelectSpeakMode = _settingsService.getContentSelectSpeakMode();
     _webDavService = WebDavService();
     final baseReadingSettings =
         _readSettingsWithExclusions(_settingsService.readingSettings);
@@ -553,15 +500,125 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _settingsService.appSettingsListenable
         .addListener(_handleAppSettingsChanged);
     _warmUpReadStyleBackgroundDirectoryPath();
+    _bookmarkHelper = ReaderBookmarkHelper(
+      ReaderBookmarkContext(
+        bookId: widget.bookId,
+        bookTitle: () => widget.bookTitle,
+        bookAuthor: () => _bookAuthor,
+        currentChapterIndex: () => _currentChapterIndex,
+        currentTitle: () => _currentTitle,
+        chapterCount: () => _chapters.length,
+        chapterTitleAt: (i) => _chapters[i].title,
+        chapterProgress: () => _progressHelper.getChapterProgress(),
+        currentPageText: () => _pageFactory.curPage,
+        currentContent: () => _currentContent,
+      ),
+      bookmarkRepo: _bookmarkRepo,
+    );
+    _progressHelper = ReaderProgressHelper(
+      ReaderProgressContext(
+        bookId: widget.bookId,
+        widgetBookTitle: widget.bookTitle,
+        isEphemeral: widget.isEphemeral,
+        currentChapterIndex: () => _currentChapterIndex,
+        currentTitle: () => _currentTitle,
+        readableChapterCount: _effectiveReadableChapterCount,
+        clampChapterIndex: _clampChapterIndexToReadableRange,
+        pageTurnMode: () => _settings.pageTurnMode,
+        currentPageIndex: () => _pageFactory.currentPageIndex,
+        totalPages: () => _pageFactory.totalPages,
+        scrollChapterProgress: () => _currentScrollChapterProgress,
+        chapterContentAt: (i) =>
+            _chapters.isNotEmpty ? (_chapters[i].content ?? '') : '',
+        hasChapters: () => _chapters.isNotEmpty,
+        scrollOffset: () =>
+            _scrollController.hasClients
+                ? _scrollController.offset
+                : null,
+        scrollHasClients: () => _scrollController.hasClients,
+        currentSourceUrl: () => _currentSourceUrl ?? '',
+        bookAuthor: () => _bookAuthor,
+      ),
+      bookRepo: _bookRepo,
+      settingsService: _settingsService,
+      webDavService: _webDavService,
+    );
+    _searchHelper = ReaderContentSearchHelper(
+      ReaderContentSearchContext(
+        bookId: widget.bookId,
+        currentChapterIndex: () => _currentChapterIndex,
+        currentTitle: () => _currentTitle,
+        readableChapters: () => _effectiveReadableChapters()
+            .map((c) => SearchableChapter(
+                  title: c.title,
+                  content: c.content,
+                ))
+            .toList(),
+        readableChapterCount: _effectiveReadableChapterCount,
+        clampChapterIndex: _clampChapterIndexToReadableRange,
+        chapterProgress: _progressHelper.getChapterProgress,
+        postProcessTitle: _postProcessTitle,
+        isScrollMode: () =>
+            _settings.pageTurnMode == PageTurnMode.scroll,
+        currentPageTexts: () =>
+            _pageFactory.currentPages.map((p) => p.text).toList(),
+        trimFirstPageTitlePrefix: () =>
+            _settings.titleMode != 2,
+        resolveSearchableContent: _resolveContentSearchableContent,
+      ),
+    );
     _loadReaderBgUiImage();
+    _readAloudHelper = ReaderReadAloudHelper(
+      ReaderReadAloudContext(
+        currentChapterIndex: () => _currentChapterIndex,
+        currentTitle: () => _currentTitle,
+        currentContent: () => _currentContent,
+        chapterCount: () => _chapters.length,
+        readableChapterCount: _effectiveReadableChapterCount,
+        loadChapter: (index, {bool goToLastPage = false}) =>
+            _loadChapter(index, goToLastPage: goToLastPage),
+        chapterProgress: () =>
+            _progressHelper.getChapterProgress(),
+        isAutoPagerRunning: () => _autoPager.isRunning,
+        stopAutoPagerForReadAloud: () {
+          _autoPagerPausedByMenu = false;
+          _autoPager.stop();
+          if (_showAutoReadPanel) {
+            setState(() => _showAutoReadPanel = false);
+          }
+        },
+        contentSelectSpeakMode: () =>
+            _settingsService.getContentSelectSpeakMode(),
+        saveContentSelectSpeakMode: (mode) =>
+            _settingsService.saveContentSelectSpeakMode(mode),
+        audioPlayUseWakeLock: () =>
+            _settingsService.getAudioPlayUseWakeLock(),
+        saveAudioPlayUseWakeLock: (enabled) =>
+            _settingsService.saveAudioPlayUseWakeLock(enabled),
+        showToast: _showToast,
+        showCopyToast: _showCopyToast,
+      ),
+    );
+    _sourceSwitchConfig = ReaderSourceSwitchConfigHelper(
+      ReaderSourceSwitchConfigContext(
+        bookId: widget.bookId,
+        currentChapterIndex: () => _currentChapterIndex,
+        currentTitle: () => _currentTitle,
+        chapters: () => _chapters,
+        bookProgress: () => _progressHelper.getBookProgress(),
+        showToast: _showToast,
+      ),
+      sourceRepo: _sourceRepo,
+      ruleEngine: _ruleEngine,
+      settingsService: _settingsService,
+    );
+    _sourceSwitchConfig.loadConfig();
     _autoPager.setSpeed(_settings.autoReadSpeed);
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
         : AutoPagerMode.page);
-    _lastReadRecordAccumulatedAt = DateTime.now();
-    _lastReadRecordPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
-    _pendingReadRecordDurationMs = 0;
-    unawaited(_initReadAloudService());
+    _progressHelper.resetReadRecordTimers();
+    unawaited(_readAloudHelper.init());
 
     _currentChapterIndex = widget.initialChapter;
     unawaited(() async {
@@ -733,21 +790,24 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     WidgetsBinding.instance.removeObserver(this);
     _menuAnimController.dispose();
     _searchMenuAnimController.dispose();
-    _stopSourceSwitchCandidateSearch();
+    _searchHelper.dispose();
+    _bookmarkHelper.dispose();
+    _progressHelper.dispose();
+    _readAloudHelper.dispose();
+    _sourceSwitchConfig.stopCandidateSearch();
+    _sourceSwitchConfig.dispose();
     _settingsService.readingSettingsListenable
         .removeListener(_handleReadingSettingsChanged);
     _settingsService.appSettingsListenable
         .removeListener(_handleAppSettingsChanged);
     _pageFactory.removeContentChangedListener(_handlePageFactoryContentChanged);
-    unawaited(_saveProgress(forcePersistReadRecord: true));
+    unawaited(_progressHelper.saveProgress(forcePersistReadRecord: true));
     _scrollController.removeListener(_handleScrollControllerTick);
     _scrollController.dispose();
     _scrollTipNotifier.dispose();
     _scrollSegmentsVersion.dispose();
     _keyboardFocusNode.dispose();
     _autoPager.dispose();
-    unawaited(_readAloudServiceOrNull?.dispose());
-    unawaited(_disposeContentSelectReadAloudTts());
     _contentSelectMenuLongPressResetTimer?.cancel();
     _contentSelectMenuLongPressResetTimer = null;
     _keepLightTimer?.cancel();
@@ -778,31 +838,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         _screenOffTimerStart(force: true);
       }
     }
-  }
-
-  Future<void> _initReadAloudService() async {
-    final selectedRuleId = await _httpTtsRuleStore.loadSelectedRuleId();
-    final speechRate = await _httpTtsRuleStore.loadSpeechRate();
-    if (!mounted) return;
-
-    ReadAloudEngine engine;
-    if (selectedRuleId != null) {
-      final rules = await _httpTtsRuleStore.loadRules();
-      final rule = rules.where((r) => r.id == selectedRuleId).firstOrNull;
-      engine = rule != null
-          ? HttpTtsReadAloudEngine(rule: rule, speechRate: speechRate)
-          : FlutterReadAloudEngine();
-    } else {
-      engine = FlutterReadAloudEngine();
-    }
-
-    _readAloudServiceOrNull = ReadAloudService(
-      engine: engine,
-      onStateChanged: _handleReadAloudStateChanged,
-      onMessage: _handleReadAloudMessage,
-      onRequestChapterSwitch: _handleReadAloudChapterSwitchRequest,
-    );
-    setState(() => _readAloudSpeechRate = speechRate);
   }
 
   Future<void> _applyPreferredOrientations(
@@ -1129,80 +1164,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return _chapters.sublist(0, count);
   }
 
-  Future<void> _collectReadRecordDuration({
-    required bool enableReadRecord,
-    bool forcePersist = false,
-  }) async {
-    final now = DateTime.now();
-    final elapsedMs =
-        now.difference(_lastReadRecordAccumulatedAt).inMilliseconds;
-    _lastReadRecordAccumulatedAt = now;
-    if (enableReadRecord && elapsedMs > 0) {
-      _pendingReadRecordDurationMs += elapsedMs;
-    }
-
-    if (_pendingReadRecordDurationMs <= 0) {
-      return;
-    }
-
-    final reachedPersistInterval =
-        now.difference(_lastReadRecordPersistAt).inMilliseconds >=
-            _readRecordPersistIntervalMs;
-    final reachedMinChunk =
-        _pendingReadRecordDurationMs >= _readRecordPersistMinChunkMs;
-    if (!forcePersist && !(reachedPersistInterval && reachedMinChunk)) {
-      return;
-    }
-
-    final durationToPersist = _pendingReadRecordDurationMs;
-    _pendingReadRecordDurationMs = 0;
-    _lastReadRecordPersistAt = now;
-    await _settingsService.addBookReadRecordDurationMs(
-      widget.bookId,
-      durationToPersist,
-    );
-  }
-
-  /// 保存进度：章节 + 滚动偏移
-  Future<void> _saveProgress({bool forcePersistReadRecord = false}) async {
-    final enableReadRecord = _settingsService.enableReadRecord;
-    await _collectReadRecordDuration(
-      enableReadRecord: enableReadRecord,
-      forcePersist: forcePersistReadRecord,
-    );
-
-    final totalReadableChapters = _effectiveReadableChapterCount();
-    if (totalReadableChapters <= 0) return;
-
-    final readableMaxIndex = totalReadableChapters - 1;
-    final safeChapterIndex =
-        _currentChapterIndex.clamp(0, readableMaxIndex).toInt();
-    final progress = (safeChapterIndex + 1) / totalReadableChapters;
-    final chapterProgress = _getChapterProgress();
-
-    // 保存到书籍库
-    await _bookRepo.updateReadProgress(
-      widget.bookId,
-      currentChapter: safeChapterIndex,
-      readProgress: progress,
-      updateLastReadTime: enableReadRecord,
-    );
-
-    // 保存滚动偏移量
-    if (_scrollController.hasClients) {
-      await _settingsService.saveScrollOffset(
-        widget.bookId,
-        _scrollController.offset,
-        chapterIndex: safeChapterIndex,
+  /// 保存进度（委托 _progressHelper）
+  Future<void> _saveProgress({
+    bool forcePersistReadRecord = false,
+  }) =>
+      _progressHelper.saveProgress(
+        forcePersistReadRecord: forcePersistReadRecord,
       );
-    }
-
-    await _settingsService.saveChapterPageProgress(
-      widget.bookId,
-      chapterIndex: safeChapterIndex,
-      progress: chapterProgress,
-    );
-  }
 
   GlobalKey _scrollSegmentKeyFor(int chapterIndex) {
     return _scrollSegmentKeys.putIfAbsent(
@@ -1856,7 +1824,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           centerIndex: index,
           preferCachedForFarChapters: deferFarChapterTransforms,
         );
-        _syncReadAloudChapterContext();
+        _readAloudHelper.syncChapterContext();
         unawaited(_prefetchNeighborChapters(centerIndex: index));
       } finally {
         _isRestoringProgress = false;
@@ -1909,7 +1877,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     });
     _cacheCurrentChapterImageMetasFromSnapshot(resolved);
     _updateBookmarkStatus();
-    _syncReadAloudChapterContext();
+    _readAloudHelper.syncChapterContext();
 
     _syncPageFactoryChapters(
       centerIndex: index,
@@ -2241,7 +2209,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
     unawaited(_saveProgress());
     if (chapterChanged) {
-      _syncReadAloudChapterContext();
+      _readAloudHelper.syncChapterContext();
       unawaited(_prefetchNeighborChapters(centerIndex: factoryChapterIndex));
     }
 
@@ -2500,7 +2468,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             chapter.copyWith(content: content, isDownloaded: true);
       }
     } catch (e) {
-      if (_settings.autoChangeSource && !_isAutoChangingSource) {
+      if (_settings.autoChangeSource && !_sourceSwitchConfig.isAutoChangingSource) {
         unawaited(_autoChangeSource());
       }
       rethrow;
@@ -3155,12 +3123,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           : ReaderOverlayTokens.textSubtleLight);
 
   String? get _activeSearchHighlightQuery {
-    if (!_showSearchMenu || _contentSearchHits.isEmpty) {
-      return null;
-    }
-    final query = _contentSearchQuery.trim();
-    if (query.isEmpty) return null;
-    return query;
+    if (!_showSearchMenu) return null;
+    return _searchHelper.activeHighlightQuery;
   }
 
   Color get _searchHighlightColor =>
@@ -3264,7 +3228,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final key = event.logicalKey;
     if (ReaderKeyPagingHelper.shouldBlockVolumePagingDuringReadAloud(
       key: key,
-      readAloudPlaying: _readAloudSnapshot.isPlaying,
+      readAloudPlaying: _readAloudHelper.snapshot.isPlaying,
       volumeKeyPageOnPlayEnabled: _settings.volumeKeyPageOnPlay,
     )) {
       return;
@@ -3390,15 +3354,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         break;
       case ClickAction.readAloudPrevParagraph:
         if (MigrationExclusions.excludeTts) break;
-        unawaited(_triggerReadAloudPreviousParagraph());
+        unawaited(_readAloudHelper.triggerPreviousParagraph());
         break;
       case ClickAction.readAloudNextParagraph:
         if (MigrationExclusions.excludeTts) break;
-        unawaited(_triggerReadAloudNextParagraph());
+        unawaited(_readAloudHelper.triggerNextParagraph());
         break;
       case ClickAction.readAloudPauseResume:
         if (MigrationExclusions.excludeTts) break;
-        unawaited(_triggerReadAloudPauseResume());
+        unawaited(_readAloudHelper.triggerPauseResume());
         break;
       default:
         break;
@@ -4742,27 +4706,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  /// 计算章节内进度
-  double _getChapterProgress() {
-    if (_settings.pageTurnMode != PageTurnMode.scroll) {
-      return ChapterProgressUtils.pageProgressFromIndex(
-        pageIndex: _pageFactory.currentPageIndex,
-        totalPages: _pageFactory.totalPages,
-      );
-    }
+  /// 计算章节内进度（委托 _progressHelper）
+  double _getChapterProgress() => _progressHelper.getChapterProgress();
 
-    return _currentScrollChapterProgress.clamp(0.0, 1.0).toDouble();
-  }
-
-  double _getBookProgress() {
-    final totalReadableChapters = _effectiveReadableChapterCount();
-    if (totalReadableChapters <= 0) return 0;
-    final chapterProgress = _getChapterProgress();
-    final safeChapterIndex =
-        _currentChapterIndex.clamp(0, totalReadableChapters - 1).toInt();
-    return ((safeChapterIndex + chapterProgress) / totalReadableChapters)
-        .clamp(0.0, 1.0);
-  }
+  /// 计算全书进度（委托 _progressHelper）
+  double _getBookProgress() => _progressHelper.getBookProgress();
 
   int _resolveScrollTipTotalPages() {
     final total = _pageFactory.totalPages;
@@ -4979,8 +4927,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                         isNightMode: _isUiDark,
                         showReadAloud: !MigrationExclusions.excludeTts,
                         readBarStyleFollowPage: _menuFollowPageTone,
-                        readAloudRunning: _readAloudSnapshot.isRunning,
-                        readAloudPaused: _readAloudSnapshot.isPaused,
+                        readAloudRunning: _readAloudHelper.snapshot.isRunning,
+                        readAloudPaused: _readAloudHelper.snapshot.isPaused,
                         menuFadeAnimation: _menuFadeAnim,
                         menuSlideAnimation: _bottomMenuSlideAnim,
                       ),
@@ -4995,30 +4943,29 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                       ),
 
                     // 朗读控制浮层
-                    if (_readAloudSnapshot.isRunning)
+                    if (_readAloudHelper.snapshot.isRunning)
                       Positioned(
                         top: 0,
                         left: 0,
                         right: 0,
                         child: ReaderReadAloudBar(
-                          snapshot: _readAloudSnapshot,
-                          speechRate: _readAloudSpeechRate,
+                          snapshot: _readAloudHelper.snapshot,
+                          speechRate: _readAloudHelper.speechRate,
                           bgColor: _uiPanelBg,
                           fgColor: _uiTextStrong,
                           accentColor: _uiAccent,
                           onPreviousParagraph: () =>
-                              unawaited(_readAloudService.previousParagraph()),
+                              unawaited(_readAloudHelper.previousParagraph()),
                           onTogglePauseResume: () =>
-                              unawaited(_readAloudService.togglePauseResume()),
+                              unawaited(_readAloudHelper.togglePauseResume()),
                           onNextParagraph: () =>
-                              unawaited(_readAloudService.nextParagraph()),
-                          onStop: () => unawaited(_readAloudService.stop()),
+                              unawaited(_readAloudHelper.nextParagraph()),
+                          onStop: () => unawaited(_readAloudHelper.stop()),
                           onSetTimer: () => unawaited(_showReadAloudTimerPicker()),
                           onOpenChapterList: _openChapterListFromAutoReadPanel,
                           onSpeechRateChanged: (rate) {
-                            setState(() => _readAloudSpeechRate = rate);
-                            unawaited(_readAloudService.updateSpeechRate(rate));
-                            unawaited(_httpTtsRuleStore.saveSpeechRate(rate));
+                            unawaited(_readAloudHelper.updateSpeechRate(rate));
+                            setState(() {});
                           },
                           onPreviousChapter: _currentChapterIndex > 0
                               ? () => unawaited(
@@ -5742,11 +5689,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       await _showReadAloudExcludedHint(entry: 'text_action_menu.read_aloud');
       return;
     }
-    if (_contentSelectSpeakMode == 1) {
-      await _startReadAloudFromSelectedText(normalizedText);
-      return;
-    }
-    await _speakSelectedTextOnce(normalizedText);
+    await _readAloudHelper.handleSelectedTextReadAloud(normalizedText);
   }
 
   Future<void> _openDictDialogFromSelectedText(String selectedText) async {
@@ -5883,175 +5826,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   void _toggleContentSelectSpeakMode() {
-    final nextMode = _contentSelectSpeakMode == 1 ? 0 : 1;
-    if (mounted) {
-      setState(() {
-        _contentSelectSpeakMode = nextMode;
-      });
-    } else {
-      _contentSelectSpeakMode = nextMode;
-    }
-    unawaited(_settingsService.saveContentSelectSpeakMode(nextMode));
-    _showToast(
-      nextMode == 1 ? '切换为从选择的地方开始一直朗读' : '切换为朗读选择内容',
-    );
-  }
-
-  Future<void> _startReadAloudFromSelectedText(String selectedText) async {
-    final capability = _detectReadAloudCapability();
-    if (!capability.available) {
-      _showToast(capability.reason);
-      return;
-    }
-
-    if (_autoPager.isRunning) {
-      _autoPagerPausedByMenu = false;
-      _autoPager.stop();
-      if (_showAutoReadPanel) {
-        setState(() {
-          _showAutoReadPanel = false;
-        });
-      }
-    }
-
-    final normalizedSelection = selectedText.trim();
-    final selectionStartIndex = _resolveSelectedTextStartIndexInChapterContent(
-      normalizedSelection,
-    );
-    ReadAloudActionResult result;
-    if (selectionStartIndex >= 0) {
-      result = await _readAloudService.start(
-        chapterIndex: _currentChapterIndex,
-        chapterTitle: _currentTitle,
-        content: _currentContent.substring(selectionStartIndex),
-        startParagraphIndex: 0,
-      );
-    } else {
-      final startParagraphIndex =
-          _resolveReadAloudStartParagraphIndex(normalizedSelection);
-      result = await _readAloudService.start(
-        chapterIndex: _currentChapterIndex,
-        chapterTitle: _currentTitle,
-        content: _currentContent,
-        startParagraphIndex: startParagraphIndex,
-      );
-    }
-    if (!mounted || result.success) return;
-    _showToast(result.message);
-  }
-
-  int _resolveSelectedTextStartIndexInChapterContent(String selectedText) {
-    if (selectedText.isEmpty) {
-      return -1;
-    }
-    final content = _currentContent;
-    if (content.isEmpty) {
-      return -1;
-    }
-    final matches = <int>[];
-    var cursor = 0;
-    while (cursor < content.length) {
-      final matchIndex = content.indexOf(selectedText, cursor);
-      if (matchIndex < 0) break;
-      matches.add(matchIndex);
-      cursor = matchIndex + 1;
-    }
-    if (matches.isEmpty) {
-      return -1;
-    }
-    final estimatedOffset =
-        (content.length * _getChapterProgress().clamp(0.0, 1.0))
-            .round()
-            .clamp(0, content.length)
-            .toInt();
-    matches.sort(
-      (a, b) =>
-          (a - estimatedOffset).abs().compareTo((b - estimatedOffset).abs()),
-    );
-    return matches.first;
-  }
-
-  int _resolveReadAloudStartParagraphIndex(String selectedText) {
-    final paragraphs = _buildReadAloudParagraphs(_currentContent);
-    if (paragraphs.isEmpty) {
-      return 0;
-    }
-    final normalizedText = selectedText.trim();
-    if (normalizedText.isEmpty) {
-      return 0;
-    }
-    final exactIndex = paragraphs
-        .indexWhere((paragraph) => paragraph.contains(normalizedText));
-    if (exactIndex >= 0) {
-      return exactIndex;
-    }
-    final compactSelected = normalizedText.replaceAll(RegExp(r'\s+'), '');
-    if (compactSelected.isEmpty) {
-      return 0;
-    }
-    final compactIndex = paragraphs.indexWhere(
-      (paragraph) =>
-          paragraph.replaceAll(RegExp(r'\s+'), '').contains(compactSelected),
-    );
-    return compactIndex >= 0 ? compactIndex : 0;
-  }
-
-  List<String> _buildReadAloudParagraphs(String content) {
-    final normalizedContent =
-        content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-    return normalizedContent
-        .split('\n')
-        .map((line) => line.trim())
-        .where(
-          (line) =>
-              line.isNotEmpty && _SimpleReaderViewState._readAloudSpeakablePattern.hasMatch(line),
-        )
-        .toList(growable: false);
-  }
-
-  Future<void> _speakSelectedTextOnce(String selectedText) async {
-    if (kIsWeb) {
-      _showToast('当前平台暂不支持语音朗读');
-      return;
-    }
-    try {
-      final tts = await _ensureContentSelectReadAloudTtsReady();
-      await tts.stop();
-      final result = await tts.speak(selectedText);
-      if (!mounted) return;
-      if (result != 1) {
-        _showToast('启动朗读失败');
-      }
-    } catch (error) {
-      if (!mounted) return;
-      _showToast('启动朗读失败：$error');
-    }
-  }
-
-  Future<FlutterTts> _ensureContentSelectReadAloudTtsReady() async {
-    final existing = _contentSelectReadAloudTts;
-    if (existing != null && _contentSelectReadAloudTtsReady) {
-      return existing;
-    }
-    final tts = existing ?? FlutterTts();
-    _contentSelectReadAloudTts ??= tts;
-    if (!_contentSelectReadAloudTtsReady) {
-      await tts.awaitSpeakCompletion(true);
-      _contentSelectReadAloudTtsReady = true;
-    }
-    return tts;
-  }
-
-  Future<void> _disposeContentSelectReadAloudTts() async {
-    final tts = _contentSelectReadAloudTts;
-    _contentSelectReadAloudTts = null;
-    _contentSelectReadAloudTtsReady = false;
-    if (tts == null) return;
-    try {
-      await tts.stop();
-    } catch (_) {
-      // ignore dispose errors
-    }
+    _readAloudHelper.toggleContentSelectSpeakMode();
+    if (mounted) setState(() {});
   }
 
   /// 滚动模式内容（跨章节连续滚动，对齐 legado）
@@ -6368,7 +6144,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       unawaited(_showReadAloudExcludedHint(entry: 'bottom_menu.tap'));
       return;
     }
-    unawaited(_openReadAloudAction());
+    unawaited(_readAloudHelper.openReadAloudAction());
   }
 
   void _openReadAloudDialogFromMenu() {
@@ -6426,7 +6202,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               ReaderAudioPlayMenuAction.wakeLock,
             ),
             child: Text(
-              _audioPlayUseWakeLock ? '✓ 音频服务唤醒锁' : '音频服务唤醒锁',
+              _readAloudHelper.audioPlayUseWakeLock
+                  ? '✓ 音频服务唤醒锁'
+                  : '音频服务唤醒锁',
             ),
           ),
           CupertinoActionSheetAction(
@@ -6462,15 +6240,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         }
         return;
       case ReaderAudioPlayMenuAction.wakeLock:
-        final next = !_audioPlayUseWakeLock;
-        if (mounted) {
-          setState(() {
-            _audioPlayUseWakeLock = next;
-          });
-        } else {
-          _audioPlayUseWakeLock = next;
-        }
-        await _settingsService.saveAudioPlayUseWakeLock(next);
+        await _readAloudHelper.toggleAudioPlayWakeLock();
+        if (mounted) setState(() {});
         return;
       case ReaderAudioPlayMenuAction.log:
         await _openAppLogsFromAudioPlayMenu();
@@ -6698,8 +6469,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   Future<void> _toggleAutoPageFromQuickAction() async {
     _closeReaderMenuOverlay();
     if (!_autoPager.isRunning && !_autoPager.isPaused) {
-      if (_readAloudSnapshot.isRunning) {
-        await _readAloudService.stop();
+      if (_readAloudHelper.snapshot.isRunning) {
+        await _readAloudHelper.stop();
         if (!mounted) return;
       }
       _autoPager.start();
@@ -6941,18 +6712,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (!mounted) return;
     debugPrint('[migration-exclusion][tts] blocked entry=$entry');
 
-    if (_showingReadAloudExclusionDialog) {
+    if (_readAloudHelper.showingExclusionDialog) {
       _showToast('朗读（TTS）功能暂不开放');
       return;
     }
 
-    _showingReadAloudExclusionDialog = true;
+    _readAloudHelper.setShowingExclusionDialog(true);
     try {
       await showCupertinoBottomSheetDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('扩展阶段'),
-          content: Text('\n$_SimpleReaderViewState._readAloudExclusionHint'),
+          content: Text(
+            '\n${ReaderReadAloudHelper.exclusionHint}',
+          ),
           actions: [
             CupertinoDialogAction(
               onPressed: () => Navigator.pop(dialogContext),
@@ -6966,110 +6739,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       debugPrintStack(stackTrace: stackTrace);
       _showToast('朗读（TTS）功能暂不开放');
     } finally {
-      _showingReadAloudExclusionDialog = false;
+      _readAloudHelper.setShowingExclusionDialog(false);
     }
-  }
-
-  Future<void> _triggerReadAloudPreviousParagraph() async {
-    final result = await _readAloudService.previousParagraph();
-    if (!mounted) return;
-    if (!result.success) {
-      _showToast(result.message);
-    }
-  }
-
-  Future<void> _triggerReadAloudNextParagraph() async {
-    final result = await _readAloudService.nextParagraph();
-    if (!mounted) return;
-    if (!result.success) {
-      _showToast(result.message);
-    }
-  }
-
-  Future<void> _triggerReadAloudPauseResume() async {
-    final result = await _readAloudService.togglePauseResume();
-    if (!mounted) return;
-    _showToast(result.message);
-  }
-
-  Future<void> _openReadAloudAction() async {
-    final capability = _detectReadAloudCapability();
-    if (!capability.available) {
-      _showToast(capability.reason);
-      return;
-    }
-
-    if (_autoPager.isRunning) {
-      _autoPagerPausedByMenu = false;
-      _autoPager.stop();
-      if (_showAutoReadPanel) {
-        setState(() {
-          _showAutoReadPanel = false;
-        });
-      }
-    }
-
-    ReadAloudActionResult result;
-    if (!_readAloudSnapshot.isRunning) {
-      result = await _readAloudService.start(
-        chapterIndex: _currentChapterIndex,
-        chapterTitle: _currentTitle,
-        content: _currentContent,
-      );
-    } else if (_readAloudSnapshot.isPaused) {
-      result = await _readAloudService.resume();
-    } else {
-      result = await _readAloudService.pause();
-    }
-    if (!mounted) return;
-    _showToast(result.message);
-  }
-
-  Future<bool> _handleReadAloudChapterSwitchRequest(
-    ReadAloudChapterDirection direction,
-  ) async {
-    final readableChapterCount = _effectiveReadableChapterCount();
-    if (readableChapterCount <= 0) return false;
-    final step = direction == ReadAloudChapterDirection.next ? 1 : -1;
-    final targetIndex = _currentChapterIndex + step;
-    if (targetIndex < 0 || targetIndex >= readableChapterCount) {
-      return false;
-    }
-    await _loadChapter(
-      targetIndex,
-      goToLastPage: direction == ReadAloudChapterDirection.previous,
-    );
-    return true;
-  }
-
-  void _handleReadAloudStateChanged(ReadAloudStatusSnapshot snapshot) {
-    if (!mounted) return;
-    setState(() {
-      _readAloudSnapshot = snapshot;
-    });
-  }
-
-  void _handleReadAloudMessage(String message) {
-    if (!mounted) return;
-    _showToast(message);
-  }
-
-  void _syncReadAloudChapterContext() {
-    // 迁移排除态下不进入朗读业务链路：不主动同步章节上下文。
-    if (MigrationExclusions.excludeTts) return;
-    unawaited(
-      _readAloudService.updateChapter(
-        chapterIndex: _currentChapterIndex,
-        chapterTitle: _currentTitle,
-        content: _currentContent,
-      ),
-    );
   }
 
   /// 定时停止选择器，对标 legado ReadAloudDialog tvTimer 快速选择。
   Future<void> _showReadAloudTimerPicker() async {
     const times = [0, 5, 10, 15, 30, 60, 90, 180];
-    final current = _readAloudSnapshot.sleepTimerMinutes;
+    final current = _readAloudHelper.snapshot.sleepTimerMinutes;
     final selected = await showCupertinoBottomSheetDialog<int>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
@@ -7090,7 +6767,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       ),
     );
     if (selected == null) return;
-    _readAloudService.setTimer(selected);
+    _readAloudHelper.setTimer(selected);
     if (mounted) setState(() {});
     if (selected > 0) {
       _showToast('将在 $selected 分钟后停止朗读');
@@ -7222,7 +6899,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (_showMenu) {
       _closeReaderMenuOverlay();
     }
-    final controller = TextEditingController(text: _contentSearchQuery);
+    final controller =
+        TextEditingController(text: _searchHelper.query);
     showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
@@ -7260,123 +6938,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Future<void> _applyContentSearch(String query) async {
-    final normalized = query.trim();
-    if (normalized.isEmpty) {
-      return;
-    }
-    _captureSearchProgressSnapshotIfNeeded();
-
-    final taskToken = ++_contentSearchTaskToken;
-    setState(() {
-      _contentSearchQuery = normalized;
-      _isSearchingContent = true;
-      _contentSearchHits = const <ReaderSearchHit>[];
-      _currentSearchHitIndex = -1;
-    });
     _setSearchMenuVisible(true);
-
-    debugPrint(
-      '[reader][content-search] start token=$taskToken queryLength=${normalized.length}',
-    );
-    late final List<ReaderSearchHit> hits;
-    try {
-      hits = await _collectBookContentSearchHits(
-        normalized,
-        taskToken: taskToken,
-      );
-    } catch (error, stackTrace) {
-      if (!mounted || taskToken != _contentSearchTaskToken) {
-        return;
+    final hits = await _searchHelper.applySearch(query);
+    if (!mounted) return;
+    if (hits.isEmpty && _searchHelper.query.isNotEmpty) {
+      if (!_searchHelper.hasHits) {
+        _showToast('全文搜索失败');
       }
-      ExceptionLogService().record(
-        node: 'reader.menu.search_content.collect',
-        message: '全文搜索失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'bookId': widget.bookId,
-          'chapterIndex': _currentChapterIndex,
-          'queryLength': normalized.length,
-          'searchableChapterCount': _effectiveReadableChapters().length,
-        },
-      );
-      setState(() {
-        _isSearchingContent = false;
-        _contentSearchHits = const <ReaderSearchHit>[];
-        _currentSearchHitIndex = -1;
-      });
-      _showToast('全文搜索失败');
-      return;
     }
-    if (!mounted || taskToken != _contentSearchTaskToken) {
-      return;
-    }
-
-    setState(() {
-      _isSearchingContent = false;
-      _contentSearchHits = hits;
-      _currentSearchHitIndex = hits.isEmpty ? -1 : 0;
-    });
-    debugPrint(
-      '[reader][content-search] done token=$taskToken hits=${hits.length}',
-    );
-
+    setState(() {});
     if (hits.isNotEmpty) {
       unawaited(_jumpToSearchHit(hits.first));
     }
-  }
-
-  Future<List<ReaderSearchHit>> _collectBookContentSearchHits(
-    String query, {
-    required int taskToken,
-  }) async {
-    final normalizedQuery = query.trim();
-    if (normalizedQuery.isEmpty) return const <ReaderSearchHit>[];
-    final searchableChapters = _effectiveReadableChapters();
-    if (searchableChapters.isEmpty) return const <ReaderSearchHit>[];
-    final hits = <ReaderSearchHit>[];
-    for (var chapterIndex = 0;
-        chapterIndex < searchableChapters.length;
-        chapterIndex++) {
-      if (taskToken != _contentSearchTaskToken) {
-        return const <ReaderSearchHit>[];
-      }
-
-      final chapter = searchableChapters[chapterIndex];
-      final rawContent = (chapter.content ?? '')
-          .replaceAll('\r\n', '\n')
-          .replaceAll('\r', '\n');
-      // 对齐 legado SearchContentActivity：在线书仅搜索已缓存正文（content 为空即跳过）。
-      if (rawContent.trim().isEmpty) {
-        continue;
-      }
-
-      final searchableContent = await _resolveContentSearchableContent(
-        rawContent,
-        taskToken: taskToken,
-      );
-      if (taskToken != _contentSearchTaskToken) {
-        return const <ReaderSearchHit>[];
-      }
-      if (searchableContent.isEmpty) {
-        continue;
-      }
-
-      final chapterTitle = _postProcessTitle(chapter.title);
-      hits.addAll(
-        _collectChapterSearchHits(
-          chapterIndex: chapterIndex,
-          chapterTitle: chapterTitle,
-          content: searchableContent,
-          query: normalizedQuery,
-        ),
-      );
-
-      if ((chapterIndex & 7) == 0) {
-        await Future<void>.delayed(Duration.zero);
-      }
-    }
-    return hits;
   }
 
   Future<String> _resolveContentSearchableContent(
@@ -7385,72 +6958,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }) async {
     var processed = rawContent;
     // 对齐 legado SearchContentActivity.menu_enable_replace：
-    // 开关只影响全文搜索流程，且仍受书籍“替换净化”总开关约束。
-    if (_contentSearchUseReplace && _useReplaceRule) {
+    // 开关只影响全文搜索流程，且仍受书籍”替换净化”总开关约束。
+    if (_searchHelper.useReplace && _useReplaceRule) {
       processed = await _replaceService.applyContent(
         processed,
         bookName: widget.bookTitle,
         sourceUrl: _currentSourceUrl,
       );
-      if (taskToken != _contentSearchTaskToken) {
+      if (taskToken != _searchHelper.taskToken) {
         return '';
       }
     }
     return _convertByChineseConverterType(processed);
-  }
-
-  List<ReaderSearchHit> _collectChapterSearchHits({
-    required int chapterIndex,
-    required String chapterTitle,
-    required String content,
-    required String query,
-  }) {
-    final hits = <ReaderSearchHit>[];
-    var from = 0;
-    var occurrenceIndex = 0;
-    while (from < content.length) {
-      final found = content.indexOf(query, from);
-      if (found == -1) break;
-      final end = found + query.length;
-      final previewStart = (found - 20).clamp(0, content.length).toInt();
-      final previewEnd = (end + 24).clamp(0, content.length).toInt();
-      final previewRaw =
-          content.substring(previewStart, previewEnd).replaceAll('\n', ' ');
-      final localStart =
-          (found - previewStart).clamp(0, previewRaw.length).toInt();
-      final localEnd = (localStart + query.length)
-          .clamp(localStart, previewRaw.length)
-          .toInt();
-      final previewBefore = previewRaw.substring(0, localStart);
-      final previewMatch = previewRaw.substring(localStart, localEnd);
-      final previewAfter = previewRaw.substring(localEnd);
-      final pageIndex = chapterIndex == _currentChapterIndex &&
-              _settings.pageTurnMode != PageTurnMode.scroll
-          ? _resolveSearchHitPageIndex(
-              contentOffset: found,
-              occurrenceIndex: occurrenceIndex,
-              query: query,
-            )
-          : null;
-      hits.add(
-        ReaderSearchHit(
-          chapterIndex: chapterIndex,
-          chapterTitle: chapterTitle,
-          chapterContentLength: content.length,
-          start: found,
-          end: end,
-          query: query,
-          occurrenceIndex: occurrenceIndex,
-          previewBefore: previewBefore,
-          previewMatch: previewMatch,
-          previewAfter: previewAfter,
-          pageIndex: pageIndex,
-        ),
-      );
-      occurrenceIndex += 1;
-      from = found + query.length;
-    }
-    return hits;
   }
 
   int? _resolveSearchHitPageIndex({
@@ -7458,31 +6977,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     required int occurrenceIndex,
     required String query,
   }) {
-    final byOccurrence = _resolveSearchHitPageIndexByOccurrence(
-      occurrenceIndex: occurrenceIndex,
-      query: query,
-    );
-    if (byOccurrence != null) return byOccurrence;
-    return _resolveSearchHitPageIndexByOffset(contentOffset);
-  }
-
-  int? _resolveSearchHitPageIndexByOccurrence({
-    required int occurrenceIndex,
-    required String query,
-  }) {
-    return ReaderSearchNavigationHelper.resolvePageIndexByOccurrence(
-      pages: _pageFactory.currentPages.map((p) => p.text).toList(),
-      query: query,
-      occurrenceIndex: occurrenceIndex,
-      chapterTitle: _currentTitle,
-      trimFirstPageTitlePrefix: _settings.titleMode != 2,
-    );
-  }
-
-  int? _resolveSearchHitPageIndexByOffset(int contentOffset) {
-    return ReaderSearchNavigationHelper.resolvePageIndexByOffset(
-      pages: _pageFactory.currentPages.map((p) => p.text).toList(),
+    return _searchHelper.resolveHitPageIndex(
       contentOffset: contentOffset,
+      occurrenceIndex: occurrenceIndex,
+      query: query,
     );
   }
 
@@ -7656,30 +7154,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   void _navigateSearchHit(int delta) {
-    if (_contentSearchHits.isEmpty) return;
-    final size = _contentSearchHits.length;
-    final nextIndex = ReaderSearchNavigationHelper.resolveNextHitIndex(
-      currentIndex: _currentSearchHitIndex,
-      delta: delta,
-      totalHits: size,
-    );
-    if (nextIndex < 0) {
-      return;
-    }
-    setState(() {
-      _currentSearchHitIndex = nextIndex;
-    });
-    unawaited(_jumpToSearchHit(_contentSearchHits[nextIndex]));
-  }
-
-  void _captureSearchProgressSnapshotIfNeeded() {
-    if (_searchProgressSnapshot != null) return;
-    final readableCount = _effectiveReadableChapterCount();
-    if (readableCount <= 0) return;
-    _searchProgressSnapshot = ReaderSearchProgressSnapshot(
-      chapterIndex: _clampChapterIndexToReadableRange(_currentChapterIndex),
-      chapterProgress: _getChapterProgress().clamp(0.0, 1.0).toDouble(),
-    );
+    final hit = _searchHelper.navigateHit(delta);
+    if (hit == null) return;
+    setState(() {});
+    unawaited(_jumpToSearchHit(hit));
   }
 
   Future<void> _handleReaderBack() async {
@@ -7723,7 +7201,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   Future<void> _handleBackFromSearchMenu() async {
     if (!_showSearchMenu) return;
-    final snapshot = _searchProgressSnapshot;
+    final snapshot = _searchHelper.progressSnapshot;
     if (snapshot == null) {
       _exitSearchMenu();
       return;
@@ -7739,7 +7217,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       restoreOffset: true,
       targetChapterProgress: snapshot.chapterProgress,
     );
-    _searchProgressSnapshot = null;
+    _searchHelper.clearProgressSnapshot();
   }
 
   Future<bool> _confirmRestoreSearchProgress() async {
@@ -7765,22 +7243,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   void _exitSearchMenu({bool clearProgressSnapshot = true}) {
-    debugPrint(
-      '[reader][content-search] exit queryLength=${_contentSearchQuery.length} '
-      'hits=${_contentSearchHits.length}',
+    _searchHelper.resetSearch(
+      clearProgressSnapshot: clearProgressSnapshot,
     );
-    _contentSearchTaskToken += 1;
     setState(() {
       _showSearchMenu = false;
-      _isSearchingContent = false;
-      _contentSearchHits = <ReaderSearchHit>[];
-      _currentSearchHitIndex = -1;
-      _contentSearchQuery = '';
-      _contentSearchUseReplace = false;
     });
-    if (clearProgressSnapshot) {
-      _searchProgressSnapshot = null;
-    }
     _syncSystemUiForOverlay();
   }
 
@@ -7793,13 +7261,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           CupertinoActionSheetAction(
             onPressed: () {
               if (mounted) {
-                setState(() {
-                  _contentSearchUseReplace = !_contentSearchUseReplace;
-                });
+                _searchHelper.toggleUseReplace();
+                setState(() {});
               }
               Navigator.pop(sheetContext);
             },
-            child: Text(_contentSearchUseReplace ? '✓ 替换' : '替换'),
+            child: Text(
+                _searchHelper.useReplace ? '✓ 替换' : '替换'),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -7811,18 +7279,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Widget _buildSearchMenuOverlay() {
-    final currentHit = (_currentSearchHitIndex >= 0 &&
-            _currentSearchHitIndex < _contentSearchHits.length)
-        ? _contentSearchHits[_currentSearchHitIndex]
-        : null;
-    final isSearching = _isSearchingContent;
-    final hasHits = _contentSearchHits.isNotEmpty;
+    final currentHit = _searchHelper.currentHit;
+    final isSearching = _searchHelper.isSearching;
+    final hasHits = _searchHelper.hasHits;
     final canNavigate = hasHits && !isSearching;
     final info = isSearching
         ? '正在搜索全文...'
         : hasHits
-            ? '结果 ${_currentSearchHitIndex + 1}/${_contentSearchHits.length} · ${currentHit?.chapterTitle ?? _currentTitle}'
-            : (_contentSearchQuery.trim().isEmpty ? '未开始全文搜索' : '全文未找到匹配内容');
+            ? '结果 ${_searchHelper.currentHitIndex + 1}/${_searchHelper.hits.length} · ${currentHit?.chapterTitle ?? _currentTitle}'
+            : (_searchHelper.query.trim().isEmpty ? '未开始全文搜索' : '全文未找到匹配内容');
     final location = hasHits && currentHit != null
         ? '位置 ${currentHit.start + 1}/${currentHit.chapterContentLength}'
         : null;
@@ -8212,31 +7677,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  ReadAloudCapability _detectReadAloudCapability() {
-    if (kIsWeb) {
-      return const ReadAloudCapability(
-        available: false,
-        reason: '当前平台暂不支持语音朗读',
-      );
-    }
-    if (_chapters.isEmpty) {
-      return const ReadAloudCapability(
-        available: false,
-        reason: '当前书籍暂无可朗读章节',
-      );
-    }
-    if (_currentContent.trim().isEmpty) {
-      return const ReadAloudCapability(
-        available: false,
-        reason: '当前章节暂无可朗读内容',
-      );
-    }
-    return const ReadAloudCapability(
-      available: true,
-      reason: '',
-    );
-  }
-
   void _refreshCurrentSourceName() {
     final sourceUrl = _currentSourceUrl;
     if (sourceUrl == null || sourceUrl.trim().isEmpty) {
@@ -8291,19 +7731,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return _SimpleReaderViewState._defaultLegacyImageStyle;
   }
 
-  bool _hasWebDavProgressConfig() {
-    final settings = _settingsService.appSettings;
-    final rootUrl = _webDavService.buildRootUrl(settings).trim();
-    final rootUri = Uri.tryParse(rootUrl);
-    if (rootUri == null) return false;
-    final scheme = rootUri.scheme.toLowerCase();
-    if (scheme != 'http' && scheme != 'https') return false;
-    return _webDavService.hasValidConfig(settings);
-  }
+  bool _hasWebDavProgressConfig() =>
+      _progressHelper.hasWebDavProgressConfig();
 
-  bool _isSyncBookProgressEnabled() {
-    return _settingsService.appSettings.syncBookProgress;
-  }
+  bool _isSyncBookProgressEnabled() =>
+      _progressHelper.isSyncBookProgressEnabled();
 
   Future<void> _openExceptionLogsFromReader() async {
     await Navigator.of(context).push(
@@ -8313,248 +7745,72 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  String _progressSyncBookTitle() {
-    final bookTitleFromRepo =
-        _bookRepo.getBookById(widget.bookId)?.title.trim() ?? '';
-    if (bookTitleFromRepo.isNotEmpty) {
-      return bookTitleFromRepo;
-    }
-    final title = widget.bookTitle.trim();
-    if (title.isNotEmpty) {
-      return title;
-    }
-    return '未知书名';
-  }
-
-  String _progressSyncBookAuthor() {
-    final authorFromRepo =
-        _bookRepo.getBookById(widget.bookId)?.author.trim() ?? '';
-    if (authorFromRepo.isNotEmpty) {
-      return authorFromRepo;
-    }
-    final author = _bookAuthor.trim();
-    if (author.isNotEmpty) {
-      return author;
-    }
-    return '未知作者';
-  }
-
-  WebDavBookProgress _buildLocalBookProgressPayload() {
-    final chapterProgress = _getChapterProgress().clamp(0.0, 1.0).toDouble();
-    final readableChapterCount = _effectiveReadableChapterCount();
-    final safeChapterIndex = readableChapterCount > 0
-        ? _currentChapterIndex.clamp(0, readableChapterCount - 1).toInt()
-        : 0;
-    return WebDavBookProgress(
-      name: _progressSyncBookTitle(),
-      author: _progressSyncBookAuthor(),
-      durChapterIndex: safeChapterIndex,
-      durChapterPos: (chapterProgress * 10000).round(),
-      durChapterTime: DateTime.now().millisecondsSinceEpoch,
-      durChapterTitle: _currentTitle,
-      chapterProgress: chapterProgress,
-      readProgress: _getBookProgress().clamp(0.0, 1.0).toDouble(),
-      totalChapters: readableChapterCount,
-    );
-  }
-
-  double _decodeRemoteChapterProgress(WebDavBookProgress remote) {
-    final explicit = remote.chapterProgress;
-    if (explicit != null) {
-      return explicit.clamp(0.0, 1.0).toDouble();
-    }
-    final pos = remote.durChapterPos;
-    if (pos <= 0) return 0.0;
-    if (pos <= 10000) {
-      return (pos / 10000.0).clamp(0.0, 1.0).toDouble();
-    }
-    return 0.0;
-  }
-
   Future<void> _pushBookProgressToWebDav() async {
-    if (!_isSyncBookProgressEnabled()) {
-      return;
-    }
-    if (!_hasWebDavProgressConfig()) {
-      return;
-    }
-    if (_chapters.isEmpty) {
-      return;
-    }
-    final bookTitle = _progressSyncBookTitle();
-    final bookAuthor = _progressSyncBookAuthor();
-    try {
-      await _saveProgress();
-      final progress = _buildLocalBookProgressPayload();
-      await _webDavService.uploadBookProgress(
-        progress: progress,
-        settings: _settingsService.appSettings,
-      );
-      if (!mounted) return;
+    final result = await _progressHelper.pushBookProgressToWebDav();
+    if (!mounted) return;
+    if (result.success) {
       _showToast('上传成功');
-    } catch (error, stackTrace) {
-      final reason = _normalizeReaderErrorMessage(error);
-      ExceptionLogService().record(
-        node: 'reader.menu.cover_progress.failed',
-        message: '上传阅读进度失败《$bookTitle》\n$reason',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'bookId': widget.bookId,
-          'bookTitle': bookTitle,
-          'bookAuthor': bookAuthor,
-          'syncBookProgress': _settingsService.appSettings.syncBookProgress,
-          'sourceUrl': _currentSourceUrl,
-        },
-      );
-      if (!mounted) return;
+    } else if (!result.skipped && result.error != null) {
+      final reason = _normalizeReaderErrorMessage(result.error!);
       _showToast('上传进度失败\n$reason');
     }
   }
 
   Future<void> _pullBookProgressFromWebDav() async {
-    if (!_isSyncBookProgressEnabled()) {
-      return;
-    }
-    if (!_hasWebDavProgressConfig()) {
-      return;
-    }
-    if (_chapters.isEmpty) {
-      return;
-    }
-    final bookTitle = _progressSyncBookTitle();
-    final bookAuthor = _progressSyncBookAuthor();
-    try {
-      final remote = await _webDavService.getBookProgress(
-        bookTitle: bookTitle,
-        bookAuthor: bookAuthor,
-        settings: _settingsService.appSettings,
-      );
-      if (remote == null) return;
-      await _applyRemoteBookProgress(
-        remote,
-        bookTitle: bookTitle,
-        bookAuthor: bookAuthor,
-      );
-    } catch (error, stackTrace) {
-      final reason = _normalizeReaderErrorMessage(error);
-      ExceptionLogService().record(
-        node: 'reader.menu.get_progress.failed',
-        message: '拉取阅读进度失败《$bookTitle》\n$reason',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'bookId': widget.bookId,
-          'bookTitle': widget.bookTitle,
-          'bookAuthor': _bookAuthor,
-          'syncBookProgress': _settingsService.appSettings.syncBookProgress,
-          'sourceUrl': _currentSourceUrl,
-        },
-      );
-    }
+    final pullResult =
+        await _progressHelper.pullBookProgressFromWebDav();
+    if (pullResult == null) return;
+    await _applyRemoteBookProgress(pullResult);
   }
 
   Future<void> _applyRemoteBookProgress(
-    WebDavBookProgress remote, {
-    required String bookTitle,
-    required String bookAuthor,
-  }) async {
-    final readableChapterCount = _effectiveReadableChapterCount();
-    if (readableChapterCount <= 0) return;
-    final maxIndex = readableChapterCount - 1;
-    final targetChapterIndex = remote.durChapterIndex;
-    if (targetChapterIndex < 0 || targetChapterIndex > maxIndex) {
-      return;
-    }
-    var targetChapterProgress = _decodeRemoteChapterProgress(remote);
-    final remotePos = remote.durChapterPos;
-    final hasLegacyRawPos = remote.chapterProgress == null && remotePos > 10000;
-    if (hasLegacyRawPos && targetChapterProgress <= 0) {
-      final chapterContent =
-          (_chapters[targetChapterIndex].content ?? '').trim();
-      if (chapterContent.isNotEmpty) {
-        targetChapterProgress =
-            (remotePos / chapterContent.length).clamp(0.0, 1.0).toDouble();
-      }
-    }
-    final localChapterIndex = _currentChapterIndex.clamp(0, maxIndex).toInt();
-    final localChapterProgress =
-        _getChapterProgress().clamp(0.0, 1.0).toDouble();
-    final remoteBehindLocal = targetChapterIndex < localChapterIndex ||
-        (targetChapterIndex == localChapterIndex &&
-            targetChapterProgress < localChapterProgress);
-
-    if (remoteBehindLocal) {
+    WebDavPullResult pullResult,
+  ) async {
+    if (pullResult.remoteBehindLocal) {
       if (!mounted) return;
-      final confirmOverride = await showCupertinoBottomSheetDialog<bool>(
-            context: context,
-            builder: (dialogContext) => CupertinoAlertDialog(
-              title: const Text('获取进度'),
-              content: const Text('\n当前进度超过云端，是否覆盖为云端进度？'),
-              actions: [
-                CupertinoDialogAction(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('取消'),
+      final confirmOverride =
+          await showCupertinoBottomSheetDialog<bool>(
+                context: context,
+                builder: (dialogContext) => CupertinoAlertDialog(
+                  title: const Text('获取进度'),
+                  content: const Text(
+                    '\n当前进度超过云端，是否覆盖为云端进度？',
+                  ),
+                  actions: [
+                    CupertinoDialogAction(
+                      onPressed: () =>
+                          Navigator.pop(dialogContext, false),
+                      child: const Text('取消'),
+                    ),
+                    CupertinoDialogAction(
+                      onPressed: () =>
+                          Navigator.pop(dialogContext, true),
+                      child: const Text('覆盖'),
+                    ),
+                  ],
                 ),
-                CupertinoDialogAction(
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('覆盖'),
-                ),
-              ],
-            ),
-          ) ??
-          false;
+              ) ??
+              false;
       if (!confirmOverride) return;
     }
 
-    final chapterProgressDelta =
-        (targetChapterProgress - localChapterProgress).abs();
-    final remoteEqualsLocal = targetChapterIndex == localChapterIndex &&
-        chapterProgressDelta <= 0.0001;
-    if (remoteEqualsLocal) {
-      if (!remoteBehindLocal) {
-        final syncedTitle = (remote.durChapterTitle ?? '').trim();
-        final suffix = syncedTitle.isEmpty ? '' : ' $syncedTitle';
-        ExceptionLogService().record(
-          node: 'reader.menu.get_progress.synced',
-          message: '自动同步阅读进度成功《$bookTitle》$suffix',
-          context: <String, dynamic>{
-            'bookId': widget.bookId,
-            'bookTitle': bookTitle,
-            'bookAuthor': bookAuthor,
-            'chapterIndex': targetChapterIndex,
-            'chapterTitle': remote.durChapterTitle,
-            'sourceUrl': _currentSourceUrl,
-          },
-        );
+    if (pullResult.remoteEqualsLocal) {
+      if (!pullResult.remoteBehindLocal) {
+        _progressHelper.logProgressSynced(pullResult: pullResult);
       }
       return;
     }
 
     await _loadChapter(
-      targetChapterIndex,
+      pullResult.targetChapterIndex,
       restoreOffset: true,
-      targetChapterProgress: targetChapterProgress,
+      targetChapterProgress: pullResult.targetChapterProgress,
     );
     await _saveProgress();
-    if (remoteBehindLocal) {
+    if (pullResult.remoteBehindLocal) {
       return;
     }
-
-    final syncedTitle = (remote.durChapterTitle ?? '').trim();
-    final suffix = syncedTitle.isEmpty ? '' : ' $syncedTitle';
-    ExceptionLogService().record(
-      node: 'reader.menu.get_progress.synced',
-      message: '自动同步阅读进度成功《$bookTitle》$suffix',
-      context: <String, dynamic>{
-        'bookId': widget.bookId,
-        'bookTitle': bookTitle,
-        'bookAuthor': bookAuthor,
-        'chapterIndex': targetChapterIndex,
-        'chapterTitle': remote.durChapterTitle,
-        'sourceUrl': _currentSourceUrl,
-      },
-    );
+    _progressHelper.logProgressSynced(pullResult: pullResult);
   }
 
   Future<void> _openContentEditFromMenu() async {
@@ -9458,18 +8714,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   Future<void> _exportBookmarksFromReader({
     required bool markdown,
   }) async {
-    final bookmarks = _bookmarkRepo.getBookmarksForBook(widget.bookId);
-    final result = markdown
-        ? await _bookmarkExportService.exportMarkdown(
-            bookTitle: widget.bookTitle,
-            bookAuthor: _bookAuthor,
-            bookmarks: bookmarks,
-          )
-        : await _bookmarkExportService.exportJson(
-            bookTitle: widget.bookTitle,
-            bookAuthor: _bookAuthor,
-            bookmarks: bookmarks,
-          );
+    final result = await _bookmarkHelper.exportBookmarks(
+      markdown: markdown,
+    );
     if (!mounted) return;
     if (result.success) {
       final path = result.outputPath?.trim();
@@ -10604,220 +9851,44 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _showToast('已禁用书源：${source.bookSourceName}');
   }
 
-  Future<void> _deleteSourceByLegacyRule(String sourceUrl) async {
-    await _sourceRepo.deleteSource(sourceUrl);
-    await SourceVariableStore.removeVariable(sourceUrl);
-  }
-
   Future<List<ReaderSourceSwitchCandidate>> _disableSourceSwitchCandidate({
     required ReaderSourceSwitchCandidate candidate,
     required List<ReaderSourceSwitchCandidate> currentCandidates,
   }) async {
-    final source = _sourceRepo.getSourceByUrl(candidate.source.bookSourceUrl);
-    if (source != null) {
-      await _sourceRepo.updateSource(source.copyWith(enabled: false));
-    }
-    final targetSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-      candidate.source.bookSourceUrl,
+    return _sourceSwitchConfig.disableCandidate(
+      candidate: candidate,
+      currentCandidates: currentCandidates,
     );
-    final targetBookUrl = candidate.book.bookUrl.trim();
-    return currentCandidates.where((item) {
-      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        item.source.bookSourceUrl,
-      );
-      if (sourceKey != targetSourceKey) {
-        return true;
-      }
-      if (targetBookUrl.isEmpty) {
-        return false;
-      }
-      return item.book.bookUrl.trim() != targetBookUrl;
-    }).toList(growable: false);
   }
 
   Future<List<ReaderSourceSwitchCandidate>> _deleteSourceSwitchCandidate({
     required ReaderSourceSwitchCandidate candidate,
     required List<ReaderSourceSwitchCandidate> currentCandidates,
   }) async {
-    await _deleteSourceByLegacyRule(candidate.source.bookSourceUrl);
-    final targetSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-      candidate.source.bookSourceUrl,
+    return _sourceSwitchConfig.deleteCandidate(
+      candidate: candidate,
+      currentCandidates: currentCandidates,
     );
-    final targetBookUrl = candidate.book.bookUrl.trim();
-    return currentCandidates.where((item) {
-      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        item.source.bookSourceUrl,
-      );
-      if (sourceKey != targetSourceKey) {
-        return true;
-      }
-      if (targetBookUrl.isEmpty) {
-        return false;
-      }
-      return item.book.bookUrl.trim() != targetBookUrl;
-    }).toList(growable: false);
   }
 
   Future<List<ReaderSourceSwitchCandidate>> _topSourceSwitchCandidate({
     required ReaderSourceSwitchCandidate candidate,
     required List<ReaderSourceSwitchCandidate> currentCandidates,
   }) async {
-    final source = _sourceRepo.getSourceByUrl(candidate.source.bookSourceUrl);
-    if (source == null) {
-      return List<ReaderSourceSwitchCandidate>.from(
-        currentCandidates,
-        growable: false,
-      );
-    }
-    final allSources = _sourceRepo.getAllSources();
-    if (allSources.isEmpty) {
-      return List<ReaderSourceSwitchCandidate>.from(
-        currentCandidates,
-        growable: false,
-      );
-    }
-    var minOrder = allSources.first.customOrder;
-    for (final item in allSources.skip(1)) {
-      if (item.customOrder < minOrder) {
-        minOrder = item.customOrder;
-      }
-    }
-    final updatedSource = source.copyWith(customOrder: minOrder - 1);
-    await _sourceRepo.updateSource(updatedSource);
-
-    final targetKey = ReaderSourceSwitchHelper.normalizeForCompare(
-      updatedSource.bookSourceUrl,
+    return _sourceSwitchConfig.topCandidate(
+      candidate: candidate,
+      currentCandidates: currentCandidates,
     );
-    final updatedCandidates = currentCandidates.map((item) {
-      final itemKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        item.source.bookSourceUrl,
-      );
-      if (itemKey != targetKey) {
-        return item;
-      }
-      return ReaderSourceSwitchCandidate(
-        source: updatedSource,
-        book: item.book,
-        chapterWordCountText: item.chapterWordCountText,
-        chapterWordCount: item.chapterWordCount,
-        respondTimeMs: item.respondTimeMs,
-      );
-    }).toList(growable: false);
-
-    return _reorderSourceSwitchCandidatesByCustomOrder(updatedCandidates);
   }
 
   Future<List<ReaderSourceSwitchCandidate>> _bottomSourceSwitchCandidate({
     required ReaderSourceSwitchCandidate candidate,
     required List<ReaderSourceSwitchCandidate> currentCandidates,
   }) async {
-    final source = _sourceRepo.getSourceByUrl(candidate.source.bookSourceUrl);
-    if (source == null) {
-      return List<ReaderSourceSwitchCandidate>.from(
-        currentCandidates,
-        growable: false,
-      );
-    }
-    final allSources = _sourceRepo.getAllSources();
-    if (allSources.isEmpty) {
-      return List<ReaderSourceSwitchCandidate>.from(
-        currentCandidates,
-        growable: false,
-      );
-    }
-    var maxOrder = allSources.first.customOrder;
-    for (final item in allSources.skip(1)) {
-      if (item.customOrder > maxOrder) {
-        maxOrder = item.customOrder;
-      }
-    }
-    final updatedSource = source.copyWith(customOrder: maxOrder + 1);
-    await _sourceRepo.updateSource(updatedSource);
-
-    final targetKey = ReaderSourceSwitchHelper.normalizeForCompare(
-      updatedSource.bookSourceUrl,
+    return _sourceSwitchConfig.bottomCandidate(
+      candidate: candidate,
+      currentCandidates: currentCandidates,
     );
-    final updatedCandidates = currentCandidates.map((item) {
-      final itemKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        item.source.bookSourceUrl,
-      );
-      if (itemKey != targetKey) {
-        return item;
-      }
-      return ReaderSourceSwitchCandidate(
-        source: updatedSource,
-        book: item.book,
-        chapterWordCountText: item.chapterWordCountText,
-        chapterWordCount: item.chapterWordCount,
-        respondTimeMs: item.respondTimeMs,
-      );
-    }).toList(growable: false);
-
-    return _reorderSourceSwitchCandidatesByCustomOrder(updatedCandidates);
-  }
-
-  Future<List<ReaderSourceSwitchCandidate>>
-      _refreshEditedSourceSwitchCandidate({
-    required ReaderSourceSwitchCandidate editedCandidate,
-    required List<ReaderSourceSwitchCandidate> currentCandidates,
-    required Book currentBook,
-    required String savedSourceUrl,
-  }) async {
-    final oldSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-      editedCandidate.source.bookSourceUrl,
-    );
-    final nextSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-      savedSourceUrl,
-    );
-    final retained = <ReaderSourceSwitchCandidate>[];
-    var firstReplacedIndex = -1;
-    for (final item in currentCandidates) {
-      final key = ReaderSourceSwitchHelper.normalizeForCompare(
-        item.source.bookSourceUrl,
-      );
-      final shouldReplace = key == oldSourceKey || key == nextSourceKey;
-      if (shouldReplace) {
-        if (firstReplacedIndex < 0) {
-          firstReplacedIndex = retained.length;
-        }
-        continue;
-      }
-      retained.add(item);
-    }
-
-    final savedSource = _sourceRepo.getSourceByUrl(savedSourceUrl);
-    if (savedSource == null) {
-      return List<ReaderSourceSwitchCandidate>.from(
-        retained,
-        growable: false,
-      );
-    }
-
-    final refreshed = await _loadSourceSwitchCandidatesBySources(
-      currentBook: currentBook,
-      sourcesToSearch: <BookSource>[savedSource],
-      loadInfoEnabled: _changeSourceLoadInfo,
-      loadWordCountEnabled: _changeSourceLoadWordCount,
-      loadTocEnabled: _changeSourceLoadToc,
-      sourceDelaySeconds: _changeSourceDelaySeconds,
-    );
-    if (refreshed.isEmpty) {
-      return List<ReaderSourceSwitchCandidate>.from(
-        retained,
-        growable: false,
-      );
-    }
-
-    final merged = List<ReaderSourceSwitchCandidate>.from(
-      retained,
-      growable: true,
-    );
-    final insertIndex =
-        firstReplacedIndex < 0 || firstReplacedIndex > merged.length
-            ? merged.length
-            : firstReplacedIndex;
-    merged.insertAll(insertIndex, refreshed);
-    return List<ReaderSourceSwitchCandidate>.from(merged, growable: false);
   }
 
   Future<List<ReaderSourceSwitchCandidate>> _editSourceSwitchCandidate({
@@ -10835,16 +9906,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       );
     }
     if (refreshAllAfterEdit) {
-      return _startSourceSwitchCandidateSearch(
+      return _sourceSwitchConfig.startCandidateSearch(
         currentBook: currentBook,
         currentCandidates: currentCandidates,
-        loadInfoEnabled: _changeSourceLoadInfo,
-        loadWordCountEnabled: _changeSourceLoadWordCount,
-        loadTocEnabled: _changeSourceLoadToc,
-        sourceDelaySeconds: _changeSourceDelaySeconds,
       );
     }
-    return _refreshEditedSourceSwitchCandidate(
+    return _sourceSwitchConfig.refreshEditedCandidate(
       editedCandidate: candidate,
       currentCandidates: currentCandidates,
       currentBook: currentBook,
@@ -10852,45 +9919,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-  List<ReaderSourceSwitchCandidate> _reorderSourceSwitchCandidatesByCustomOrder(
-    List<ReaderSourceSwitchCandidate> candidates,
-  ) {
-    if (candidates.length <= 1) {
-      return List<ReaderSourceSwitchCandidate>.from(
-        candidates,
-        growable: false,
-      );
-    }
-    final sourceOrderByKey = <String, int>{
-      for (final source in _sourceRepo.getAllSources())
-        ReaderSourceSwitchHelper.normalizeForCompare(source.bookSourceUrl):
-            source.customOrder,
-    };
-    final indexed = candidates.asMap().entries.toList(growable: false);
-    indexed.sort((left, right) {
-      final leftKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        left.value.source.bookSourceUrl,
-      );
-      final rightKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        right.value.source.bookSourceUrl,
-      );
-      final leftOrder =
-          sourceOrderByKey[leftKey] ?? left.value.source.customOrder;
-      final rightOrder =
-          sourceOrderByKey[rightKey] ?? right.value.source.customOrder;
-      final orderCompare = leftOrder.compareTo(rightOrder);
-      if (orderCompare != 0) {
-        return orderCompare;
-      }
-      return left.key.compareTo(right.key);
-    });
-    return indexed.map((entry) => entry.value).toList(growable: false);
-  }
-
   void _stopSourceSwitchCandidateSearch() {
-    final token = _sourceSwitchCandidateSearchCancelToken;
-    if (token == null || token.isCancelled) return;
-    token.cancel('source switch candidate search stopped by user');
+    _sourceSwitchConfig.stopCandidateSearch();
   }
 
   Future<List<ReaderSourceSwitchCandidate>> _startSourceSwitchCandidateSearch({
@@ -10901,33 +9931,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     bool? loadTocEnabled,
     int? sourceDelaySeconds,
   }) async {
-    _stopSourceSwitchCandidateSearch();
-    final token = CancelToken();
-    _sourceSwitchCandidateSearchCancelToken = token;
-    try {
-      final searched = await _loadSourceSwitchCandidates(
-        currentBook: currentBook,
-        loadInfoEnabled: loadInfoEnabled ?? _changeSourceLoadInfo,
-        loadWordCountEnabled:
-            loadWordCountEnabled ?? _changeSourceLoadWordCount,
-        loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
-        sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
-        cancelToken: token,
-      );
-      if (token.isCancelled) {
-        return currentCandidates;
-      }
-      return searched;
-    } catch (_) {
-      if (token.isCancelled) {
-        return currentCandidates;
-      }
-      rethrow;
-    } finally {
-      if (identical(_sourceSwitchCandidateSearchCancelToken, token)) {
-        _sourceSwitchCandidateSearchCancelToken = null;
-      }
-    }
+    return _sourceSwitchConfig.startCandidateSearch(
+      currentBook: currentBook,
+      currentCandidates: currentCandidates,
+      loadInfoEnabled: loadInfoEnabled,
+      loadWordCountEnabled: loadWordCountEnabled,
+      loadTocEnabled: loadTocEnabled,
+      sourceDelaySeconds: sourceDelaySeconds,
+    );
   }
 
   Book _buildCurrentBookForSourceSwitch() {
@@ -10945,264 +9956,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           readProgress: _getBookProgress(),
           isLocal: false,
         );
-  }
-
-  SearchResult _copySourceSwitchSearchResult(
-    SearchResult source, {
-    required String lastChapter,
-  }) {
-    return SearchResult(
-      name: source.name,
-      author: source.author,
-      coverUrl: source.coverUrl,
-      intro: source.intro,
-      kind: source.kind,
-      lastChapter: lastChapter,
-      updateTime: source.updateTime,
-      wordCount: source.wordCount,
-      bookUrl: source.bookUrl,
-      sourceUrl: source.sourceUrl,
-      sourceName: source.sourceName,
-    );
-  }
-
-  String _resolveCurrentChapterTitleForSourceSwitch(Book currentBook) {
-    if (_chapters.isNotEmpty) {
-      final chapterIndex = currentBook.currentChapter.clamp(
-        0,
-        _chapters.length - 1,
-      );
-      final chapterTitle = _chapters[chapterIndex].title.trim();
-      if (chapterTitle.isNotEmpty) {
-        return chapterTitle;
-      }
-    }
-    return _currentTitle.trim();
-  }
-
-  String _buildSourceSwitchWordCountText({
-    required int chapterIndex,
-    required String chapterTitle,
-    required int wordCount,
-  }) {
-    final trimmedTitle = chapterTitle.trim();
-    final displayTitle = trimmedTitle.isEmpty ? '未知章节' : trimmedTitle;
-    final foldedTitle = displayTitle.length > 20
-        ? '${displayTitle.substring(0, 20)}…'
-        : displayTitle;
-    return '[${chapterIndex + 1}] $foldedTitle\n字数：$wordCount';
-  }
-
-  Future<
-      ({
-        SearchResult result,
-        String chapterWordCountText,
-        int chapterWordCount,
-        int respondTimeMs
-      })> _hydrateSourceSwitchSearchResult({
-    required Book currentBook,
-    required BookSource source,
-    required SearchResult result,
-    required bool loadInfoEnabled,
-    required bool loadTocEnabled,
-    required bool loadWordCountEnabled,
-    CancelToken? cancelToken,
-  }) async {
-    final bookUrl = result.bookUrl.trim();
-    if (bookUrl.isEmpty ||
-        (!loadInfoEnabled && !loadTocEnabled && !loadWordCountEnabled)) {
-      return (
-        result: result,
-        chapterWordCountText: '',
-        chapterWordCount: -1,
-        respondTimeMs: -1,
-      );
-    }
-
-    final detail = await _ruleEngine.getBookInfo(
-      source,
-      bookUrl,
-      clearRuntimeVariables: true,
-      cancelToken: cancelToken,
-    );
-    final detailLastChapter = detail?.lastChapter.trim() ?? '';
-    final tocUrl = detail?.tocUrl.trim().isNotEmpty == true
-        ? detail!.tocUrl.trim()
-        : bookUrl;
-    var toc = const <TocItem>[];
-    if (loadTocEnabled || loadWordCountEnabled) {
-      toc = await _ruleEngine.getToc(
-        source,
-        tocUrl,
-        clearRuntimeVariables: false,
-        cancelToken: cancelToken,
-      );
-    }
-
-    var nextLastChapter = result.lastChapter;
-    if (loadTocEnabled && toc.isNotEmpty) {
-      final latest = toc.last.name.trim();
-      if (latest.isNotEmpty) {
-        nextLastChapter = latest;
-      }
-    } else if (detailLastChapter.isNotEmpty &&
-        (loadInfoEnabled || loadWordCountEnabled || loadTocEnabled)) {
-      nextLastChapter = detailLastChapter;
-    } else if (loadTocEnabled) {
-      if (detailLastChapter.isNotEmpty) {
-        nextLastChapter = detailLastChapter;
-      }
-    }
-    final nextResult = nextLastChapter == result.lastChapter
-        ? result
-        : _copySourceSwitchSearchResult(
-            result,
-            lastChapter: nextLastChapter,
-          );
-    if (!loadWordCountEnabled || toc.isEmpty) {
-      return (
-        result: nextResult,
-        chapterWordCountText: '',
-        chapterWordCount: -1,
-        respondTimeMs: -1,
-      );
-    }
-
-    final parsedChapters = <Chapter>[];
-    for (final item in toc) {
-      final chapterTitle = item.name.trim();
-      final chapterUrl = item.url.trim();
-      if (chapterTitle.isEmpty || chapterUrl.isEmpty) continue;
-      parsedChapters.add(
-        Chapter(
-          id: '${widget.bookId}_switch_word_count_${parsedChapters.length}',
-          bookId: widget.bookId,
-          title: chapterTitle,
-          url: chapterUrl,
-          index: parsedChapters.length,
-        ),
-      );
-    }
-    if (parsedChapters.isEmpty) {
-      return (
-        result: nextResult,
-        chapterWordCountText: '',
-        chapterWordCount: -1,
-        respondTimeMs: -1,
-      );
-    }
-
-    final currentChapterTitle = _resolveCurrentChapterTitleForSourceSwitch(
-      currentBook,
-    );
-    final currentChapterIndex = currentBook.currentChapter.clamp(
-      0,
-      parsedChapters.length - 1,
-    );
-    final oldChapterCount = currentBook.totalChapters > 0
-        ? currentBook.totalChapters
-        : _chapters.length;
-    final targetChapterIndex =
-        ReaderSourceSwitchHelper.resolveTargetChapterIndex(
-      newChapters: parsedChapters,
-      currentChapterTitle: currentChapterTitle,
-      currentChapterIndex: currentChapterIndex,
-      oldChapterCount: oldChapterCount,
-    ).clamp(0, parsedChapters.length - 1);
-    final targetChapter = parsedChapters[targetChapterIndex];
-    final targetNextChapterUrl = targetChapterIndex + 1 < parsedChapters.length
-        ? parsedChapters[targetChapterIndex + 1].url
-        : null;
-
-    final startedAtMs = DateTime.now().millisecondsSinceEpoch;
-    try {
-      final content = await _ruleEngine.getContent(
-        source,
-        targetChapter.url ?? '',
-        nextChapterUrl: targetNextChapterUrl,
-        clearRuntimeVariables: false,
-        cancelToken: cancelToken,
-      );
-      final elapsedMs = DateTime.now().millisecondsSinceEpoch - startedAtMs;
-      final chapterWordCount = content.length;
-      return (
-        result: nextResult,
-        chapterWordCountText: _buildSourceSwitchWordCountText(
-          chapterIndex: targetChapterIndex,
-          chapterTitle: targetChapter.title,
-          wordCount: chapterWordCount,
-        ),
-        chapterWordCount: chapterWordCount,
-        respondTimeMs: elapsedMs,
-      );
-    } catch (error) {
-      if (cancelToken?.isCancelled == true) rethrow;
-      final elapsedMs = DateTime.now().millisecondsSinceEpoch - startedAtMs;
-      final message = _normalizeReaderErrorMessage(error);
-      final errorText = message.isEmpty ? '未知错误' : message;
-      return (
-        result: nextResult,
-        chapterWordCountText:
-            '[${targetChapterIndex + 1}] ${targetChapter.title}\n获取字数失败：$errorText',
-        chapterWordCount: -1,
-        respondTimeMs: elapsedMs,
-      );
-    }
-  }
-
-  Future<void> _handleChangeSourceLoadWordCountChanged(bool enabled) async {
-    _changeSourceLoadWordCount = enabled;
-    await _settingsService.saveChangeSourceLoadWordCount(enabled);
-  }
-
-  Future<void> _handleChangeSourceLoadInfoChanged(bool enabled) async {
-    _changeSourceLoadInfo = enabled;
-    await _settingsService.saveChangeSourceLoadInfo(enabled);
-  }
-
-  Future<void> _handleChangeSourceLoadTocChanged(bool enabled) async {
-    _changeSourceLoadToc = enabled;
-    await _settingsService.saveChangeSourceLoadToc(enabled);
-  }
-
-  Future<void> _handleChangeSourceCheckAuthorChanged(bool enabled) async {
-    _changeSourceCheckAuthor = enabled;
-    await _settingsService.saveChangeSourceCheckAuthor(enabled);
-  }
-
-  String _normalizeChangeSourceGroup(String group) {
-    return group.trim();
-  }
-
-  Future<void> _handleChangeSourceGroupChanged(String group) async {
-    final normalized = _normalizeChangeSourceGroup(group);
-    _changeSourceGroup = normalized;
-    await _settingsService.saveChangeSourceGroup(normalized);
-  }
-
-  List<String> _buildChangeSourceGroups() {
-    return SearchScopeGroupHelper.enabledGroupsFromSources(
-      _sourceRepo.getAllSources(),
-    );
-  }
-
-  List<BookSource> _scopeChangeSourceSourcesByGroup(
-    List<BookSource> enabledSources,
-  ) {
-    final selectedGroup = _normalizeChangeSourceGroup(_changeSourceGroup);
-    if (selectedGroup.isEmpty) {
-      return enabledSources;
-    }
-    final scopedSources = enabledSources.where((source) {
-      return SearchScope.splitSourceGroups(source.bookSourceGroup)
-          .contains(selectedGroup);
-    }).toList(growable: false);
-    if (scopedSources.isNotEmpty) {
-      return scopedSources;
-    }
-    _changeSourceGroup = '';
-    unawaited(_settingsService.saveChangeSourceGroup(''));
-    return enabledSources;
   }
 
   Future<bool> _confirmSwitchChangeSourceGroupToAll(String group) async {
@@ -11236,7 +9989,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     int? sourceDelaySeconds,
     CancelToken? cancelToken,
   }) async {
-    var candidates = await _loadSourceSwitchCandidates(
+    var candidates = await _sourceSwitchConfig.loadCandidates(
       currentBook: currentBook,
       loadInfoEnabled: loadInfoEnabled,
       loadWordCountEnabled: loadWordCountEnabled,
@@ -11244,10 +9997,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       sourceDelaySeconds: sourceDelaySeconds,
       cancelToken: cancelToken,
     );
-    if (!mounted) {
-      return candidates;
-    }
-    final selectedGroup = _normalizeChangeSourceGroup(_changeSourceGroup);
+    if (!mounted) return candidates;
+    final selectedGroup = _sourceSwitchConfig.group.trim();
     if (candidates.isNotEmpty ||
         selectedGroup.isEmpty ||
         cancelToken?.isCancelled == true) {
@@ -11259,8 +10010,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (!mounted || !fallbackToAll || cancelToken?.isCancelled == true) {
       return candidates;
     }
-    await _handleChangeSourceGroupChanged('');
-    candidates = await _loadSourceSwitchCandidates(
+    await _sourceSwitchConfig.handleGroupChanged('');
+    candidates = await _sourceSwitchConfig.loadCandidates(
       currentBook: currentBook,
       loadInfoEnabled: loadInfoEnabled,
       loadWordCountEnabled: loadWordCountEnabled,
@@ -11269,255 +10020,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       cancelToken: cancelToken,
     );
     return candidates;
-  }
-
-  int _normalizeChangeSourceDelaySeconds(int seconds) {
-    return seconds.clamp(0, 9999).toInt();
-  }
-
-  Future<void> _handleChangeSourceDelayChanged(int seconds) async {
-    final normalized = _normalizeChangeSourceDelaySeconds(seconds);
-    _changeSourceDelaySeconds = normalized;
-    await _settingsService.saveBatchChangeSourceDelay(normalized);
-  }
-
-  Future<bool> _waitSourceSwitchDelayWithCancel({
-    required int seconds,
-    CancelToken? cancelToken,
-  }) async {
-    if (seconds <= 0) return true;
-    final totalMs = seconds * 1000;
-    var elapsedMs = 0;
-    while (elapsedMs < totalMs) {
-      if (cancelToken?.isCancelled == true) {
-        return false;
-      }
-      final remainingMs = totalMs - elapsedMs;
-      final stepMs = remainingMs > 200 ? 200 : remainingMs;
-      await Future<void>.delayed(Duration(milliseconds: stepMs));
-      elapsedMs += stepMs;
-    }
-    return cancelToken?.isCancelled != true;
-  }
-
-  Future<List<ReaderSourceSwitchCandidate>> _loadSourceSwitchCandidates({
-    required Book currentBook,
-    bool? loadInfoEnabled,
-    bool? loadWordCountEnabled,
-    bool? loadTocEnabled,
-    int? sourceDelaySeconds,
-    CancelToken? cancelToken,
-  }) async {
-    final enabledSources = _sourceRepo
-        .getAllSources()
-        .where((source) => source.enabled)
-        .toList(growable: false);
-    if (enabledSources.isEmpty) {
-      return const <ReaderSourceSwitchCandidate>[];
-    }
-    final orderedSources = enabledSources
-        .asMap()
-        .entries
-        .toList(growable: false)
-      ..sort((a, b) {
-        final orderCompare = a.value.customOrder.compareTo(b.value.customOrder);
-        if (orderCompare != 0) return orderCompare;
-        return a.key.compareTo(b.key);
-      });
-    final sortedEnabledSources =
-        orderedSources.map((entry) => entry.value).toList(growable: false);
-    final scopedSources = _scopeChangeSourceSourcesByGroup(
-      sortedEnabledSources,
-    );
-
-    return _loadSourceSwitchCandidatesBySources(
-      currentBook: currentBook,
-      sourcesToSearch: scopedSources,
-      loadInfoEnabled: loadInfoEnabled ?? _changeSourceLoadInfo,
-      loadWordCountEnabled: loadWordCountEnabled ?? _changeSourceLoadWordCount,
-      loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
-      sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
-      cancelToken: cancelToken,
-    );
-  }
-
-  Future<List<ReaderSourceSwitchCandidate>>
-      _refreshSourceSwitchCandidatesByCurrentList({
-    required Book currentBook,
-    required List<ReaderSourceSwitchCandidate> currentCandidates,
-    bool? loadInfoEnabled,
-    bool? loadWordCountEnabled,
-    bool? loadTocEnabled,
-    int? sourceDelaySeconds,
-    CancelToken? cancelToken,
-  }) async {
-    if (currentCandidates.isEmpty) {
-      return const <ReaderSourceSwitchCandidate>[];
-    }
-
-    final enabledSourceByUrl = <String, BookSource>{
-      for (final source in _sourceRepo.getAllSources())
-        if (source.enabled)
-          ReaderSourceSwitchHelper.normalizeForCompare(source.bookSourceUrl):
-              source,
-    };
-    final scopedSources = <BookSource>[];
-    final scopedSourceKeys = <String>{};
-    for (final candidate in currentCandidates) {
-      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        candidate.source.bookSourceUrl,
-      );
-      if (sourceKey.isEmpty || !scopedSourceKeys.add(sourceKey)) {
-        continue;
-      }
-      final source = enabledSourceByUrl[sourceKey];
-      if (source == null) continue;
-      scopedSources.add(source);
-    }
-    if (scopedSources.isEmpty) {
-      return const <ReaderSourceSwitchCandidate>[];
-    }
-
-    return _loadSourceSwitchCandidatesBySources(
-      currentBook: currentBook,
-      sourcesToSearch: scopedSources,
-      loadInfoEnabled: loadInfoEnabled ?? _changeSourceLoadInfo,
-      loadWordCountEnabled: loadWordCountEnabled ?? _changeSourceLoadWordCount,
-      loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
-      sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
-      cancelToken: cancelToken,
-    );
-  }
-
-  Future<List<ReaderSourceSwitchCandidate>>
-      _loadSourceSwitchCandidatesBySources({
-    required Book currentBook,
-    required List<BookSource> sourcesToSearch,
-    required bool loadInfoEnabled,
-    required bool loadWordCountEnabled,
-    required bool loadTocEnabled,
-    required int sourceDelaySeconds,
-    CancelToken? cancelToken,
-  }) async {
-    final keyword = currentBook.title.trim();
-    if (keyword.isEmpty || sourcesToSearch.isEmpty) {
-      return const <ReaderSourceSwitchCandidate>[];
-    }
-
-    final searchDelaySeconds = _normalizeChangeSourceDelaySeconds(
-      sourceDelaySeconds,
-    );
-    final searchResults = <SearchResult>[];
-    final chapterWordCountTextByKey = <String, String>{};
-    final chapterWordCountByKey = <String, int>{};
-    final respondTimeMsByKey = <String, int>{};
-
-    String buildCandidateMetricKey(SearchResult result) {
-      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        result.sourceUrl,
-      );
-      final bookUrl = result.bookUrl.trim();
-      return '$sourceKey|$bookUrl';
-    }
-
-    void recordWordCountMeta(
-      SearchResult result, {
-      required String chapterWordCountText,
-      required int chapterWordCount,
-      required int respondTimeMs,
-    }) {
-      if (!loadWordCountEnabled) return;
-      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
-        result.sourceUrl,
-      );
-      if (sourceKey.isEmpty) return;
-      final bookUrl = result.bookUrl.trim();
-      if (bookUrl.isEmpty) return;
-      final key = buildCandidateMetricKey(result);
-      chapterWordCountTextByKey[key] = chapterWordCountText.trim();
-      chapterWordCountByKey[key] = chapterWordCount;
-      respondTimeMsByKey[key] = respondTimeMs;
-    }
-
-    for (var index = 0; index < sourcesToSearch.length; index++) {
-      if (cancelToken?.isCancelled == true) {
-        break;
-      }
-      final source = sourcesToSearch[index];
-      if (index > 0 && searchDelaySeconds > 0) {
-        final continueSearch = await _waitSourceSwitchDelayWithCancel(
-          seconds: searchDelaySeconds,
-          cancelToken: cancelToken,
-        );
-        if (!continueSearch) {
-          break;
-        }
-      }
-      try {
-        final list = await _ruleEngine.search(
-          source,
-          keyword,
-          filter: (name, _) {
-            if (name != keyword) return false;
-            return true;
-          },
-          cancelToken: cancelToken,
-        );
-        if (cancelToken?.isCancelled == true) {
-          break;
-        }
-        if (!(loadInfoEnabled || loadTocEnabled || loadWordCountEnabled) ||
-            list.isEmpty) {
-          searchResults.addAll(list);
-          continue;
-        }
-
-        for (final item in list) {
-          if (cancelToken?.isCancelled == true) {
-            break;
-          }
-          try {
-            final hydrated = await _hydrateSourceSwitchSearchResult(
-              currentBook: currentBook,
-              source: source,
-              result: item,
-              loadInfoEnabled: loadInfoEnabled,
-              loadTocEnabled: loadTocEnabled,
-              loadWordCountEnabled: loadWordCountEnabled,
-              cancelToken: cancelToken,
-            );
-            final hydratedResult = hydrated.result;
-            searchResults.add(hydratedResult);
-            recordWordCountMeta(
-              hydratedResult,
-              chapterWordCountText: hydrated.chapterWordCountText,
-              chapterWordCount: hydrated.chapterWordCount,
-              respondTimeMs: hydrated.respondTimeMs,
-            );
-          } catch (_) {
-            if (cancelToken?.isCancelled == true) {
-              break;
-            }
-            searchResults.add(item);
-          }
-        }
-      } catch (_) {
-        if (cancelToken?.isCancelled == true) {
-          break;
-        }
-        // 单源失败隔离
-      }
-    }
-
-    return ReaderSourceSwitchHelper.buildCandidates(
-      currentBook: currentBook,
-      enabledSources: sourcesToSearch,
-      searchResults: searchResults,
-      loadWordCountEnabled: loadWordCountEnabled,
-      chapterWordCountTextByKey: chapterWordCountTextByKey,
-      chapterWordCountByKey: chapterWordCountByKey,
-      respondTimeMsByKey: respondTimeMsByKey,
-    );
   }
 
   Future<void> _showSwitchSourceBookMenu() async {
@@ -11537,10 +10039,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
     final candidates = await _loadSourceSwitchCandidatesWithGroupFallback(
       currentBook: currentBook,
-      loadInfoEnabled: _changeSourceLoadInfo,
-      loadWordCountEnabled: _changeSourceLoadWordCount,
-      loadTocEnabled: _changeSourceLoadToc,
-      sourceDelaySeconds: _changeSourceDelaySeconds,
+      loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+      loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+      loadTocEnabled: _sourceSwitchConfig.loadToc,
+      sourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
     );
     if (!mounted) return;
     if (candidates.isEmpty) {
@@ -11553,42 +10055,42 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       keyword: keyword,
       candidates: candidates,
       currentSourceUrl: _resolveActiveSourceUrl(currentBook),
-      changeSourceGroup: _changeSourceGroup,
-      sourceGroups: _buildChangeSourceGroups(),
+      changeSourceGroup: _sourceSwitchConfig.group,
+      sourceGroups: _sourceSwitchConfig.buildGroups(),
       authorKeyword: currentBook.author,
-      checkAuthorEnabled: _changeSourceCheckAuthor,
-      loadInfoEnabled: _changeSourceLoadInfo,
-      loadWordCountEnabled: _changeSourceLoadWordCount,
-      loadTocEnabled: _changeSourceLoadToc,
-      changeSourceDelaySeconds: _changeSourceDelaySeconds,
-      onChangeSourceGroupChanged: _handleChangeSourceGroupChanged,
-      onCheckAuthorChanged: _handleChangeSourceCheckAuthorChanged,
-      onLoadInfoChanged: _handleChangeSourceLoadInfoChanged,
-      onLoadWordCountChanged: _handleChangeSourceLoadWordCountChanged,
-      onLoadTocChanged: _handleChangeSourceLoadTocChanged,
-      onChangeSourceDelayChanged: _handleChangeSourceDelayChanged,
+      checkAuthorEnabled: _sourceSwitchConfig.checkAuthor,
+      loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+      loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+      loadTocEnabled: _sourceSwitchConfig.loadToc,
+      changeSourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
+      onChangeSourceGroupChanged: _sourceSwitchConfig.handleGroupChanged,
+      onCheckAuthorChanged: _sourceSwitchConfig.handleCheckAuthorChanged,
+      onLoadInfoChanged: _sourceSwitchConfig.handleLoadInfoChanged,
+      onLoadWordCountChanged: _sourceSwitchConfig.handleLoadWordCountChanged,
+      onLoadTocChanged: _sourceSwitchConfig.handleLoadTocChanged,
+      onChangeSourceDelayChanged: _sourceSwitchConfig.handleDelayChanged,
       onOpenSourceManage: _openSourceManageFromReader,
       onStartCandidatesSearch: (currentCandidates) {
         return _startSourceSwitchCandidateSearch(
           currentBook: currentBook,
           currentCandidates: currentCandidates,
-          loadInfoEnabled: _changeSourceLoadInfo,
-          loadWordCountEnabled: _changeSourceLoadWordCount,
-          loadTocEnabled: _changeSourceLoadToc,
-          sourceDelaySeconds: _changeSourceDelaySeconds,
+          loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+          loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+          loadTocEnabled: _sourceSwitchConfig.loadToc,
+          sourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
         );
       },
       onStopCandidatesSearch: () async {
         _stopSourceSwitchCandidateSearch();
       },
       onRefreshCandidates: (currentCandidates) {
-        return _refreshSourceSwitchCandidatesByCurrentList(
+        return _sourceSwitchConfig.refreshCandidatesByCurrentList(
           currentBook: currentBook,
           currentCandidates: currentCandidates,
-          loadInfoEnabled: _changeSourceLoadInfo,
-          loadWordCountEnabled: _changeSourceLoadWordCount,
-          loadTocEnabled: _changeSourceLoadToc,
-          sourceDelaySeconds: _changeSourceDelaySeconds,
+          loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+          loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+          loadTocEnabled: _sourceSwitchConfig.loadToc,
+          sourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
         );
       },
       onTopSourceCandidate: (candidate, currentCandidates) {
@@ -11654,10 +10156,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
     final candidates = await _loadSourceSwitchCandidatesWithGroupFallback(
       currentBook: currentBook,
-      loadInfoEnabled: _changeSourceLoadInfo,
-      loadWordCountEnabled: _changeSourceLoadWordCount,
-      loadTocEnabled: _changeSourceLoadToc,
-      sourceDelaySeconds: _changeSourceDelaySeconds,
+      loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+      loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+      loadTocEnabled: _sourceSwitchConfig.loadToc,
+      sourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
     );
     if (!mounted) return;
     if (candidates.isEmpty) {
@@ -11670,42 +10172,42 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       keyword: keyword,
       candidates: candidates,
       currentSourceUrl: _resolveActiveSourceUrl(currentBook),
-      changeSourceGroup: _changeSourceGroup,
-      sourceGroups: _buildChangeSourceGroups(),
+      changeSourceGroup: _sourceSwitchConfig.group,
+      sourceGroups: _sourceSwitchConfig.buildGroups(),
       authorKeyword: currentBook.author,
-      checkAuthorEnabled: _changeSourceCheckAuthor,
-      loadInfoEnabled: _changeSourceLoadInfo,
-      loadWordCountEnabled: _changeSourceLoadWordCount,
-      loadTocEnabled: _changeSourceLoadToc,
-      changeSourceDelaySeconds: _changeSourceDelaySeconds,
-      onChangeSourceGroupChanged: _handleChangeSourceGroupChanged,
-      onCheckAuthorChanged: _handleChangeSourceCheckAuthorChanged,
-      onLoadInfoChanged: _handleChangeSourceLoadInfoChanged,
-      onLoadWordCountChanged: _handleChangeSourceLoadWordCountChanged,
-      onLoadTocChanged: _handleChangeSourceLoadTocChanged,
-      onChangeSourceDelayChanged: _handleChangeSourceDelayChanged,
+      checkAuthorEnabled: _sourceSwitchConfig.checkAuthor,
+      loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+      loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+      loadTocEnabled: _sourceSwitchConfig.loadToc,
+      changeSourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
+      onChangeSourceGroupChanged: _sourceSwitchConfig.handleGroupChanged,
+      onCheckAuthorChanged: _sourceSwitchConfig.handleCheckAuthorChanged,
+      onLoadInfoChanged: _sourceSwitchConfig.handleLoadInfoChanged,
+      onLoadWordCountChanged: _sourceSwitchConfig.handleLoadWordCountChanged,
+      onLoadTocChanged: _sourceSwitchConfig.handleLoadTocChanged,
+      onChangeSourceDelayChanged: _sourceSwitchConfig.handleDelayChanged,
       onOpenSourceManage: _openSourceManageFromReader,
       onStartCandidatesSearch: (currentCandidates) {
         return _startSourceSwitchCandidateSearch(
           currentBook: currentBook,
           currentCandidates: currentCandidates,
-          loadInfoEnabled: _changeSourceLoadInfo,
-          loadWordCountEnabled: _changeSourceLoadWordCount,
-          loadTocEnabled: _changeSourceLoadToc,
-          sourceDelaySeconds: _changeSourceDelaySeconds,
+          loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+          loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+          loadTocEnabled: _sourceSwitchConfig.loadToc,
+          sourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
         );
       },
       onStopCandidatesSearch: () async {
         _stopSourceSwitchCandidateSearch();
       },
       onRefreshCandidates: (currentCandidates) {
-        return _refreshSourceSwitchCandidatesByCurrentList(
+        return _sourceSwitchConfig.refreshCandidatesByCurrentList(
           currentBook: currentBook,
           currentCandidates: currentCandidates,
-          loadInfoEnabled: _changeSourceLoadInfo,
-          loadWordCountEnabled: _changeSourceLoadWordCount,
-          loadTocEnabled: _changeSourceLoadToc,
-          sourceDelaySeconds: _changeSourceDelaySeconds,
+          loadInfoEnabled: _sourceSwitchConfig.loadInfo,
+          loadWordCountEnabled: _sourceSwitchConfig.loadWordCount,
+          loadTocEnabled: _sourceSwitchConfig.loadToc,
+          sourceDelaySeconds: _sourceSwitchConfig.delaySeconds,
         );
       },
       onTopSourceCandidate: (candidate, currentCandidates) {
@@ -12129,9 +10631,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   ///
   /// 静默搜索所有启用书源，取第一个匹配结果直接切换，无需用户交互。
   Future<void> _autoChangeSource() async {
-    if (_isAutoChangingSource) return;
+    if (_sourceSwitchConfig.isAutoChangingSource) return;
     if (!mounted) return;
-    setState(() => _isAutoChangingSource = true);
+    _sourceSwitchConfig.setAutoChangingSource(true);
+    setState(() {});
     try {
       final currentBook = _buildCurrentBookForSourceSwitch();
       if (currentBook.title.trim().isEmpty) return;
@@ -12141,23 +10644,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
       _showToast('正在自动换源...');
 
-      final token = CancelToken();
-      _sourceSwitchCandidateSearchCancelToken = token;
       List<ReaderSourceSwitchCandidate> candidates;
-      try {
-        candidates = await _loadSourceSwitchCandidates(
-          currentBook: currentBook,
-          loadInfoEnabled: false,
-          loadWordCountEnabled: false,
-          loadTocEnabled: false,
-          sourceDelaySeconds: 0,
-          cancelToken: token,
-        );
-      } finally {
-        if (identical(_sourceSwitchCandidateSearchCancelToken, token)) {
-          _sourceSwitchCandidateSearchCancelToken = null;
-        }
-      }
+      candidates = await _sourceSwitchConfig.loadCandidates(
+        currentBook: currentBook,
+        loadInfoEnabled: false,
+        loadWordCountEnabled: false,
+        loadTocEnabled: false,
+        sourceDelaySeconds: 0,
+      );
 
       if (!mounted) return;
       if (candidates.isEmpty) {
@@ -12170,47 +10664,38 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     } catch (e) {
       if (mounted) _showToast('自动换源失败');
     } finally {
-      if (mounted) setState(() => _isAutoChangingSource = false);
+      _sourceSwitchConfig.setAutoChangingSource(false);
+      if (mounted) setState(() {});
     }
   }
 
   // --- from simple_reader_view_bookmark.dart ---
   Future<void> _openAddBookmarkDialog() async {
-    final draft = _buildBookmarkDraft();
+    final draft = _bookmarkHelper.buildBookmarkDraft();
     await _openBookmarkEditorFromDraft(draft);
   }
 
-  Future<void> _openBookmarkEditorFromSelectedText(String selectedText) async {
-    final baseDraft = _buildBookmarkDraft();
-    if (baseDraft == null) {
+  Future<void> _openBookmarkEditorFromSelectedText(
+    String selectedText,
+  ) async {
+    final draft =
+        _bookmarkHelper.buildBookmarkDraftFromSelectedText(selectedText);
+    if (draft == null) {
       _showToast('创建书签失败');
       return;
     }
-    final draft = ReaderBookmarkDraft(
-      chapterTitle: baseDraft.chapterTitle,
-      chapterPos: baseDraft.chapterPos,
-      pageText: selectedText.trim(),
-    );
     await _openBookmarkEditorFromDraft(draft);
   }
 
-  Future<void> _openBookmarkEditorFromDraft(ReaderBookmarkDraft? draft) async {
+  Future<void> _openBookmarkEditorFromDraft(BookmarkDraft? draft) async {
     if (draft == null || !mounted) return;
     final result = await _showBookmarkEditorDialog(draft);
     if (result == null) return;
 
     try {
-      await _bookmarkRepo.addBookmark(
-        bookId: widget.bookId,
-        bookName: widget.bookTitle,
-        bookAuthor: _bookAuthor,
-        chapterIndex: _currentChapterIndex,
-        chapterTitle: draft.chapterTitle,
-        chapterPos: draft.chapterPos,
-        content: _composeBookmarkPreview(
-          bookText: result.bookText,
-          note: result.note,
-        ),
+      await _bookmarkHelper.saveBookmark(
+        draft: draft,
+        result: result,
       );
       _updateBookmarkStatus();
     } catch (e) {
@@ -12219,30 +10704,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-  ReaderBookmarkDraft? _buildBookmarkDraft() {
-    if (_chapters.isEmpty ||
-        _currentChapterIndex < 0 ||
-        _currentChapterIndex >= _chapters.length) {
-      return null;
-    }
-    final fallbackTitle = _chapters[_currentChapterIndex].title.trim();
-    final chapterTitle =
-        _currentTitle.trim().isNotEmpty ? _currentTitle.trim() : fallbackTitle;
-    return ReaderBookmarkDraft(
-      chapterTitle: chapterTitle.isEmpty
-          ? '第 ${_currentChapterIndex + 1} 章'
-          : chapterTitle,
-      chapterPos: _encodeCurrentBookmarkChapterPos(),
-      pageText: _resolveCurrentBookmarkText(),
-    );
-  }
-
-  Future<ReaderBookmarkEditResult?> _showBookmarkEditorDialog(
-    ReaderBookmarkDraft draft,
+  Future<BookmarkEditResult?> _showBookmarkEditorDialog(
+    BookmarkDraft draft,
   ) async {
-    final bookTextController = TextEditingController(text: draft.pageText);
+    final bookTextController =
+        TextEditingController(text: draft.pageText);
     final noteController = TextEditingController();
-    final result = await showCupertinoBottomSheetDialog<ReaderBookmarkEditResult>(
+    final result =
+        await showCupertinoBottomSheetDialog<BookmarkEditResult>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('书签'),
@@ -12279,7 +10748,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             onPressed: () {
               Navigator.pop(
                 dialogContext,
-                ReaderBookmarkEditResult(
+                BookmarkEditResult(
                   bookText: bookTextController.text,
                   note: noteController.text,
                 ),
@@ -12295,56 +10764,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return result;
   }
 
-  String _resolveCurrentBookmarkText() {
-    final pageText = _pageFactory.curPage.trim();
-    if (pageText.isNotEmpty) {
-      return pageText;
-    }
-    final content = _currentContent.trim();
-    if (content.isEmpty) {
-      return '';
-    }
-    final progress = _getChapterProgress().clamp(0.0, 1.0).toDouble();
-    final center =
-        (content.length * progress).round().clamp(0, content.length).toInt();
-    final start = (center - 90).clamp(0, content.length).toInt();
-    final end = (start + 180).clamp(0, content.length).toInt();
-    return content.substring(start, end).trim();
-  }
+  double _decodeBookmarkChapterProgress(int chapterPos) =>
+      _bookmarkHelper.decodeBookmarkChapterProgress(chapterPos);
 
-  String _composeBookmarkPreview({
-    required String bookText,
-    required String note,
-  }) {
-    final trimmedText = bookText.trim();
-    final trimmedNote = note.trim();
-    if (trimmedText.isEmpty) {
-      return trimmedNote;
-    }
-    if (trimmedNote.isEmpty) {
-      return trimmedText;
-    }
-    return '$trimmedText\n\n笔记：$trimmedNote';
-  }
-
-  int _encodeCurrentBookmarkChapterPos() {
-    return (_getChapterProgress().clamp(0.0, 1.0) * 10000).round();
-  }
-
-  double _decodeBookmarkChapterProgress(int chapterPos) {
-    return (chapterPos / 10000.0).clamp(0.0, 1.0).toDouble();
-  }
-
-  /// 更新书签状态
+  /// 更新书签状态（委托 _bookmarkHelper + setState）
   void _updateBookmarkStatus() {
     if (!mounted) return;
-    bool hasBookmark = false;
-    try {
-      hasBookmark =
-          _bookmarkRepo.hasBookmark(widget.bookId, _currentChapterIndex);
-    } catch (_) {
-      hasBookmark = false;
-    }
+    _bookmarkHelper.updateBookmarkStatus();
+    final hasBookmark = _bookmarkHelper.hasBookmarkAtCurrent;
     if (_hasBookmarkAtCurrent == hasBookmark) return;
     setState(() {
       _hasBookmarkAtCurrent = hasBookmark;
@@ -12644,7 +11071,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         coverUrl: _bookCoverUrl,
         chapters: _effectiveReadableChapters(),
         currentChapterIndex: _currentChapterIndex,
-        bookmarks: _bookmarkRepo.getBookmarksForBook(widget.bookId),
+        bookmarks: _bookmarkHelper.getBookmarksForBook(),
         onClearBookCache: _clearBookCache,
         onRefreshCatalog: _refreshCatalogFromSource,
         onChapterSelected: (index) {
@@ -12661,7 +11088,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           );
         },
         onDeleteBookmark: (bookmark) async {
-          await _bookmarkRepo.removeBookmark(bookmark.id);
+          await _bookmarkHelper.removeBookmark(bookmark.id);
           _updateBookmarkStatus();
         },
         onEditBookmark: (bookmark) async {
@@ -12722,7 +11149,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () async {
-              await _bookmarkRepo.removeBookmark(bookmark.id);
+              await _bookmarkHelper.removeBookmark(bookmark.id);
               _updateBookmarkStatus();
               if (ctx.mounted) Navigator.pop(ctx, 'deleted');
             },
@@ -12741,13 +11168,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       ),
     );
     if (result != 'saved') return;
-    await _bookmarkRepo.addBookmark(
-      bookId: bookmark.bookId,
-      bookName: bookmark.bookName,
-      bookAuthor: bookmark.bookAuthor,
-      chapterIndex: bookmark.chapterIndex,
-      chapterTitle: bookmark.chapterTitle,
-      chapterPos: bookmark.chapterPos,
+    await _bookmarkHelper.saveEditedBookmark(
+      bookmark: bookmark,
       content: controller.text.trim(),
     );
     _updateBookmarkStatus();
