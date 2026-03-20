@@ -61,6 +61,8 @@ import '../services/read_style_import_export_service.dart';
 import '../services/reader_bookmark_helper.dart';
 import '../services/reader_charset_service.dart';
 import '../services/reader_key_paging_helper.dart';
+import '../services/reader_content_processor.dart';
+import '../services/reader_image_warmup_helper.dart';
 import '../services/reader_image_request_parser.dart';
 import '../services/reader_image_resolver.dart';
 import '../services/reader_image_marker_codec.dart';
@@ -236,16 +238,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   final PageFactory _pageFactory = PageFactory();
   final PagedReaderController _pagedReaderController = PagedReaderController();
 
-  final _replaceStageCache = <String, ReplaceStageCache>{};
   final _catalogDisplayTitleCacheByChapterId = <String, String>{};
   final Map<String, ResolvedChapterSnapshot>
-      _resolvedChapterSnapshotByChapterId =
-      <String, ResolvedChapterSnapshot>{};
+      _resolvedChapterSnapshotByChapterId = <String, ResolvedChapterSnapshot>{};
   final Map<String, ChapterImageMetaSnapshot>
       _chapterImageMetaSnapshotByChapterId =
       <String, ChapterImageMetaSnapshot>{};
   bool _hasDeferredChapterTransformRefresh = false;
-
 
   static const List<TipOption> _chineseConverterOptions = [
     TipOption(ChineseConverterType.off, '关闭'),
@@ -274,11 +273,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _legacyImageStyleText,
     _legacyImageStyleSingle,
   ];
-  static final RegExp _legacyImageTagRegex = legacyImageTagRegex;
-  static final RegExp _cssStyleAttrRegex = RegExp(
-    r'''style\s*=\s*(?:"([^"]*)"|'([^']*)')''',
-    caseSensitive: false,
-  );
   static const int _scrollUiSyncIntervalMs = 100;
   static const int _scrollSaveProgressIntervalMs = 450;
   static const int _scrollPreloadIntervalMs = 80;
@@ -291,48 +285,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       Duration(milliseconds: 180);
   static const int _persistedImageSizeSnapshotMaxEntries = 180;
   static const int _chapterImageMetaSnapshotMaxEntries = 64;
-  static const double _longImageAspectRatioThreshold = 1.6;
-  static const double _longImageErrorBoostThreshold = 0.22;
-  static const List<String> _legacyImageWidthQueryKeys = <String>[
-    'w',
-    'width',
-    'imgw',
-    'img_width',
-    'imagewidth',
-    'ow',
-    'origw',
-    'srcw',
-  ];
-  static const List<String> _legacyImageHeightQueryKeys = <String>[
-    'h',
-    'height',
-    'imgh',
-    'img_height',
-    'imageheight',
-    'oh',
-    'origh',
-    'srch',
-  ];
-  static final List<RegExp> _legacyImageWidthUrlPatterns = <RegExp>[
-    RegExp(
-      r'[?&](?:w|width|imgw|img_width|imagewidth|ow|origw|srcw)=([0-9]+(?:\.[0-9]+)?)',
-      caseSensitive: false,
-    ),
-    RegExp(
-      r'(?:^|[?&,_/\.-])w_([0-9]+(?:\.[0-9]+)?)(?:[?&,_/\.-]|$)',
-      caseSensitive: false,
-    ),
-  ];
-  static final List<RegExp> _legacyImageHeightUrlPatterns = <RegExp>[
-    RegExp(
-      r'[?&](?:h|height|imgh|img_height|imageheight|oh|origh|srch)=([0-9]+(?:\.[0-9]+)?)',
-      caseSensitive: false,
-    ),
-    RegExp(
-      r'(?:^|[?&,_/\.-])h_([0-9]+(?:\.[0-9]+)?)(?:[?&,_/\.-]|$)',
-      caseSensitive: false,
-    ),
-  ];
 
   // 章节加载锁（用于翻页模式）
   bool _isLoadingChapter = false;
@@ -350,6 +302,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   int _scrollLayoutFingerprint = 0;
   late final ReaderContentSearchHelper _searchHelper;
   late final ReaderProgressHelper _progressHelper;
+  late final ReaderContentProcessor _contentProcessor;
+  late final ReaderImageWarmupHelper _imageWarmupHelper;
   final List<ScrollSegment> _scrollSegments = <ScrollSegment>[];
   final Map<int, GlobalKey> _scrollSegmentKeys = <int, GlobalKey>{};
   final Map<int, double> _scrollSegmentHeights = <int, double>{};
@@ -358,7 +312,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   final GlobalKey _scrollViewportKey =
       GlobalKey(debugLabel: 'reader_scroll_viewport');
   // Notifier：章节 tip 信息（供 Header/Footer 局部重建）
-  final _scrollTipNotifier = ValueNotifier<ScrollTipData>(const ScrollTipData.empty());
+  final _scrollTipNotifier =
+      ValueNotifier<ScrollTipData>(const ScrollTipData.empty());
   // Notifier：segment 列表版本号（供 scroll content 局部重建）
   final _scrollSegmentsVersion = ValueNotifier<int>(0);
 
@@ -380,22 +335,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   String? _readerBgUiImageKey; // 用于避免重复加载
   String? _readerCustomFontFamily;
   Timer? _keepLightTimer;
-  bool _pendingImageSizeRepagination = false;
-  final Set<String> _imageSizeWarmupInFlight = <String>{};
-  Timer? _imageSizeSnapshotPersistTimer;
-  final Set<String> _bookImageSizeCacheKeys = <String>{};
-  final Map<String, ReaderImageMarkerMeta> _chapterImageMetaByCacheKey =
-      <String, ReaderImageMarkerMeta>{};
-  double _longImageFirstFrameErrorEma = 0.0;
-  int _longImageFirstFrameErrorSamples = 0;
   final Map<String, String> _readerImageCookieHeaderByHost = <String, String>{};
   final Set<String> _readerImageCookieLoadInFlight = <String>{};
   final ReaderImageResolver _readerImageResolver =
       const ReaderImageResolver(isWeb: kIsWeb);
   Duration _recentChapterFetchDuration = Duration.zero;
-  final Map<String, ReaderImageWarmupSourceTelemetry>
-      _imageWarmupTelemetryBySource =
-      <String, ReaderImageWarmupSourceTelemetry>{};
+
+  Map<String, ReplaceStageCache> get _replaceStageCache =>
+      _contentProcessor.replaceStageCache;
+  Map<String, ReaderImageMarkerMeta> get _chapterImageMetaByCacheKey =>
+      _imageWarmupHelper.chapterImageMetaByCacheKey;
 
   @override
   void initState() {
@@ -532,9 +481,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             _chapters.isNotEmpty ? (_chapters[i].content ?? '') : '',
         hasChapters: () => _chapters.isNotEmpty,
         scrollOffset: () =>
-            _scrollController.hasClients
-                ? _scrollController.offset
-                : null,
+            _scrollController.hasClients ? _scrollController.offset : null,
         scrollHasClients: () => _scrollController.hasClients,
         currentSourceUrl: () => _currentSourceUrl ?? '',
         bookAuthor: () => _bookAuthor,
@@ -542,6 +489,72 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       bookRepo: _bookRepo,
       settingsService: _settingsService,
       webDavService: _webDavService,
+    );
+    _imageWarmupHelper = ReaderImageWarmupHelper(
+      ReaderImageWarmupContext(
+        bookId: widget.bookId,
+        isEphemeral: () => widget.isEphemeral,
+        isScrollMode: () => _settings.pageTurnMode == PageTurnMode.scroll,
+        normalizedImageStyle: () => _normalizeLegacyImageStyle(_imageStyle),
+        currentSource: _resolveCurrentSource,
+        currentSourceUrl: () => _currentSourceUrl,
+        effectiveSourceUrl: () => widget.effectiveSourceUrl,
+        recentChapterFetchDuration: () => _recentChapterFetchDuration,
+        resolveImageProvider: _resolveReaderImageProviderFromRequest,
+        ensureCookieHeaderCached: _ensureReaderImageCookieHeaderCached,
+        normalizeImageSrc: _normalizeReaderImageSrc,
+        isHttpLikeUri: _isHttpLikeUri,
+        onImageSizeCacheUpdated: _schedulePagedImageCacheRepagination,
+        loadBytesFromSourceLoader: ({
+          required BookSource source,
+          required String imageUrl,
+        }) {
+          return SourceCoverLoader.instance.load(
+            imageUrl: imageUrl,
+            source: source,
+          );
+        },
+        loadBytesFromRuleEngine: ({
+          required BookSource source,
+          required String imageUrl,
+        }) {
+          return _ruleEngine.fetchCoverBytes(
+            source: source,
+            imageUrl: imageUrl,
+          );
+        },
+        saveImageSizeSnapshot: _settingsService.saveBookReaderImageSizeSnapshot,
+        getImageSizeSnapshot: _settingsService.getBookReaderImageSizeSnapshot,
+      ),
+    );
+    _contentProcessor = ReaderContentProcessor(
+      ReaderContentProcessorContext(
+        bookName: widget.bookTitle,
+        currentSourceUrl: () => _currentSourceUrl,
+        useReplaceRule: () => _useReplaceRule,
+        removeSameTitleEnabled: (chapterId) =>
+            _settings.cleanChapterTitle ||
+            _isChapterSameTitleRemovalEnabled(chapterId),
+        isCurrentBookEpub: _isCurrentBookEpub,
+        delRubyTag: () => _delRubyTag,
+        delHTag: () => _delHTag,
+        reSegmentEnabled: () => _reSegment,
+        chineseConverterType: () => _settings.chineseConverterType,
+        normalizeImageSrc: _normalizeReaderImageSrc,
+        rememberBookImageCacheKey: _imageWarmupHelper.rememberBookImageCacheKey,
+        normalizedImageStyle: () => _normalizeLegacyImageStyle(_imageStyle),
+        isScrollMode: () => _settings.pageTurnMode == PageTurnMode.scroll,
+        extractImageDimensionHintsFromTag:
+            _imageWarmupHelper.extractImageDimensionHintsFromTag,
+        extractImageDimensionHintsFromSrcUrl:
+            _imageWarmupHelper.extractImageDimensionHintsFromSrcUrl,
+        traditionalToSimplified:
+            _chineseScriptConverter.traditionalToSimplified,
+        simplifiedToTraditional:
+            _chineseScriptConverter.simplifiedToTraditional,
+        applyTitleReplace: _replaceService.applyTitle,
+        applyContentReplaceWithTrace: _replaceService.applyContentWithTrace,
+      ),
     );
     _searchHelper = ReaderContentSearchHelper(
       ReaderContentSearchContext(
@@ -557,13 +570,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         readableChapterCount: _effectiveReadableChapterCount,
         clampChapterIndex: _clampChapterIndexToReadableRange,
         chapterProgress: _progressHelper.getChapterProgress,
-        postProcessTitle: _postProcessTitle,
-        isScrollMode: () =>
-            _settings.pageTurnMode == PageTurnMode.scroll,
+        postProcessTitle: _contentProcessor.postProcessTitle,
+        isScrollMode: () => _settings.pageTurnMode == PageTurnMode.scroll,
         currentPageTexts: () =>
             _pageFactory.currentPages.map((p) => p.text).toList(),
-        trimFirstPageTitlePrefix: () =>
-            _settings.titleMode != 2,
+        trimFirstPageTitlePrefix: () => _settings.titleMode != 2,
         resolveSearchableContent: _resolveContentSearchableContent,
       ),
     );
@@ -577,8 +588,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         readableChapterCount: _effectiveReadableChapterCount,
         loadChapter: (index, {bool goToLastPage = false}) =>
             _loadChapter(index, goToLastPage: goToLastPage),
-        chapterProgress: () =>
-            _progressHelper.getChapterProgress(),
+        chapterProgress: () => _progressHelper.getChapterProgress(),
         isAutoPagerRunning: () => _autoPager.isRunning,
         stopAutoPagerForReadAloud: () {
           _autoPagerPausedByMenu = false;
@@ -591,8 +601,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             _settingsService.getContentSelectSpeakMode(),
         saveContentSelectSpeakMode: (mode) =>
             _settingsService.saveContentSelectSpeakMode(mode),
-        audioPlayUseWakeLock: () =>
-            _settingsService.getAudioPlayUseWakeLock(),
+        audioPlayUseWakeLock: () => _settingsService.getAudioPlayUseWakeLock(),
         saveAudioPlayUseWakeLock: (enabled) =>
             _settingsService.saveAudioPlayUseWakeLock(enabled),
         showToast: _showToast,
@@ -726,7 +735,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         ? widget.effectiveSourceName!.trim()
         : null;
     _refreshCurrentSourceName();
-    await _restoreReaderImageSizeSnapshot();
+    await _imageWarmupHelper.restoreSnapshot();
 
     if (widget.effectiveInitialChapters != null &&
         widget.effectiveInitialChapters!.isNotEmpty) {
@@ -793,6 +802,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _searchHelper.dispose();
     _bookmarkHelper.dispose();
     _progressHelper.dispose();
+    _contentProcessor.dispose();
+    _imageWarmupHelper.cancelPersistTimer();
+    unawaited(_imageWarmupHelper.persistSnapshot(force: true));
+    _imageWarmupHelper.dispose();
     _readAloudHelper.dispose();
     _sourceSwitchConfig.stopCandidateSearch();
     _sourceSwitchConfig.dispose();
@@ -812,9 +825,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _contentSelectMenuLongPressResetTimer = null;
     _keepLightTimer?.cancel();
     _keepLightTimer = null;
-    _imageSizeSnapshotPersistTimer?.cancel();
-    _imageSizeSnapshotPersistTimer = null;
-    unawaited(_persistReaderImageSizeSnapshot(force: true));
     // 离开阅读器时恢复系统亮度（iOS 还原原始亮度；Android 还原窗口亮度为跟随系统）
     unawaited(_brightnessService.resetToSystem());
     unawaited(_syncNativeKeepScreenOn(const ReadingSettings()));
@@ -968,7 +978,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final safeRaw = value.isFinite ? value : fallback;
     return safeRaw.clamp(0.0, 1.0).toDouble();
   }
-
 
   void _syncNativeBrightnessForSettings(
     ReadingSettings oldSettings,
@@ -1188,7 +1197,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
     return 0.0;
   }
-
 
   double _resolveScrollHeaderSlotHeight() {
     if (!_settings.shouldShowHeader(showStatusBar: _settings.showStatusBar)) {
@@ -2468,7 +2476,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             chapter.copyWith(content: content, isDownloaded: true);
       }
     } catch (e) {
-      if (_settings.autoChangeSource && !_sourceSwitchConfig.isAutoChangingSource) {
+      if (_settings.autoChangeSource &&
+          !_sourceSwitchConfig.isAutoChangingSource) {
         unawaited(_autoChangeSource());
       }
       rethrow;
@@ -2493,174 +2502,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return (_currentSourceUrl ?? '').trim();
   }
 
-  Future<void> _restoreReaderImageSizeSnapshot() async {
-    if (widget.isEphemeral) return;
-    final rawSnapshot =
-        _settingsService.getBookReaderImageSizeSnapshot(widget.bookId);
-    if (rawSnapshot == null || rawSnapshot.trim().isEmpty) {
-      return;
-    }
-    try {
-      final decoded = jsonDecode(rawSnapshot);
-      if (decoded is! Map) {
-        return;
-      }
-      final dynamic rawEntries = decoded['entries'] ?? decoded;
-      if (rawEntries is! Map) {
-        return;
-      }
-      final entries = rawEntries.map((key, value) => MapEntry('$key', value));
-      ReaderImageMarkerCodec.restoreResolvedSizeCache(
-        entries,
-        clearBeforeRestore: false,
-        maxEntries: _persistedImageSizeSnapshotMaxEntries,
-      );
-      for (final rawKey in entries.keys) {
-        final normalized =
-            ReaderImageMarkerCodec.normalizeResolvedSizeKey(rawKey);
-        if (normalized.isNotEmpty) {
-          _bookImageSizeCacheKeys.add(normalized);
-        }
-      }
-    } catch (_) {
-      // 快照解析失败时忽略，不阻断阅读主流程。
-    }
-  }
-
-  void _schedulePersistReaderImageSizeSnapshot() {
-    if (widget.isEphemeral) return;
-    _imageSizeSnapshotPersistTimer?.cancel();
-    _imageSizeSnapshotPersistTimer =
-        Timer(const Duration(milliseconds: 680), () {
-      _imageSizeSnapshotPersistTimer = null;
-      unawaited(_persistReaderImageSizeSnapshot());
-    });
-  }
-
-  Future<void> _persistReaderImageSizeSnapshot({bool force = false}) async {
-    if (widget.isEphemeral) return;
-    if (!force && _bookImageSizeCacheKeys.isEmpty) return;
-    try {
-      final snapshot = ReaderImageMarkerCodec.snapshotResolvedSizeCache(
-        keys: _bookImageSizeCacheKeys,
-        maxEntries: _persistedImageSizeSnapshotMaxEntries,
-      );
-      final payload = snapshot.isEmpty
-          ? ''
-          : jsonEncode(
-              <String, dynamic>{
-                'v': 1,
-                'entries': snapshot,
-              },
-            );
-      await _settingsService.saveBookReaderImageSizeSnapshot(
-        widget.bookId,
-        payload,
-      );
-    } catch (_) {
-      // 持久化失败时忽略，不影响阅读链路。
-    }
-  }
-
-  void _rememberBookImageCacheKey(String src) {
-    final normalized = ReaderImageMarkerCodec.normalizeResolvedSizeKey(src);
-    if (normalized.isEmpty) return;
-    _bookImageSizeCacheKeys.add(normalized);
-  }
-
-  ReaderImageMarkerMeta? _lookupCurrentChapterImageMeta(String src) {
-    final key = ReaderImageMarkerCodec.normalizeResolvedSizeKey(src);
-    if (key.isEmpty) return null;
-    return _chapterImageMetaByCacheKey[key];
-  }
-
-  void _recordLongImageFirstFrameErrorSample({
-    required String src,
-    required Size resolvedSize,
-    ReaderImageMarkerMeta? hintMeta,
-  }) {
-    final width = resolvedSize.width;
-    final height = resolvedSize.height;
-    if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
-      return;
-    }
-    final actualRatio = height / width;
-    if (!actualRatio.isFinite ||
-        actualRatio <= _longImageAspectRatioThreshold) {
-      return;
-    }
-    final hintedRatio = _hintMetaAspectRatio(hintMeta);
-    final fallbackRatio =
-        _fallbackFirstFrameAspectRatio(_normalizeLegacyImageStyle(_imageStyle));
-    final expectedRatio = hintedRatio ?? fallbackRatio;
-    if (!expectedRatio.isFinite || expectedRatio <= 0) {
-      return;
-    }
-    final error = ((expectedRatio - actualRatio).abs() / actualRatio)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    if (!error.isFinite) return;
-    if (_longImageFirstFrameErrorSamples <= 0) {
-      _longImageFirstFrameErrorEma = error;
-    } else {
-      _longImageFirstFrameErrorEma =
-          _longImageFirstFrameErrorEma * 0.78 + error * 0.22;
-    }
-    _longImageFirstFrameErrorSamples =
-        (_longImageFirstFrameErrorSamples + 1).clamp(0, 4096).toInt();
-    _rememberBookImageCacheKey(src);
-  }
-
-  double? _hintMetaAspectRatio(ReaderImageMarkerMeta? meta) {
-    if (meta == null || !meta.hasDimensionHints) return null;
-    final width = meta.width!;
-    final height = meta.height!;
-    if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
-      return null;
-    }
-    final ratio = height / width;
-    if (!ratio.isFinite || ratio <= 0) return null;
-    return ratio;
-  }
-
-  double _fallbackFirstFrameAspectRatio(String imageStyle) {
-    switch (imageStyle) {
-      case _legacyImageStyleSingle:
-        return 1.0;
-      case _legacyImageStyleFull:
-        return 0.75;
-      default:
-        return 0.62;
-    }
-  }
-
   void _handlePagedImageSizeResolved(String src, Size size) {
     if (!mounted) return;
-    _recordLongImageFirstFrameErrorSample(
-      src: src,
-      resolvedSize: size,
-      hintMeta: _lookupCurrentChapterImageMeta(src),
-    );
-    _schedulePersistReaderImageSizeSnapshot();
+    _imageWarmupHelper.handlePagedImageSizeResolved(src, size);
   }
 
-  /// 将内容分页（使用 PageFactory 对标 Legado）
-  /// 将内容分页（使用 PageFactory 对标 Legado）
-  void _paginateContent() {
-    if (!mounted) return;
-    _paginateContentLogicOnly();
-    setState(() {});
-  }
-
-  void _handlePagedImageSizeCacheUpdated() {
-    if (!mounted) return;
-    if (_settings.pageTurnMode == PageTurnMode.scroll) return;
-    _schedulePersistReaderImageSizeSnapshot();
-    if (_pendingImageSizeRepagination) return;
-
-    _pendingImageSizeRepagination = true;
+  void _schedulePagedImageCacheRepagination() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _pendingImageSizeRepagination = false;
+      _imageWarmupHelper.pendingImageSizeRepagination = false;
       if (!mounted) return;
       if (_settings.pageTurnMode == PageTurnMode.scroll) return;
 
@@ -2684,6 +2533,31 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       }
       setState(() {});
     });
+  }
+
+  void _handlePagedImageSizeCacheUpdated() {
+    if (!mounted) return;
+    _imageWarmupHelper.handlePagedImageSizeCacheUpdated();
+  }
+
+  Future<bool> _warmupPagedImageSizeCache(
+    String content, {
+    int maxProbeCount = 8,
+    Duration maxDuration = const Duration(milliseconds: 260),
+  }) {
+    return _imageWarmupHelper.warmupPagedImageSizeCache(
+      content,
+      maxProbeCount: maxProbeCount,
+      maxDuration: maxDuration,
+    );
+  }
+
+  /// 将内容分页（使用 PageFactory 对标 Legado）
+  /// 将内容分页（使用 PageFactory 对标 Legado）
+  void _paginateContent() {
+    if (!mounted) return;
+    _paginateContentLogicOnly();
+    setState(() {});
   }
 
   /// 仅执行分页计算逻辑，不触发 setState (用于在 setState 内部调用)
@@ -2793,8 +2667,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _catalogDisplayTitleCacheByChapterId.clear();
     }
 
-    final doublePageChanged =
-        oldSettings.doublePage != newSettings.doublePage;
+    final doublePageChanged = oldSettings.doublePage != newSettings.doublePage;
     double? desiredChapterProgress;
     if (modeChanged) {
       if (oldMode == PageTurnMode.scroll) {
@@ -2857,7 +2730,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           oldSettings.hideNavigationBar != newSettings.hideNavigationBar ||
           oldSettings.headerMode != newSettings.headerMode ||
           oldSettings.footerMode != newSettings.footerMode ||
-          oldSettings.paddingDisplayCutouts != newSettings.paddingDisplayCutouts ||
+          oldSettings.paddingDisplayCutouts !=
+              newSettings.paddingDisplayCutouts ||
           contentTransformChanged) {
         needRepaginate = true;
       }
@@ -3019,7 +2893,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-
   int get _activeReadStyleIndex {
     final styles = _activeReadStyleConfigs;
     if (styles.isEmpty) return 0;
@@ -3031,7 +2904,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final trimmed = config.name.trim();
     return trimmed.isEmpty ? '文字' : trimmed;
   }
-
 
   ReadStyleConfig _createLegacyReadStyleTemplate() {
     return const ReadStyleConfig(
@@ -3152,7 +3024,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (fallback.isEmpty) return null;
     return fallback;
   }
-
 
   FontWeight get _currentFontWeight {
     switch (_settings.textBold) {
@@ -3276,15 +3147,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       return;
     }
     if (_pagedReaderController.isAttached) {
-      final moved =
-          next ? _pagedReaderController.turnNextPage() : _pagedReaderController.turnPrevPage();
+      final moved = next
+          ? _pagedReaderController.turnNextPage()
+          : _pagedReaderController.turnPrevPage();
       if (!moved && mounted) {
         _showToast(next ? '已到最后一页' : '已到第一页');
       }
       return;
     }
     final moved = _settings.doublePage
-        ? (next ? _pageFactory.moveToNextDouble() : _pageFactory.moveToPrevDouble())
+        ? (next
+            ? _pageFactory.moveToNextDouble()
+            : _pageFactory.moveToPrevDouble())
         : (next ? _pageFactory.moveToNext() : _pageFactory.moveToPrev());
     if (!mounted) return;
     if (!moved) {
@@ -3295,8 +3169,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   int _resolveClickAction(Offset position) {
-    final size = (context.findRenderObject() as RenderBox?)?.size
-        ?? MediaQuery.sizeOf(context);
+    final size = (context.findRenderObject() as RenderBox?)?.size ??
+        MediaQuery.sizeOf(context);
     final col = (position.dx / size.width * 3).floor().clamp(0, 2);
     final row = (position.dy / size.height * 3).floor().clamp(0, 2);
     const zones = [
@@ -3595,34 +3469,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     String processedTitle, {
     String? chapterId,
   }) {
-    var processed = content;
-    final removeSameTitle = _settings.cleanChapterTitle ||
-        (chapterId != null && _isChapterSameTitleRemovalEnabled(chapterId));
-    if (removeSameTitle) {
-      processed = _removeDuplicateTitle(processed, processedTitle).content;
-    }
-    if (_isCurrentBookEpub()) {
-      if (_delRubyTag) {
-        processed = _removeRubyTagsLikeLegado(processed);
-      }
-      if (_delHTag) {
-        processed = _removeHTagLikeLegado(processed);
-      }
-    }
-    if (_reSegment) {
-      processed = TxtParser.reSegmentLikeLegado(
-        processed,
-        chapterTitle: processedTitle,
-      );
-    }
-    processed = _convertByChineseConverterType(processed);
-    processed = _normalizeContentForLegacyImageStyle(processed);
-    processed = _formatContentLikeLegado(processed);
-    return processed;
+    return _contentProcessor.postProcessContent(
+      content,
+      processedTitle,
+      chapterId: chapterId,
+    );
   }
 
   String _postProcessTitle(String title) {
-    return _convertByChineseConverterType(title);
+    return _contentProcessor.postProcessTitle(title);
   }
 
   String? _catalogDisplaySourceUrl() {
@@ -3666,122 +3521,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     required String rawTitle,
     required String rawContent,
   }) async {
-    final cached = _replaceStageCache[chapterId];
-    if (cached != null &&
-        cached.rawTitle == rawTitle &&
-        cached.rawContent == rawContent) {
-      return cached;
-    }
-
-    final title = _useReplaceRule
-        ? await _replaceService.applyTitle(
-            rawTitle,
-            bookName: widget.bookTitle,
-            sourceUrl: _currentSourceUrl,
-          )
-        : rawTitle;
-    final contentTrace = _useReplaceRule
-        ? await _replaceService.applyContentWithTrace(
-            rawContent,
-            bookName: widget.bookTitle,
-            sourceUrl: _currentSourceUrl,
-          )
-        : ReplaceContentApplyTrace(
-            output: rawContent,
-            appliedRules: const <ReplaceRule>[],
-          );
-
-    final stage = ReplaceStageCache(
+    return _contentProcessor.computeReplaceStage(
+      chapterId: chapterId,
       rawTitle: rawTitle,
       rawContent: rawContent,
-      title: title,
-      content: contentTrace.output,
-      effectiveContentReplaceRules: contentTrace.appliedRules,
-    );
-    _replaceStageCache[chapterId] = stage;
-    return stage;
-  }
-
-  /// 参考 Legado 的正文处理方式，对章节内容进行“段落化”格式化：
-  /// - 清理段落首尾空白
-  /// - 压缩多余换行（段落之间仅保留一个换行）
-  ///
-  /// 额外兼容：清理常见 HTML 空白实体（&emsp; 等），避免缩进显示异常。
-  ///
-  /// 注意：段首缩进不在这里“改文本”完成，而是交给渲染层按 `ReadingSettings.paragraphIndent`
-  /// 做“首行缩进”。原因：
-  /// - Flutter 的 `TextAlign.justify` 等对“前导空格”显示不稳定，容易出现看起来不缩进
-  /// - 对标 legado：其翻页排版会根据配置计算缩进宽度，而不是依赖文本里塞空格
-  String _formatContentLikeLegado(String content) {
-    var text = content;
-
-    // 兼容常见 HTML 空白实体（部分书源会残留在纯文本中）
-    text = text
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&ensp;', ' ')
-        .replaceAll('&emsp;', ' ')
-        .replaceAll('&thinsp;', '')
-        .replaceAll('&zwnj;', '')
-        .replaceAll('&zwj;', '')
-        // 对应 Legado 的 noPrintRegex 中的几个常见字符
-        .replaceAll('\u2009', '')
-        .replaceAll('\u200C', '')
-        .replaceAll('\u200D', '');
-
-    text = text.replaceAll('\r\n', '\n');
-
-    // 等价于 Legado HtmlFormatter 的 `\\s*\\n+\\s*`：忽略多余空白与多换行
-    final rawParagraphs = text.split(RegExp(r'\s*\n+\s*'));
-    final paragraphs = rawParagraphs
-        // 对齐 legado：trim 规则不仅去掉常规空白，也要去掉全角空格（U+3000，常用于缩进）
-        .map(_trimParagraphLikeLegado)
-        .where((p) => p.isNotEmpty)
-        .toList(growable: false);
-
-    if (paragraphs.isEmpty) return '';
-    return paragraphs.join('\n');
-  }
-
-  String _normalizeContentForLegacyImageStyle(String content) {
-    if (content.isEmpty || !_legacyImageTagRegex.hasMatch(content)) {
-      return content;
-    }
-    final imageStyle = _normalizeLegacyImageStyle(_imageStyle);
-    if (imageStyle == _legacyImageStyleText) {
-      return content.replaceAllMapped(
-        _legacyImageTagRegex,
-        (_) => ReaderImageMarkerCodec.textFallbackPlaceholder,
-      );
-    }
-    if (_settings.pageTurnMode != PageTurnMode.scroll) {
-      // 翻页模式保留可逆图片标记，交由分页/渲染层按 legacy 语义处理图片块。
-      return content.replaceAllMapped(
-        _legacyImageTagRegex,
-        (match) {
-          final rawSrc = (match.group(1) ?? '').trim();
-          final src = _normalizeReaderImageSrc(rawSrc);
-          if (src.isEmpty) {
-            return ReaderImageMarkerCodec.textFallbackPlaceholder;
-          }
-          _rememberBookImageCacheKey(src);
-          final rawTag = match.group(0) ?? '';
-          final hintedSize = _extractImageDimensionHintsFromTag(rawTag) ??
-              _extractImageDimensionHintsFromSrcUrl(rawSrc);
-          final resolvedSize = ReaderImageMarkerCodec.lookupResolvedSize(src);
-          final width = resolvedSize?.width ?? hintedSize?.width;
-          final height = resolvedSize?.height ?? hintedSize?.height;
-          return '\n${ReaderImageMarkerCodec.encode(
-            src,
-            width: width,
-            height: height,
-          )}\n';
-        },
-      );
-    }
-    // 滚动模式保留并隔离图片标签，便于后续渲染层按样式分流。
-    return content.replaceAllMapped(
-      _legacyImageTagRegex,
-      (match) => '\n${match.group(0)}\n',
     );
   }
 
@@ -3789,921 +3532,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     String content, {
     int maxCount = 24,
   }) {
-    if (content.isEmpty || !ReaderImageMarkerCodec.containsMarker(content)) {
-      return const <ReaderImageMarkerMeta>[];
-    }
-    final lines = content.replaceAll('\r\n', '\n').split('\n');
-    final seen = <String>{};
-    final metas = <ReaderImageMarkerMeta>[];
-    for (final line in lines) {
-      if (metas.length >= maxCount) {
-        break;
-      }
-      final meta = ReaderImageMarkerCodec.decodeMetaLine(line);
-      if (meta == null) {
-        continue;
-      }
-      final normalizedSrc = _normalizeReaderImageSrc(meta.src);
-      final normalizedKey =
-          ReaderImageMarkerCodec.normalizeResolvedSizeKey(normalizedSrc);
-      if (normalizedSrc.isEmpty ||
-          normalizedKey.isEmpty ||
-          !seen.add(normalizedKey)) {
-        continue;
-      }
-      _bookImageSizeCacheKeys.add(normalizedKey);
-      metas.add(
-        ReaderImageMarkerMeta(
-          src: normalizedSrc,
-          width: meta.width,
-          height: meta.height,
-        ),
-      );
-    }
-    return metas;
-  }
-
-  String _resolveWarmupTelemetrySourceKey(BookSource? source) {
-    final sourceUrl = (source?.bookSourceUrl ??
-            _currentSourceUrl ??
-            widget.effectiveSourceUrl ??
-            '')
-        .trim();
-    if (sourceUrl.isNotEmpty) {
-      return sourceUrl;
-    }
-    return '__global__';
-  }
-
-  ReaderImageWarmupSourceTelemetry _telemetryForSource(BookSource? source) {
-    final key = _resolveWarmupTelemetrySourceKey(source);
-    final cached = _imageWarmupTelemetryBySource[key];
-    if (cached != null) {
-      return cached;
-    }
-    if (_imageWarmupTelemetryBySource.length >= 48) {
-      String? staleKey;
-      DateTime? staleAt;
-      _imageWarmupTelemetryBySource.forEach((mapKey, telemetry) {
-        if (staleAt == null || telemetry.updatedAt.isBefore(staleAt!)) {
-          staleKey = mapKey;
-          staleAt = telemetry.updatedAt;
-        }
-      });
-      if (staleKey != null) {
-        _imageWarmupTelemetryBySource.remove(staleKey);
-      }
-    }
-    final created = ReaderImageWarmupSourceTelemetry();
-    _imageWarmupTelemetryBySource[key] = created;
-    return created;
-  }
-
-  ReaderImageWarmupSourceTelemetry? _telemetrySnapshotForSource(
-    BookSource? source,
-  ) {
-    final key = _resolveWarmupTelemetrySourceKey(source);
-    return _imageWarmupTelemetryBySource[key];
-  }
-
-  void _recordWarmupProbeSuccessForSource(BookSource? source) {
-    _telemetryForSource(source).recordSuccess();
-  }
-
-  void _recordWarmupProbeFailureForSource(
-    ReaderImageWarmupFailureKind kind,
-    BookSource? source,
-  ) {
-    _telemetryForSource(source).recordFailure(kind);
-  }
-
-  ReaderImageWarmupFailureKind _mergeWarmupFailureKind(
-    ReaderImageWarmupFailureKind? current,
-    ReaderImageWarmupFailureKind candidate,
-  ) {
-    if (current == null) {
-      return candidate;
-    }
-    if (current == ReaderImageWarmupFailureKind.timeout ||
-        candidate == ReaderImageWarmupFailureKind.timeout) {
-      return ReaderImageWarmupFailureKind.timeout;
-    }
-    if (current == ReaderImageWarmupFailureKind.auth ||
-        candidate == ReaderImageWarmupFailureKind.auth) {
-      return ReaderImageWarmupFailureKind.auth;
-    }
-    if (current == ReaderImageWarmupFailureKind.decode ||
-        candidate == ReaderImageWarmupFailureKind.decode) {
-      return ReaderImageWarmupFailureKind.decode;
-    }
-    return ReaderImageWarmupFailureKind.other;
-  }
-
-  ReaderImageWarmupFailureKind _classifyWarmupProbeError(Object error) {
-    if (error is TimeoutException) {
-      return ReaderImageWarmupFailureKind.timeout;
-    }
-    final statusCode = _extractStatusCodeFromProbeError(error);
-    if (statusCode == 401 || statusCode == 403) {
-      return ReaderImageWarmupFailureKind.auth;
-    }
-    final message = '$error'.toLowerCase();
-    if (_looksLikeTimeoutMessage(message)) {
-      return ReaderImageWarmupFailureKind.timeout;
-    }
-    if (_looksLikeAuthFailureMessage(message)) {
-      return ReaderImageWarmupFailureKind.auth;
-    }
-    if (_looksLikeDecodeFailureMessage(message)) {
-      return ReaderImageWarmupFailureKind.decode;
-    }
-    return ReaderImageWarmupFailureKind.other;
-  }
-
-  int? _extractStatusCodeFromProbeError(Object error) {
-    try {
-      final dynamic dynamicError = error;
-      final value = dynamicError.statusCode;
-      if (value is int) {
-        return value;
-      }
-    } catch (_) {
-      // ignore statusCode extract failure
-    }
-    return null;
-  }
-
-  bool _looksLikeTimeoutMessage(String message) {
-    return message.contains('timeout') ||
-        message.contains('timed out') ||
-        message.contains('deadline exceeded');
-  }
-
-  bool _looksLikeAuthFailureMessage(String message) {
-    return message.contains('unauthorized') ||
-        message.contains('forbidden') ||
-        message.contains('401') ||
-        message.contains('403') ||
-        message.contains('cookie') ||
-        message.contains('referer') ||
-        message.contains('origin') ||
-        message.contains('login required');
-  }
-
-  bool _looksLikeDecodeFailureMessage(String message) {
-    return message.contains('decode') ||
-        message.contains('codec') ||
-        message.contains('unsupported image') ||
-        message.contains('invalid image') ||
-        message.contains('format exception');
-  }
-
-  Future<bool> _warmupPagedImageSizeCache(
-    String content, {
-    int maxProbeCount = 8,
-    Duration maxDuration = const Duration(milliseconds: 260),
-  }) async {
-    if (_settings.pageTurnMode == PageTurnMode.scroll) return false;
-    final imageStyle = _normalizeLegacyImageStyle(_imageStyle);
-    if (imageStyle == _legacyImageStyleText) return false;
-    final budget = _resolveImageWarmupBudget(
-      baseProbeCount: maxProbeCount,
-      baseDuration: maxDuration,
-    );
-
-    final metas = _collectUniqueImageMarkerMetas(
+    return _imageWarmupHelper.collectUniqueImageMarkerMetas(
       content,
-      maxCount: budget.probeCount,
+      maxCount: maxCount,
     );
-    if (metas.isEmpty) return false;
-
-    final deadline = DateTime.now().add(budget.maxDuration);
-    final source = _resolveCurrentSource();
-    var changed = false;
-
-    for (final meta in metas) {
-      final src = meta.src.trim();
-      if (src.isEmpty) continue;
-      _rememberBookImageCacheKey(src);
-      final request = ReaderImageRequestParser.parse(src);
-
-      if (meta.hasDimensionHints) {
-        changed = ReaderImageMarkerCodec.rememberResolvedSize(
-              src,
-              width: meta.width!,
-              height: meta.height!,
-            ) ||
-            changed;
-      }
-
-      if (ReaderImageMarkerCodec.lookupResolvedSize(src) != null) {
-        continue;
-      }
-
-      final remaining = deadline.difference(DateTime.now());
-      if (remaining <= Duration.zero) {
-        break;
-      }
-      if (_imageSizeWarmupInFlight.contains(src)) {
-        continue;
-      }
-
-      await _ensureReaderImageCookieHeaderCached(
-        request,
-        timeout: _clampReaderWarmupDuration(
-          remaining,
-          max: const Duration(milliseconds: 140),
-        ),
-      );
-
-      final imageProvider = _resolveReaderImageProviderFromRequest(request);
-
-      _imageSizeWarmupInFlight.add(src);
-      try {
-        final probeTimeout = _clampReaderWarmupDuration(
-          remaining,
-          max: budget.perProbeTimeout,
-        );
-        Size? resolved;
-        ReaderImageWarmupFailureKind? failureKind;
-        var attempted = false;
-        if (imageProvider != null) {
-          final providerProbe = await _resolveImageIntrinsicSize(
-            imageProvider,
-            timeout: probeTimeout,
-          );
-          attempted = attempted || providerProbe.attempted;
-          resolved = providerProbe.size;
-          if (providerProbe.failureKind != null) {
-            failureKind = _mergeWarmupFailureKind(
-              failureKind,
-              providerProbe.failureKind!,
-            );
-          }
-        }
-        if (resolved == null) {
-          final sourceAwareProbe =
-              await _resolveImageIntrinsicSizeFromSourceAwareFetch(
-            request,
-            timeout: probeTimeout,
-          );
-          attempted = attempted || sourceAwareProbe.attempted;
-          resolved = sourceAwareProbe.size;
-          if (sourceAwareProbe.failureKind != null) {
-            failureKind = _mergeWarmupFailureKind(
-              failureKind,
-              sourceAwareProbe.failureKind!,
-            );
-          }
-        }
-        if (resolved == null) {
-          if (attempted) {
-            _recordWarmupProbeFailureForSource(
-              failureKind ?? ReaderImageWarmupFailureKind.other,
-              source,
-            );
-          }
-          continue;
-        }
-        _recordWarmupProbeSuccessForSource(source);
-        _recordLongImageFirstFrameErrorSample(
-          src: src,
-          resolvedSize: resolved,
-          hintMeta: meta,
-        );
-        changed = ReaderImageMarkerCodec.rememberResolvedSize(
-              src,
-              width: resolved.width,
-              height: resolved.height,
-            ) ||
-            changed;
-      } finally {
-        _imageSizeWarmupInFlight.remove(src);
-      }
-    }
-
-    if (changed) {
-      _schedulePersistReaderImageSizeSnapshot();
-    }
-    return changed;
-  }
-
-  ReaderImageWarmupBudget _resolveImageWarmupBudget({
-    required int baseProbeCount,
-    required Duration baseDuration,
-  }) {
-    var probeCount = baseProbeCount;
-    var durationMs = baseDuration.inMilliseconds;
-    final source = _resolveCurrentSource();
-    final telemetry = _telemetrySnapshotForSource(source);
-
-    final sampledLatencyMs = _recentChapterFetchDuration.inMilliseconds > 0
-        ? _recentChapterFetchDuration.inMilliseconds
-        : (source?.respondTime ?? 0);
-
-    if (sampledLatencyMs > 0) {
-      final boostedDuration = durationMs + (sampledLatencyMs * 0.6).round();
-      durationMs = boostedDuration.clamp(durationMs, 980);
-      if (sampledLatencyMs >= 900) {
-        probeCount += 3;
-      } else if (sampledLatencyMs >= 600) {
-        probeCount += 2;
-      } else if (sampledLatencyMs >= 350) {
-        probeCount += 1;
-      }
-    }
-
-    if ((source?.loginUrl ?? '').trim().isNotEmpty) {
-      durationMs = (durationMs + 120).clamp(baseDuration.inMilliseconds, 980);
-      probeCount += 1;
-    }
-
-    if (_longImageFirstFrameErrorSamples >= 3 &&
-        _longImageFirstFrameErrorEma >= _longImageErrorBoostThreshold) {
-      final errorBoostMs =
-          (_longImageFirstFrameErrorEma * 320).round().clamp(90, 260);
-      durationMs =
-          (durationMs + errorBoostMs).clamp(baseDuration.inMilliseconds, 1200);
-      probeCount += _longImageFirstFrameErrorEma >= 0.45 ? 3 : 2;
-    }
-
-    if (telemetry != null && telemetry.sampleCount >= 3) {
-      if (telemetry.timeoutRateEma >= 0.16 || telemetry.timeoutStreak >= 2) {
-        final timeoutBoostMs =
-            (telemetry.timeoutRateEma * 420).round().clamp(70, 340) +
-                telemetry.timeoutStreak * 45;
-        durationMs = (durationMs + timeoutBoostMs)
-            .clamp(baseDuration.inMilliseconds, 1450);
-        probeCount += telemetry.timeoutRateEma >= 0.34 ? 3 : 2;
-      }
-      if (telemetry.authRateEma >= 0.10 || telemetry.authStreak >= 1) {
-        final authBoostMs =
-            (120 + telemetry.authRateEma * 210).round().clamp(110, 280);
-        durationMs =
-            (durationMs + authBoostMs).clamp(baseDuration.inMilliseconds, 1450);
-        probeCount += telemetry.authRateEma >= 0.26 ? 2 : 1;
-      }
-      if (telemetry.decodeRateEma >= 0.16 || telemetry.decodeStreak >= 2) {
-        durationMs = (durationMs + 70).clamp(baseDuration.inMilliseconds, 1450);
-        probeCount += 1;
-      }
-      if (telemetry.successRateEma >= 0.78 &&
-          telemetry.timeoutRateEma <= 0.06 &&
-          telemetry.sampleCount >= 8) {
-        probeCount -= 1;
-      }
-    }
-
-    probeCount = probeCount.clamp(baseProbeCount, 18);
-    final maxDuration = Duration(milliseconds: durationMs);
-    var perProbeTimeoutMs = (durationMs * 0.46).round();
-    if (telemetry != null && telemetry.sampleCount >= 3) {
-      if (telemetry.timeoutRateEma >= 0.20 || telemetry.timeoutStreak >= 2) {
-        perProbeTimeoutMs += 70;
-      }
-      if (telemetry.authRateEma >= 0.12) {
-        perProbeTimeoutMs += 40;
-      }
-    }
-    final perProbeTimeout = Duration(
-      milliseconds: perProbeTimeoutMs.clamp(180, 620),
-    );
-    return ReaderImageWarmupBudget(
-      probeCount: probeCount,
-      maxDuration: maxDuration,
-      perProbeTimeout: perProbeTimeout,
-    );
-  }
-
-  Duration _clampReaderWarmupDuration(
-    Duration remaining, {
-    required Duration max,
-  }) {
-    if (remaining <= Duration.zero) return Duration.zero;
-    if (remaining < max) return remaining;
-    return max;
-  }
-
-  Future<ReaderImageSizeProbeResult>
-      _resolveImageIntrinsicSizeFromSourceAwareFetch(
-    ReaderImageRequest request, {
-    Duration timeout = const Duration(milliseconds: 220),
-  }) async {
-    if (timeout <= Duration.zero) {
-      return const ReaderImageSizeProbeResult.skipped();
-    }
-    final source = _resolveCurrentSource();
-    if (source == null) {
-      return const ReaderImageSizeProbeResult.skipped();
-    }
-    final normalizedUrl = request.url.trim();
-    if (normalizedUrl.isEmpty) {
-      return const ReaderImageSizeProbeResult.skipped();
-    }
-    if (normalizedUrl.toLowerCase().startsWith('data:image')) {
-      return const ReaderImageSizeProbeResult.skipped();
-    }
-    final uri = Uri.tryParse(normalizedUrl);
-    if (uri != null && uri.hasScheme && !_isHttpLikeUri(uri)) {
-      return const ReaderImageSizeProbeResult.skipped();
-    }
-
-    final rawImageUrl = request.raw.isEmpty ? request.url : request.raw;
-    final attemptTimeouts = _buildSourceAwareProbeTimeouts(timeout);
-    var attempted = false;
-    ReaderImageWarmupFailureKind? failureKind;
-    for (var i = 0; i < attemptTimeouts.length; i++) {
-      final probeTimeout = attemptTimeouts[i];
-      if (probeTimeout <= Duration.zero) {
-        continue;
-      }
-      attempted = true;
-
-      final bytesProbe = i == 0
-          ? await _loadImageBytesFromSourceAwareLoader(
-              source: source,
-              imageUrl: rawImageUrl,
-              timeout: probeTimeout,
-            )
-          : await _loadImageBytesFromRuleEngine(
-              source: source,
-              imageUrl: rawImageUrl,
-              timeout: probeTimeout,
-            );
-      if (bytesProbe.failureKind != null) {
-        failureKind = _mergeWarmupFailureKind(
-          failureKind,
-          bytesProbe.failureKind!,
-        );
-      }
-      final bytes = bytesProbe.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        continue;
-      }
-      final size = await _decodeImageSizeFromBytes(bytes);
-      if (size != null) {
-        return ReaderImageSizeProbeResult.success(size);
-      }
-      failureKind = _mergeWarmupFailureKind(
-        failureKind,
-        ReaderImageWarmupFailureKind.decode,
-      );
-    }
-    if (!attempted) {
-      return const ReaderImageSizeProbeResult.skipped();
-    }
-    return ReaderImageSizeProbeResult.failure(
-      failureKind ?? ReaderImageWarmupFailureKind.other,
-    );
-  }
-
-  List<Duration> _buildSourceAwareProbeTimeouts(Duration totalTimeout) {
-    final totalMs = totalTimeout.inMilliseconds;
-    if (totalMs <= 0) return const <Duration>[];
-    if (totalMs <= 240) {
-      return <Duration>[Duration(milliseconds: totalMs)];
-    }
-
-    int clampInt(int value, int min, int max) {
-      if (value < min) return min;
-      if (value > max) return max;
-      return value;
-    }
-
-    final attempts = <Duration>[];
-    var remainingMs = totalMs;
-
-    void take(int candidateMs) {
-      if (remainingMs <= 0) return;
-      final bounded = clampInt(candidateMs, 1, remainingMs);
-      attempts.add(Duration(milliseconds: bounded));
-      remainingMs -= bounded;
-    }
-
-    final firstTarget = clampInt((totalMs * 0.44).round(), 140, 260);
-    take(firstTarget);
-    if (remainingMs <= 0) return attempts;
-
-    final secondTarget = clampInt((totalMs * 0.36).round(), 120, 360);
-    if (remainingMs >= 120) {
-      take(secondTarget);
-    }
-    if (remainingMs > 0) {
-      take(remainingMs);
-    }
-    return attempts;
-  }
-
-  Future<ReaderImageBytesProbeResult> _loadImageBytesFromSourceAwareLoader({
-    required BookSource source,
-    required String imageUrl,
-    required Duration timeout,
-  }) async {
-    try {
-      final bytes = await SourceCoverLoader.instance
-          .load(
-            imageUrl: imageUrl,
-            source: source,
-          )
-          .timeout(timeout);
-      if (bytes == null || bytes.isEmpty) {
-        return const ReaderImageBytesProbeResult.failure(
-          ReaderImageWarmupFailureKind.other,
-        );
-      }
-      return ReaderImageBytesProbeResult.success(bytes);
-    } on TimeoutException {
-      return const ReaderImageBytesProbeResult.failure(
-        ReaderImageWarmupFailureKind.timeout,
-      );
-    } catch (error) {
-      return ReaderImageBytesProbeResult.failure(
-        _classifyWarmupProbeError(error),
-      );
-    }
-  }
-
-  Future<ReaderImageBytesProbeResult> _loadImageBytesFromRuleEngine({
-    required BookSource source,
-    required String imageUrl,
-    required Duration timeout,
-  }) async {
-    try {
-      final bytes = await _ruleEngine
-          .fetchCoverBytes(
-            source: source,
-            imageUrl: imageUrl,
-          )
-          .timeout(timeout);
-      if (bytes == null || bytes.isEmpty) {
-        return const ReaderImageBytesProbeResult.failure(
-          ReaderImageWarmupFailureKind.other,
-        );
-      }
-      return ReaderImageBytesProbeResult.success(bytes);
-    } on TimeoutException {
-      return const ReaderImageBytesProbeResult.failure(
-        ReaderImageWarmupFailureKind.timeout,
-      );
-    } catch (error) {
-      return ReaderImageBytesProbeResult.failure(
-        _classifyWarmupProbeError(error),
-      );
-    }
-  }
-
-  Future<Size?> _decodeImageSizeFromBytes(Uint8List bytes) async {
-    if (bytes.isEmpty) return null;
-    try {
-      final codec = await ui.instantiateImageCodec(bytes);
-      try {
-        final frame = await codec.getNextFrame();
-        final image = frame.image;
-        final width = image.width.toDouble();
-        final height = image.height.toDouble();
-        image.dispose();
-        if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
-          return null;
-        }
-        return Size(width, height);
-      } finally {
-        codec.dispose();
-      }
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<ReaderImageSizeProbeResult> _resolveImageIntrinsicSize(
-    ImageProvider<Object> imageProvider, {
-    Duration timeout = const Duration(milliseconds: 220),
-  }) async {
-    if (timeout <= Duration.zero) {
-      return const ReaderImageSizeProbeResult.skipped();
-    }
-    final completer = Completer<ReaderImageSizeProbeResult>();
-    final stream = imageProvider.resolve(const ImageConfiguration());
-    ImageStreamListener? listener;
-    Timer? timer;
-
-    void finish(ReaderImageSizeProbeResult value) {
-      if (completer.isCompleted) return;
-      if (listener != null) {
-        stream.removeListener(listener);
-      }
-      timer?.cancel();
-      completer.complete(value);
-    }
-
-    listener = ImageStreamListener(
-      (ImageInfo info, bool synchronousCall) {
-        final width = info.image.width.toDouble();
-        final height = info.image.height.toDouble();
-        if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
-          finish(
-            const ReaderImageSizeProbeResult.failure(
-              ReaderImageWarmupFailureKind.decode,
-            ),
-          );
-          return;
-        }
-        finish(ReaderImageSizeProbeResult.success(Size(width, height)));
-      },
-      onError: (Object error, StackTrace? stackTrace) {
-        finish(
-          ReaderImageSizeProbeResult.failure(
-            _classifyWarmupProbeError(error),
-          ),
-        );
-      },
-    );
-
-    stream.addListener(listener);
-    timer = Timer(
-      timeout,
-      () => finish(
-        const ReaderImageSizeProbeResult.failure(
-          ReaderImageWarmupFailureKind.timeout,
-        ),
-      ),
-    );
-    return completer.future;
-  }
-
-  Size? _extractImageDimensionHintsFromTag(String imgTag) {
-    if (imgTag.isEmpty) return null;
-    var width = _extractImageDimensionFromAttribute(
-          imgTag,
-          attribute: 'width',
-        ) ??
-        _extractImageDimensionFromInlineStyle(
-          imgTag,
-          property: 'width',
-        );
-    var height = _extractImageDimensionFromAttribute(
-          imgTag,
-          attribute: 'height',
-        ) ??
-        _extractImageDimensionFromInlineStyle(
-          imgTag,
-          property: 'height',
-        );
-    final aspectRatio = _extractImageAspectRatioFromInlineStyle(imgTag);
-    if (aspectRatio != null) {
-      if (width != null && height == null) {
-        height = width / aspectRatio;
-      } else if (height != null && width == null) {
-        width = height * aspectRatio;
-      }
-    }
-    if (width == null || height == null) {
-      return null;
-    }
-    return Size(width, height);
-  }
-
-  double? _extractImageDimensionFromAttribute(
-    String imgTag, {
-    required String attribute,
-  }) {
-    final attrRegex = RegExp(
-      '''$attribute\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))''',
-      caseSensitive: false,
-    );
-    final match = attrRegex.firstMatch(imgTag);
-    if (match == null) return null;
-    final raw = match.group(2) ?? match.group(3) ?? match.group(4) ?? '';
-    return _parseLegacyCssPixelValue(raw);
-  }
-
-  double? _extractImageDimensionFromInlineStyle(
-    String imgTag, {
-    required String property,
-  }) {
-    final rawValue = _extractInlineStyleProperty(imgTag, property: property);
-    if (rawValue == null) return null;
-    return _parseLegacyCssPixelValue(rawValue);
-  }
-
-  double? _extractImageAspectRatioFromInlineStyle(String imgTag) {
-    final rawValue = _extractInlineStyleProperty(
-      imgTag,
-      property: 'aspect-ratio',
-    );
-    if (rawValue == null) return null;
-    final value = rawValue.trim().toLowerCase();
-    if (value.isEmpty || value == 'auto') return null;
-    final ratioMatch =
-        RegExp(r'^([0-9]+(?:\.[0-9]+)?)\s*/\s*([0-9]+(?:\.[0-9]+)?)$')
-            .firstMatch(value);
-    if (ratioMatch != null) {
-      final numerator = double.tryParse(ratioMatch.group(1) ?? '');
-      final denominator = double.tryParse(ratioMatch.group(2) ?? '');
-      if (numerator == null ||
-          denominator == null ||
-          !numerator.isFinite ||
-          !denominator.isFinite ||
-          numerator <= 0 ||
-          denominator <= 0) {
-        return null;
-      }
-      return numerator / denominator;
-    }
-    final parsed = double.tryParse(value);
-    if (parsed == null || !parsed.isFinite || parsed <= 0) {
-      return null;
-    }
-    return parsed;
-  }
-
-  String? _extractInlineStyleProperty(
-    String imgTag, {
-    required String property,
-  }) {
-    final styleMatch = _cssStyleAttrRegex.firstMatch(imgTag);
-    if (styleMatch == null) return null;
-    final styleText = (styleMatch.group(1) ?? styleMatch.group(2) ?? '').trim();
-    if (styleText.isEmpty) return null;
-    final propertyRegex = RegExp(
-      '''$property\\s*:\\s*([^;]+)''',
-      caseSensitive: false,
-    );
-    final match = propertyRegex.firstMatch(styleText);
-    if (match == null) return null;
-    return match.group(1)?.trim();
-  }
-
-  Size? _extractImageDimensionHintsFromSrcUrl(String rawSrc) {
-    final request = ReaderImageRequestParser.parse(rawSrc);
-    final normalizedUrl = request.url.trim();
-    if (normalizedUrl.isEmpty) return null;
-    final uri = Uri.tryParse(normalizedUrl);
-    final width = _extractImageDimensionFromUrl(
-      uri: uri,
-      url: normalizedUrl,
-      queryKeys: _legacyImageWidthQueryKeys,
-      urlPatterns: _legacyImageWidthUrlPatterns,
-    );
-    final height = _extractImageDimensionFromUrl(
-      uri: uri,
-      url: normalizedUrl,
-      queryKeys: _legacyImageHeightQueryKeys,
-      urlPatterns: _legacyImageHeightUrlPatterns,
-    );
-    if (width == null || height == null) {
-      return null;
-    }
-    return Size(width, height);
-  }
-
-  double? _extractImageDimensionFromUrl({
-    required Uri? uri,
-    required String url,
-    required List<String> queryKeys,
-    required List<RegExp> urlPatterns,
-  }) {
-    if (uri != null && uri.queryParameters.isNotEmpty) {
-      final normalizedQuery = <String, String>{};
-      uri.queryParameters.forEach((key, value) {
-        final normalizedKey = key.trim().toLowerCase();
-        final normalizedValue = value.trim();
-        if (normalizedKey.isEmpty || normalizedValue.isEmpty) return;
-        normalizedQuery[normalizedKey] = normalizedValue;
-      });
-      for (final key in queryKeys) {
-        final value = normalizedQuery[key.toLowerCase()];
-        final parsed = _parsePositiveDimensionFromText(value);
-        if (parsed != null) {
-          return parsed;
-        }
-      }
-    }
-
-    for (final pattern in urlPatterns) {
-      final match = pattern.firstMatch(url);
-      if (match == null) continue;
-      final parsed = _parsePositiveDimensionFromText(match.group(1));
-      if (parsed != null) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  double? _parsePositiveDimensionFromText(String? raw) {
-    if (raw == null) return null;
-    final match = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(raw.trim());
-    if (match == null) return null;
-    final parsed = double.tryParse(match.group(1) ?? '');
-    if (parsed == null || !parsed.isFinite || parsed <= 0) {
-      return null;
-    }
-    return parsed;
-  }
-
-  double? _parseLegacyCssPixelValue(String raw) {
-    final value = raw.trim().toLowerCase();
-    if (value.isEmpty || value.contains('%')) return null;
-    final match = RegExp(r'^([0-9]+(?:\.[0-9]+)?)(px)?$').firstMatch(value);
-    if (match == null) return null;
-    final parsed = double.tryParse(match.group(1) ?? '');
-    if (parsed == null || !parsed.isFinite || parsed <= 0) {
-      return null;
-    }
-    return parsed;
-  }
-
-  /// 对齐 legado 的段落 trim 行为：
-  /// - 去掉两端的 ASCII 控制字符/空格（<= 0x20）
-  /// - 去掉两端的全角空格 `　`（U+3000）
-  ///
-  /// 说明：部分书源/EPUB 章节会把缩进写成全角空格；如果不清理，会导致“缩进叠加/段首错位”。
-  String _trimParagraphLikeLegado(String input) {
-    if (input.isEmpty) return '';
-    var start = 0;
-    var end = input.length;
-    while (start < end) {
-      final ch = input[start];
-      final code = input.codeUnitAt(start);
-      if (code <= 0x20 || ch == '　') {
-        start++;
-      } else {
-        break;
-      }
-    }
-    while (end > start) {
-      final ch = input[end - 1];
-      final code = input.codeUnitAt(end - 1);
-      if (code <= 0x20 || ch == '　') {
-        end--;
-      } else {
-        break;
-      }
-    }
-    return input.substring(start, end);
   }
 
   DuplicateTitleRemovalResult _removeDuplicateTitle(
     String content,
     String title,
   ) {
-    if (content.isEmpty) {
-      return DuplicateTitleRemovalResult(content: content, removed: false);
-    }
-    final lines = content.replaceAll('\r\n', '\n').split('\n');
-    final trimmedTitle = title.trim();
-    final index = lines.indexWhere((line) => line.trim().isNotEmpty);
-    if (index != -1) {
-      final firstLine = lines[index].trim();
-      if (firstLine == trimmedTitle || firstLine.contains(trimmedTitle)) {
-        lines.removeAt(index);
-        return DuplicateTitleRemovalResult(
-          content: lines.join('\n'),
-          removed: true,
-        );
-      }
-    }
-    return DuplicateTitleRemovalResult(
-        content: lines.join('\n'), removed: false);
-  }
-
-  String _removeRubyTagsLikeLegado(String content) {
-    return content
-        .replaceAll(
-          RegExp(r'<rt\b[^>]*>.*?</rt>', caseSensitive: false, dotAll: true),
-          '',
-        )
-        .replaceAll(
-          RegExp(r'<rp\b[^>]*>.*?</rp>', caseSensitive: false, dotAll: true),
-          '',
-        );
-  }
-
-  String _removeHTagLikeLegado(String content) {
-    final withoutHeaderBlocks = content.replaceAll(
-      RegExp(
-        r'<h[1-6]\b[^>]*>.*?</h[1-6]\s*>',
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      '',
-    );
-    return withoutHeaderBlocks.replaceAll(
-      RegExp(r'<h[1-6]\b[^>]*/>', caseSensitive: false),
-      '',
-    );
+    return _contentProcessor.removeDuplicateTitle(content, title);
   }
 
   String _convertByChineseConverterType(String text) {
-    switch (_settings.chineseConverterType) {
-      case ChineseConverterType.traditionalToSimplified:
-        return _chineseScriptConverter.traditionalToSimplified(text);
-      case ChineseConverterType.simplifiedToTraditional:
-        return _chineseScriptConverter.simplifiedToTraditional(text);
-      case ChineseConverterType.off:
-      default:
-        return text;
-    }
+    return _contentProcessor.convertByChineseConverterType(text);
   }
 
   /// 计算章节内进度（委托 _progressHelper）
@@ -4961,7 +3804,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                           onNextParagraph: () =>
                               unawaited(_readAloudHelper.nextParagraph()),
                           onStop: () => unawaited(_readAloudHelper.stop()),
-                          onSetTimer: () => unawaited(_showReadAloudTimerPicker()),
+                          onSetTimer: () =>
+                              unawaited(_showReadAloudTimerPicker()),
                           onOpenChapterList: _openChapterListFromAutoReadPanel,
                           onSpeechRateChanged: (rate) {
                             unawaited(_readAloudHelper.updateSpeechRate(rate));
@@ -5034,8 +3878,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
-
-
   // --- from simple_reader_view_build.dart ---
   Widget _buildReadingContent() {
     // 根据翻页模式选择渲染方式
@@ -5068,8 +3910,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         provider = AssetImage(assetPath);
       }
     } else if (style.bgType == ReadStyleConfig.bgTypeFile && !kIsWeb) {
-      final resolvedPath =
-          _resolveReadStyleBackgroundFilePath(style.bgStr);
+      final resolvedPath = _resolveReadStyleBackgroundFilePath(style.bgStr);
       if (resolvedPath != null && resolvedPath.isNotEmpty) {
         imageKey = 'file:$resolvedPath';
         provider = FileImage(File(resolvedPath));
@@ -5888,10 +4729,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     EdgeInsets padding,
     EdgeInsets viewPadding,
   ) {
-    final leftInset =
-        _settings.paddingDisplayCutouts ? padding.left : 0.0;
-    final rightInset =
-        _settings.paddingDisplayCutouts ? padding.right : 0.0;
+    final leftInset = _settings.paddingDisplayCutouts ? padding.left : 0.0;
+    final rightInset = _settings.paddingDisplayCutouts ? padding.right : 0.0;
     final topInset = _settings.showStatusBar
         ? padding.top
         : (_settings.paddingDisplayCutouts ? viewPadding.top : 0.0);
@@ -5905,7 +4744,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       bottomInset + _resolveScrollFooterSlotHeight(),
     );
   }
-
 
   String _normalizeReaderImageSrc(String raw) {
     return _readerImageResolver.normalizeSrc(raw);
@@ -6061,7 +4899,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             context,
             settings: _settings,
             onSettingsChanged: _updateSettings,
-            isDarkMode: CupertinoTheme.of(context).brightness == Brightness.dark,
+            isDarkMode:
+                CupertinoTheme.of(context).brightness == Brightness.dark,
           ));
         },
         onImportStyle: () {
@@ -6091,8 +4930,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final styles = List<ReadStyleConfig>.from(_activeReadStyleConfigs)
       ..add(result.style!.sanitize());
     _updateSettings(_settings.copyWith(readStyleConfigs: styles));
-    if (result.warning != null) _showToast(result.warning!);
-    else _showToast('主题已导入');
+    if (result.warning != null)
+      _showToast(result.warning!);
+    else
+      _showToast('主题已导入');
   }
 
   Future<void> _exportCurrentReadStyleFromSheet() async {
@@ -6127,16 +4968,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         .resolveProvider(request, headers: request.headers);
     if (imageProvider == null) return;
     _autoPager.pause();
-    Navigator.of(context).push(
+    Navigator.of(context)
+        .push(
       CupertinoPageRoute<void>(
         fullscreenDialog: true,
         builder: (_) => ImagePreviewPage(imageProvider: imageProvider),
       ),
-    ).then((_) {
+    )
+        .then((_) {
       if (_autoPager.isPaused) _autoPager.resume();
     });
   }
-
 
   void _openReadAloudFromMenu() {
     _closeReaderMenuOverlay();
@@ -6202,9 +5044,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               ReaderAudioPlayMenuAction.wakeLock,
             ),
             child: Text(
-              _readAloudHelper.audioPlayUseWakeLock
-                  ? '✓ 音频服务唤醒锁'
-                  : '音频服务唤醒锁',
+              _readAloudHelper.audioPlayUseWakeLock ? '✓ 音频服务唤醒锁' : '音频服务唤醒锁',
             ),
           ),
           CupertinoActionSheetAction(
@@ -6300,7 +5140,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _screenOffTimerStart(force: true);
   }
 
-
   ReadingSettings _effectiveSettingsWithBookPageAnim({
     required ReadingSettings base,
     required int? bookPageAnimOverride,
@@ -6359,7 +5198,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   int _legacyBookPageAnimSelection() {
-    return _bookPageAnimOverride ?? _SimpleReaderViewState._legacyBookPageAnimDefault;
+    return _bookPageAnimOverride ??
+        _SimpleReaderViewState._legacyBookPageAnimDefault;
   }
 
   Future<void> _showBookPageAnimConfigFromMenu() async {
@@ -6383,7 +5223,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   Future<void> _applyBookPageAnimFromMenu(int selectedValue) async {
     final nextOverride =
-        selectedValue == _SimpleReaderViewState._legacyBookPageAnimDefault ? null : selectedValue;
+        selectedValue == _SimpleReaderViewState._legacyBookPageAnimDefault
+            ? null
+            : selectedValue;
     if (!widget.isEphemeral) {
       await _settingsService.saveBookPageAnim(widget.bookId, nextOverride);
     }
@@ -6395,7 +5237,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
     _updateSettings(nextSettings, persist: false);
   }
-
 
   Future<void> _openPageAnimConfigFromAutoReadPanel() async {
     _screenOffTimerStart(force: true);
@@ -6899,8 +5740,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     if (_showMenu) {
       _closeReaderMenuOverlay();
     }
-    final controller =
-        TextEditingController(text: _searchHelper.query);
+    final controller = TextEditingController(text: _searchHelper.query);
     showCupertinoBottomSheetDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
@@ -7141,7 +5981,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       textDirection: TextDirection.ltr,
       maxLines: null,
     )..layout(maxWidth: _scrollBodyWidth());
-    return _settings.titleTopSpacing + titlePainter.height + _settings.titleBottomSpacing;
+    return _settings.titleTopSpacing +
+        titlePainter.height +
+        _settings.titleBottomSpacing;
   }
 
   String _lineText(ScrollTextLine line) {
@@ -7266,8 +6108,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               }
               Navigator.pop(sheetContext);
             },
-            child: Text(
-                _searchHelper.useReplace ? '✓ 替换' : '替换'),
+            child: Text(_searchHelper.useReplace ? '✓ 替换' : '替换'),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -7339,151 +6180,157 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
             child: FadeTransition(
               opacity: _searchMenuFadeAnim,
               child: SafeArea(
-            top: false,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-              margin: const EdgeInsets.fromLTRB(6, 0, 6, 0),
-              decoration: BoxDecoration(
-                color: _uiPanelBg.withValues(alpha: 0.85),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                border: Border(
-                  top: BorderSide(
-                    color: _uiBorder.withValues(alpha: 0.5),
-                    width: 0.5,
+                top: false,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
                   ),
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color:
-                          _uiCardBg.withValues(alpha: _isUiDark ? 0.78 : 0.86),
-                      border: Border(
-                        bottom: BorderSide(
-                          color: _uiBorder.withValues(alpha: 0.9),
-                          width: 0.5,
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(6, 0, 6, 0),
+                      decoration: BoxDecoration(
+                        color: _uiPanelBg.withValues(alpha: 0.85),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        border: Border(
+                          top: BorderSide(
+                            color: _uiBorder.withValues(alpha: 0.5),
+                            width: 0.5,
+                          ),
                         ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        _buildSearchTopIconButton(
-                          icon: CupertinoIcons.chevron_up,
-                          onTap:
-                              canNavigate ? () => _navigateSearchHit(-1) : null,
-                        ),
-                        _buildSearchTopIconButton(
-                          icon: CupertinoIcons.chevron_down,
-                          onTap:
-                              canNavigate ? () => _navigateSearchHit(1) : null,
-                        ),
-                        const SizedBox(width: 6),
-                        if (isSearching)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 6),
-                            child: CupertinoActivityIndicator(radius: 7),
-                          ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                info,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: _uiTextNormal,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: _uiCardBg.withValues(
+                                  alpha: _isUiDark ? 0.78 : 0.86),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: _uiBorder.withValues(alpha: 0.9),
+                                  width: 0.5,
                                 ),
                               ),
-                              if (location != null)
-                                Text(
-                                  location,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: _uiTextSubtle,
-                                    fontSize: 11,
+                            ),
+                            child: Row(
+                              children: [
+                                _buildSearchTopIconButton(
+                                  icon: CupertinoIcons.chevron_up,
+                                  onTap: canNavigate
+                                      ? () => _navigateSearchHit(-1)
+                                      : null,
+                                ),
+                                _buildSearchTopIconButton(
+                                  icon: CupertinoIcons.chevron_down,
+                                  onTap: canNavigate
+                                      ? () => _navigateSearchHit(1)
+                                      : null,
+                                ),
+                                const SizedBox(width: 6),
+                                if (isSearching)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 6),
+                                    child:
+                                        CupertinoActivityIndicator(radius: 7),
+                                  ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        info,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: _uiTextNormal,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (location != null)
+                                        Text(
+                                          location,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: _uiTextSubtle,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
-                            ],
+                                _buildSearchTopIconButton(
+                                  icon: CupertinoIcons.ellipsis_circle,
+                                  onTap: _showContentSearchOptionsSheet,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        _buildSearchTopIconButton(
-                          icon: CupertinoIcons.ellipsis_circle,
-                          onTap: _showContentSearchOptionsSheet,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (currentHit != null)
-                    SizedBox(
-                      width: double.infinity,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                        child: _buildSearchPreviewText(currentHit, accent),
+                          if (currentHit != null)
+                            SizedBox(
+                              width: double.infinity,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                                child:
+                                    _buildSearchPreviewText(currentHit, accent),
+                              ),
+                            ),
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(10, 7, 10, 9),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                top: BorderSide(
+                                  color: _uiBorder.withValues(alpha: 0.78),
+                                  width: 0.5,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _buildSearchMenuMainAction(
+                                    icon: CupertinoIcons.search,
+                                    label: '结果',
+                                    onTap: _showContentSearchDialog,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildSearchMenuMainAction(
+                                    icon: CupertinoIcons.square_grid_2x2,
+                                    label: '主菜单',
+                                    onTap: () {
+                                      _setSearchMenuVisible(false);
+                                      _setReaderMenuVisible(true);
+                                    },
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildSearchMenuMainAction(
+                                    icon: CupertinoIcons.clear_circled_solid,
+                                    label: '退出',
+                                    onTap: _exitSearchMenu,
+                                    activeColor: CupertinoColors.destructiveRed
+                                        .resolveFrom(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(10, 7, 10, 9),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: _uiBorder.withValues(alpha: 0.78),
-                          width: 0.5,
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildSearchMenuMainAction(
-                            icon: CupertinoIcons.search,
-                            label: '结果',
-                            onTap: _showContentSearchDialog,
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildSearchMenuMainAction(
-                            icon: CupertinoIcons.square_grid_2x2,
-                            label: '主菜单',
-                            onTap: () {
-                              _setSearchMenuVisible(false);
-                              _setReaderMenuVisible(true);
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildSearchMenuMainAction(
-                            icon: CupertinoIcons.clear_circled_solid,
-                            label: '退出',
-                            onTap: _exitSearchMenu,
-                            activeColor: CupertinoColors.destructiveRed
-                                .resolveFrom(context),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-              ),
-            ),
             ),
           ),
         ),
@@ -7653,9 +6500,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                 filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 28),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground.resolveFrom(context)
+                    color: CupertinoColors.systemBackground
+                        .resolveFrom(context)
                         .resolveFrom(context)
                         .withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(12),
@@ -7731,8 +6580,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     return _SimpleReaderViewState._defaultLegacyImageStyle;
   }
 
-  bool _hasWebDavProgressConfig() =>
-      _progressHelper.hasWebDavProgressConfig();
+  bool _hasWebDavProgressConfig() => _progressHelper.hasWebDavProgressConfig();
 
   bool _isSyncBookProgressEnabled() =>
       _progressHelper.isSyncBookProgressEnabled();
@@ -7757,8 +6605,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   }
 
   Future<void> _pullBookProgressFromWebDav() async {
-    final pullResult =
-        await _progressHelper.pullBookProgressFromWebDav();
+    final pullResult = await _progressHelper.pullBookProgressFromWebDav();
     if (pullResult == null) return;
     await _applyRemoteBookProgress(pullResult);
   }
@@ -7768,29 +6615,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   ) async {
     if (pullResult.remoteBehindLocal) {
       if (!mounted) return;
-      final confirmOverride =
-          await showCupertinoBottomSheetDialog<bool>(
-                context: context,
-                builder: (dialogContext) => CupertinoAlertDialog(
-                  title: const Text('获取进度'),
-                  content: const Text(
-                    '\n当前进度超过云端，是否覆盖为云端进度？',
-                  ),
-                  actions: [
-                    CupertinoDialogAction(
-                      onPressed: () =>
-                          Navigator.pop(dialogContext, false),
-                      child: const Text('取消'),
-                    ),
-                    CupertinoDialogAction(
-                      onPressed: () =>
-                          Navigator.pop(dialogContext, true),
-                      child: const Text('覆盖'),
-                    ),
-                  ],
+      final confirmOverride = await showCupertinoBottomSheetDialog<bool>(
+            context: context,
+            builder: (dialogContext) => CupertinoAlertDialog(
+              title: const Text('获取进度'),
+              content: const Text(
+                '\n当前进度超过云端，是否覆盖为云端进度？',
+              ),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('取消'),
                 ),
-              ) ??
-              false;
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('覆盖'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
       if (!confirmOverride) return;
     }
 
@@ -8733,8 +7577,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
 
   // --- from simple_reader_view_source_switch.dart ---
   Future<void> _showChangeSourceEntryActions() async {
-    final selected =
-        await showCupertinoBottomSheetDialog<ReaderLegacyChangeSourceMenuAction>(
+    final selected = await showCupertinoBottomSheetDialog<
+        ReaderLegacyChangeSourceMenuAction>(
       context: context,
       barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
@@ -10537,43 +9381,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   Future<Directory> _resolveReadStyleBackgroundDirectory() async {
     final docsDirectory = await getApplicationDocumentsDirectory();
     return Directory(p.join(docsDirectory.path, 'reader', 'bg'));
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /// Aa（排版）主面板：对标专业阅读器的“高频项集中”
   ///
@@ -10581,49 +9392,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   /// - 第一屏优先：字号/行距/段距/缩进/对齐
   /// - 字体与装饰留在同页下方
   /// - 边距给预设 + “高级”入口，避免用户在四个滑条里迷路
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /// 以 legado 同义语义添加书签：打开编辑弹窗，确认后落库。
 
@@ -10660,7 +9428,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       }
 
       await _switchToSourceCandidate(candidates.first);
-      if (mounted) _showToast('已自动换源：${candidates.first.source.bookSourceName}');
+      if (mounted)
+        _showToast('已自动换源：${candidates.first.source.bookSourceName}');
     } catch (e) {
       if (mounted) _showToast('自动换源失败');
     } finally {
@@ -10707,11 +9476,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
   Future<BookmarkEditResult?> _showBookmarkEditorDialog(
     BookmarkDraft draft,
   ) async {
-    final bookTextController =
-        TextEditingController(text: draft.pageText);
+    final bookTextController = TextEditingController(text: draft.pageText);
     final noteController = TextEditingController();
-    final result =
-        await showCupertinoBottomSheetDialog<BookmarkEditResult>(
+    final result = await showCupertinoBottomSheetDialog<BookmarkEditResult>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('书签'),
@@ -11134,8 +9901,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     final result = await showCupertinoBottomSheetDialog<String>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: Text(bookmark.chapterTitle, maxLines: 1,
-            overflow: TextOverflow.ellipsis),
+        title: Text(bookmark.chapterTitle,
+            maxLines: 1, overflow: TextOverflow.ellipsis),
         content: Padding(
           padding: const EdgeInsets.only(top: 10),
           child: CupertinoTextField(

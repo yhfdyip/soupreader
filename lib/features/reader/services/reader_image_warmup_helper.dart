@@ -1,16 +1,14 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:convert';
 import 'dart:ui' as ui show instantiateImageCodec;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 import '../../source/models/book_source.dart';
-import '../../source/services/source_cover_loader.dart';
-import '../../source/services/rule_parser_engine.dart';
 import '../models/reader_view_types.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_image_request_parser.dart';
-import '../services/reader_image_resolver.dart';
 
 /// Dependencies the warmup helper needs from the host reader.
 class ReaderImageWarmupContext {
@@ -103,7 +101,7 @@ class ReaderImageWarmupContext {
 ///
 /// Extracted from `_SimpleReaderViewState` to reduce file size
 /// while keeping the same logic and data flow.
-class ReaderImageWarmupHelper {
+class ReaderImageWarmupHelper extends ChangeNotifier {
   ReaderImageWarmupHelper(this._ctx);
 
   final ReaderImageWarmupContext _ctx;
@@ -111,11 +109,9 @@ class ReaderImageWarmupHelper {
   // ── Constants ─────────────────────────────────────────────
 
   static const int chapterLoadMaxProbeCount = 8;
-  static const Duration chapterLoadMaxDuration =
-      Duration(milliseconds: 260);
+  static const Duration chapterLoadMaxDuration = Duration(milliseconds: 260);
   static const int prefetchMaxProbeCount = 6;
-  static const Duration prefetchMaxDuration =
-      Duration(milliseconds: 180);
+  static const Duration prefetchMaxDuration = Duration(milliseconds: 180);
   static const int persistedSnapshotMaxEntries = 180;
 
   static const String legacyImageStyleText = 'TEXT';
@@ -126,12 +122,24 @@ class ReaderImageWarmupHelper {
   static const double _longImageErrorBoostThreshold = 0.22;
 
   static const List<String> _legacyImageWidthQueryKeys = <String>[
-    'w', 'width', 'imgw', 'img_width', 'imagewidth',
-    'ow', 'origw', 'srcw',
+    'w',
+    'width',
+    'imgw',
+    'img_width',
+    'imagewidth',
+    'ow',
+    'origw',
+    'srcw',
   ];
   static const List<String> _legacyImageHeightQueryKeys = <String>[
-    'h', 'height', 'imgh', 'img_height', 'imageheight',
-    'oh', 'origh', 'srch',
+    'h',
+    'height',
+    'imgh',
+    'img_height',
+    'imageheight',
+    'oh',
+    'origh',
+    'srch',
   ];
   static final List<RegExp> _legacyImageWidthUrlPatterns = <RegExp>[
     RegExp(
@@ -161,28 +169,17 @@ class ReaderImageWarmupHelper {
 
   // ── Mutable state ─────────────────────────────────────────
 
-  bool _pendingImageSizeRepagination = false;
+  bool pendingImageSizeRepagination = false;
   final Set<String> _imageSizeWarmupInFlight = <String>{};
   Timer? _imageSizeSnapshotPersistTimer;
-  final Set<String> _bookImageSizeCacheKeys = <String>{};
-  final Map<String, ReaderImageMarkerMeta> _chapterImageMetaByCacheKey =
+  final Set<String> bookImageSizeCacheKeys = <String>{};
+  final Map<String, ReaderImageMarkerMeta> chapterImageMetaByCacheKey =
       <String, ReaderImageMarkerMeta>{};
   double _longImageFirstFrameErrorEma = 0.0;
   int _longImageFirstFrameErrorSamples = 0;
   final Map<String, ReaderImageWarmupSourceTelemetry>
       _imageWarmupTelemetryBySource =
       <String, ReaderImageWarmupSourceTelemetry>{};
-
-  // ── Public getters ────────────────────────────────────────
-
-  bool get pendingImageSizeRepagination => _pendingImageSizeRepagination;
-  set pendingImageSizeRepagination(bool v) =>
-      _pendingImageSizeRepagination = v;
-
-  Set<String> get bookImageSizeCacheKeys => _bookImageSizeCacheKeys;
-
-  Map<String, ReaderImageMarkerMeta> get chapterImageMetaByCacheKey =>
-      _chapterImageMetaByCacheKey;
 
   // ── Lifecycle ─────────────────────────────────────────────
 
@@ -203,8 +200,7 @@ class ReaderImageWarmupHelper {
       return;
     }
     try {
-      final decoded =
-          const JsonDecoder().convert(rawSnapshot) as Object?;
+      final decoded = const JsonDecoder().convert(rawSnapshot) as Object?;
       if (decoded is! Map) {
         return;
       }
@@ -212,8 +208,7 @@ class ReaderImageWarmupHelper {
       if (rawEntries is! Map) {
         return;
       }
-      final entries =
-          rawEntries.map((key, value) => MapEntry('$key', value));
+      final entries = rawEntries.map((key, value) => MapEntry('$key', value));
       ReaderImageMarkerCodec.restoreResolvedSizeCache(
         entries,
         clearBeforeRestore: false,
@@ -223,7 +218,7 @@ class ReaderImageWarmupHelper {
         final normalized =
             ReaderImageMarkerCodec.normalizeResolvedSizeKey(rawKey);
         if (normalized.isNotEmpty) {
-          _bookImageSizeCacheKeys.add(normalized);
+          bookImageSizeCacheKeys.add(normalized);
         }
       }
     } catch (_) {
@@ -245,10 +240,10 @@ class ReaderImageWarmupHelper {
   /// Persists the current image size cache to storage.
   Future<void> persistSnapshot({bool force = false}) async {
     if (_ctx.isEphemeral()) return;
-    if (!force && _bookImageSizeCacheKeys.isEmpty) return;
+    if (!force && bookImageSizeCacheKeys.isEmpty) return;
     try {
       final snapshot = ReaderImageMarkerCodec.snapshotResolvedSizeCache(
-        keys: _bookImageSizeCacheKeys,
+        keys: bookImageSizeCacheKeys,
         maxEntries: persistedSnapshotMaxEntries,
       );
       final payload = snapshot.isEmpty
@@ -267,20 +262,18 @@ class ReaderImageWarmupHelper {
 
   /// Remembers a normalized cache key for a given image src.
   void rememberBookImageCacheKey(String src) {
-    final normalized =
-        ReaderImageMarkerCodec.normalizeResolvedSizeKey(src);
+    final normalized = ReaderImageMarkerCodec.normalizeResolvedSizeKey(src);
     if (normalized.isEmpty) return;
-    _bookImageSizeCacheKeys.add(normalized);
+    bookImageSizeCacheKeys.add(normalized);
   }
 
   /// Looks up a chapter image meta by normalized cache key.
   ReaderImageMarkerMeta? lookupCurrentChapterImageMeta(
     String src,
   ) {
-    final key =
-        ReaderImageMarkerCodec.normalizeResolvedSizeKey(src);
+    final key = ReaderImageMarkerCodec.normalizeResolvedSizeKey(src);
     if (key.isEmpty) return null;
-    return _chapterImageMetaByCacheKey[key];
+    return chapterImageMetaByCacheKey[key];
   }
 
   // ── Long-image first-frame error tracking ─────────────────
@@ -294,10 +287,7 @@ class ReaderImageWarmupHelper {
   }) {
     final width = resolvedSize.width;
     final height = resolvedSize.height;
-    if (!width.isFinite ||
-        !height.isFinite ||
-        width <= 0 ||
-        height <= 0) {
+    if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
       return;
     }
     final actualRatio = height / width;
@@ -306,16 +296,14 @@ class ReaderImageWarmupHelper {
       return;
     }
     final hintedRatio = _hintMetaAspectRatio(hintMeta);
-    final fallbackRatio =
-        _fallbackFirstFrameAspectRatio(normalizedImageStyle);
+    final fallbackRatio = _fallbackFirstFrameAspectRatio(normalizedImageStyle);
     final expectedRatio = hintedRatio ?? fallbackRatio;
     if (!expectedRatio.isFinite || expectedRatio <= 0) {
       return;
     }
-    final error =
-        ((expectedRatio - actualRatio).abs() / actualRatio)
-            .clamp(0.0, 1.0)
-            .toDouble();
+    final error = ((expectedRatio - actualRatio).abs() / actualRatio)
+        .clamp(0.0, 1.0)
+        .toDouble();
     if (!error.isFinite) return;
     if (_longImageFirstFrameErrorSamples <= 0) {
       _longImageFirstFrameErrorEma = error;
@@ -332,10 +320,7 @@ class ReaderImageWarmupHelper {
     if (meta == null || !meta.hasDimensionHints) return null;
     final width = meta.width!;
     final height = meta.height!;
-    if (!width.isFinite ||
-        !height.isFinite ||
-        width <= 0 ||
-        height <= 0) {
+    if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
       return null;
     }
     final ratio = height / width;
@@ -370,13 +355,11 @@ class ReaderImageWarmupHelper {
 
   /// Called when the paged reader's internal image size cache
   /// changes (e.g. after an image finishes loading).
-  void handlePagedImageSizeCacheUpdated(
-    void Function() repaginate,
-  ) {
+  void handlePagedImageSizeCacheUpdated() {
     if (_ctx.isScrollMode()) return;
     schedulePersistSnapshot();
-    if (_pendingImageSizeRepagination) return;
-    _pendingImageSizeRepagination = true;
+    if (pendingImageSizeRepagination) return;
+    pendingImageSizeRepagination = true;
     _ctx.onImageSizeCacheUpdated();
   }
 
@@ -406,8 +389,7 @@ class ReaderImageWarmupHelper {
       String? staleKey;
       DateTime? staleAt;
       _imageWarmupTelemetryBySource.forEach((mapKey, telemetry) {
-        if (staleAt == null ||
-            telemetry.updatedAt.isBefore(staleAt!)) {
+        if (staleAt == null || telemetry.updatedAt.isBefore(staleAt!)) {
           staleKey = mapKey;
           staleAt = telemetry.updatedAt;
         }
@@ -676,8 +658,7 @@ class ReaderImageWarmupHelper {
             : (source?.respondTime ?? 0);
 
     if (sampledLatencyMs > 0) {
-      final boostedDuration =
-          durationMs + (sampledLatencyMs * 0.6).round();
+      final boostedDuration = durationMs + (sampledLatencyMs * 0.6).round();
       durationMs = boostedDuration.clamp(durationMs, 980);
       if (sampledLatencyMs >= 900) {
         probeCount += 3;
@@ -689,52 +670,37 @@ class ReaderImageWarmupHelper {
     }
 
     if ((source?.loginUrl ?? '').trim().isNotEmpty) {
-      durationMs = (durationMs + 120)
-          .clamp(baseDuration.inMilliseconds, 980);
+      durationMs = (durationMs + 120).clamp(baseDuration.inMilliseconds, 980);
       probeCount += 1;
     }
 
     if (_longImageFirstFrameErrorSamples >= 3 &&
-        _longImageFirstFrameErrorEma >=
-            _longImageErrorBoostThreshold) {
+        _longImageFirstFrameErrorEma >= _longImageErrorBoostThreshold) {
       final errorBoostMs =
-          (_longImageFirstFrameErrorEma * 320)
-              .round()
-              .clamp(90, 260);
-      durationMs = (durationMs + errorBoostMs)
-          .clamp(baseDuration.inMilliseconds, 1200);
-      probeCount +=
-          _longImageFirstFrameErrorEma >= 0.45 ? 3 : 2;
+          (_longImageFirstFrameErrorEma * 320).round().clamp(90, 260);
+      durationMs =
+          (durationMs + errorBoostMs).clamp(baseDuration.inMilliseconds, 1200);
+      probeCount += _longImageFirstFrameErrorEma >= 0.45 ? 3 : 2;
     }
 
     if (telemetry != null && telemetry.sampleCount >= 3) {
-      if (telemetry.timeoutRateEma >= 0.16 ||
-          telemetry.timeoutStreak >= 2) {
+      if (telemetry.timeoutRateEma >= 0.16 || telemetry.timeoutStreak >= 2) {
         final timeoutBoostMs =
-            (telemetry.timeoutRateEma * 420)
-                    .round()
-                    .clamp(70, 340) +
+            (telemetry.timeoutRateEma * 420).round().clamp(70, 340) +
                 telemetry.timeoutStreak * 45;
         durationMs = (durationMs + timeoutBoostMs)
             .clamp(baseDuration.inMilliseconds, 1450);
-        probeCount +=
-            telemetry.timeoutRateEma >= 0.34 ? 3 : 2;
+        probeCount += telemetry.timeoutRateEma >= 0.34 ? 3 : 2;
       }
-      if (telemetry.authRateEma >= 0.10 ||
-          telemetry.authStreak >= 1) {
+      if (telemetry.authRateEma >= 0.10 || telemetry.authStreak >= 1) {
         final authBoostMs =
-            (120 + telemetry.authRateEma * 210)
-                .round()
-                .clamp(110, 280);
-        durationMs = (durationMs + authBoostMs)
-            .clamp(baseDuration.inMilliseconds, 1450);
-        probeCount +=
-            telemetry.authRateEma >= 0.26 ? 2 : 1;
+            (120 + telemetry.authRateEma * 210).round().clamp(110, 280);
+        durationMs =
+            (durationMs + authBoostMs).clamp(baseDuration.inMilliseconds, 1450);
+        probeCount += telemetry.authRateEma >= 0.26 ? 2 : 1;
       }
-      if (telemetry.decodeRateEma >= 0.16 ||
-          telemetry.decodeStreak >= 2) {
-        durationMs = (durationMs + 70)
-            .clamp(baseDuration.inMilliseconds, 1450);
+      if (telemetry.decodeRateEma >= 0.16 || telemetry.decodeStreak >= 2) {
+        durationMs = (durationMs + 70).clamp(baseDuration.inMilliseconds, 1450);
         probeCount += 1;
       }
       if (telemetry.successRateEma >= 0.78 &&
@@ -748,8 +714,7 @@ class ReaderImageWarmupHelper {
     final maxDuration = Duration(milliseconds: durationMs);
     var perProbeTimeoutMs = (durationMs * 0.46).round();
     if (telemetry != null && telemetry.sampleCount >= 3) {
-      if (telemetry.timeoutRateEma >= 0.20 ||
-          telemetry.timeoutStreak >= 2) {
+      if (telemetry.timeoutRateEma >= 0.20 || telemetry.timeoutStreak >= 2) {
         perProbeTimeoutMs += 70;
       }
       if (telemetry.authRateEma >= 0.12) {
@@ -801,10 +766,8 @@ class ReaderImageWarmupHelper {
       return const ReaderImageSizeProbeResult.skipped();
     }
 
-    final rawImageUrl =
-        request.raw.isEmpty ? request.url : request.raw;
-    final attemptTimeouts =
-        _buildSourceAwareProbeTimeouts(timeout);
+    final rawImageUrl = request.raw.isEmpty ? request.url : request.raw;
+    final attemptTimeouts = _buildSourceAwareProbeTimeouts(timeout);
     var attempted = false;
     ReaderImageWarmupFailureKind? failureKind;
     for (var i = 0; i < attemptTimeouts.length; i++) {
@@ -877,13 +840,11 @@ class ReaderImageWarmupHelper {
       remainingMs -= bounded;
     }
 
-    final firstTarget =
-        clampInt((totalMs * 0.44).round(), 140, 260);
+    final firstTarget = clampInt((totalMs * 0.44).round(), 140, 260);
     take(firstTarget);
     if (remainingMs <= 0) return attempts;
 
-    final secondTarget =
-        clampInt((totalMs * 0.36).round(), 120, 360);
+    final secondTarget = clampInt((totalMs * 0.36).round(), 120, 360);
     if (remainingMs >= 120) {
       take(secondTarget);
     }
@@ -893,8 +854,7 @@ class ReaderImageWarmupHelper {
     return attempts;
   }
 
-  Future<ReaderImageBytesProbeResult>
-      _loadImageBytesFromSourceAwareLoader({
+  Future<ReaderImageBytesProbeResult> _loadImageBytesFromSourceAwareLoader({
     required BookSource source,
     required String imageUrl,
     required Duration timeout,
@@ -923,8 +883,7 @@ class ReaderImageWarmupHelper {
     }
   }
 
-  Future<ReaderImageBytesProbeResult>
-      _loadImageBytesFromRuleEngine({
+  Future<ReaderImageBytesProbeResult> _loadImageBytesFromRuleEngine({
     required BookSource source,
     required String imageUrl,
     required Duration timeout,
@@ -966,10 +925,7 @@ class ReaderImageWarmupHelper {
         final width = image.width.toDouble();
         final height = image.height.toDouble();
         image.dispose();
-        if (!width.isFinite ||
-            !height.isFinite ||
-            width <= 0 ||
-            height <= 0) {
+        if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
           return null;
         }
         return Size(width, height);
@@ -991,8 +947,7 @@ class ReaderImageWarmupHelper {
       return const ReaderImageSizeProbeResult.skipped();
     }
     final completer = Completer<ReaderImageSizeProbeResult>();
-    final stream =
-        imageProvider.resolve(const ImageConfiguration());
+    final stream = imageProvider.resolve(const ImageConfiguration());
     ImageStreamListener? listener;
     Timer? timer;
 
@@ -1009,10 +964,7 @@ class ReaderImageWarmupHelper {
       (ImageInfo info, bool synchronousCall) {
         final width = info.image.width.toDouble();
         final height = info.image.height.toDouble();
-        if (!width.isFinite ||
-            !height.isFinite ||
-            width <= 0 ||
-            height <= 0) {
+        if (!width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
           finish(
             const ReaderImageSizeProbeResult.failure(
               ReaderImageWarmupFailureKind.decode,
@@ -1067,8 +1019,7 @@ class ReaderImageWarmupHelper {
           imgTag,
           property: 'height',
         );
-    final aspectRatio =
-        _extractImageAspectRatioFromInlineStyle(imgTag);
+    final aspectRatio = _extractImageAspectRatioFromInlineStyle(imgTag);
     if (aspectRatio != null) {
       if (width != null && height == null) {
         height = width / aspectRatio;
@@ -1092,8 +1043,7 @@ class ReaderImageWarmupHelper {
     );
     final match = attrRegex.firstMatch(imgTag);
     if (match == null) return null;
-    final raw =
-        match.group(2) ?? match.group(3) ?? match.group(4) ?? '';
+    final raw = match.group(2) ?? match.group(3) ?? match.group(4) ?? '';
     return _parseLegacyCssPixelValue(raw);
   }
 
@@ -1101,8 +1051,7 @@ class ReaderImageWarmupHelper {
     String imgTag, {
     required String property,
   }) {
-    final rawValue =
-        _extractInlineStyleProperty(imgTag, property: property);
+    final rawValue = _extractInlineStyleProperty(imgTag, property: property);
     if (rawValue == null) return null;
     return _parseLegacyCssPixelValue(rawValue);
   }
@@ -1121,10 +1070,8 @@ class ReaderImageWarmupHelper {
       r'^([0-9]+(?:\.[0-9]+)?)\s*/\s*([0-9]+(?:\.[0-9]+)?)$',
     ).firstMatch(value);
     if (ratioMatch != null) {
-      final numerator =
-          double.tryParse(ratioMatch.group(1) ?? '');
-      final denominator =
-          double.tryParse(ratioMatch.group(2) ?? '');
+      final numerator = double.tryParse(ratioMatch.group(1) ?? '');
+      final denominator = double.tryParse(ratioMatch.group(2) ?? '');
       if (numerator == null ||
           denominator == null ||
           !numerator.isFinite ||
@@ -1148,8 +1095,7 @@ class ReaderImageWarmupHelper {
   }) {
     final styleMatch = _cssStyleAttrRegex.firstMatch(imgTag);
     if (styleMatch == null) return null;
-    final styleText =
-        (styleMatch.group(1) ?? styleMatch.group(2) ?? '').trim();
+    final styleText = (styleMatch.group(1) ?? styleMatch.group(2) ?? '').trim();
     if (styleText.isEmpty) return null;
     final propertyRegex = RegExp(
       '''$property\\s*:\\s*([^;]+)''',
@@ -1213,8 +1159,7 @@ class ReaderImageWarmupHelper {
     for (final pattern in urlPatterns) {
       final match = pattern.firstMatch(url);
       if (match == null) continue;
-      final parsed =
-          _parsePositiveDimensionFromText(match.group(1));
+      final parsed = _parsePositiveDimensionFromText(match.group(1));
       if (parsed != null) {
         return parsed;
       }
@@ -1224,8 +1169,7 @@ class ReaderImageWarmupHelper {
 
   double? _parsePositiveDimensionFromText(String? raw) {
     if (raw == null) return null;
-    final match =
-        RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(raw.trim());
+    final match = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(raw.trim());
     if (match == null) return null;
     final parsed = double.tryParse(match.group(1) ?? '');
     if (parsed == null || !parsed.isFinite || parsed <= 0) {
@@ -1237,8 +1181,7 @@ class ReaderImageWarmupHelper {
   double? _parseLegacyCssPixelValue(String raw) {
     final value = raw.trim().toLowerCase();
     if (value.isEmpty || value.contains('%')) return null;
-    final match =
-        RegExp(r'^([0-9]+(?:\.[0-9]+)?)(px)?$').firstMatch(value);
+    final match = RegExp(r'^([0-9]+(?:\.[0-9]+)?)(px)?$').firstMatch(value);
     if (match == null) return null;
     final parsed = double.tryParse(match.group(1) ?? '');
     if (parsed == null || !parsed.isFinite || parsed <= 0) {
@@ -1254,8 +1197,7 @@ class ReaderImageWarmupHelper {
     String content, {
     int maxCount = 24,
   }) {
-    if (content.isEmpty ||
-        !ReaderImageMarkerCodec.containsMarker(content)) {
+    if (content.isEmpty || !ReaderImageMarkerCodec.containsMarker(content)) {
       return const <ReaderImageMarkerMeta>[];
     }
     final lines = content.replaceAll('\r\n', '\n').split('\n');
@@ -1270,8 +1212,7 @@ class ReaderImageWarmupHelper {
         continue;
       }
       final normalizedSrc = _ctx.normalizeImageSrc(meta.src);
-      final normalizedKey =
-          ReaderImageMarkerCodec.normalizeResolvedSizeKey(
+      final normalizedKey = ReaderImageMarkerCodec.normalizeResolvedSizeKey(
         normalizedSrc,
       );
       if (normalizedSrc.isEmpty ||
@@ -1279,7 +1220,7 @@ class ReaderImageWarmupHelper {
           !seen.add(normalizedKey)) {
         continue;
       }
-      _bookImageSizeCacheKeys.add(normalizedKey);
+      bookImageSizeCacheKeys.add(normalizedKey);
       metas.add(
         ReaderImageMarkerMeta(
           src: normalizedSrc,
