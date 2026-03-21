@@ -6,7 +6,6 @@ import 'package:html/dom.dart';
 import 'dart:convert';
 import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
-import 'package:fast_gbk/fast_gbk.dart';
 import '../../../core/services/js_runtime.dart';
 import '../../../core/services/exception_log_service.dart';
 import 'package:json_path/json_path.dart';
@@ -15,6 +14,9 @@ import '../../../core/utils/html_text_formatter.dart';
 import '../../../core/services/cookie_store.dart';
 import '../../../core/services/source_login_store.dart';
 import '../models/rule_parser_types.dart';
+import 'rule_parser_encoding_helper.dart';
+import 'rule_parser_selector_compat_helper.dart';
+import 'rule_parser_text_extract_helper.dart';
 export '../models/rule_parser_types.dart';
 
 /// 书源规则解析引擎
@@ -76,6 +78,13 @@ class RuleParserEngine {
 
   final Map<String, String> _runtimeVariables = <String, String>{};
   final Map<String, String> _bookInfoTocHtmlCache = <String, String>{};
+
+  final RuleParserEncodingHelper _encoding =
+      RuleParserEncodingHelper();
+  final RuleParserSelectorCompatHelper _selectorCompat =
+      RuleParserSelectorCompatHelper();
+  final RuleParserTextExtractHelper _textExtract =
+      RuleParserTextExtractHelper();
 
   bool _isValidJsIdentifier(String key) {
     return RegExp(r'^[A-Za-z_\$][A-Za-z0-9_\$]*$').hasMatch(key);
@@ -2844,206 +2853,22 @@ class RuleParserEngine {
     );
   }
 
-  String _normalizeCharset(String raw) {
-    final c = raw.trim().toLowerCase();
-    if (c.isEmpty) return '';
-    if (c == 'utf8') return 'utf-8';
-    if (c == 'utf_8') return 'utf-8';
-    if (c == 'gb2312' || c == 'gbk' || c == 'gb18030') return 'gbk';
-    return c;
-  }
-
-  bool _containsPercentTriplet(String text) {
-    if (text.length < 3) return false;
-    for (var i = 0; i <= text.length - 3; i++) {
-      if (text.codeUnitAt(i) != 0x25) continue; // '%'
-      final a = text.codeUnitAt(i + 1);
-      final b = text.codeUnitAt(i + 2);
-      final aHex =
-          (a >= 48 && a <= 57) || (a >= 65 && a <= 70) || (a >= 97 && a <= 102);
-      final bHex =
-          (b >= 48 && b <= 57) || (b >= 65 && b <= 70) || (b >= 97 && b <= 102);
-      if (aHex && bHex) return true;
-    }
-    return false;
-  }
-
-  String _percentEncodeBytes(
-    List<int> bytes, {
-    required bool spaceAsPlus,
-  }) {
-    const hex = '0123456789ABCDEF';
-    final out = StringBuffer();
-
-    for (final b in bytes) {
-      final byte = b & 0xFF;
-      final isAlphaNum = (byte >= 0x30 && byte <= 0x39) ||
-          (byte >= 0x41 && byte <= 0x5A) ||
-          (byte >= 0x61 && byte <= 0x7A);
-      final isUnreserved = isAlphaNum ||
-          byte == 0x2D || // -
-          byte == 0x5F || // _
-          byte == 0x2E || // .
-          byte == 0x7E; // ~
-      if (isUnreserved) {
-        out.writeCharCode(byte);
-        continue;
-      }
-      if (spaceAsPlus && byte == 0x20) {
-        out.write('+');
-        continue;
-      }
-      out.write('%');
-      out.write(hex[(byte >> 4) & 0x0F]);
-      out.write(hex[byte & 0x0F]);
-    }
-
-    return out.toString();
-  }
-
-  String _decodeMaybePercentEncoded(
-    String token, {
-    required bool formStyle,
-  }) {
-    if (token.isEmpty) return token;
-    final hasEncoded = _containsPercentTriplet(token);
-    final hasFormPlus = formStyle && token.contains('+');
-    if (!hasEncoded && !hasFormPlus) return token;
-
-    var input = token;
-    if (formStyle && input.contains('+')) {
-      input = input.replaceAll('+', '%20');
-    }
-    try {
-      return Uri.decodeComponent(input);
-    } catch (_) {
-      return token;
-    }
-  }
-
-  String _legacyEscape(String source) {
-    if (source.isEmpty) return source;
-    final out = StringBuffer();
-    for (final code in source.codeUnits) {
-      final isDigit = code >= 48 && code <= 57;
-      final isUpper = code >= 65 && code <= 90;
-      final isLower = code >= 97 && code <= 122;
-      if (isDigit || isUpper || isLower) {
-        out.writeCharCode(code);
-        continue;
-      }
-
-      if (code < 16) {
-        out.write('%0${code.toRadixString(16)}');
-      } else if (code < 256) {
-        out.write('%${code.toRadixString(16)}');
-      } else {
-        out.write('%u${code.toRadixString(16)}');
-      }
-    }
-    return out.toString();
-  }
-
-  String _encodeParamToken(
-    String token, {
-    required String normalizedCharset,
-    required bool checkEncoded,
-    required bool isQuery,
-  }) {
-    final text = token;
-    if (text.isEmpty) return text;
-
-    if (checkEncoded) {
-      final already =
-          _containsPercentTriplet(text) || (!isQuery && text.contains('+'));
-      if (already) return text;
-    }
-
-    var source = text;
-    if (!checkEncoded) {
-      source = _decodeMaybePercentEncoded(text, formStyle: !isQuery);
-    }
-
-    if (normalizedCharset == 'escape') {
-      return _legacyEscape(source);
-    }
-
-    final bytes =
-        normalizedCharset == 'gbk' ? gbk.encode(source) : utf8.encode(source);
-    return _percentEncodeBytes(bytes, spaceAsPlus: !isQuery);
-  }
+  String _normalizeCharset(String raw) =>
+      _encoding.normalizeCharset(raw);
 
   String _encodeParamsText(
     String params,
     String? optionCharset, {
     required bool isQuery,
-  }) {
-    final text = params.trim();
-    if (text.isEmpty) return '';
-
-    final normalizedCharset = _normalizeCharset(optionCharset ?? '');
-    final checkEncoded = normalizedCharset.isEmpty;
-
-    final out = <String>[];
-    for (final part in text.split('&')) {
-      if (part.isEmpty) {
-        out.add('');
-        continue;
-      }
-      final idx = part.indexOf('=');
-      if (idx < 0) {
-        out.add(
-          _encodeParamToken(
-            part,
-            normalizedCharset: normalizedCharset,
-            checkEncoded: checkEncoded,
-            isQuery: isQuery,
-          ),
-        );
-        continue;
-      }
-
-      final key = part.substring(0, idx);
-      final value = part.substring(idx + 1);
-      final encodedKey = _encodeParamToken(
-        key,
-        normalizedCharset: normalizedCharset,
-        checkEncoded: checkEncoded,
+  }) =>
+      _encoding.encodeParamsText(
+        params,
+        optionCharset,
         isQuery: isQuery,
       );
-      final encodedValue = _encodeParamToken(
-        value,
-        normalizedCharset: normalizedCharset,
-        checkEncoded: checkEncoded,
-        isQuery: isQuery,
-      );
-      out.add('$encodedKey=$encodedValue');
-    }
 
-    return out.join('&');
-  }
-
-  String _encodeUrlQueryByCharset(String url, String? optionCharset) {
-    if (url.trim().isEmpty) return url;
-    final hashIndex = url.indexOf('#');
-    final beforeFragment = hashIndex >= 0 ? url.substring(0, hashIndex) : url;
-    final fragment = hashIndex >= 0 ? url.substring(hashIndex) : '';
-
-    final queryIndex = beforeFragment.indexOf('?');
-    if (queryIndex < 0) return url;
-    if (queryIndex >= beforeFragment.length - 1) {
-      return '$beforeFragment$fragment';
-    }
-
-    final base = beforeFragment.substring(0, queryIndex);
-    final query = beforeFragment.substring(queryIndex + 1);
-    final encodedQuery = _encodeParamsText(
-      query,
-      optionCharset,
-      isQuery: true,
-    );
-    return '$base?$encodedQuery$fragment';
-  }
+  String _encodeUrlQueryByCharset(String url, String? optionCharset) =>
+      _encoding.encodeUrlQueryByCharset(url, optionCharset);
 
   String? _getHeaderIgnoreCase(Map<String, String> headers, String key) {
     final lower = key.toLowerCase();
@@ -3070,13 +2895,8 @@ class RuleParserEngine {
     return t.startsWith('<');
   }
 
-  String _charsetLabelForContentType(String normalizedCharset) {
-    if (normalizedCharset.isEmpty || normalizedCharset == 'escape') {
-      return 'UTF-8';
-    }
-    if (normalizedCharset == 'gbk') return 'GBK';
-    return normalizedCharset.toUpperCase();
-  }
+  String _charsetLabelForContentType(String normalizedCharset) =>
+      _encoding.charsetLabelForContentType(normalizedCharset);
 
   ({
     String url,
@@ -3212,100 +3032,16 @@ class RuleParserEngine {
     );
   }
 
-  String? _tryParseCharsetFromContentType(String? contentType) {
-    final ct = (contentType ?? '').trim();
-    if (ct.isEmpty) return null;
-    final m =
-        RegExp(r'charset\s*=\s*([^;\s]+)', caseSensitive: false).firstMatch(ct);
-    if (m == null) return null;
-    final v = m.group(1);
-    if (v == null) return null;
-    return _normalizeCharset(v.replaceAll('"', '').replaceAll("'", ''));
-  }
-
-  String? _tryParseCharsetFromHtmlHead(Uint8List bytes) {
-    // 用 latin1 作为“无损映射”，只为查 meta charset（不用于最终文本）
-    final headLen = bytes.length < 4096 ? bytes.length : 4096;
-    final head = latin1.decode(bytes.sublist(0, headLen), allowInvalid: true);
-    final m1 = RegExp(r'''<meta[^>]+charset\s*=\s*['"]?\s*([^'"\s/>]+)''',
-            caseSensitive: false)
-        .firstMatch(head);
-    final c1 = m1?.group(1);
-    if (c1 != null && c1.trim().isNotEmpty) return _normalizeCharset(c1);
-
-    final m2 = RegExp(
-            r'''<meta[^>]+http-equiv\s*=\s*['"]content-type['"][^>]+content\s*=\s*['"][^'"]*charset\s*=\s*([^'"\s;]+)''',
-            caseSensitive: false)
-        .firstMatch(head);
-    final c2 = m2?.group(1);
-    if (c2 != null && c2.trim().isNotEmpty) return _normalizeCharset(c2);
-    return null;
-  }
-
   DecodedText _decodeResponseBytes({
     required Uint8List bytes,
     required Map<String, String> responseHeaders,
     String? optionCharset,
-  }) {
-    final forced = optionCharset != null && optionCharset.trim().isNotEmpty
-        ? _normalizeCharset(optionCharset)
-        : '';
-    final headerCharset = _tryParseCharsetFromContentType(
-      responseHeaders['content-type'] ?? responseHeaders['Content-Type'],
-    );
-    final htmlCharset = _tryParseCharsetFromHtmlHead(bytes);
-
-    final charsetSource = forced.isNotEmpty
-        ? 'urlOption.charset'
-        : (headerCharset?.isNotEmpty == true)
-            ? '响应头 Content-Type'
-            : (htmlCharset?.isNotEmpty == true)
-                ? 'HTML meta'
-                : '默认回退';
-
-    final charset = (forced.isNotEmpty
-            ? forced
-            : (headerCharset?.isNotEmpty == true ? headerCharset! : ''))
-        .trim();
-
-    final effective = charset.isNotEmpty ? charset : (htmlCharset ?? 'utf-8');
-    final normalized = _normalizeCharset(effective);
-    final decisionPrefix =
-        '来源=$charsetSource，option=${forced.isEmpty ? '-' : forced}，header=${headerCharset ?? '-'}，meta=${htmlCharset ?? '-'}，effective=${normalized.isEmpty ? 'utf-8' : normalized}';
-
-    try {
-      if (normalized == 'gbk') {
-        return DecodedText(
-          text: gbk.decode(bytes, allowMalformed: true),
-          charset: 'gbk',
-          charsetSource: charsetSource,
-          charsetDecision: '$decisionPrefix，decoder=gbk',
-        );
-      }
-      if (normalized == 'utf-8') {
-        return DecodedText(
-          text: utf8.decode(bytes, allowMalformed: true),
-          charset: 'utf-8',
-          charsetSource: charsetSource,
-          charsetDecision: '$decisionPrefix，decoder=utf-8',
-        );
-      }
-      // 其它编码先走 utf-8 容错；失败再回退 latin1
-      return DecodedText(
-        text: utf8.decode(bytes, allowMalformed: true),
-        charset: normalized,
-        charsetSource: charsetSource,
-        charsetDecision: '$decisionPrefix，decoder=utf-8(容错)',
+  }) =>
+      _encoding.decodeResponseBytes(
+        bytes: bytes,
+        responseHeaders: responseHeaders,
+        optionCharset: optionCharset,
       );
-    } catch (_) {
-      return DecodedText(
-        text: latin1.decode(bytes, allowInvalid: true),
-        charset: normalized.isEmpty ? 'latin1' : normalized,
-        charsetSource: charsetSource,
-        charsetDecision: '$decisionPrefix，decoder=latin1(回退)',
-      );
-    }
-  }
 
   ResolvedBookListRule? _resolveBookListRuleForStage(
     BookSource source, {
@@ -8096,358 +7832,14 @@ class RuleParserEngine {
     );
   }
 
-  bool _containsNthPseudo(String css) {
-    final t = css.toLowerCase();
-    return t.contains(':nth-child(') ||
-        t.contains(':nth-last-child(') ||
-        t.contains(':nth-of-type(') ||
-        t.contains(':nth-last-of-type(');
-  }
+  bool _containsNthPseudo(String css) =>
+      _selectorCompat.containsNthPseudo(css);
 
-  List<String> _splitSelectorGroups(String selector) {
-    // 按顶层逗号拆分：`a, b > c` => [a, b > c]
-    final out = <String>[];
-    final buf = StringBuffer();
-    var bracket = 0;
-    var paren = 0;
-    String? quote;
-
-    void flush() {
-      final s = buf.toString().trim();
-      buf.clear();
-      if (s.isNotEmpty) out.add(s);
-    }
-
-    for (var i = 0; i < selector.length; i++) {
-      final ch = selector[i];
-      if (quote != null) {
-        buf.write(ch);
-        if (ch == quote) quote = null;
-        continue;
-      }
-      if (ch == '"' || ch == "'") {
-        quote = ch;
-        buf.write(ch);
-        continue;
-      }
-      if (ch == '[') bracket++;
-      if (ch == ']') bracket = bracket > 0 ? (bracket - 1) : 0;
-      if (ch == '(') paren++;
-      if (ch == ')') paren = paren > 0 ? (paren - 1) : 0;
-
-      if (ch == ',' && bracket == 0 && paren == 0) {
-        flush();
-        continue;
-      }
-      buf.write(ch);
-    }
-    flush();
-    return out;
-  }
-
-  NthExpr? _parseNthExpr(String raw) {
-    final t = raw.trim().toLowerCase().replaceAll(' ', '');
-    if (t.isEmpty) return null;
-    if (t == 'odd') return const NthExpr(a: 2, b: 1);
-    if (t == 'even') return const NthExpr(a: 2, b: 0);
-
-    if (!t.contains('n')) {
-      final v = int.tryParse(t);
-      return v == null ? null : NthExpr(a: 0, b: v);
-    }
-
-    final parts = t.split('n');
-    final aPart = parts.isNotEmpty ? parts.first : '';
-    final bPart = parts.length >= 2 ? parts[1] : '';
-
-    int a;
-    if (aPart.isEmpty || aPart == '+') {
-      a = 1;
-    } else if (aPart == '-') {
-      a = -1;
-    } else {
-      a = int.tryParse(aPart) ?? 0;
-    }
-
-    int b = 0;
-    if (bPart.isNotEmpty) {
-      b = int.tryParse(bPart) ?? 0;
-    }
-
-    return NthExpr(a: a, b: b);
-  }
-
-  bool _matchesNth(NthExpr expr, int position1Based) {
-    final a = expr.a;
-    final b = expr.b;
-    final p = position1Based;
-    if (p <= 0) return false;
-
-    if (a == 0) return p == b;
-
-    // 存在 n>=0 使 p = a*n + b
-    if (a > 0) {
-      final diff = p - b;
-      if (diff < 0) return false;
-      return diff % a == 0;
-    } else {
-      final diff = b - p;
-      if (diff < 0) return false;
-      return diff % (-a) == 0;
-    }
-  }
-
-  List<SelectorStepCompat> _tokenizeSelectorChain(String selector) {
-    // 仅实现 legado 常见链式：后代（空格）/子代（>）/兄弟（+、~）
-    final steps = <SelectorStepCompat>[];
-    final buf = StringBuffer();
-
-    var bracket = 0;
-    var paren = 0;
-    String? quote;
-
-    void pushStep(String combinator) {
-      final raw = buf.toString().trim();
-      buf.clear();
-      if (raw.isEmpty) return;
-      final extracted = _extractNthFilters(raw);
-      steps.add(
-        SelectorStepCompat(
-          combinator: combinator,
-          selector: extracted.baseSelector,
-          nthFilters: extracted.filters,
-        ),
-      );
-    }
-
-    String pendingCombinator = '';
-
-    for (var i = 0; i < selector.length; i++) {
-      final ch = selector[i];
-      if (quote != null) {
-        buf.write(ch);
-        if (ch == quote) quote = null;
-        continue;
-      }
-      if (ch == '"' || ch == "'") {
-        quote = ch;
-        buf.write(ch);
-        continue;
-      }
-      if (ch == '[') bracket++;
-      if (ch == ']') bracket = bracket > 0 ? (bracket - 1) : 0;
-      if (ch == '(') paren++;
-      if (ch == ')') paren = paren > 0 ? (paren - 1) : 0;
-
-      final isTopLevel = bracket == 0 && paren == 0;
-      if (isTopLevel && (ch == '>' || ch == '+' || ch == '~')) {
-        pushStep(pendingCombinator);
-        pendingCombinator = ch;
-        continue;
-      }
-
-      if (isTopLevel && ch.trim().isEmpty) {
-        // 多个空白 => 一个后代 combinator
-        if (buf.isNotEmpty) {
-          pushStep(pendingCombinator);
-          pendingCombinator = ' ';
-        } else {
-          pendingCombinator =
-              pendingCombinator.isEmpty ? ' ' : pendingCombinator;
-        }
-        continue;
-      }
-
-      buf.write(ch);
-    }
-    pushStep(pendingCombinator);
-
-    // 规范：第一个 step combinator 置空（不管前面怎么解析的）
-    if (steps.isNotEmpty) {
-      final first = steps.first;
-      steps[0] = SelectorStepCompat(
-        combinator: '',
-        selector: first.selector,
-        nthFilters: first.nthFilters,
-      );
-    }
-    return steps;
-  }
-
-  NthExtractResult _extractNthFilters(String rawSelectorPart) {
-    var s = rawSelectorPart;
-    final filters = <NthFilter>[];
-
-    // 只处理最常用的四种；避免误伤其它伪类（例如 :not(...)）
-    final kinds = <String>[
-      'nth-child',
-      'nth-last-child',
-      'nth-of-type',
-      'nth-last-of-type',
-    ];
-
-    // 简单扫描：找 `:kind(...)` 并剥离
-    // 注意：这里不解析嵌套 :not(:nth-...) 的复杂情况（少见），保持实现可控。
-    for (final kind in kinds) {
-      while (true) {
-        final lower = s.toLowerCase();
-        final idx = lower.indexOf(':$kind(');
-        if (idx < 0) break;
-
-        // 找到对应的 ')'
-        var start = idx + kind.length + 2; // : + kind + (
-        var depth = 1;
-        var end = -1;
-        for (var i = start; i < s.length; i++) {
-          final ch = s[i];
-          if (ch == '(') depth++;
-          if (ch == ')') depth--;
-          if (depth == 0) {
-            end = i;
-            break;
-          }
-        }
-        if (end < 0) break;
-        final exprText = s.substring(start, end);
-        final expr = _parseNthExpr(exprText);
-        if (expr != null) {
-          filters.add(NthFilter(kind: kind, expr: expr));
-        }
-        s = (s.substring(0, idx) + s.substring(end + 1)).trim();
-      }
-    }
-
-    if (s.trim().isEmpty) s = '*';
-    return NthExtractResult(baseSelector: s.trim(), filters: filters);
-  }
-
-  List<Element> _querySelectorAllCompat(dynamic ctx, String selector) {
-    final groups = _splitSelectorGroups(selector);
-    if (groups.isEmpty) return const <Element>[];
-
-    final out = <Element>[];
-    final seen = <Element>{};
-    for (final g in groups) {
-      final one = _querySelectorAllCompatSingle(ctx, g);
-      for (final el in one) {
-        if (seen.add(el)) out.add(el);
-      }
-    }
-    return out;
-  }
-
-  List<Element> _querySelectorAllCompatSingle(dynamic ctx, String selector) {
-    final chain = _tokenizeSelectorChain(selector);
-    if (chain.isEmpty) return const <Element>[];
-
-    List<Element> contexts;
-    if (ctx is Document) {
-      final root = ctx.documentElement;
-      contexts = root == null ? const <Element>[] : <Element>[root];
-    } else if (ctx is Element) {
-      contexts = <Element>[ctx];
-    } else {
-      return const <Element>[];
-    }
-
-    List<Element> queryDescendants(Element root, String css) {
-      try {
-        return root.querySelectorAll(css);
-      } catch (e) {
-        debugPrint('选择器解析失败(compat): $css - $e');
-        return const <Element>[];
-      }
-    }
-
-    List<Element> applyNthFilters(
-        List<Element> elements, List<NthFilter> filters) {
-      if (filters.isEmpty || elements.isEmpty) return elements;
-      return elements.where((el) {
-        final parent = el.parent;
-        if (parent is! Element) return false;
-        final siblings = parent.children;
-        final idx = siblings.indexOf(el);
-        if (idx < 0) return false;
-
-        for (final f in filters) {
-          int pos;
-          if (f.kind == 'nth-child') {
-            pos = idx + 1;
-          } else if (f.kind == 'nth-last-child') {
-            pos = siblings.length - idx;
-          } else if (f.kind == 'nth-of-type' || f.kind == 'nth-last-of-type') {
-            final tag = (el.localName ?? '').toLowerCase();
-            final sameType = siblings
-                .where((e) => (e.localName ?? '').toLowerCase() == tag)
-                .toList(growable: false);
-            final typeIdx = sameType.indexOf(el);
-            if (typeIdx < 0) return false;
-            pos = f.kind == 'nth-of-type'
-                ? (typeIdx + 1)
-                : (sameType.length - typeIdx);
-          } else {
-            continue;
-          }
-
-          if (!_matchesNth(f.expr, pos)) return false;
-        }
-        return true;
-      }).toList(growable: false);
-    }
-
-    for (final step in chain) {
-      final combinator = step.combinator.isEmpty ? ' ' : step.combinator;
-      final css = step.selector.trim();
-      if (css.isEmpty) return const <Element>[];
-
-      final matched = <Element>[];
-      if (combinator == ' ') {
-        for (final c in contexts) {
-          matched.addAll(queryDescendants(c, css));
-        }
-      } else if (combinator == '>') {
-        for (final c in contexts) {
-          final all = queryDescendants(c, css);
-          matched.addAll(all.where((e) => e.parent == c));
-        }
-      } else if (combinator == '+') {
-        for (final c in contexts) {
-          final parent = c.parent;
-          if (parent is! Element) continue;
-          final siblings = parent.children;
-          final idx = siblings.indexOf(c);
-          if (idx < 0 || idx + 1 >= siblings.length) continue;
-          final cand = siblings[idx + 1];
-          // 通过“父节点内筛选”判断是否命中 selector（避免依赖 Element.matches）
-          final allowed = queryDescendants(parent, css).toSet();
-          if (allowed.contains(cand)) matched.add(cand);
-        }
-      } else if (combinator == '~') {
-        for (final c in contexts) {
-          final parent = c.parent;
-          if (parent is! Element) continue;
-          final siblings = parent.children;
-          final idx = siblings.indexOf(c);
-          if (idx < 0) continue;
-          final allowed = queryDescendants(parent, css).toSet();
-          for (var i = idx + 1; i < siblings.length; i++) {
-            final cand = siblings[i];
-            if (allowed.contains(cand)) matched.add(cand);
-          }
-        }
-      } else {
-        // 未知 combinator：退化为后代选择（尽量不让解析直接挂掉）
-        for (final c in contexts) {
-          matched.addAll(queryDescendants(c, css));
-        }
-      }
-
-      contexts = applyNthFilters(matched, step.nthFilters);
-      if (contexts.isEmpty) return const <Element>[];
-    }
-
-    return contexts;
-  }
+  List<Element> _querySelectorAllCompat(
+    dynamic ctx,
+    String selector,
+  ) =>
+      _selectorCompat.querySelectorAllCompat(ctx, selector);
 
   List<Element> _selectAllElementsByRule(
     dynamic parent,
@@ -8532,169 +7924,29 @@ class RuleParserEngine {
     Element target,
     List<String> extractors, {
     required String baseUrl,
-  }) {
-    for (final ex in extractors) {
-      final token = ex.trim();
-      if (token.isEmpty) continue;
-      final lower = token.toLowerCase();
-
-      String value;
-      if (lower == 'text') {
-        value = target.text;
-      } else if (lower == 'textnodes') {
-        value = _extractTextNodesLikeLegado(target);
-      } else if (lower == 'owntext') {
-        value = _extractOwnTextLikeLegado(target);
-      } else if (lower == 'html' || lower == 'innerhtml') {
-        value = _extractHtmlLikeLegado(target);
-      } else if (lower == 'outerhtml' || lower == 'all') {
-        value = target.outerHtml;
-      } else {
-        value = target.attributes[token] ??
-            target.attributes[lower] ??
-            target.attributes[token.toLowerCase()] ??
-            '';
-      }
-
-      value = value.trim();
-      if (value.isEmpty) continue;
-
-      // 常见 URL 属性：自动转绝对链接
-      if (lower == 'href' || lower == 'src') {
-        value = _absoluteUrl(baseUrl, value);
-      }
-      return value;
-    }
-    return '';
-  }
-
-  String _extractTextNodesLikeLegado(Element target) {
-    final lines = <String>[];
-    for (final node in target.nodes.whereType<Text>()) {
-      final text = node.text.trim();
-      if (text.isEmpty) continue;
-      lines.add(text);
-    }
-    return lines.join('\n');
-  }
-
-  String _extractOwnTextLikeLegado(Element target) {
-    final buf = StringBuffer();
-    for (final node in target.nodes.whereType<Text>()) {
-      buf.write(node.text);
-    }
-    return buf.toString();
-  }
-
-  String _extractHtmlLikeLegado(Element target) {
-    final fragment = html_parser.parseFragment(target.outerHtml);
-    for (final node in fragment.querySelectorAll('script')) {
-      node.remove();
-    }
-    for (final node in fragment.querySelectorAll('style')) {
-      node.remove();
-    }
-    return fragment.nodes.map((node) {
-      if (node is Element) return node.outerHtml;
-      if (node is Text) return node.text;
-      return node.toString();
-    }).join();
-  }
+  }) =>
+      _textExtract.extractWithFallbacks(
+        target,
+        extractors,
+        baseUrl: baseUrl,
+        absoluteUrl: _absoluteUrl,
+      );
 
   String _applyInlineReplacements(
     String input,
     List<LegadoReplacePair> replacements,
-  ) {
-    var result = input;
-    for (final r in replacements) {
-      final pattern = r.pattern;
-      final replacement = r.replacement;
-      if (pattern.isEmpty) continue;
-      result = _applyLegacyReplaceRegex(
-        content: result,
-        pattern: pattern,
-        replacement: replacement,
-        firstOnly: r.firstOnly,
-      );
-    }
-    return result;
-  }
-
-  String _applyLegacyReplaceRegex({
-    required String content,
-    required String pattern,
-    required String replacement,
-    required bool firstOnly,
-  }) {
-    if (pattern.isEmpty) return content;
-
-    if (firstOnly) {
-      try {
-        final regex = RegExp(pattern);
-        final matcher = regex.firstMatch(content);
-        if (matcher == null) return '';
-        final matchedText = matcher.group(0) ?? '';
-        return matchedText.replaceFirst(regex, replacement);
-      } catch (_) {
-        return replacement;
-      }
-    }
-
-    try {
-      return content.replaceAll(RegExp(pattern), replacement);
-    } catch (_) {
-      return content.replaceAll(pattern, replacement);
-    }
-  }
+  ) =>
+      _textExtract.applyInlineReplacements(input, replacements);
 
   /// 应用替换正则
-  String _applyReplaceRegex(String content, String replaceRegex) {
-    // 源阅格式: regex##replacement##regex2##replacement2...
-    final parts = replaceRegex.split('##');
-    if (parts.isEmpty) return content;
-
-    var start = 0;
-    // 对齐 legado：`##regex##replacement###` 触发 replaceFirst 语义。
-    if (parts.length >= 3 && parts.length.isOdd) {
-      final pattern = parts[0];
-      if (pattern.isNotEmpty) {
-        final replacement = parts[1];
-        content = _applyLegacyReplaceRegex(
-          content: content,
-          pattern: pattern,
-          replacement: replacement,
-          firstOnly: true,
-        );
-      }
-      start = 3;
-    }
-
-    for (int i = start; i < parts.length - 1; i += 2) {
-      final pattern = parts[i];
-      if (pattern.isEmpty) continue;
-      final replacement = parts.length > i + 1 ? parts[i + 1] : '';
-      content = _applyLegacyReplaceRegex(
-        content: content,
-        pattern: pattern,
-        replacement: replacement,
-        firstOnly: false,
-      );
-    }
-
-    return content;
-  }
+  String _applyReplaceRegex(String content, String replaceRegex) =>
+      _textExtract.applyReplaceRegex(content, replaceRegex);
 
   /// 清理正文内容
   String _cleanContent(
     String content, {
     required String baseUrl,
-  }) {
-    // 对齐 legado BookContent.analyzeContent + HtmlFormatter.formatKeepImg：
-    // 保留并绝对化 <img src="...">，供阅读层按图片样式渲染。
-    return HtmlTextFormatter.formatKeepImageTags(
-      content,
-      baseUrl: baseUrl,
-    );
-  }
+  }) =>
+      _textExtract.cleanContent(content, baseUrl: baseUrl);
 }
 
